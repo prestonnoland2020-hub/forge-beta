@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 import { createClient } from '@supabase/supabase-js';
 
-const args=process.argv.slice(2);const option=name=>{const index=args.indexOf(name);return index>=0?args[index+1]:undefined};const file=option('--file');const owner=option('--owner');const commit=args.includes('--commit');
+const args=process.argv.slice(2);const option=name=>{const index=args.indexOf(name);return index>=0?args[index+1]:undefined};const file=option('--file');const owner=option('--owner');const commit=args.includes('--commit');const preserveSplit=args.includes('--preserve-split');
 if(!file||!owner){console.error('Usage: npm run import:legacy -- --file ./legacy.json --owner USER_UUID [--commit]');process.exit(1)}
 const url=process.env.SUPABASE_URL;const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
 if(!url||!serviceKey){console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the shell running this command.');process.exit(1)}
@@ -30,7 +30,7 @@ if(Array.isArray(payload.exercises)||Array.isArray(payload.goals)){
   if(libraryError){console.error(`Training history imported, but exercises/goals failed: ${libraryError.message}`);process.exit(1)}
   console.log('Exercise and goal import');console.log(JSON.stringify(libraryData,null,2));
 }
-if(payload.split?.days?.length){
+if(payload.split?.days?.length&&!preserveSplit){
   const splitName=`${payload.person||'Legacy'} imported split`;
   const splitDays=payload.split.days.map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,muscle_groups:normalizeMuscles(day.muscleGroups),goal_lifts:Array.isArray(day.goalLifts)?day.goalLifts:[],cardio_types:Array.isArray(day.cardioTypes)?day.cardioTypes:[]}));
   console.log('Split import');console.log(JSON.stringify({dryRun:!commit,name:splitName,days:splitDays},null,2));
@@ -42,6 +42,7 @@ if(payload.split?.days?.length){
     const {error:daysError}=await supabase.from('training_split_days').insert(splitDays.map(day=>({split_id:newSplit.id,...day})));if(daysError){console.error(daysError.message);process.exit(1)}
   }
 }
+if(payload.split?.days?.length&&preserveSplit)console.log('Split import skipped: preserving the active Forge split.');
 if(commit){
   const [daysResult,setsResult,cardioResult]=await Promise.all([
     supabase.from('workout_days').select('id,workout_date,body_weight',{count:'exact'}).eq('owner_id',owner),
