@@ -52,6 +52,13 @@ export function cardioMiles(draft:CardioLogDraft):number{
   const totals=summarizeCardioDraft(draft);return distanceMiles(totals.distance,unit);
 }
 
+export function isRunningCardio(draft:CardioLogDraft):boolean{
+  if(isNonRunningCardio(draft.activity)||/\bwalk\b/i.test(draft.activity))return false;
+  const legacy=legacyCardioIntervals(draft);
+  if(legacy.length)return legacy.some(line=>{const activity=String(line.cardioType||line.activity||draft.activity);const unit=String(line.unit||line.distanceUnit||(isRunning(activity)?'miles':''));return !isNonRunningCardio(activity)&&!/\bwalk\b/i.test(activity)&&isMileageInterval(activity,unit)&&(Number(line.distance)||0)>0});
+  return cardioMiles(draft)>0;
+}
+
 export function formatCardioMinutes(value:number){const seconds=Math.max(0,Math.round(value*60));const hours=Math.floor(seconds/3600),minutes=Math.floor((seconds%3600)/60),remainder=seconds%60;return hours?`${hours}:${String(minutes).padStart(2,'0')}:${String(remainder).padStart(2,'0')}`:`${minutes}:${String(remainder).padStart(2,'0')}`}
 export function formatCardioPace(draft:CardioLogDraft){
   let miles=cardioMiles(draft);let minutes=summarizeCardioDraft(draft).minutes;
