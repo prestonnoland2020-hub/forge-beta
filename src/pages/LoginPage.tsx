@@ -20,14 +20,26 @@ export function LoginPage() {
 
   return (
     <main className="login-page">
-      <section className="login-visual"><a className="brand" href="#/"><span className="brand-mark"><i /></span><span>FORGE</span></a><div className="login-copy"><span className="eyebrow accent">TRAIN WITH INTENT</span><h1>Earn every<br/>number.</h1><p>Log the set that matters, build a plan around your real progress, and train alongside people you trust.</p></div><div className="login-points"><span>TRUE 1RM TRACKING</span><span>SMART PROGRESSION</span><span>FRIEND INSIGHTS</span></div></section>
-      <section className="login-panel"><div className="login-card">
-        <span className="preview-badge">UI PREVIEW · NO LIVE ACCOUNT YET</span>
-        <span className="eyebrow">WELCOME TO FORGE</span><h2>Your training.<br/>One account.</h2><p className="muted">Google keeps sign-in simple. Your app username powers friends, sharing, and comparisons.</p>
-        <button className="google-button" onClick={handleGoogleLogin}>G&nbsp;&nbsp; Continue with Google</button>
-        {error && <div className="error" role="alert">{error}</div>}
-        <p className="legal">By continuing, you agree to the future Terms and Privacy Policy. This prototype does not collect account or payment data.</p>
-      </div></section>
+      <a className="login-brand" href="#/" aria-label="Forge home">
+        <span className="brand-mark"><i /></span>
+        <span>FORGE</span>
+      </a>
+
+      <section className="login-card" aria-labelledby="login-title">
+        <span className="eyebrow accent">YOUR TRAINING, CONNECTED</span>
+        <h1 id="login-title">Show up.<br />Forge ahead.</h1>
+        <p>Today’s workout, your progress, and one coach that learns from every session.</p>
+
+        <button className="google-button" onClick={handleGoogleLogin} disabled={loading}>
+          <span className="google-mark" aria-hidden="true">G</span>
+          {loading ? 'Checking your account…' : 'Continue with Google'}
+        </button>
+
+        {error && <div className="login-error" role="alert">{error}</div>}
+        <p className="login-note">Secure sign-in. Your training stays with your account.</p>
+      </section>
+
+      <p className="login-footer">TRAIN WITH INTENT</p>
     </main>
   );
 }
