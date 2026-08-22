@@ -11,7 +11,7 @@ import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
 
 type GoalEvidence = { date: string; value: number; label: string };
 type GoalCoachTurn = { question: string; answer: string; source: 'ai' | 'local' };
-type CachedAssessment = { createdAt: number; estimate: { seconds: number; confidence: string; reason: string }; error?: string };
+type CachedAssessment = { createdAt: number; fingerprint: string; estimate: { seconds: number; confidence: string; reason: string }; error?: string };
 type StrengthForecast = { predicted: number; low: number; high: number; weeklyRate: number; confidence: 'Low' | 'Medium' | 'High'; reason: string };
 const goalCoachStorageKey = (goal: CreatedGoal) => `forge-goal-coach-v1:${goal.type}:${goal.title}:${goal.date}`;
 const goalAssessmentStorageKey = (goal: CreatedGoal) => `forge-goal-assessment-v1:${goal.type}:${goal.title}:${goal.date}`;
@@ -171,17 +171,18 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
       setAiEstimateError('Forge needs at least three recent two-week running periods for the legacy race assessment.');
       return;
     }
+    const assessmentFingerprint=JSON.stringify([Math.round(legacyPrediction.seconds),legacyPrediction.supportingRuns,legacyPrediction.recentRunMiles,legacyPrediction.recentRunDays,aiEvidence]);
     const cacheKey = goalAssessmentStorageKey(goal);
     try {
       const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null') as CachedAssessment | null;
-      if (cached && Date.now() - cached.createdAt < assessmentCacheAgeMs) {
+      if (cached && cached.fingerprint===assessmentFingerprint && Date.now() - cached.createdAt < assessmentCacheAgeMs) {
         setAiEstimate(cached.estimate); setAiEstimateError(cached.error || ''); setAiEstimateLoading(false); return;
       }
     } catch { /* A malformed old cache is safely replaced. */ }
     let active = true;
     const baseEstimate: CachedAssessment['estimate'] = { seconds: legacyPrediction.seconds, confidence: legacyPrediction.confidence, reason: legacyPrediction.reason };
     setAiEstimate(baseEstimate); setAiEstimateLoading(true); setAiEstimateError('');
-    const save = (estimate: CachedAssessment['estimate'], error = '') => localStorage.setItem(cacheKey, JSON.stringify({ createdAt: Date.now(), estimate, error }));
+    const save = (estimate: CachedAssessment['estimate'], error = '') => localStorage.setItem(cacheKey, JSON.stringify({ createdAt: Date.now(), fingerprint:assessmentFingerprint, estimate, error }));
     const recentTraining = records.filter(record => record.date >= recentCutoffIso).slice(0, 60).map(record => ({ date: record.date, effort: record.effort, notes: record.notes, cardio: (record.cardioSessions || []).map(session => ({ activity: session.activity, summary: session.summary, totals: summarizeCardioDraft(session) })) }));
     void requestForgeCoach({ scope: 'goal', question: 'Review this legacy race-model assessment. Do not change its number or invent a new performance. Return exactly: CONFIDENCE=<low|medium|high>; REASON=<one short sentence naming the most important training-context qualifier>.', context: { event: goal.exercise || goal.title, eventMiles: expectedMiles, targetSeconds: target, legacyAssessment: { seconds: legacyPrediction.seconds, confidence: legacyPrediction.confidence, method: '180-day window; continuous runs only; 80–125% goal-distance filter; Riegel 1.06 distance adjustment; fastest qualifying result', supportingPeriods: legacyPrediction.supportingRuns, recentRunMiles: legacyPrediction.recentRunMiles, recentRunDays: legacyPrediction.recentRunDays }, exactNonRecoveryEfforts: aiEvidence.map(([date, seconds]) => ({ date, seconds })), recentTraining, rules: { legacyMethodControlsTheNumber: true, assessmentIsNotActual: true, noInventedData: true } } }, '').then(response => {
       if (!active) return;
