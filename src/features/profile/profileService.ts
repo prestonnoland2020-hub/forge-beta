@@ -22,8 +22,7 @@ export async function saveProfile(input: ProfileInput) {
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('Not signed in.');
 
-  const { error } = await supabase.from('profiles').upsert({
-    id: authData.user.id,
+  const { error } = await supabase.from('profiles').update({
     username: parsed.username,
     display_name: parsed.displayName,
     birth_date: parsed.birthDate,
@@ -36,7 +35,7 @@ export async function saveProfile(input: ProfileInput) {
     equipment: parsed.equipment,
     preferred_training_days: parsed.preferredTrainingDays,
     onboarding_completed: true,
-  });
+  }).eq('id', authData.user.id);
   if (error) throw error;
 }
 

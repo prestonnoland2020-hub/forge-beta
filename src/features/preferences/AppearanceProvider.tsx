@@ -12,7 +12,6 @@ function applyToRoot(settings:AppearanceSettings){const root=document.documentEl
 export function AppearanceProvider({children}:{children:ReactNode}){
   const [settings,setSettings]=useState<AppearanceSettings>(readSettings);
   useEffect(()=>{applyToRoot(settings);localStorage.setItem(storageKey,JSON.stringify(settings))},[settings]);
-  useEffect(()=>{const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="28" fill="#09100e"/><circle cx="64" cy="64" r="39" fill="none" stroke="#d7ff45" stroke-width="8"/><path d="M28 64h20m32 0h20M48 57v14m32-14v14M48 64h32" stroke="#d7ff45" stroke-width="8" stroke-linecap="round"/></svg>';const href=`data:image/svg+xml,${encodeURIComponent(svg)}`;for(const rel of ['icon','apple-touch-icon']){let link=document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);if(!link){link=document.createElement('link');link.rel=rel;document.head.appendChild(link)}link.href=href}},[]);
   const value=useMemo(()=>({settings,update:(changes:Partial<AppearanceSettings>)=>setSettings(current=>({...current,...changes,preset:'custom'})),applyPreset:(preset:Preset)=>setSettings(current=>({...current,...presetSettings[preset],preset})),reset:()=>setSettings(defaults)}),[settings]);
   return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>
 }
