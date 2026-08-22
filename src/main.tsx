@@ -61,6 +61,14 @@ import './long-range-plan.css';
 import './simplified-platform.css';
 import './frontend-polish.css';
 import './profile-customization.css';
+import './mobile-calm.css';
+
+// OAuth providers return to the public app URL before the hash route. Send the
+// callback into Profile, where the signed-in user can finish the connection.
+const callbackQuery = new URLSearchParams(window.location.search);
+if (callbackQuery.get('strava') === 'callback' && !window.location.hash) {
+  window.location.hash = '/profile';
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

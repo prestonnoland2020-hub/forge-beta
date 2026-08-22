@@ -1,31 +1,113 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../features/auth/AuthProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup, type AthleteSetup } from '../features/profile/ProfileSetupProvider';
 import { saveProfile } from '../features/profile/profileService';
+import { saveTrainingSplit } from '../features/splits/splitService';
 
-const steps=[['Athlete profile','The essentials for safe, personal coaching.'],['Training life','What Forge can realistically program.'],['Training split','Give every day a clear training focus.'],['Current capacity','A starting point—not a judgment.'],['Limits & recovery','Only the constraints Forge truly needs.'],['Review','Confirm your coaching profile.']];
-const blank:AthleteSetup={displayName:'',username:'',birthDate:'',units:'Imperial',height:'',startingWeight:'',currentWeight:'',primaryFocus:'Hybrid',strengthExperience:'Intermediate',runningExperience:'Recreational',trainingDays:4,runningDays:3,weeklyMileage:0,longestRun:0,strengthSessionMinutes:60,cardioSessionMinutes:45,combinedSessionMinutes:75,scheduleStyle:'Rolling cycle',equipment:'',environment:'Mixed',splitSource:'Recommended',splitDays:[{name:'Upper Strength',type:'Strength',muscles:['Chest','Back','Shoulders','Biceps','Triceps']},{name:'Lower Strength',type:'Strength',muscles:['Quads','Hamstrings','Glutes']},{name:'Conditioning',type:'Cardio',muscles:[]},{name:'Recovery',type:'Rest',muscles:[]}],injuryConstraint:false,limitationNotes:'',wearableIntent:'Connect later',profileVisibility:'Private',acceptedSafety:false,completedAt:''};
-const muscleGroups=['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps','Triceps','Forearms','Abs'];
-const heightInCm=(height:string,units:AthleteSetup['units'])=>{const values=height.match(/[\d.]+/g)?.map(Number)||[];if(!values.length)return null;if(units==='Metric')return values[0];const inches=values.length>1?values[0]*12+values[1]:values[0];return Number((inches*2.54).toFixed(2))};
+const steps = [
+  ['The essentials', 'Tell Forge what your training should serve.'],
+  ['Train safely', 'Add only the limits that can change a workout.'],
+] as const;
 
-export function OnboardingPage(){
-  const {setup,saveSetup}=useProfileSetup(); const {updateProfile}=useAdaptiveTraining(); const navigate=useNavigate(); const location=useLocation();
-  const [step,setStep]=useState(0); const [data,setData]=useState<AthleteSetup>(()=>setup?{...blank,...setup}:blank); const [error,setError]=useState(''); const [saving,setSaving]=useState(false);
-  const set=<K extends keyof AthleteSetup>(key:K,value:AthleteSetup[K])=>setData(current=>({...current,[key]:value}));
-  const recommendSplit=()=>{const count=Math.max(2,data.trainingDays);const strength=data.primaryFocus==='Strength';const endurance=data.primaryFocus==='Endurance';const patterns=strength?['Upper Strength','Lower Strength','Upper Volume','Lower Volume']:endurance?['Quality Cardio','Easy Cardio','Long Cardio','Recovery']:['Upper Strength','Lower Strength','Quality Cardio','Combined Training'];const days=Array.from({length:count},(_,index)=>{const name=patterns[index%patterns.length];const type=name==='Recovery'?'Rest':name.includes('Cardio')?'Cardio':name.includes('Combined')?'Mixed':'Strength';const muscles=name.includes('Upper')?['Chest','Back','Shoulders','Biceps','Triceps']:name.includes('Lower')?['Quads','Hamstrings','Glutes']:type==='Mixed'?['Quads','Glutes','Back','Shoulders']:[];return{name,type:type as AthleteSetup['splitDays'][number]['type'],muscles}});setData(current=>({...current,splitSource:'Recommended',splitDays:days}))};
-  const updateSplitDay=(index:number,change:Partial<AthleteSetup['splitDays'][number]>)=>set('splitDays',data.splitDays.map((day,i)=>i===index?{...day,...change}:day));
-  const toggleSplitMuscle=(index:number,muscle:string)=>{const selected=data.splitDays[index].muscles||[];updateSplitDay(index,{muscles:selected.includes(muscle)?selected.filter(item=>item!==muscle):[...selected,muscle]})};
-  const weightUnit=data.units==='Imperial'?'lb':'kg'; const distanceUnit=data.units==='Imperial'?'miles':'km';
-  const missing=useMemo(()=>{if(step===0&&!data.displayName.trim())return 'Enter your name.';if(step===0&&!data.birthDate)return 'Enter your date of birth.';if(step===0&&!data.height.trim())return 'Enter your height.';if(step===0&&!Number(data.currentWeight))return 'Enter your current weight.';if(step===1&&(data.trainingDays<1||data.trainingDays>7))return 'Choose 1–7 available training days.';if(step===2&&!data.splitDays.length)return 'Add at least one day to your training cycle.';if(step===2&&['Strength','Hybrid'].includes(data.primaryFocus)&&!data.splitDays.some(day=>day.type==='Strength'||day.type==='Mixed'))return 'Strength and hybrid athletes need at least one Strength or Mixed day.';if(step===2&&data.splitDays.some(day=>(day.type==='Strength'||day.type==='Mixed')&&!(day.muscles||[]).length))return 'Choose at least one muscle group for every Strength or Mixed day.';if(step===5&&!data.acceptedSafety)return 'Confirm the safety acknowledgement to finish.';return ''},[data,step]);
-  const advance=()=>{if(missing){setError(missing);return}setError('');setStep(value=>Math.min(5,value+1));window.scrollTo(0,0)};
-  const finish=async()=>{if(missing){setError(missing);return}setSaving(true);setError('');let username=(data.username||data.displayName.toLowerCase().replace(/[^a-z0-9]+/g,'')).slice(0,24);if(username.length<3)username=`${username}fit`.slice(0,24);const completed={...data,username,completedAt:new Date().toISOString()};try{await saveProfile({username,displayName:data.displayName,birthDate:data.birthDate||null,heightCm:heightInCm(data.height,data.units),startingWeight:Number(data.startingWeight)||null,currentWeight:Number(data.currentWeight)||null,unitSystem:data.units==='Metric'?'metric':'imperial',experienceLevel:data.strengthExperience.toLowerCase() as 'beginner'|'intermediate'|'advanced'|'competitive',primaryGoal:data.primaryFocus==='Strength'?'strength':data.primaryFocus==='Endurance'?'endurance':data.primaryFocus==='Body composition'?'weight_change':'general_fitness',equipment:data.equipment.split(',').map(item=>item.trim()).filter(Boolean),preferredTrainingDays:Array.from({length:Math.min(7,data.trainingDays)},(_,index)=>index)});saveSetup(completed);updateProfile({weeklyMileage:data.units==='Metric'?data.weeklyMileage*.621371:data.weeklyMileage,longestRunMiles:data.units==='Metric'?data.longestRun*.621371:data.longestRun,runningDays:data.runningDays,experience:data.runningExperience,environment:data.environment,injuryConstraint:data.injuryConstraint});const from=(location.state as {from?:string}|null)?.from;navigate(from&&from!=='/onboarding'?from:'/',{replace:true})}catch(reason){setError(reason instanceof Error?reason.message:'Your profile could not be saved. Please try again.');setSaving(false)}};
-  return <main className="onboarding-shell"><header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>ATHLETE SETUP</span></header><div className="onboarding-grid"><aside><span className="eyebrow">SETUP · {step+1} OF {steps.length}</span><h1>Build your coaching foundation.</h1><p>Forge uses this profile to scale training, place sessions, interpret recovery, and avoid recommendations that do not fit your life.</p><ol>{steps.map(([name],index)=><li className={index===step?'active':index<step?'done':''} key={name}><i>{index<step?'✓':index+1}</i><span>{name}</span></li>)}</ol><small>You can change these details later in Profile. Performance baselines and wearable data improve over time.</small></aside><section className="onboarding-card"><div className="setup-heading"><span className="eyebrow">{steps[step][0]}</span><h2>{steps[step][1]}</h2></div>
-  {step===0&&<div className="setup-fields"><label>Full or display name <em>Required</em><input value={data.displayName} onChange={e=>set('displayName',e.target.value)} placeholder="Alex Morgan"/></label><label>Date of birth <em>Required</em><input type="date" value={data.birthDate} onChange={e=>set('birthDate',e.target.value)}/></label><label>Measurement system<select value={data.units} onChange={e=>set('units',e.target.value as AthleteSetup['units'])}><option>Imperial</option><option>Metric</option></select></label><label>Height <em>Required</em><input value={data.height} onChange={e=>set('height',e.target.value)} placeholder={data.units==='Imperial'?`5' 10\"`:'178 cm'}/></label><label>Current weight ({weightUnit}) <em>Required</em><input type="number" min="1" value={data.currentWeight} onChange={e=>set('currentWeight',e.target.value)}/></label><label>Starting weight ({weightUnit}) <span>Optional</span><input type="number" min="1" value={data.startingWeight} onChange={e=>set('startingWeight',e.target.value)}/></label></div>}
-  {step===1&&<div className="setup-fields"><fieldset className="full"><legend>What should Forge prioritize?</legend><div className="setup-choices">{(['Strength','Endurance','Body composition','Hybrid'] as const).map(item=><button type="button" className={data.primaryFocus===item?'active':''} onClick={()=>set('primaryFocus',item)} key={item}>{item}</button>)}</div></fieldset><label>Strength experience<select value={data.strengthExperience} onChange={e=>set('strengthExperience',e.target.value as AthleteSetup['strengthExperience'])}>{['Beginner','Intermediate','Advanced','Competitive'].map(x=><option key={x}>{x}</option>)}</select></label><label>Running experience<select value={data.runningExperience} onChange={e=>set('runningExperience',e.target.value as AthleteSetup['runningExperience'])}>{['New','Recreational','Experienced','Competitive'].map(x=><option key={x}>{x}</option>)}</select></label><label>Available training days / cycle<input type="number" min="1" max="7" value={data.trainingDays} onChange={e=>set('trainingDays',Number(e.target.value))}/></label><label>Available running days<input type="number" min="0" max="7" value={data.runningDays} onChange={e=>set('runningDays',Number(e.target.value))}/></label><div className="setup-note full"><strong>Maximum usable session time</strong><span>Warm-ups and cooldowns count. Forge uses separate limits because strength, cardio, and combined sessions consume time differently.</span></div>{data.primaryFocus!=='Endurance'&&<label>Strength-only session (minutes)<input type="number" min="20" step="5" value={data.strengthSessionMinutes} onChange={e=>set('strengthSessionMinutes',Number(e.target.value))}/></label>}{data.primaryFocus!=='Strength'&&<label>Cardio-only session (minutes)<input type="number" min="15" step="5" value={data.cardioSessionMinutes} onChange={e=>set('cardioSessionMinutes',Number(e.target.value))}/></label>}{data.primaryFocus==='Hybrid'&&<label>Combined strength + cardio (minutes)<input type="number" min="30" step="5" value={data.combinedSessionMinutes} onChange={e=>set('combinedSessionMinutes',Number(e.target.value))}/></label>}<label>Schedule style<select value={data.scheduleStyle} onChange={e=>set('scheduleStyle',e.target.value as AthleteSetup['scheduleStyle'])}><option>Rolling cycle</option><option>Weekly schedule</option></select></label></div>}
-  {step===2&&<div className="split-setup"><div className="split-source"><button className={data.splitSource==='Recommended'?'active':''} onClick={recommendSplit}><strong>Use Forge’s recommendation</strong><span>Start with an editable split whose strength days already include muscle groups.</span></button><button className={data.splitSource==='Custom'?'active':''} onClick={()=>setData(current=>({...current,splitSource:'Custom',splitDays:[]}))}><strong>Build my own</strong><span>Define each training and rest day, then tell Forge which muscles each strength day trains.</span></button></div><div className="setup-note"><strong>Muscle groups make the split useful.</strong><span>Forge uses them to balance training frequency, avoid accidental overlap, and interpret recovery. Strength and Mixed days require at least one.</span></div><div className="split-day-builder">{data.splitDays.map((day,index)=><article className={`setup-split-day ${day.type.toLowerCase()}`} key={index}><div className="split-day-main"><b>{String(index+1).padStart(2,'0')}</b><input value={day.name} onChange={e=>updateSplitDay(index,{name:e.target.value})}/><select value={day.type} onChange={e=>{const type=e.target.value as AthleteSetup['splitDays'][number]['type'];updateSplitDay(index,{type,...(type==='Cardio'||type==='Rest'?{muscles:[]}:{})})}}><option>Strength</option><option>Cardio</option><option>Mixed</option><option>Rest</option></select><button aria-label={`Remove ${day.name}`} onClick={()=>set('splitDays',data.splitDays.filter((_,i)=>i!==index))}>×</button></div>{(day.type==='Strength'||day.type==='Mixed')&&<div className="split-muscle-assignment"><span>MUSCLE GROUPS · REQUIRED</span><div>{muscleGroups.map(muscle=><button type="button" className={(day.muscles||[]).includes(muscle)?'active':''} onClick={()=>toggleSplitMuscle(index,muscle)} key={muscle}>{(day.muscles||[]).includes(muscle)?'✓ ':''}{muscle}</button>)}</div></div>}</article>)}<button className="add-split-day" onClick={()=>set('splitDays',[...data.splitDays,{name:'New day',type:'Strength',muscles:[]}])}>＋ Add cycle day</button></div></div>}
-  {step===3&&<div className="setup-fields"><div className="setup-note full"><strong>Use honest recent averages.</strong><span>Leave these blank if you are new or returning. Forge will establish a baseline from completed workouts instead of treating a placeholder as real data.</span></div><label>Weekly running volume ({distanceUnit})<input type="number" min="0" step="0.5" value={data.weeklyMileage||''} placeholder="e.g. 15" onChange={e=>set('weeklyMileage',e.target.value===''?0:Number(e.target.value))}/></label><label>Longest recent run ({distanceUnit})<input type="number" min="0" step="0.1" value={data.longestRun||''} placeholder="e.g. 6" onChange={e=>set('longestRun',e.target.value===''?0:Number(e.target.value))}/></label><div className="setup-note full"><strong>Strength baselines come from your logs.</strong><span>Log a weight and rep count. Forge will calculate a comparable max automatically—no separate max test is required.</span></div></div>}
-  {step===4&&<div className="setup-fields"><div className="setup-note full"><strong>No equipment inventory required.</strong><span>Build or choose the exercises you actually use in the Exercise Library. Forge will not restrict your plan from a long onboarding checklist.</span></div><label>Primary cardio environment<select value={data.environment} onChange={e=>set('environment',e.target.value as AthleteSetup['environment'])}>{['Road','Track','Trail','Treadmill','Mixed'].map(x=><option key={x}>{x}</option>)}</select></label><label>Smartwatch recovery<select value={data.wearableIntent==='Manual only'?'Connect later':data.wearableIntent} onChange={e=>set('wearableIntent',e.target.value as AthleteSetup['wearableIntent'])}><option>Connect now</option><option>Connect later</option></select><span>Recovery data is automatic only. Without a connected device, Forge ignores recovery signals.</span></label><label className="setup-check full"><input type="checkbox" checked={data.injuryConstraint} onChange={e=>set('injuryConstraint',e.target.checked)}/><span><strong>I have a current injury or training limitation</strong><small>Forge will treat this as a hard coaching constraint.</small></span></label>{data.injuryConstraint&&<label className="full">What should Forge avoid?<textarea rows={3} value={data.limitationNotes} onChange={e=>set('limitationNotes',e.target.value)} placeholder="Movements, impact, range of motion, medical restrictions…"/></label>}</div>}
-  {step===5&&<div className="review-stack"><div className="review-hero"><span>PRIMARY DIRECTION</span><strong>{data.primaryFocus}</strong><p>{data.splitDays.length}-day cycle · {data.runningDays} running days · {data.scheduleStyle}</p></div><div className="review-grid"><div><span>Athlete</span><strong>{data.displayName}</strong></div><div><span>Current baseline</span><strong>{data.currentWeight} {weightUnit}</strong><small>{data.weeklyMileage?`${data.weeklyMileage} ${distanceUnit}/week`:'Running baseline pending'}</small></div><div><span>Training split</span><strong>{data.splitSource}</strong><small>{data.splitDays.map(day=>`${day.name}${day.muscles?.length?` (${day.muscles.join(', ')})`:''}`).join(' · ')}</small></div><div><span>Session limits</span><strong>{data.strengthSessionMinutes}m strength · {data.cardioSessionMinutes}m cardio</strong><small>{data.primaryFocus==='Hybrid'?`${data.combinedSessionMinutes}m combined · `:''}{data.environment}</small></div></div><label className="setup-check safety"><input type="checkbox" checked={data.acceptedSafety} onChange={e=>set('acceptedSafety',e.target.checked)}/><span><strong>I’ll use my judgment and report pain, injury, or unusual fatigue.</strong><small>Forge provides training guidance, not medical diagnosis. Recovery signals can reduce a session but never prove that training is safe.</small></span></label></div>}
-  {error&&<div className="setup-error">{error}</div>}<footer className="setup-actions">{step>0?<button className="button ghost" disabled={saving} onClick={()=>{setError('');setStep(value=>value-1)}}>← Back</button>:<span/>}<button className="button" disabled={saving} onClick={step===5?finish:advance}>{step===5?(saving?'Saving…':'Enter Forge'):'Continue'} →</button></footer></section></div></main>
+const blank: AthleteSetup = {
+  displayName: '', username: '', birthDate: '', units: 'Imperial', height: '', startingWeight: '', currentWeight: '',
+  primaryFocus: 'Hybrid', strengthExperience: 'Intermediate', runningExperience: 'Recreational', trainingDays: 4,
+  runningDays: 2, weeklyMileage: 0, longestRun: 0, strengthSessionMinutes: 60, cardioSessionMinutes: 45,
+  combinedSessionMinutes: 75, scheduleStyle: 'Rolling cycle', equipment: '', environment: 'Mixed',
+  splitSource: 'Recommended', splitDays: [], injuryConstraint: false, limitationNotes: '', wearableIntent: 'Connect later',
+  profileVisibility: 'Private', acceptedSafety: false, completedAt: '',
+};
+
+function starterSplit(focus: AthleteSetup['primaryFocus'], count: number): AthleteSetup['splitDays'] {
+  const strength = [
+    { name: 'Chest & Back', type: 'Strength' as const, muscles: ['Chest', 'Back'] },
+    { name: 'Shoulders & Arms', type: 'Strength' as const, muscles: ['Shoulders', 'Biceps', 'Triceps'] },
+    { name: 'Lower Body', type: 'Strength' as const, muscles: ['Quads', 'Hamstrings', 'Glutes'] },
+  ];
+  const endurance = [
+    { name: 'Quality Cardio', type: 'Cardio' as const, muscles: [] },
+    { name: 'Easy Cardio', type: 'Cardio' as const, muscles: [] },
+    { name: 'Long Cardio', type: 'Cardio' as const, muscles: [] },
+  ];
+  const source = focus === 'Strength' ? strength : focus === 'Endurance' ? endurance : [strength[0], endurance[0], strength[1], strength[2]];
+  return Array.from({ length: Math.max(1, Math.min(7, count)) }, (_, index) => source[index % source.length]);
+}
+
+export function OnboardingPage() {
+  const { user } = useAuth();
+  const { setup, saveSetup } = useProfileSetup();
+  const { updateProfile } = useAdaptiveTraining();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const suggestedName = String(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '');
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState<AthleteSetup>(() => ({ ...blank, ...(setup || {}), displayName: setup?.displayName || suggestedName }));
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const set = <K extends keyof AthleteSetup>(key: K, value: AthleteSetup[K]) => setData(current => ({ ...current, [key]: value }));
+  const isEditing = Boolean(setup?.completedAt);
+
+  const next = () => {
+    if (!data.displayName.trim()) return setError('Enter your name.');
+    if (data.trainingDays < 1 || data.trainingDays > 7) return setError('Choose 1–7 training days.');
+    setError(''); setStep(1); window.scrollTo(0, 0);
+  };
+
+  const finish = async () => {
+    if (!data.acceptedSafety) return setError('Confirm the safety note to finish.');
+    setSaving(true); setError('');
+    let username = (data.username || data.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '')).slice(0, 18);
+    if (username.length < 3) username = `athlete${user?.id.slice(0, 6) || 'fit'}`;
+    const splitDays = setup?.splitDays?.length ? setup.splitDays : starterSplit(data.primaryFocus, data.trainingDays);
+    const completed = { ...data, username, splitDays, splitSource: 'Recommended' as const, completedAt: new Date().toISOString() };
+    try {
+      await saveProfile({
+        username, displayName: data.displayName, birthDate: data.birthDate || null, heightCm: null,
+        startingWeight: null, currentWeight: Number(data.currentWeight) || null,
+        unitSystem: data.units === 'Metric' ? 'metric' : 'imperial', experienceLevel: 'intermediate',
+        primaryGoal: data.primaryFocus === 'Strength' ? 'strength' : data.primaryFocus === 'Endurance' ? 'endurance' : data.primaryFocus === 'Body composition' ? 'weight_change' : 'general_fitness',
+        equipment: [], preferredTrainingDays: Array.from({ length: data.trainingDays }, (_, index) => index),
+      });
+      if (!isEditing) {
+        await saveTrainingSplit('Forge starter split', splitDays.map((day, index) => ({
+          position: index + 1, name: day.name, muscleGroups: day.muscles || [], goalLifts: [],
+          cardioTypes: day.type === 'Cardio' || day.type === 'Mixed' ? ['Forge'] : [],
+        })));
+      }
+      saveSetup(completed);
+      updateProfile({ runningDays: Math.min(data.trainingDays, data.runningDays), injuryConstraint: data.injuryConstraint });
+      const from = (location.state as { from?: string } | null)?.from;
+      navigate(from && from !== '/onboarding' ? from : '/', { replace: true });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
+    }
+  };
+
+  return <main className="onboarding-shell onboarding-simple">
+    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing ? 'EDIT PROFILE' : `SETUP ${step + 1} OF 2`}</span></header>
+    <div className="onboarding-grid">
+      <aside><span className="eyebrow">START SIMPLE</span><h1>Ready in two steps.</h1><p>Forge learns performance from completed workouts. You do not need to estimate maxes, pace, equipment, or recovery during setup.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
+      <section className="onboarding-card">
+        <div className="setup-heading"><span className="eyebrow">{steps[step][0]}</span><h2>{steps[step][1]}</h2></div>
+        {step === 0 && <div className="setup-fields">
+          <label className="full">Your name <em>Required</em><input autoFocus value={data.displayName} onChange={event => set('displayName', event.target.value)} placeholder="Preston" /></label>
+          <fieldset className="full"><legend>Main training focus</legend><div className="setup-choices">{(['Hybrid', 'Strength', 'Endurance', 'Body composition'] as const).map(item => <button type="button" className={data.primaryFocus === item ? 'active' : ''} onClick={() => set('primaryFocus', item)} key={item}>{item}</button>)}</div></fieldset>
+          <label>Training days per cycle <input type="number" inputMode="numeric" min="1" max="7" value={data.trainingDays} onChange={event => set('trainingDays', Number(event.target.value))} /></label>
+          <label>Units <select value={data.units} onChange={event => set('units', event.target.value as AthleteSetup['units'])}><option>Imperial</option><option>Metric</option></select></label>
+          <label className="full">Current weight <span>Optional</span><input type="number" inputMode="decimal" min="1" value={data.currentWeight} onChange={event => set('currentWeight', event.target.value)} placeholder={data.units === 'Metric' ? 'kg' : 'lb'} /></label>
+          <div className="setup-note full"><strong>That is enough to begin.</strong><span>Forge creates a starter split. You can adjust its days and exercises later from Plan.</span></div>
+        </div>}
+        {step === 1 && <div className="setup-fields">
+          <label className="setup-check full"><input type="checkbox" checked={data.injuryConstraint} onChange={event => set('injuryConstraint', event.target.checked)} /><span><strong>I have a current injury or training limitation</strong><small>Forge will treat this as a hard constraint.</small></span></label>
+          {data.injuryConstraint && <label className="full">What should Forge avoid?<textarea rows={4} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="Movements, impact, or medical restrictions…" /></label>}
+          <div className="setup-note full"><strong>Your first workouts establish the baseline.</strong><span>Strength comes from completed weight and reps. Endurance comes from recorded distance, time, and pace. A connected activity service can be added after setup.</span></div>
+          <label className="setup-check safety full"><input type="checkbox" checked={data.acceptedSafety} onChange={event => set('acceptedSafety', event.target.checked)} /><span><strong>I’ll report pain, injury, or unusual fatigue.</strong><small>Forge provides training guidance, not medical diagnosis.</small></span></label>
+        </div>}
+        {error && <div className="setup-error">{error}</div>}
+        <footer className="setup-actions">{step ? <button className="button ghost" disabled={saving} onClick={() => { setError(''); setStep(0); }}>← Back</button> : <span />}<button className="button" disabled={saving} onClick={step ? finish : next}>{step ? saving ? 'Saving…' : isEditing ? 'Save profile' : 'Enter Forge' : 'Continue'} →</button></footer>
+      </section>
+    </div>
+  </main>;
 }
