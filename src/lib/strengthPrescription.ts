@@ -1,0 +1,10 @@
+export const TOP_SET_SEQUENCE=[6,8,4] as const;
+export type TopSetStage={reps:number;label:string;weight:number;calculatedMax:number;targetCalculatedMax:number;percentOfGoal:number;isTest:boolean;rationale:string};
+const roundToFive=(value:number)=>Math.max(0,Math.round(value/5)*5);
+export function epleyMax(weight:number,reps:number){return Math.round(weight*(1+reps/30))}
+export function prescribeTopSet({baselineMax,goalMax,weekIndex,progress=0,readiness=100,highFatigue=false,allowTest=false}:{baselineMax:number;goalMax?:number;weekIndex:number;progress?:number;readiness?:number;highFatigue?:boolean;allowTest?:boolean}):TopSetStage{
+  const sequenceIndex=((weekIndex%TOP_SET_SEQUENCE.length)+TOP_SET_SEQUENCE.length)%TOP_SET_SEQUENCE.length;let reps:1|4|6|8=TOP_SET_SEQUENCE[sequenceIndex];let isTest=allowTest&&readiness>=75&&!highFatigue;if(isTest)reps=1;const destination=goalMax&&goalMax>baselineMax?goalMax:baselineMax*1.04;const requestedMax=baselineMax+(destination-baselineMax)*Math.max(0,Math.min(1,progress));const evidenceCeiling=baselineMax*(1+Math.min(.15,Math.max(0,weekIndex)*.006));let targetCalculatedMax=Math.min(requestedMax,Math.max(baselineMax,evidenceCeiling));let adjustment=1;
+  if(readiness<65||highFatigue){adjustment=.94;if(isTest){reps=4;isTest=false}}
+  targetCalculatedMax=Math.round(targetCalculatedMax*adjustment);const weight=roundToFive(targetCalculatedMax/(1+reps/30));const calculatedMax=epleyMax(weight,reps);
+  return{reps,label:isTest?'MAX':String(reps),weight,calculatedMax,targetCalculatedMax,percentOfGoal:goalMax?Math.round(calculatedMax/goalMax*100):100,isTest,rationale:isTest?'Readiness-gated tested single. Stop before failure if warm-ups do not support the attempt.':readiness<65||highFatigue?'Recovery safeguard reduced the calculated-max target; the rep-range sequence is preserved without forcing a max test.':`${reps}-rep load is calculated backward from the recent comparable max. Goal size cannot force a larger jump than the evidence ceiling allows.`};
+}

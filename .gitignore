@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+supabase/.temp/
+forge-*-legacy-*.json
+forge-*-legacy-*.txt
+migration/exports/
+*.tsbuildinfo
+/bash
+/fitness-platform@0.1.0

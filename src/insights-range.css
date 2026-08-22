@@ -1,0 +1,37 @@
+.insights-range-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+}
+.insights-range-bar > div:first-child { display: grid; gap: 3px; }
+.insights-range-bar > div:first-child strong { font-size: 13px; }
+.range-options {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0b1210;
+}
+.range-options button {
+  min-width: 48px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+.range-options button:hover { color: var(--text); }
+.range-options button.active { background: var(--accent); color: var(--accent-ink); }
+@media (max-width: 600px) {
+  .insights-range-bar { align-items: stretch; flex-direction: column; }
+  .range-options { overflow-x: auto; }
+  .range-options button { flex: 1; }
+}

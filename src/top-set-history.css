@@ -1,0 +1,13 @@
+.top-set-history { display: grid; gap: 10px; }
+.history-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.history-heading small { color: var(--muted); font-size: 12px; }
+.recent-set-row.contextual button { min-width: 145px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3px 12px; text-align: left; }
+.recent-set-row.contextual button > span { color: var(--text); font-weight: 700; }
+.recent-set-row.contextual button > b { color: var(--accent); }
+.recent-set-row.contextual button > small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+.empty-history { margin: 0; color: var(--muted); }
+@media (max-width: 700px) {
+  .history-heading { align-items: start; flex-direction: column; gap: 3px; }
+  .recent-set-row.contextual { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recent-set-row.contextual button { min-width: 0; }
+}
