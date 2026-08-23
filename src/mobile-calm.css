@@ -50,10 +50,11 @@ body {
 .completed-day-card footer { grid-column: 1 / -1; display: flex; gap: 10px; }
 .classic-streak { display: none; }
 
-/* One mobile-shell breakpoint, matching where the sidebar gives way to the bottom
-   nav in styles.css / home-simple.css / simplified-platform.css. This pass used to
-   stop at 700px, so 701–900px got a bottom nav with no mobile layout behind it. */
-@media (max-width: 900px) {
+/* Phone layout. The single-column card treatment and the capped reading column
+   belong to phone widths; above this the content's own breakpoints still hold a
+   multi-column layout that would be crushed inside a 560px column.
+   Touch ergonomics are handled separately, up to the 900px shell breakpoint. */
+@media (max-width: 760px) {
   .app-main .page { width: min(100%, 560px); margin-inline: auto; padding: 12px var(--gutter) calc(98px + env(safe-area-inset-bottom)); }
   .stack-xl { gap: 14px; }
   /* The sticky top bar already names the section, so the page intro repeated it in
@@ -291,4 +292,11 @@ body {
   .completed-day-card { align-items: start; }
   .completed-day-card h2 { font-size: 24px; line-height: 1.08; }
   .completed-day-check { margin-top: 2px; }
+}
+
+@media (max-width: 380px) {
+  /* Seven columns plus gaps left the day cells a hair under the touch minimum
+     on a 360px screen. Tightening the gap buys the pixels back. */
+  .classic-calendar .weekday-row, .classic-calendar .calendar-grid { gap: 2px; }
+  .app-main .page { padding-inline: 12px; }
 }
