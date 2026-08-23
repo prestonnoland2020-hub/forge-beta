@@ -437,3 +437,15 @@ select,input:not([type=checkbox]):not([type=radio]){min-height:38px}
    a wrapped label pushed its own column out of alignment with its neighbours. */
 .feed-metric-row span,.completed-day-results span,
 .split-review-summary span,.review-summary span{white-space:nowrap}
+
+/* ------------------------------------------------------- schedule row tags
+   A session's kind, stress and scaling were concatenated into one accent
+   string that ran to two wrapped lines above every row. As discrete chips
+   they carry the same information at a glance without shouting. */
+.session-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.session-tags i{
+  font-style:normal;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 7px;border-radius:var(--r-xs);
+  background:var(--surface-2);color:var(--ink-2);border:1px solid var(--hairline);
+}
+.session-tags i:first-child{background:var(--accent-wash);color:var(--accent);border-color:transparent}
