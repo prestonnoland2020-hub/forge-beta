@@ -32,7 +32,15 @@ export function HomePage() {
   const weekRecords = records.filter(record => record.date >= weekStartIso && record.date <= currentDate);
   const weekTopSets = weekRecords.reduce((total, record) => total + (record.topSets || []).filter(set => set.completed !== false).length, 0);
   const weekMiles = weekRecords.reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => sum + cardioMiles(session), 0), 0);
-  const primaryGoal = goals[0];
+  // The goal shown here should be the one today's session actually serves, not
+  // whichever goal happens to be first in the list. A mile-pace cardio day was
+  // headlining a Pull Ups target.
+  const byNearestDate = (a: typeof goals[number], b: typeof goals[number]) => String(a.date || '9999-12-31').localeCompare(String(b.date || '9999-12-31'));
+  const todayExercises = new Set((recommendation?.topSets || []).filter(set => set.selected).map(set => set.exercise.trim().toLowerCase()));
+  const strengthGoal = goals.filter(goal => goal.type === 'Strength' && goal.exercise && todayExercises.has(goal.exercise.trim().toLowerCase())).sort(byNearestDate)[0];
+  const enduranceGoal = recommendation?.cardio?.selected ? goals.filter(goal => goal.type === 'Endurance').sort(byNearestDate)[0] : undefined;
+  const primaryGoal = strengthGoal || enduranceGoal || [...goals].sort(byNearestDate)[0];
+  const goalReason = strengthGoal ? `Today’s ${strengthGoal.exercise} set moves this` : enduranceGoal ? 'Today’s run moves this' : primaryGoal ? 'Next target by date' : '';
   const firstName = (setup?.displayName || 'Athlete').trim().split(/\s+/)[0];
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
 
@@ -54,7 +62,7 @@ export function HomePage() {
       <footer><Link className="button" to={`/workout?edit=${completedToday.id}`}>Review today</Link><Link className="feed-text-link" to="/history">Open history →</Link></footer>
     </section> : <section className="feed-card today-focus-card">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || 'Cardio and recovery'}</em></div></div><span className="feed-status">READY</span></header>
-      <div className="today-focus-title"><span>{recommendation.splitDay.type}</span><h3>{selectedCount ? `${selectedCount} items ready` : 'Choose today’s work'}</h3><p>Keep what you plan to complete. Only logged results move your training forward.</p></div>
+      <div className="today-focus-title"><span>{recommendation.splitDay.type}</span><h3>{selectedCount ? `${selectedCount} item${selectedCount === 1 ? '' : 's'} ready` : 'Choose today’s work'}</h3><p>Keep what you plan to complete. Only logged results move your training forward.</p></div>
       <div className="today-workout-items">
         {recommendation.topSets.map(set => <label className={set.selected ? 'selected' : ''} key={set.id}><input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} /><span><small>{set.muscle}{set.optional ? ' · OPTIONAL' : ''}</small><strong>{set.exercise}</strong><em>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : 'Log a baseline set'}</em></span></label>)}
         {!recommendation.topSets.length && recommendation.splitDay.type !== 'rest' && <Link className="feed-empty-row" to="/exercises"><span><small>STRENGTH</small><strong>Choose exercises for this split day</strong><em>Forge needs a strength exercise mapped to this day.</em></span><b>Fix →</b></Link>}
@@ -67,7 +75,7 @@ export function HomePage() {
     <section className="feed-support-grid" aria-label="Training overview">
       <article className="feed-card compact-card"><header><span>LAST ACTIVITY</span><Link to="/history">View all</Link></header>{priorWorkout ? <><div className="compact-activity"><span className="feed-icon muted-icon">✓</span><div><strong>{priorWorkout.title}</strong><small>{shortDate(priorWorkout.date)} · {priorWorkout.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Cardio'}</small></div></div><div className="compact-result-list">{priorSets.slice(0, 2).map(set => <div key={set.id || `${set.lift}-${set.weight}-${set.reps}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}{!priorSets.length && priorWorkout.cardioSessions?.slice(0, 1).map(session => <div key={session.id}><span>{session.activity}</span><strong>{session.summary}</strong></div>)}</div></> : <p className="feed-empty-copy">Your latest completed workout will appear here.</p>}</article>
       <article className="feed-card compact-card"><header><span>LAST 7 DAYS</span><Link to="/insights">Insights</Link></header><div className="week-score"><strong>{weekRecords.length}</strong><span>active {weekRecords.length === 1 ? 'day' : 'days'}</span></div><div className="feed-metric-row small"><div><strong>{weekTopSets}</strong><span>Top sets</span></div><div><strong>{weekMiles ? weekMiles.toFixed(1) : '0'}</strong><span>Miles</span></div></div></article>
-      <article className="feed-card compact-card goal-card"><header><span>GOAL FOCUS</span><Link to="/goals">Goals</Link></header>{primaryGoal ? <><strong className="goal-name">{primaryGoal.title}</strong><p>{primaryGoal.metric || primaryGoal.type} · target {primaryGoal.date ? shortDate(primaryGoal.date) : 'set'}</p><div className="goal-target"><span>TARGET</span><strong>{primaryGoal.target}</strong></div></> : <><p className="feed-empty-copy">Add a goal to connect today’s work to a clear outcome.</p><Link className="feed-text-link" to="/goals">Create a goal →</Link></>}</article>
+      <article className="feed-card compact-card goal-card"><header><span>GOAL FOCUS</span><Link to="/goals">Goals</Link></header>{primaryGoal ? <><strong className="goal-name">{primaryGoal.title}</strong><p>{goalReason}</p><p>{primaryGoal.metric || primaryGoal.type} · target {primaryGoal.date ? shortDate(primaryGoal.date) : 'set'}</p><div className="goal-target"><span>TARGET</span><strong>{primaryGoal.target}</strong></div></> : <><p className="feed-empty-copy">Add a goal to connect today’s work to a clear outcome.</p><Link className="feed-text-link" to="/goals">Create a goal →</Link></>}</article>
     </section>
   </div>;
 }

@@ -1,4 +1,5 @@
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
+import { trainedMuscles } from '../lib/muscleGroups';
 
 type TimeRange = '4w' | '3m' | '6m' | '1y' | 'all';
 
@@ -9,7 +10,7 @@ export function MuscleFrequencyPanel({ range, rangeLabel }: { range: TimeRange; 
   const {records}=useWorkoutHistory();
   const now = Date.now();
   const cutoff = rangeDays[range] === Infinity ? -Infinity : now - rangeDays[range] * 86400000;
-  const muscleSessions=records.reduce<Record<string,string[]>>((groups,record)=>{if(new Date(`${record.date}T12:00:00`).getTime()<cutoff)return groups;[...new Set(record.muscles.filter(muscle=>muscle!=='Cardio'))].forEach(muscle=>{groups[muscle]=[...(groups[muscle]||[]),record.date]});return groups},{});
+  const muscleSessions=records.reduce<Record<string,string[]>>((groups,record)=>{if(new Date(`${record.date}T12:00:00`).getTime()<cutoff)return groups;trainedMuscles(record.muscles).forEach(muscle=>{groups[muscle]=[...(groups[muscle]||[]),record.date]});return groups},{});
   const rows = Object.entries(muscleSessions).map(([muscle, dates]) => {
     const visible = dates.filter(date => new Date(`${date}T12:00:00`).getTime() >= cutoff);
     return { muscle, count: visible.length, last: visible.at(-1) ?? null };

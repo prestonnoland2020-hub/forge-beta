@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
-import { summarizeCardioDraft } from '../lib/cardioSession';
+import {summarizeCardioDraft, isRunningCardio} from '../lib/cardioSession';
 
 type TimeRange='4w'|'3m'|'6m'|'1y'|'all';
 type Mode='equivalent'|'actual';
@@ -17,7 +17,7 @@ export function RunningPerformanceChart({range,rangeLabel}:{range:TimeRange;rang
   const [target,setTarget]=useState<Target>('5k');
   const [mode,setMode]=useState<Mode>('equivalent');
   const [activePoint,setActivePoint]=useState<number|null>(null);
-  const efforts=useMemo<RunEffort[]>(()=>records.flatMap(record=>(record.cardioSessions||[]).filter(session=>session.activity==='Run').map(session=>{const totals=summarizeCardioDraft(session);return{date:record.date,label:new Date(`${record.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),distance:totals.distance,seconds:totals.minutes*60,kind:session.summary}})).filter(effort=>effort.distance>0&&effort.seconds>0),[records]);
+  const efforts=useMemo<RunEffort[]>(()=>records.flatMap(record=>(record.cardioSessions||[]).filter(session=>isRunningCardio(session)).map(session=>{const totals=summarizeCardioDraft(session);return{date:record.date,label:new Date(`${record.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),distance:totals.distance,seconds:totals.minutes*60,kind:session.summary}})).filter(effort=>effort.distance>0&&effort.seconds>0),[records]);
   const data=useMemo(()=>{
     const now=Date.now();
     const cutoff=rangeDays[range]===Infinity?-Infinity:now-rangeDays[range]*86400000;
@@ -48,7 +48,7 @@ export function RunningPerformanceChart({range,rangeLabel}:{range:TimeRange;rang
           {ticks.map((tick,index)=>{const y=plot.top+index*(plotHeight/4);return <g className="run-grid-line" key={index}><line x1={plot.left} y1={y} x2={plot.width-plot.right} y2={y}/><text x={plot.left-12} y={y+4} textAnchor="end">{formatTime(tick)}</text></g>})}
           <polygon className="run-chart-area" points={`${points[0].x},${plot.top+plotHeight} ${points.map(point=>`${point.x},${point.y}`).join(' ')} ${points.at(-1)!.x},${plot.top+plotHeight}`}/><polyline className="run-chart-line" points={points.map(point=>`${point.x},${point.y}`).join(' ')} fill="none"/>
           {points.map((point,index)=><g className={activePoint===index?'run-point active':'run-point'} key={`${point.date}-${point.distance}`} onMouseEnter={()=>setActivePoint(index)} onFocus={()=>setActivePoint(index)} tabIndex={0}><circle className="run-hit" cx={point.x} cy={point.y} r="14"/><circle className="run-dot" cx={point.x} cy={point.y} r="5"/></g>)}
-          {points.map((point,index)=>labelIndexes.has(index)&&<text className="run-date" key={`date-${point.date}-${index}`} x={point.x} y={plot.height-8} textAnchor={index===0?'start':index===points.length-1?'end':'middle'}>{new Date(`${point.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</text>)}
+          {points.map((point,index)=>labelIndexes.has(index)&&<text className="run-date" key={`date-${point.date}-${index}`} x={point.x} y={plot.height-8} textAnchor={index===0?'start':index===points.length-1?'end':'middle'}>{new Date(`${point.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})}</text>)}
         </svg>{focused&&<div className="run-tooltip" style={{left:`${focused.x/plot.width*100}%`,top:`${focused.y/plot.height*100}%`}}><span>{focused.label}</span><strong>{formatTime(focused.value)}</strong><small>From {formatDistance(focused.distance)} in {formatTime(focused.seconds)}</small></div>}</div>:<div className="run-empty">No {mode==='actual'?`actual ${targets[target].label}`:'qualifying run'} results in this range. Try Equivalent Time or a wider range.</div>}
         <p className="running-method">{mode==='equivalent'?`Equivalent Time converts logged runs with both distance and duration into a comparable ${targets[target].label} time. Training-run equivalents are context, not race predictions.`:`Actual Results includes only logged runs completed at the selected distance. No conversion is applied.`}</p>
         <details className="running-data"><summary>View source efforts <span>{data.length}</span></summary><div>{data.map(entry=><article key={`${entry.date}-${entry.distance}`}><span>{entry.label}</span><strong>{formatTime(entry.value)}</strong><small>{formatDistance(entry.distance)} · {formatTime(entry.seconds)} · {entry.kind}</small></article>)}</div></details>

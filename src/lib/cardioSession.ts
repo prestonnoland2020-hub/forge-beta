@@ -119,3 +119,11 @@ export function summarizeCardioDraft(draft:CardioLogDraft):CardioTotals{
   if(draft.structure==='steady')return{minutes:Number(draft.prescription.duration)||0,workMinutes:Number(draft.prescription.duration)||0,recoveryMinutes:0,distance:Number(draft.prescription.distance)||0,workDistance:Number(draft.prescription.distance)||0,recoveryDistance:0,completed:1};
   return{minutes:0,workMinutes:0,recoveryMinutes:0,distance:0,workDistance:0,recoveryDistance:0,completed:1};
 }
+
+/* Endurance work splits into running and everything else — nothing finer.
+   Session names in the imported history are training *intensities* ("Base",
+   "Easy", "Speed Run", "Long Run"), which are all running and should never have
+   been shown as separate cardio categories. */
+export function enduranceGroup(draft:CardioLogDraft):'Running'|'Other'{
+  return isRunningCardio(draft)?'Running':'Other';
+}

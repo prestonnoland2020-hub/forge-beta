@@ -113,18 +113,28 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const selectedExercises:Array<{muscle:string;exercise:LibraryExercise;optional:boolean}>=[];
   const explicitlyMapped=strengthLibrary.filter(exercise=>explicitNames.has(normalized(exercise.name))).sort(compareExercise);
   explicitlyMapped.forEach(exercise=>{
-    const muscle=dueMuscles.find(item=>exercise.muscles.includes(item))||exercise.muscles[0]||'Primary';
-    const alreadyCovered=coveredMuscles.has(muscle);
-    selectedExercises.push({muscle,exercise,optional:alreadyCovered});
+    // Label a mapped exercise with its own primary muscle. Matching against the
+    // day's muscle list first meant Bench showed as "Triceps" simply because
+    // Triceps happened to come earlier in that list than Chest.
+    const muscle=exercise.muscles[0]||dueMuscles.find(item=>exercise.muscles.includes(item))||'Primary';
+    // Every exercise mapped to this split day is prescribed. Sharing a muscle with
+    // another mapped lift does not make one of them optional.
+    selectedExercises.push({muscle,exercise,optional:false});
     used.add(normalized(exercise.name));coveredMuscles.add(muscle);
   });
-  dueMuscles.forEach(muscle=>{
-    if(coveredMuscles.has(muscle))return;
-    const candidate=strengthLibrary.filter(exercise=>exercise.muscles.includes(muscle)).sort(compareExercise).find(exercise=>!used.has(normalized(exercise.name)));
-    if(!candidate)return;
-    selectedExercises.push({muscle,exercise:candidate,optional:false});
-    used.add(normalized(candidate.name));coveredMuscles.add(muscle);
-  });
+  // Gate on what the day *declares*, not on what resolved. A day naming an exercise
+  // that is missing or disabled in the library must not quietly fill itself from the
+  // library instead — the Today card's "map an exercise to this day" prompt is the
+  // honest outcome.
+  if(!input.splitDay.exercises.length){
+    dueMuscles.forEach(muscle=>{
+      if(coveredMuscles.has(muscle))return;
+      const candidate=strengthLibrary.filter(exercise=>exercise.muscles.includes(muscle)).sort(compareExercise).find(exercise=>!used.has(normalized(exercise.name)));
+      if(!candidate)return;
+      selectedExercises.push({muscle,exercise:candidate,optional:false});
+      used.add(normalized(candidate.name));coveredMuscles.add(muscle);
+    });
+  }
   const templates=selectedExercises.map(({exercise})=>({exercise:exercise.name,calculatedMax:0,exposureIndex:new Set(completed.filter(result=>result.lift===exercise.name).map(result=>result.date)).size}));
   const intelligence=buildTrainingIntelligence({records:input.records,recovery:input.recovery,templates,goalMaxByLift,today:new Date(`${input.date}T12:00:00`),loadBiasPercent:input.loadBiasPercent});
   const topSets=selectedExercises.map(selection=>{
