@@ -4,18 +4,20 @@
    is the only signal the imported rows carry, so the muscle is derived from it
    at read time rather than by rewriting history in the database. */
 
+/* Plural forms matter: the account's own log has "Pull Ups", not "Pull Up",
+   and \b after "up" does not match when an "s" follows. */
 const patterns: Array<[RegExp, string]> = [
-  [/\b(hip thrust|glute)\b/i, 'Glutes'],
-  [/\b(rdl|romanian|hamstring|leg curl|good ?morning)\b/i, 'Hamstrings'],
-  [/\b(squat|leg press|lunge|hack|quad|leg extension|step ?up)\b/i, 'Quads'],
-  [/\b(deadlift)\b/i, 'Hamstrings'],
-  [/\b(lat|pulldown|pull ?up|chin ?up|row|shrug|back extension)\b/i, 'Back'],
-  [/\b(bench|chest|fly|flye|pec|push ?up|dip)\b/i, 'Chest'],
-  [/\b(shoulder|overhead|ohp|lateral raise|front raise|delt|upright|arnold)\b/i, 'Shoulders'],
-  [/\b(tricep|pushdown|skull ?crusher|kickback|close ?grip)\b/i, 'Triceps'],
-  [/\b(bicep|curl|preacher|hammer)\b/i, 'Biceps'],
-  [/\b(forearm|wrist|grip|farmer)\b/i, 'Forearms'],
-  [/\b(ab|abs|crunch|plank|sit ?up|toes to bar|hanging leg|oblique)\b/i, 'Abs'],
+  [/\b(hip thrusts?|glutes?)\b/i, 'Glutes'],
+  [/\b(rdls?|romanian|hamstrings?|leg curls?|good ?mornings?)\b/i, 'Hamstrings'],
+  [/\b(squats?|leg press|lunges?|hack|quads?|leg extensions?|step ?ups?)\b/i, 'Quads'],
+  [/\b(deadlifts?)\b/i, 'Hamstrings'],
+  [/\b(lat|pulldowns?|pull ?ups?|chin ?ups?|rows?|shrugs?|back extensions?)\b/i, 'Back'],
+  [/\b(bench|chest|fly|flyes?|flies|pec|push ?ups?|dips?)\b/i, 'Chest'],
+  [/\b(shoulders?|overhead|ohp|lateral raises?|front raises?|delts?|upright|arnold)\b/i, 'Shoulders'],
+  [/\b(triceps?|pushdowns?|skull ?crushers?|kickbacks?|close ?grip)\b/i, 'Triceps'],
+  [/\b(biceps?|curls?|preacher|hammer)\b/i, 'Biceps'],
+  [/\b(forearms?|wrist|grip|farmers?)\b/i, 'Forearms'],
+  [/\b(abs?|crunch(?:es)?|planks?|sit ?ups?|toes to bar|hanging leg|obliques?)\b/i, 'Abs'],
 ];
 
 /* Values the import used where a muscle group belonged. Anything in here means
