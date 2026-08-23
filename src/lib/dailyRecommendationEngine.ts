@@ -113,7 +113,10 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const selectedExercises:Array<{muscle:string;exercise:LibraryExercise;optional:boolean}>=[];
   const explicitlyMapped=strengthLibrary.filter(exercise=>explicitNames.has(normalized(exercise.name))).sort(compareExercise);
   explicitlyMapped.forEach(exercise=>{
-    const muscle=dueMuscles.find(item=>exercise.muscles.includes(item))||exercise.muscles[0]||'Primary';
+    // Label a mapped exercise with its own primary muscle. Matching against the
+    // day's muscle list first meant Bench showed as "Triceps" simply because
+    // Triceps happened to come earlier in that list than Chest.
+    const muscle=exercise.muscles[0]||dueMuscles.find(item=>exercise.muscles.includes(item))||'Primary';
     // Every exercise mapped to this split day is prescribed. Sharing a muscle with
     // another mapped lift does not make one of them optional.
     selectedExercises.push({muscle,exercise,optional:false});

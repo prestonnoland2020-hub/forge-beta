@@ -84,3 +84,5 @@
    so a blocked save read as the button doing nothing at all. */
 .review-blocked{margin:0;padding:12px 14px;border:1px solid #6b4a20;border-left:3px solid var(--warning);border-radius:9px;background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);font-size:13px;line-height:1.45}
 .save-confirmation.save-warning{margin:0 0 10px;padding:11px 13px;border-radius:9px;border:1px solid #6b4a20;background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);text-align:left}
+.lift-scope-note{display:block;margin-top:7px;color:var(--muted);font-size:11px;line-height:1.4}
+.lift-scope-note .text-button{font-size:11px;padding:0}

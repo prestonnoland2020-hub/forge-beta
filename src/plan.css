@@ -47,3 +47,9 @@
 .day-drag-handle{display:grid;place-items:center;min-width:27px;color:#7b8983!important;font-size:15px;letter-spacing:-5px;cursor:grab;user-select:none}
 .plan-day-list>button:hover .day-drag-handle,.plan-day-list>button:focus-visible .day-drag-handle{color:var(--accent)!important}
 @media(max-width:900px){.day-drag-handle{letter-spacing:-4px}.plan-day-list>button[draggable="true"]{cursor:default}}
+/* Muscle chips read out what the selected exercises train; they are only an
+   input on a day with no exercises chosen. */
+.muscle-picker.derived .muscle-chip{cursor:default}
+.muscle-picker.derived .muscle-chip:not(.active){opacity:.4}
+.muscle-picker.derived .muscle-chip:disabled{opacity:.4}
+.muscle-picker.derived .muscle-chip.active:disabled{opacity:1}
