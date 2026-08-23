@@ -81,7 +81,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         <div><span className="eyebrow">FORGE</span><h1>{titles[location.pathname] ?? 'Forge'}</h1></div>
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
-          <NavLink className="top-readiness" to="/profile"><span>{hasRecoveryData ? recovery.readiness : '—'}</span><small>{hasRecoveryData ? 'READY' : 'NO DATA'}</small></NavLink>
+          {hasRecoveryData && <NavLink className="top-readiness" to="/profile"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
           <NavLink className="avatar" to="/profile">{initials}</NavLink>
           <details className="mobile-manage">
             <summary aria-label="Open management menu">•••</summary>
