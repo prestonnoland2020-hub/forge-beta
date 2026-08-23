@@ -129,9 +129,18 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   if(!input.splitDay.exercises.length){
     dueMuscles.forEach(muscle=>{
       if(coveredMuscles.has(muscle))return;
-      const candidate=strengthLibrary.filter(exercise=>exercise.muscles.includes(muscle)).sort(compareExercise).find(exercise=>!used.has(normalized(exercise.name)));
+      // Prefer a movement this muscle actually leads. Matching on mere
+      // involvement put Bench Press — whose primary muscle is Chest but whose
+      // list also names Shoulders — on a shoulders day as if it were a
+      // shoulder press. When only a secondary match exists it is still worth
+      // offering, but it is marked optional rather than presented as the
+      // prescribed work for that muscle.
+      const leads=strengthLibrary.filter(exercise=>exercise.muscles[0]===muscle);
+      const involves=strengthLibrary.filter(exercise=>exercise.muscles.includes(muscle));
+      const pool=leads.length?leads:involves;
+      const candidate=pool.sort(compareExercise).find(exercise=>!used.has(normalized(exercise.name)));
       if(!candidate)return;
-      selectedExercises.push({muscle,exercise:candidate,optional:false});
+      selectedExercises.push({muscle,exercise:candidate,optional:!leads.length});
       used.add(normalized(candidate.name));coveredMuscles.add(muscle);
     });
   }

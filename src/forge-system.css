@@ -114,7 +114,7 @@ body{
 /* A card that is the screen's primary action gets an accent hairline at the
    top edge rather than a full tint — enough to lead the eye, quiet enough to
    sit next to five other cards. */
-.today-focus-card,.accent-card{position:relative;overflow:hidden}
+.today-focus-card,.accent-card{position:relative;overflow:hidden;border-top-width:1px;border-top-style:solid;border-top-color:var(--hairline)}
 .today-focus-card::before,.accent-card::before{
   content:'';position:absolute;inset:0 0 auto;height:2px;
   background:linear-gradient(90deg,var(--accent),transparent 70%);
@@ -124,19 +124,25 @@ body{
 /* --------------------------------------------------------------- stat rows
    Big numeral, small uppercase label, hairline rules between columns. This is
    the densest legible way to show three to five comparable numbers. */
+/* Typography and column rhythm only. The box model — the inset that keeps the
+   row aligned with the card's header and footer — belongs to whichever pass
+   authored each row, and overriding it here made the numbers run to the card
+   edge while the header stayed inset. */
 .feed-metric-row,.completed-day-results,.split-review-summary,.review-summary{
-  display:grid;grid-auto-flow:column;grid-auto-columns:1fr;
-  align-items:end;gap:0;
-  padding:var(--s3) 0;margin:var(--s3) 0 0;
-  border-top:1px solid var(--hairline);
+  display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);align-items:end;
 }
 .feed-metric-row>div,.completed-day-results>div,.split-review-summary>div,.review-summary>div{
-  display:grid;gap:2px;justify-items:start;
-  padding:0 var(--s3);
-  border-left:1px solid var(--hairline);
+  display:grid;gap:3px;justify-items:start;min-width:0;
 }
-.feed-metric-row>div:first-child,.completed-day-results>div:first-child,
-.split-review-summary>div:first-child,.review-summary>div:first-child{border-left:0;padding-left:0}
+/* Rows that arrived with no inset of their own get one. */
+.completed-day-results,.split-review-summary,.review-summary{
+  padding:var(--s3) 0;margin:var(--s3) 0 0;border-top:1px solid var(--hairline);
+}
+.completed-day-results>div,.split-review-summary>div,.review-summary>div{
+  padding:0 var(--s3);border-left:1px solid var(--hairline);
+}
+.completed-day-results>div:first-child,.split-review-summary>div:first-child,
+.review-summary>div:first-child{border-left:0;padding-left:0}
 .feed-metric-row strong,.completed-day-results strong,.split-review-summary strong,.review-summary strong{
   font:800 26px/1 var(--display);letter-spacing:.01em;color:var(--ink);
 }
@@ -426,3 +432,8 @@ select,input:not([type=checkbox]):not([type=radio]){min-height:38px}
 .goal-trajectory-chart .trajectory-grid line{stroke:var(--hairline)}
 .goal-trajectory-chart footer{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:var(--s3)}
 .goal-trajectory-chart footer span{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-2)}
+
+/* Stat labels sit on one line so the numbers above them share a baseline;
+   a wrapped label pushed its own column out of alignment with its neighbours. */
+.feed-metric-row span,.completed-day-results span,
+.split-review-summary span,.review-summary span{white-space:nowrap}

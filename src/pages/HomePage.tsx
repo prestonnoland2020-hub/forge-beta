@@ -57,7 +57,7 @@ export function HomePage() {
 
     {completedToday ? <section className="feed-card today-focus-card completed">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon completed">✓</span><div><small>TODAY · COMPLETE</small><strong>{completedToday.title}</strong></div></div><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></header>
-      <div className="feed-metric-row"><div><strong>{completedSets.length}</strong><span>Top sets</span></div><div><strong>{completedToday.cardioSessions?.length || 0}</strong><span>Cardio entries</span></div><div><strong>{completedToday.effort || '—'}</strong><span>Effort</span></div></div>
+      <div className="feed-metric-row"><div><strong>{completedSets.length}</strong><span>Top sets</span></div><div><strong>{completedToday.cardioSessions?.length || 0}</strong><span>Cardio</span></div><div><strong>{completedToday.effort || '—'}</strong><span>Effort</span></div></div>
       <footer><Link className="button" to={`/workout?edit=${completedToday.id}`}>Review today</Link><Link className="feed-text-link" to="/history">Open history →</Link></footer>
     </section> : <section className="feed-card today-focus-card">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || 'Cardio and recovery'}</em></div></div></header>
