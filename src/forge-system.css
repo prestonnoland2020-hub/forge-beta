@@ -1,0 +1,347 @@
+/* ============================================================================
+   FORGE DESIGN SYSTEM
+   ----------------------------------------------------------------------------
+   One authoritative layer, loaded last. Every stylesheet before this one grew
+   by accretion — this file defines the tokens they all read from, then rebuilds
+   the shared primitives so a screen looks the same whichever pass authored it.
+
+   The structural vocabulary is the one endurance apps converged on because it
+   works on a phone held one-handed: a feed of self-contained cards, numbers
+   presented as a divider-separated stat row, a persistent bottom tab bar, and
+   controls large enough to hit without looking. The palette, type, and voice
+   stay Forge's own.
+
+   Committed to a single dark theme, so colors are declared once and every
+   surface is painted explicitly rather than inheriting.
+   ========================================================================== */
+
+:root{
+  /* Surfaces climb toward the viewer. Dark UI reads depth from surface
+     lightness and hairlines far better than from drop shadows. */
+  --surface-0:#0a0e0d;
+  --surface-1:#131a18;
+  --surface-2:#1a2320;
+  --surface-3:#212c28;
+  --surface-sunken:#080c0b;
+
+  --hairline:#222d29;
+  --hairline-strong:#31403a;
+
+  --ink:#eef4f1;
+  --ink-2:#9daba5;
+  --ink-3:#6d7a75;
+
+  --accent:#d7ff45;
+  --accent-ink:#0e1305;
+  --accent-dim:#a8c92f;
+  --accent-wash:rgba(215,255,69,.10);
+  --accent-wash-strong:rgba(215,255,69,.18);
+
+  --good:#58d68d;
+  --warn:#f6c453;
+  --bad:#ef8a7b;
+  --info:#6fc3ff;
+
+  --r-xs:6px; --r-sm:9px; --r-md:13px; --r-lg:18px; --r-pill:999px;
+
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:22px; --s6:30px; --s7:40px;
+
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 6px 20px rgba(0,0,0,.45);
+  --shadow-3:0 18px 48px rgba(0,0,0,.6);
+
+  --ease:cubic-bezier(.2,.7,.3,1);
+  --dur:150ms;
+
+  /* Legacy token names still read by ~50 older stylesheets. Repointing them
+     here upgrades those rules instead of leaving two systems fighting. */
+  --bg:var(--surface-0);
+  --panel:var(--surface-1);
+  --panel-2:var(--surface-2);
+  --line:var(--hairline);
+  --text:var(--ink);
+  --muted:var(--ink-2);
+  --card:var(--surface-1);
+  --border:var(--hairline);
+  --success:var(--good);
+  --warning:var(--warn);
+  --gold:var(--accent);
+  --accent-contrast:var(--accent-ink);
+}
+
+body{
+  background:var(--surface-0);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* Numerals line up in columns everywhere they are compared. */
+.metric strong,.stat-row strong,.feed-metric-row strong,.week-score strong,
+.compact-result-list strong,.completed-day-results strong,.review-summary strong,
+.split-review-summary strong,.goal-target strong,.top-set-card-result strong,
+.calculated-max strong,.cardio-log-line-end em{font-variant-numeric:tabular-nums}
+
+/* ---------------------------------------------------------------- containers
+   A card is a self-contained unit of content with one job. Consistent radius,
+   one hairline, one padding step — the variation between the old stylesheets
+   was the single loudest signal that this was not a finished product. */
+.card,.feed-card,.form-card,.compact-card,.top-set-entry,.top-set-card-stack>article{
+  background:var(--surface-1);
+  border:1px solid var(--hairline);
+  border-radius:var(--r-md);
+  box-shadow:var(--shadow-1);
+}
+
+/* Older passes reserved fixed heights to keep a grid even; on a phone that
+   reads as an empty card. Content decides the height now. */
+.compact-card{min-height:0}
+.compact-card>header{padding:var(--s3) var(--s4)}
+.compact-card>*:not(header){padding-left:var(--s4);padding-right:var(--s4)}
+.compact-card>*:last-child{padding-bottom:var(--s4)}
+.week-score{padding:var(--s4) 0 var(--s2)}
+.week-score strong{font:800 34px/1 var(--display);color:var(--ink)}
+.week-score span{color:var(--ink-3);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.compact-card .feed-metric-row{margin-top:0}
+.feed-empty-copy{color:var(--ink-3);font-size:13px;margin:0;padding-top:var(--s2)}
+
+/* The greeting keeps its action on the same line as the heading; the link is
+   secondary and must never push the title into a second wrap. */
+.feed-welcome{align-items:baseline;gap:var(--s3)}
+.feed-welcome h2{font-size:clamp(26px,7vw,40px);line-height:1.05}
+.feed-welcome>a{flex:0 0 auto;white-space:nowrap;font-size:12px}
+
+/* A card that is the screen's primary action gets an accent hairline at the
+   top edge rather than a full tint — enough to lead the eye, quiet enough to
+   sit next to five other cards. */
+.today-focus-card,.accent-card{position:relative;overflow:hidden}
+.today-focus-card::before,.accent-card::before{
+  content:'';position:absolute;inset:0 0 auto;height:2px;
+  background:linear-gradient(90deg,var(--accent),transparent 70%);
+}
+.today-focus-card.completed::before{background:linear-gradient(90deg,var(--good),transparent 70%)}
+
+/* --------------------------------------------------------------- stat rows
+   Big numeral, small uppercase label, hairline rules between columns. This is
+   the densest legible way to show three to five comparable numbers. */
+.feed-metric-row,.completed-day-results,.split-review-summary,.review-summary{
+  display:grid;grid-auto-flow:column;grid-auto-columns:1fr;
+  align-items:end;gap:0;
+  padding:var(--s3) 0;margin:var(--s3) 0 0;
+  border-top:1px solid var(--hairline);
+}
+.feed-metric-row>div,.completed-day-results>div,.split-review-summary>div,.review-summary>div{
+  display:grid;gap:2px;justify-items:start;
+  padding:0 var(--s3);
+  border-left:1px solid var(--hairline);
+}
+.feed-metric-row>div:first-child,.completed-day-results>div:first-child,
+.split-review-summary>div:first-child,.review-summary>div:first-child{border-left:0;padding-left:0}
+.feed-metric-row strong,.completed-day-results strong,.split-review-summary strong,.review-summary strong{
+  font:800 26px/1 var(--display);letter-spacing:.01em;color:var(--ink);
+}
+.feed-metric-row span,.completed-day-results span,.split-review-summary span,.review-summary span{
+  font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+}
+.feed-metric-row.small strong{font-size:21px}
+
+/* ---------------------------------------------------------------- buttons
+   Three weights only: solid for the one action that matters, outlined for
+   alternatives, text for anything reversible. */
+.button{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);
+  min-height:46px;padding:0 var(--s5);
+  border:1px solid transparent;border-radius:var(--r-pill);
+  background:var(--accent);color:var(--accent-ink);
+  font-size:14px;font-weight:800;letter-spacing:.01em;
+  transition:transform var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);
+}
+.button:hover{background:#e4ff6b}
+.button:active{transform:scale(.975)}
+.button:disabled{opacity:.4;transform:none}
+.button.secondary,.button.ghost{
+  background:transparent;color:var(--ink);border-color:var(--hairline-strong);
+}
+.button.secondary:hover,.button.ghost:hover{background:var(--surface-2);border-color:var(--ink-3)}
+.button.wide{width:100%}
+.text-button{
+  min-height:38px;padding:0 var(--s2);border:0;background:transparent;
+  color:var(--accent);font-size:13px;font-weight:700;border-radius:var(--r-xs);
+  transition:background var(--dur) var(--ease);
+}
+.text-button:hover{background:var(--accent-wash)}
+.text-button.danger{color:var(--bad)}
+.text-button.danger:hover{background:rgba(239,138,123,.12)}
+
+/* ------------------------------------------------------------------- chips
+   Pill group with a filled active state. Scrolls horizontally rather than
+   wrapping, so a long filter list never pushes content down the page. */
+.muscle-chip,.question-chips button,.exercise-picker-filters button{
+  min-height:38px;padding:0 var(--s3);
+  border:1px solid var(--hairline-strong);border-radius:var(--r-pill);
+  background:transparent;color:var(--ink-2);
+  font-size:13px;font-weight:700;white-space:nowrap;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease),border-color var(--dur) var(--ease);
+}
+.muscle-chip:hover,.question-chips button:hover,.exercise-picker-filters button:hover{
+  background:var(--surface-2);color:var(--ink);
+}
+.muscle-chip.active,.question-chips button.active,.exercise-picker-filters button.active{
+  background:var(--accent);border-color:var(--accent);color:var(--accent-ink);
+}
+.muscle-chip:disabled{opacity:.45}
+
+/* -------------------------------------------------------- segmented control */
+.segmented,.plan-tabs,.mode-tabs,.library-type-tabs,.library-subtabs{
+  display:inline-flex;gap:2px;padding:3px;
+  background:var(--surface-sunken);border:1px solid var(--hairline);border-radius:var(--r-pill);
+}
+.segmented button,.plan-tabs button,.mode-tabs button,.library-type-tabs button,.library-subtabs button{
+  flex:1 1 auto;min-height:38px;padding:0 var(--s4);
+  border:0;border-radius:var(--r-pill);background:transparent;color:var(--ink-2);
+  font-size:13px;font-weight:700;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.segmented button:hover,.plan-tabs button:hover,.mode-tabs button:hover{color:var(--ink)}
+.segmented button.active,.plan-tabs button.active,.mode-tabs button.active,
+.library-type-tabs button.active,.library-subtabs button.active{
+  background:var(--surface-3);color:var(--ink);box-shadow:var(--shadow-1);
+}
+
+/* -------------------------------------------------------------------- inputs */
+input,select,textarea{
+  background:var(--surface-sunken);color:var(--ink);
+  border:1px solid var(--hairline);border-radius:var(--r-sm);
+  transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
+}
+input:hover,select:hover,textarea:hover{border-color:var(--hairline-strong)}
+input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-wash);
+}
+:where(button,a,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-xs)}
+::placeholder{color:var(--ink-3)}
+label>span.field-caption,.field-caption{
+  font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+}
+
+/* -------------------------------------------------------------- list rows
+   Whole row is the target, chevron signals it, background answers the press. */
+.plan-day-list>button,.recent-workout-picker button,.saved-cardio-list>div,
+.sidebar-foot,.compact-activity{
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease);
+}
+.plan-day-list>button:hover,.recent-workout-picker button:hover,.sidebar-foot:hover{
+  background:var(--surface-2);
+}
+
+/* ------------------------------------------------------------------ eyebrow */
+.eyebrow{
+  display:inline-block;
+  font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);
+}
+.feed-card-header small,.feed-identity small{
+  font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+}
+
+/* ------------------------------------------------------------------ headings */
+h1,h2,h3{font-family:var(--display);letter-spacing:.005em;text-wrap:balance}
+.page-intro h2{margin:var(--s1) 0 0}
+.page-intro p{color:var(--ink-2);margin:var(--s2) 0 0;max-width:62ch;line-height:1.5}
+
+/* --------------------------------------------------------------- navigation
+   Tab bar: icon over label, hairline top edge, blurred ground so content
+   scrolling underneath stays legible, and the home-indicator inset respected. */
+.bottom-nav{
+  background:color-mix(in srgb,var(--surface-1) 92%,transparent);
+  backdrop-filter:saturate(140%) blur(14px);
+  -webkit-backdrop-filter:saturate(140%) blur(14px);
+  border-top:1px solid var(--hairline);
+  padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -1px 0 rgba(0,0,0,.3);
+}
+.bottom-nav a{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-height:56px;padding:var(--s2) 2px;
+  color:var(--ink-3);position:relative;
+  transition:color var(--dur) var(--ease);
+}
+.bottom-nav a small{font-size:10px;font-weight:700;letter-spacing:.02em}
+.bottom-nav a .nav-icon svg{width:23px;height:23px}
+.bottom-nav a:active{color:var(--ink-2)}
+.bottom-nav a.active{color:var(--accent)}
+.bottom-nav a.active::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:26px;height:2px;border-radius:0 0 2px 2px;background:var(--accent);
+}
+
+.side-nav a{
+  display:flex;align-items:center;gap:var(--s3);
+  min-height:44px;padding:0 var(--s3);border-radius:var(--r-sm);
+  color:var(--ink-2);font-size:14px;font-weight:700;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.side-nav a:hover{background:var(--surface-2);color:var(--ink)}
+.side-nav a.active{background:var(--accent-wash);color:var(--accent)}
+.sidebar{background:var(--surface-1);border-right:1px solid var(--hairline)}
+
+.topbar{
+  background:color-mix(in srgb,var(--surface-0) 88%,transparent);
+  backdrop-filter:saturate(140%) blur(14px);
+  -webkit-backdrop-filter:saturate(140%) blur(14px);
+  border-bottom:1px solid var(--hairline);
+}
+
+/* --------------------------------------------------------------- disclosure */
+details>summary{cursor:pointer;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+
+/* ------------------------------------------------------------------- sheets */
+.workout-review,.coach-bubble-panel,.mobile-editor-panel{
+  background:var(--surface-1);border:1px solid var(--hairline-strong);
+  border-radius:var(--r-lg);box-shadow:var(--shadow-3);
+}
+.workout-review-backdrop,.mobile-editor-backdrop,.coach-bubble-backdrop{
+  background:rgba(4,7,6,.7);backdrop-filter:blur(3px);
+}
+
+/* -------------------------------------------------------------------- charts
+   Faint horizontal rules only, one accent series, the most recent point
+   emphasised. Everything else is scaffolding and should recede. */
+.chart-grid line,.chart-gridline{stroke:var(--hairline);stroke-width:1}
+.chart-series-fill{fill:url(#forgeAccentFill)}
+.chart-series-line{stroke:var(--accent);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.chart-endpoint{fill:var(--accent);stroke:var(--surface-1);stroke-width:3}
+.chart-bar{fill:var(--accent-dim);transition:fill var(--dur) var(--ease)}
+.chart-bar:hover,.chart-bar.active{fill:var(--accent)}
+.chart-axis-label{font-size:10px;font-weight:700;letter-spacing:.06em;fill:var(--ink-3)}
+
+/* Bars authored as divs across the older insight components. */
+.progress-bar-track,.weekly-bar-track{background:var(--surface-sunken);border-radius:var(--r-pill)}
+.progress-bar-fill,.weekly-bar-fill{background:var(--accent);border-radius:var(--r-pill)}
+
+/* ------------------------------------------------------------ horizontal rows
+   Filter strips and week scrubbers scroll instead of wrapping, and snap so a
+   flick lands on a whole item rather than mid-label. */
+.exercise-picker-filters,.question-chips,.insight-range-row{
+  display:flex;gap:var(--s2);overflow-x:auto;scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
+  padding-bottom:2px;
+}
+.exercise-picker-filters::-webkit-scrollbar,.question-chips::-webkit-scrollbar,
+.insight-range-row::-webkit-scrollbar{display:none}
+.exercise-picker-filters>*,.question-chips>*,.insight-range-row>*{flex:0 0 auto;scroll-snap-align:start}
+
+/* --------------------------------------------------------------- motion */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  .button:active{transform:none}
+}
+
+/* --------------------------------------------------------------- phone pass */
+@media(max-width:760px){
+  .page{padding-left:var(--s4);padding-right:var(--s4)}
+  .page .card,.feed-card{border-radius:var(--r-md)}
+  .feed-metric-row strong,.completed-day-results strong{font-size:23px}
+  .button{min-height:48px}
+}

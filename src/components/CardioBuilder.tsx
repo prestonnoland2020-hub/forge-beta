@@ -187,10 +187,10 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
           <label className="cardio-log-time"><span className="cardio-log-label">Time</span>
             <input inputMode="numeric" value={line.time} onChange={event => updateLine(line.id, { time: event.target.value })} placeholder="mm:ss" />
           </label>
-          <div className="cardio-log-line-end">
+          {(linePace(line) || lines.length > 1) && <div className="cardio-log-line-end">
             {linePace(line) && <em>{linePace(line)}</em>}
             {lines.length > 1 && <button type="button" onClick={() => removeLine(line.id)} aria-label={`Remove line ${index + 1}`}>×</button>}
-          </div>
+          </div>}
         </div>)}
       </div>
 

@@ -62,6 +62,9 @@ import './simplified-platform.css';
 import './frontend-polish.css';
 import './profile-customization.css';
 import './mobile-calm.css';
+/* Loaded last: the authoritative token + primitive layer every earlier
+   stylesheet now reads from. See the header comment in forge-system.css. */
+import './forge-system.css';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.
