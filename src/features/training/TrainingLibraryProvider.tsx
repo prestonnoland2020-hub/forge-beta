@@ -7,8 +7,11 @@ import { useAuth } from '../auth/AuthProvider';
 
 export type LibraryExercise={id:number;name:string;kind:'Strength'|'Cardio';muscles:string[];detail:string;enabled:boolean;custom?:boolean;defaultTarget?:string;defaultUnit?:string};
 export type LibraryWorkout={id:number;name:string;kind:'Strength'|'Cardio'|'Circuit';source:'User'|'Forge';summary:string;exercises?:string[];plan?:PlannedCardio};
-export type ExerciseCategory='Strength'|'HYROX'|'CrossFit';
-export const exerciseCategory=(exercise:Pick<LibraryExercise,'detail'>):ExerciseCategory=>/HYROX/i.test(exercise.detail)?'HYROX':/CrossFit/i.test(exercise.detail)?'CrossFit':'Strength';
+export type ExerciseCategory='Strength'|'Cardio'|'HYROX'|'CrossFit';
+/* The category is the programme bucket a movement belongs to. It was derived
+   from `detail` alone, which named HYROX and CrossFit but nothing for plain
+   conditioning — so Run and Rowing were labelled "Strength" in the library. */
+export const exerciseCategory=(exercise:Pick<LibraryExercise,'detail'|'kind'>):ExerciseCategory=>/HYROX/i.test(exercise.detail)?'HYROX':/CrossFit/i.test(exercise.detail)?'CrossFit':exercise.kind==='Cardio'?'Cardio':'Strength';
 const starterExercises:LibraryExercise[]=[
   {id:1,name:'Back Squat',kind:'Strength',muscles:['Quads','Glutes','Hamstrings'],detail:'Barbell · Weight + reps · Primary lift',enabled:true},{id:2,name:'Bench Press',kind:'Strength',muscles:['Chest','Triceps','Shoulders'],detail:'Barbell · Weight + reps · Primary lift',enabled:true},{id:3,name:'Hack Squat',kind:'Strength',muscles:['Quads','Glutes'],detail:'Machine · Weight + reps · Accessory',enabled:true},{id:4,name:'Lat Pulldown',kind:'Strength',muscles:['Back','Biceps'],detail:'Cable · Weight + reps · Accessory',enabled:true},
   {id:5,name:'Run',kind:'Cardio',muscles:['Quads','Hamstrings','Glutes','Cardio'],detail:'Run · distance',enabled:true,defaultTarget:'400',defaultUnit:'meters'},{id:6,name:'Rowing',kind:'Cardio',muscles:['Back','Quads','Hamstrings','Glutes','Cardio'],detail:'Rower · distance',enabled:true,defaultTarget:'500',defaultUnit:'meters'},

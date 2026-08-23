@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { openCoachBubble } from '../features/training/coachService';
-import { exerciseCategory, useTrainingLibrary, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
+import { exerciseCategory, useTrainingLibrary, type ExerciseCategory, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 
-const filters = ['All', 'Strength', 'HYROX', 'CrossFit'] as const;
+const filters = ['All', 'Strength', 'Cardio', 'HYROX', 'CrossFit'] as const;
 const muscles = ['Chest', 'Back', 'Shoulders', 'Quads', 'Glutes', 'Hamstrings', 'Biceps', 'Triceps', 'Forearms', 'Abs', 'Cardio'];
 
 export function ExerciseLibrary() {
@@ -10,7 +10,7 @@ export function ExerciseLibrary() {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<'Strength' | 'HYROX' | 'CrossFit'>('Strength');
+  const [category, setCategory] = useState<ExerciseCategory>('Strength');
   const [selectedMuscles, setSelectedMuscles] = useState<string[]>([]);
   const [defaultUnit, setDefaultUnit] = useState('reps');
   const { exercises, addExercise, updateExercise, removeExercise, toggleExercise } = useTrainingLibrary();
@@ -69,8 +69,8 @@ export function ExerciseLibrary() {
     </div>}
     <section className="card library-table-card">
       <header><div className="library-filters">{filters.map(value => <button className={filter === value ? 'active' : ''} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search exercises" aria-label="Search exercises" /></header>
-      <div className="exercise-mobile-list">{shown.map(item => <article className={item.enabled ? 'exercise-mobile-row' : 'exercise-mobile-row disabled'} key={item.id}><button className="exercise-mobile-main" onClick={() => open(item)}><span><strong>{item.name}</strong><small>{section(item)} · {item.muscles.join(' · ') || 'Needs mapping'}</small></span><b>›</b></button><button aria-label={`${item.enabled ? 'Disable' : 'Enable'} ${item.name}`} className={item.enabled ? 'table-status on' : 'table-status'} onClick={() => toggleExercise(item.id)}>{item.enabled ? 'On' : 'Off'}</button></article>)}</div>
-      <div className="library-table-scroll"><table className="library-table exercise-table"><thead><tr><th>Exercise</th><th>Category</th><th>Muscle groups</th><th>Status</th><th>Action</th></tr></thead><tbody>{shown.map(item => <tr className={item.enabled ? '' : 'disabled'} key={item.id}><td><strong>{item.name}</strong><small>{item.detail}{item.kind === 'Cardio' && item.defaultUnit ? ` · Unit ${item.defaultUnit}` : ''}</small></td><td>{section(item)}</td><td>{item.muscles.join(' · ') || 'Not mapped'}</td><td><button className={item.enabled ? 'table-status on' : 'table-status'} onClick={() => toggleExercise(item.id)}>{item.enabled ? 'Enabled' : 'Disabled'}</button></td><td><button onClick={() => open(item)}>Edit</button><button className="danger" onClick={() => remove(item)}>Delete</button></td></tr>)}</tbody></table></div>
+      <div className="exercise-mobile-list">{shown.map(item => <article className={item.enabled ? 'exercise-mobile-row' : 'exercise-mobile-row disabled'} key={item.id}><button className="exercise-mobile-main" onClick={() => open(item)}><span><strong>{item.name}</strong><small>{section(item)} · {item.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Needs mapping'}</small></span><b>›</b></button><button aria-label={`${item.enabled ? 'Disable' : 'Enable'} ${item.name}`} className={item.enabled ? 'table-status on' : 'table-status'} onClick={() => toggleExercise(item.id)}>{item.enabled ? 'On' : 'Off'}</button></article>)}</div>
+      <div className="library-table-scroll"><table className="library-table exercise-table"><thead><tr><th>Exercise</th><th>Category</th><th>Muscle groups</th><th>Status</th><th>Action</th></tr></thead><tbody>{shown.map(item => <tr className={item.enabled ? '' : 'disabled'} key={item.id}><td><strong>{item.name}</strong><small>{item.detail}{item.kind === 'Cardio' && item.defaultUnit ? ` · Unit ${item.defaultUnit}` : ''}</small></td><td>{section(item)}</td><td>{item.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Not mapped'}</td><td><button className={item.enabled ? 'table-status on' : 'table-status'} onClick={() => toggleExercise(item.id)}>{item.enabled ? 'Enabled' : 'Disabled'}</button></td><td><button onClick={() => open(item)}>Edit</button><button className="danger" onClick={() => remove(item)}>Delete</button></td></tr>)}</tbody></table></div>
       {!shown.length && <div className="library-table-empty">No exercises match these filters.</div>}
     </section>
   </div>;

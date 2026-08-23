@@ -15,6 +15,7 @@ forge-*-legacy-*.json
 forge-*-legacy-*.txt
 inspect.mjs
 kill_preview.sh
+libcheck.mjs
 migration/exports/
 node_modules/
 probe.mjs
