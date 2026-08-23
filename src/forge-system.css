@@ -396,3 +396,33 @@ select,input:not([type=checkbox]):not([type=radio]){min-height:38px}
   button:not(.calendar-grid>button):not(.nav-icon),
   select,input:not([type=checkbox]):not([type=radio]){min-height:44px}
 }
+
+/* Keeps a phrase and its separator together so a wrap never leaves a line
+   ending in a dangling "·". */
+.nowrap{white-space:nowrap}
+
+/* -------------------------------------------------- completed-day result rows
+   Two columns with the measurements right-aligned works while they fit on one
+   line. A cardio summary carrying distance, duration and pace does not, and
+   right-aligned wrapped text strands a fragment ("/mi") on its own line. Below
+   the tablet breakpoint the row stacks and reads left-aligned instead. */
+.completed-day-review-list b{font-size:15px;font-variant-numeric:tabular-nums}
+.completed-day-review-list article>div:last-child{overflow-wrap:anywhere}
+@media(max-width:620px){
+  .completed-day-review-list article{grid-template-columns:1fr;gap:4px}
+  .completed-day-review-list article>div:last-child{text-align:left}
+  .completed-day-review-list article>div:first-child strong{font-size:14px;color:var(--ink-2)}
+  .completed-day-review-list b{font-size:16px;color:var(--ink)}
+}
+
+/* ------------------------------------------------------ goal trajectory plot
+   The SVG now sizes its viewBox to its own measured width, so user units are
+   CSS pixels and the axis labels render at the size they were authored at.
+   The wrapper just needs to not stretch it. */
+.trajectory-plot{width:100%;overflow:hidden}
+.trajectory-plot svg{display:block;max-width:100%;height:auto}
+.goal-trajectory-chart text{font-size:11px;font-weight:700;fill:var(--ink-3)}
+.goal-trajectory-chart .trajectory-target-label{font-size:12px;font-weight:800;fill:var(--ink)}
+.goal-trajectory-chart .trajectory-grid line{stroke:var(--hairline)}
+.goal-trajectory-chart footer{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:var(--s3)}
+.goal-trajectory-chart footer span{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-2)}

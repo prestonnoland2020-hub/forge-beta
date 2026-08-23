@@ -29,7 +29,14 @@ function CompletedDayReview({record,unit}:{record:WorkoutRecord;unit:string}) {
     </section>}
     {cardio.length>0&&<section className="completed-day-review-block">
       <header><span>CARDIO</span><b>{cardio.length}</b></header>
-      <div className="completed-day-review-list">{cardio.map((session,index)=><article key={session.id||`${session.activity}-${index}`}><div><strong>{session.activity||session.structure}</strong><small>{session.structure}</small></div><div className="completed-cardio-summary"><b>{formatCardioSummary(session)}</b>{session.structure==='intervals'&&<small>{session.intervalActuals?.filter(rep=>rep.completed).length||0} completed reps</small>}</div></article>)}</div>
+      <div className="completed-day-review-list">{cardio.map((session,index)=>{
+        /* The row already names the activity on the left, and "steady" is an
+           internal structure name, not something an athlete logged. Show the
+           measurements only. */
+        const detail=formatCardioSummary(session).replace(new RegExp(`^${session.activity.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*·\\s*`),'');
+        const lineCount=Array.isArray(session.prescription.legacyIntervals)?(session.prescription.legacyIntervals as unknown[]).length:0;
+        return <article key={session.id||`${session.activity}-${index}`}><div><strong>{session.activity||'Cardio'}</strong>{lineCount>1&&<small>{lineCount} lines</small>}</div><div className="completed-cardio-summary"><b>{detail||formatCardioSummary(session)}</b>{session.prescription.note?<small>{String(session.prescription.note)}</small>:null}</div></article>;
+      })}</div>
     </section>}
   </div>;
 }

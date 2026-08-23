@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { calculateEstimatedOneRepMax, niceAxis } from '../lib/strength';
 import { summarizeCardioDraft, isRunningCardio, cardioMiles } from '../lib/cardioSession';
 import type { CardioLogDraft } from '../lib/cardioSession';
 import { friends } from '../data/demo';
@@ -56,7 +56,7 @@ export function ProgressOverviewChart({range,rangeLabel}:{range:TimeRange;rangeL
      most recent one, so start at the right edge rather than three months ago. */
   useEffect(()=>{const node=weeklyRef.current;if(node)node.scrollLeft=node.scrollWidth},[entries]);
   const friendEntries:Entry[]=friend&&!weeklyMode?friendSeries[friend.username][domain].map((raw,index)=>{let value=raw;if(domain==='strength'||domain==='body')value=weightUnit==='kg'?raw*.453592:raw;else if(enduranceMetric==='distance')value=raw/10;else if(enduranceMetric==='pace')value=9.8-index*.12;else if(isRunTimeMetric(enduranceMetric)){const target=runTargets[enduranceMetric]||3.10686;value=(8.9-index*.08)*target}else value=raw;return{date:`friend-${index}`,label:`W${index+1}`,value:Number(value.toFixed(3))}}):[];
-  const width=plotSize,narrow=plotSize<520,height=narrow?300:320,left=narrow?42:56,right=narrow?12:18,top=20,bottom=narrow?32:36,plotWidth=width-left-right,plotHeight=height-top-bottom,values=[...entries,...friendEntries].map(item=>item.value),rawMin=values.length?Math.min(...values):0,rawMax=values.length?Math.max(...values):1,padding=Math.max(domain==='body'?1:isRunTimeMetric(enduranceMetric)?0.25:5,(rawMax-rawMin)*.15),min=rawMin-padding,max=rawMax+padding,spread=Math.max(.1,max-min);
+  const width=plotSize,narrow=plotSize<520,height=narrow?300:320,left=narrow?42:56,right=narrow?12:18,top=20,bottom=narrow?32:36,plotWidth=width-left-right,plotHeight=height-top-bottom,values=[...entries,...friendEntries].map(item=>item.value),rawMin=values.length?Math.min(...values):0,rawMax=values.length?Math.max(...values):1,padding=Math.max(domain==='body'?1:isRunTimeMetric(enduranceMetric)?0.25:5,(rawMax-rawMin)*.15),axis=niceAxis(rawMin-padding,rawMax+padding,4),min=axis.min,max=axis.max,spread=Math.max(.1,max-min);
   const plot=(items:Entry[])=>items.map((item,index)=>({...item,x:items.length===1?left+plotWidth/2:left+index*plotWidth/(items.length-1),y:top+plotHeight-(item.value-min)/spread*plotHeight})),points=weeklyMode?[]:plot(entries),friendPoints=plot(friendEntries);
   const distanceUnit=runningSelected?'mi':'distance';
   const unit=domain==='strength'?weightUnit:domain==='endurance'?(enduranceMetric==='weekly-distance'?distanceUnit:enduranceMetric==='duration'?'min':enduranceMetric==='distance'?'distance':enduranceMetric==='pace'?'min/mi':isRunTimeMetric(enduranceMetric)?'time':''):weightUnit;

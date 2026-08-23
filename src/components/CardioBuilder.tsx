@@ -55,7 +55,7 @@ const minutesToClock = (minutes: number) => {
 const linePace = (line: CardioLine) => {
   const miles = toMiles(Number(line.distance) || 0, line.unit);
   const minutes = clockToMinutes(line.time);
-  return miles > 0 && minutes > 0 ? `${minutesToClock(minutes / miles)} /mi` : '';
+  return miles > 0 && minutes > 0 ? `${minutesToClock(minutes / miles)}\u00a0/mi` : '';
 };
 
 const blankLine = (id: number, type = 'Run'): CardioLine => ({ id, cardioType: type, unit: unitFor(type), distance: '', time: '' });
@@ -82,9 +82,9 @@ const summarize = (lines: CardioLine[]) => {
     if (distance) distances.set(line.unit, (distances.get(line.unit) || 0) + distance);
   });
   const types = Array.from(new Set(filled.map(line => line.cardioType.trim()).filter(Boolean)));
-  const distanceText = [...distances].map(([unit, distance]) => `${Number(distance.toFixed(2))} ${unit}`).join(' + ');
+  const distanceText = [...distances].map(([unit, distance]) => `${Number(distance.toFixed(2))}\u00a0${Math.abs(distance) === 1 ? unit.replace(/s$/, '') : unit}`).join(' + ');
   const totalMiles = filled.reduce((total, line) => total + toMiles(Number(line.distance) || 0, line.unit), 0);
-  const pace = totalMiles > 0 && minutes > 0 ? `${minutesToClock(minutes / totalMiles)} /mi` : '';
+  const pace = totalMiles > 0 && minutes > 0 ? `${minutesToClock(minutes / totalMiles)}\u00a0/mi` : '';
   const count = filled.length > 1 ? `${filled.length} lines` : '';
   return [types.join(' + '), distanceText, minutes ? minutesToClock(minutes) : '', pace, count].filter(Boolean).join(' · ');
 };

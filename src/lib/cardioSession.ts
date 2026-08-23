@@ -73,14 +73,16 @@ export function formatCardioPace(draft:CardioLogDraft){
   }
   if(!miles||!minutes)return'';
   const looksLikeRunning=/run|jog|walk/i.test(draft.activity)||/\bmi(?:les?)?\b/i.test(draft.summary);
-  return looksLikeRunning?`${formatCardioMinutes(minutes/miles)} /mi`:'';
+  return looksLikeRunning?`${formatCardioMinutes(minutes/miles)}\u00a0/mi`:'';
 }
 const tidy=(value:number)=>Number(value.toFixed(2)).toString();
+/* "1 miles" reads as a bug even though it is only grammar. */
+const unitLabel=(value:number,unit:string)=>Math.abs(value)===1?unit.replace(/s$/,''):unit;
 export function formatCardioSummary(draft:CardioLogDraft){
   const legacy=legacyCardioIntervals(draft);
   if(!legacy.length){const pace=formatCardioPace(draft);return[draft.summary,pace].filter(Boolean).join(' · ')}
   const minutes=legacy.reduce((sum,line)=>sum+(Number(line.time)||0),0);const distances=new Map<string,number>();legacy.forEach(line=>{const distance=Number(line.distance)||0,activity=String(line.cardioType||line.activity||draft.activity),unit=String(line.unit||line.distanceUnit||(isRunning(activity)?'mi':'')).trim();if(distance&&unit)distances.set(unit,(distances.get(unit)||0)+distance)});
-  const distanceText=[...distances].map(([unit,distance])=>`${tidy(distance)} ${unit}`).join(' + ');return [draft.activity,distanceText,minutes?formatCardioMinutes(minutes):'',formatCardioPace(draft)].filter(Boolean).join(' · ');
+  const distanceText=[...distances].map(([unit,distance])=>`${tidy(distance)}\u00a0${unitLabel(distance,unit)}`).join(' + ');return [draft.activity,distanceText,minutes?formatCardioMinutes(minutes):'',formatCardioPace(draft)].filter(Boolean).join(' · ');
 }
 
 export function recommendCardioOptions({readiness,strengthFatigue,goalText}:{readiness:number;strengthFatigue:'Low'|'Moderate'|'High';goalText:string}):CardioRecommendation[]{

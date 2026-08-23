@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom';
 import { PageIntro } from '../components/AppShell';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { cardioMiles, formatCardioSummary as baseCardioSummary, type CardioLogDraft } from '../lib/cardioSession';
+import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
 
 const formatDate=(date:string)=>new Date(`${date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-const formatCardioSummary=(session:CardioLogDraft)=>{const summary=baseCardioSummary(session);const distance=summary.match(/(\d+(?:\.\d+)?)\s*mi(?:les?)?\b/i);const duration=summary.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);if(!distance||!duration)return summary;const parts=duration[1].split(':').map(Number);const seconds=parts.length===3?parts[0]*3600+parts[1]*60+parts[2]:parts[0]*60+parts[1];const paceSeconds=Math.round(seconds/Number(distance[1]));if(!Number.isFinite(paceSeconds)||paceSeconds<=0)return summary;const pace=`${Math.floor(paceSeconds/60)}:${String(paceSeconds%60).padStart(2,'0')} /mi`;const withoutBadPace=summary.replace(/\s*·\s*PACE\s+(?=\d+(?:\.\d+)?\s*mi(?:les?)?\b)/i,' · ');const unlabeledSuffix=` · ${pace}`;const clean=withoutBadPace.endsWith(unlabeledSuffix)?withoutBadPace.slice(0,-unlabeledSuffix.length):withoutBadPace;return`${clean} · PACE ${pace}`};
 const logPageSize=12;
 const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const iso=(year:number,month:number,day:number)=>`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
