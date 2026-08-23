@@ -116,13 +116,19 @@ export function WorkoutPage() {
   const choosePlanDay=(index:number)=>{const day=savedDays[index];const next:LoggedTopSet[]=(day?.muscles||[]).flatMap(muscle=>{const assigned=(day.exercises||[]).map(name=>exercises.find(exercise=>exercise.name===name)).find(exercise=>exercise?.enabled&&exercise.kind==='Strength'&&exerciseCategory(exercise)==='Strength'&&exercise.muscles.includes(muscle));return assigned?[{muscle,lift:assigned.name,weight:0,reps:0,completed:true}]:[]});setSelectedPlanDay(index);setTopSets(next);setLift('');setWeight('');setReps('1');setNewTopSetMuscle('');setHistoryExercise(next[0]?.lift||'');setManualMuscles(false)};
   const saveWorkout=async()=>{
     setSaved(false);
-    if(!editingRecord&&!completedTopSets.length&&!lift&&!hasCardio){setSaveMessage('Add a top set, cardio entry, body-weight check-in, or note before saving a new day.');return}
+    // A training day is worth saving without a top set: a body-weight check-in, a
+    // note, an effort rating or an already quick-logged set are all real records.
+    // This guard used to demand a set/lift/cardio while the message promised
+    // otherwise, and it was stricter than the one that opens the review.
+    if(!editingRecord&&!completedTopSets.length&&!lift&&!hasCardio&&!quickLoggedKeys.length&&!bodyWeight&&!notes.trim()&&!effort){setSaveMessage('Add a top set, cardio entry, body-weight check-in, effort rating, or note before saving a new day.');return}
     const title=editingRecord?.title||(workoutSource==='repeat'?repeatedWorkout.name:workoutSource==='plan'?(plannedDay?.name||'Planned Workout'):'Custom Workout');
     const selectedLiftData=exercises.find(exercise=>exercise.name===lift);const savedTopSets=completedTopSets.length?completedTopSets:(lift&&weight&&reps?[{muscle:selectedLiftData?.muscles.find(muscle=>sourceMuscles.includes(muscle))||selectedLiftData?.muscles[0]||'Primary',lift,weight:Number(weight),reps:Number(reps),calculatedMax:calculatedMax??undefined,completed:true}]:[]);const firstSet=savedTopSets[0];
     const draft={date:sessionIso,title,muscles:Array.from(new Set([...savedTopSets.map(set=>set.muscle),...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeight?Number(bodyWeight):undefined,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id))};
     const result=editingRecord?updateRecord(editingRecord.id,draft):addRecord(draft);
     if(!result.ok){setSaveMessage(editingRecord?'This workout could not be found. Return to History and try again.':'This exact workout is already in your history. Nothing was saved twice.');return}
-    if(!editingRecord&&workoutSource==='plan')markCompleted();setSaved(true);setReviewing(false);navigate(editingRecord?'/history':'/');
+    // Only real training closes out the day's recommendation. A body-weight
+    // check-in or a note must not consume the workout you still owe.
+    if(!editingRecord&&workoutSource==='plan'&&(savedTopSets.length>0||hasCardio))markCompleted();setSaved(true);setReviewing(false);navigate(editingRecord?'/history':'/');
   };
   const openReview=()=>{setSaved(false);if(editingRecord){setSaveMessage('');setReviewing(true);return}const hasQuickLoggedTopSet=quickLoggedKeys.length>0;const hasContext=Boolean(bodyWeight||notes.trim()||effort);if(!completedTopSets.length&&!lift&&!hasCardio&&!hasQuickLoggedTopSet&&!hasContext){setSaveMessage('Add a result or session detail before finishing the day.');return}setSaveMessage('');setReviewing(true)};
   const removeWorkout=async()=>{if(!editingRecord||!window.confirm(`Delete the workout record for ${todayShort}? This permanently removes it from History and Insights.`))return;setSaveMessage('');const removed=await deleteRecord(editingRecord.id);if(removed)navigate('/history');else setSaveMessage('The workout could not be deleted. Check the sync message and try again.')};
