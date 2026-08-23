@@ -78,3 +78,9 @@
 @media(max-width:700px){
   .workout-editor{gap:12px}.workout-editor>.page-intro{align-items:flex-start}.workout-editor>.page-intro h2{font-size:34px;margin:4px 0}.workout-editor>.page-intro p{display:none}.workout-editor>.card{padding:16px}.compact-workout-source .source-options{grid-template-columns:repeat(3,1fr)}.compact-workout-source .source-options button{min-height:58px}.compact-workout-source .source-options span{font-size:7px}.compact-workout-source .source-options b{font-size:13px}.compact-split-picker .split-day-options{grid-template-columns:1fr}.top-set-entry{padding:16px}.top-set-entry-head{align-items:flex-start}.top-set-entry .field-grid{grid-template-columns:1fr 1fr;gap:10px}.top-set-entry input{font-size:16px}.session-details .muscle-picker{gap:5px}.session-details .muscle-chip{padding:7px 10px;font-size:10px}.save-workout{position:sticky;bottom:calc(67px + env(safe-area-inset-bottom));z-index:4;width:calc(100% - 68px)!important;box-shadow:0 -12px 28px var(--bg)}
 }
+
+/* A rejected save must say so where the athlete is looking. This message used to
+   render after the sticky save button, in normal flow at the foot of the document,
+   so a blocked save read as the button doing nothing at all. */
+.review-blocked{margin:0;padding:12px 14px;border:1px solid #6b4a20;border-left:3px solid var(--warning);border-radius:9px;background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);font-size:13px;line-height:1.45}
+.save-confirmation.save-warning{margin:0 0 10px;padding:11px 13px;border-radius:9px;border:1px solid #6b4a20;background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);text-align:left}
