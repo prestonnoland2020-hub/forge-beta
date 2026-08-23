@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isDemoMode } from '../../lib/env';
 import { supabase } from '../../lib/supabase';
 
 export const profileInputSchema = z.object({
@@ -19,6 +20,10 @@ export type ProfileInput = z.infer<typeof profileInputSchema>;
 
 export async function saveProfile(input: ProfileInput) {
   const parsed = profileInputSchema.parse(input);
+  /* Preview builds have no Supabase session, so asking for one here failed
+     onboarding with "Auth session missing!" and trapped a new athlete on the
+     setup screen. The local profile is still written by the caller. */
+  if (isDemoMode) return;
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('Not signed in.');
 

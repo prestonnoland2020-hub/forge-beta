@@ -5,20 +5,19 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { isDemoMode } from '../lib/env';
 
+/* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
+   standalone exercise library that duplicated what the Log screen already does;
+   exercises are only ever added while logging, so the library moved to Profile. */
 const primaryNav = [
   ['/', 'Today', 'home'],
   ['/workout', 'Log', 'plus'],
-  ['/history', 'History', 'history'],
   ['/plan', 'Plan', 'calendar'],
   ['/insights', 'Insights', 'chart'],
-] as const;
-
-const manageNav = [
   ['/goals', 'Goals', 'target'],
-  ['/exercises', 'Exercises', 'library'],
+  ['/history', 'History', 'history'],
 ] as const;
 
-type NavGlyphName = typeof primaryNav[number][2] | typeof manageNav[number][2];
+type NavGlyphName = typeof primaryNav[number][2] | 'library';
 function NavGlyph({ name }: { name: NavGlyphName }) {
   const paths: Record<NavGlyphName, ReactNode> = {
     home: <><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5M9 21v-7h6v7"/></>,
@@ -68,12 +67,6 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       <nav className="side-nav" aria-label="Primary navigation">
         {primaryNav.map(([to, label, icon]) => <NavLink key={to} to={to} end={to === '/'}><NavGlyph name={icon}/>{label}</NavLink>)}
       </nav>
-      <details className="side-more">
-        <summary><span className="nav-icon">•••</span>Manage</summary>
-        <nav aria-label="Management navigation">
-          {manageNav.map(([to, label, icon]) => <NavLink key={to} to={to}><NavGlyph name={icon}/>{label}</NavLink>)}
-        </nav>
-      </details>
       <NavLink className="sidebar-foot" to="/profile"><div className="avatar small">{initials}</div><div><strong>{setup?.displayName || 'Athlete'}</strong><span>Profile & recovery</span></div><b>›</b></NavLink>
     </aside>
     <div className="app-main">
@@ -83,12 +76,6 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
           {hasRecoveryData && <NavLink className="top-readiness" to="/profile"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
           <NavLink className="avatar" to="/profile">{initials}</NavLink>
-          <details className="mobile-manage">
-            <summary aria-label="Open management menu">•••</summary>
-            <nav aria-label="Management navigation">
-              {manageNav.map(([to, label, icon]) => <NavLink key={to} to={to} onClick={event => event.currentTarget.closest('details')?.removeAttribute('open')}><NavGlyph name={icon}/>{label}</NavLink>)}
-            </nav>
-          </details>
         </div>
       </header>
       {!isDemoMode && syncError && <div className="data-sync-error"><span>Your latest training data is still saved on this device, but Supabase could not sync it.</span><button onClick={retrySync}>Retry</button></div>}

@@ -300,3 +300,182 @@ body {
   .classic-calendar .weekday-row, .classic-calendar .calendar-grid { gap: 2px; }
   .app-main .page { padding-inline: 12px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Flat navigation. "Manage" was a drawer holding Goals and a standalone
+   exercise library — two taps to reach a primary destination. Goals is now a
+   top-level tab, so the bottom bar carries six. At six the labels have to
+   shrink before the tap targets do; the targets stay at 44px.
+   --------------------------------------------------------------------------- */
+.bottom-nav { grid-auto-columns: minmax(0, 1fr); }
+.bottom-nav a { min-width: 0; }
+.bottom-nav a small {
+  overflow: hidden;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .bottom-nav a small { font-size: 9px; }
+}
+
+/* ---------------------------------------------------------------------------
+   The chart is the reason this page exists, so on a phone it gets the room.
+   --------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .overview-progress-chart { padding: 16px 12px 18px; }
+  .overview-progress-plot { margin-inline: -4px; }
+  .overview-progress-plot svg { width: 100%; height: auto; min-height: 260px; }
+  .chart-change-strip { margin: 10px 0 12px; }
+
+  /* Weekly-distance bars: scroll sideways rather than compressing sixteen
+     weeks into slivers too thin to read or tap. */
+  .overview-weekly-wrap { margin-inline: -4px; }
+  .overview-weekly-bars {
+    grid-auto-columns: minmax(38px, 1fr);
+    overflow-x: auto;
+    height: 210px;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .overview-weekly-bars > div { scroll-snap-align: end; }
+  /* Every label fits once the bars have a real minimum width. */
+  .overview-weekly-bars > div:nth-child(even) span { visibility: visible; }
+  .overview-weekly-bars b { font-size: 10px; }
+  .overview-weekly-bars span { font-size: 10px; }
+}
+.overview-weekly-wrap { display: grid; gap: 12px; }
+.overview-weekly-bars { height: 230px; }
+.overview-weekly-bars i { max-width: 44px; }
+
+/* ---------------------------------------------------------------------------
+   Split builder: picking exercises on a phone. The old picker was one flat
+   list of every strength movement with a two-line row each — a long scroll to
+   find anything. Muscle-group filter chips narrow it first, rows are single
+   line, and the day's current selections sort to the top.
+   --------------------------------------------------------------------------- */
+.exercise-picker-filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.exercise-picker-filters::-webkit-scrollbar { display: none; }
+.exercise-picker-filters button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.exercise-picker-filters button.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.exercise-picker-options > button { grid-template-columns: 24px 1fr; }
+.exercise-picker-options strong { font-size: 12px; line-height: 1.25; }
+.exercise-picker-empty {
+  margin: 0;
+  padding: 20px 12px;
+  background: #0b1210;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .exercise-picker-filters { padding: 10px 12px; }
+  .exercise-picker-filters button { min-height: 38px; font-size: 12px; }
+  /* One column, full-width rows at the 44px touch minimum. */
+  .exercise-picker-options { grid-template-columns: 1fr; max-height: 340px; }
+  .exercise-picker-options > button { min-height: 48px; padding: 12px 14px; }
+  .exercise-picker-options strong { font-size: 13px; }
+  .exercise-check { width: 24px; height: 24px; }
+  /* The selected-for-this-day chips are the answer to "what did I pick" — make
+     them readable rather than 9px. */
+  .selected-exercise-chips > button { min-height: 38px; font-size: 11px; }
+}
+
+/* ---------------------------------------------------------------------------
+   The bottom bar's column count had been hard-coded in four different files
+   (5, 6 and 7 columns, three of them !important), so adding Goals pushed
+   History onto a second row. Flex makes the count irrelevant: whatever is in
+   the bar divides the width evenly.
+   --------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .bottom-nav {
+    display: flex !important;
+    grid-template-columns: none !important;
+    align-items: stretch;
+    gap: 0;
+  }
+  .bottom-nav a { flex: 1 1 0; min-width: 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   Chart controls. A max-760 rule with two class names was beating the
+   max-900 rule with one, so all three selects stacked full-width and pushed
+   the chart itself below the fold. Match the specificity and settle it.
+   --------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .overview-progress-chart .overview-chart-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+    align-items: start;
+    margin: 14px 0 4px;
+  }
+  .overview-progress-chart .overview-chart-controls label {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    font-size: 11px;
+  }
+  .overview-progress-chart .overview-chart-controls label:first-child { grid-column: 1 / -1; }
+  .overview-progress-chart .overview-chart-controls label select { height: 46px; margin: 0; }
+  .overview-progress-chart .overview-chart-controls label small { font-size: 10px; line-height: 1.3; }
+  /* An empty range should say so in a line, not in half a screen. */
+  .performance-empty { min-height: 0; padding: 28px 16px; }
+}
+
+/* ---------------------------------------------------------------------------
+   Get the chart above the fold. On a phone the page title, the copy under it
+   and the boxed time-range card consumed most of the first screen before a
+   single data point appeared. The range still reads as a labelled control —
+   it just stops being a card, and the range name itself is redundant with the
+   selected chip.
+   --------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .insights-pro .page-intro p { display: none; }
+  .insights-pro .page-intro h2 { font-size: clamp(22px, 6vw, 28px); }
+  .insights-pro .insights-range-bar {
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .insights-pro .insights-range-bar > div:first-child { display: none; }
+  .insights-pro .range-options { width: 100%; }
+  .insights-pro .range-options button { flex: 1 1 0; min-height: 42px; }
+  .insights-pro.stack-xl { gap: 16px; }
+}
+
+/* Weekly distance hides the friend overlay (there is no comparable friend
+   series), so the two remaining controls share the row instead of leaving a
+   full-width select and a gap. */
+@media (max-width: 900px) {
+  .overview-progress-chart .overview-chart-controls.two-up label:first-child { grid-column: auto; }
+  .chart-change-strip { padding: 10px 12px; }
+  .chart-change-strip strong { font-size: 20px; }
+}

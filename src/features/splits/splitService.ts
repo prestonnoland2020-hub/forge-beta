@@ -1,3 +1,4 @@
+import { isDemoMode } from '../../lib/env';
 import { supabase } from '../../lib/supabase';
 
 export type SplitDayInput = {
@@ -9,6 +10,8 @@ export type SplitDayInput = {
 };
 
 export async function saveTrainingSplit(name: string, days: SplitDayInput[]) {
+  /* Preview builds have no Supabase session; the split still saves locally. */
+  if (isDemoMode) return null;
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) throw authError ?? new Error('Not signed in.');
 
