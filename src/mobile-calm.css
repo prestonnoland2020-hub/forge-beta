@@ -8,8 +8,101 @@
 .connection-actions button { min-height: 40px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); color: var(--text); padding: 9px 12px; font-weight: 800; }
 .connection-actions .danger { color: #ef9a9a; }
 .connection-message { margin: 0; padding: 14px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.mobile-plan-settings { display: none; }
+.mobile-swipe-hint { display: none; }
+
+/* Old Forge visual language, backed by the new account and training engine. */
+body {
+  background-color: #07100d !important;
+  background-image: linear-gradient(rgba(130, 164, 149, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(130, 164, 149, .035) 1px, transparent 1px) !important;
+  background-size: 42px 42px !important;
+}
+.app-main { background: radial-gradient(circle at 92% 0, rgba(167, 210, 45, .11), transparent 26rem); }
+.card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections {
+  border-color: #35443d !important;
+  border-radius: 22px !important;
+  background-color: #15201c !important;
+}
+.button { border-radius: 14px; }
+.card:hover, .feed-card:hover { border-color: #4a5c42; }
+.completed-day-card { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; padding: 28px !important; border-left: 7px solid var(--accent) !important; }
+.completed-day-check { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 18px; background: var(--accent); color: #07100d; font-size: 28px; font-weight: 1000; }
+.completed-day-card h2 { margin: 5px 0; }
+.completed-day-card p, .completed-day-note { color: var(--muted); }
+.completed-day-results { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #35443d; border-radius: 16px; overflow: hidden; background: #0a1310; }
+.completed-day-results > div { display: grid; gap: 3px; padding: 16px 18px; }
+.completed-day-results > div + div { border-left: 1px solid #35443d; }
+.completed-day-results strong { color: var(--accent); font: 800 28px var(--display); }
+.completed-day-results span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+.completed-day-card footer { grid-column: 1 / -1; display: flex; gap: 10px; }
 
 @media (max-width: 700px) {
+  .page { padding: 18px 14px calc(104px + env(safe-area-inset-bottom)); }
+  .page-intro { margin-bottom: 2px; }
+  .page-intro h2 { font-size: 38px !important; letter-spacing: -.015em; }
+  .page-intro p { display: none; }
+  .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list { border-radius: 24px !important; }
+  .card { padding: 18px; }
+  .bottom-nav { background: rgba(12, 24, 19, .97) !important; border-top-color: #35443d !important; backdrop-filter: blur(18px); }
+  .coach-bubble-launcher { box-shadow: 0 0 0 5px #07100d, 0 0 0 8px var(--accent); }
+
+  .completed-day-card { grid-template-columns: 44px 1fr; padding: 20px !important; border-left-width: 6px !important; }
+  .completed-day-check { width: 44px; height: 44px; border-radius: 14px; font-size: 22px; }
+  .completed-day-card footer { display: grid; }
+
+  .history-page { gap: 14px; }
+  .history-calendar { padding: 20px 14px !important; touch-action: pan-y; }
+  .history-toolbar { grid-template-columns: 48px 1fr 48px; margin-bottom: 16px; }
+  .history-toolbar button { width: 48px; height: 48px; border-radius: 16px; background: #223029; font-size: 24px; }
+  .history-toolbar h3 { font-size: 29px; }
+  .history-toolbar small { font-size: 9px; }
+  .calendar-kpis { border-radius: 18px !important; overflow: hidden; background: #09120f !important; }
+  .calendar-kpis > div { padding: 15px !important; }
+  .calendar-kpis strong { font-size: 27px !important; }
+  .calendar-grid { gap: 3px; border: 0 !important; }
+  .restored-calendar .calendar-grid > button, .restored-calendar .calendar-grid > i { min-height: 48px !important; border: 0 !important; border-radius: 13px; padding: 8px !important; background: transparent; }
+  .calendar-grid > button.trained { background: rgba(215, 255, 69, .045) !important; }
+  .calendar-grid > button.selected { box-shadow: inset 0 0 0 3px var(--accent) !important; }
+  .calendar-markers { left: 8px !important; bottom: 7px !important; }
+  .calendar-legend { justify-content: center; margin-top: 10px; }
+  .simple-day-preview { border-left: 5px solid var(--accent) !important; }
+  .history-table-card { display: none; }
+
+  .desktop-plan-settings { display: none !important; }
+  .mobile-plan-settings { display: block; padding: 0 !important; overflow: hidden; }
+  .mobile-plan-settings summary { display: flex; justify-content: space-between; align-items: center; padding: 17px 18px; list-style: none; }
+  .mobile-plan-settings summary::-webkit-details-marker { display: none; }
+  .mobile-plan-settings summary > div { display: grid; gap: 4px; }
+  .mobile-plan-settings summary > b { color: var(--accent); font-size: 22px; }
+  .mobile-plan-settings[open] summary > b { transform: rotate(45deg); }
+  .mobile-plan-settings > div { display: grid; gap: 14px; padding: 0 18px 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .plan-studio-layout { gap: 12px; }
+  .plan-day-list { display: flex !important; overflow-x: auto; position: static; padding: 12px; gap: 8px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .plan-day-list::-webkit-scrollbar { display: none; }
+  .plan-day-list > div { display: none; }
+  .plan-day-list > button { flex: 0 0 78%; min-height: 74px; border: 1px solid #35443d !important; border-radius: 17px; padding: 13px 14px; scroll-snap-align: center; background: #0c1512; }
+  .plan-day-list > button.active { border-color: var(--accent) !important; box-shadow: inset 4px 0 var(--accent); background: rgba(215,255,69,.07); }
+  .plan-day-list > .add-plan-day { flex-basis: 58%; display: grid; place-items: center; }
+  .day-editor-panel { touch-action: pan-y; }
+  .day-editor-panel > header { padding: 20px 18px; gap: 12px; }
+  .day-editor-panel h2 { font-size: 38px; }
+  .mobile-swipe-hint { display: block; margin-top: 6px; color: var(--muted); font-size: 9px; }
+  .day-order-actions { display: grid; grid-template-columns: 1fr 1fr auto; width: 100%; }
+  .day-editor-panel > header .day-order-actions button { min-height: 42px; min-width: 0; }
+  .day-editor-basics, .day-editor-section { padding: 18px; }
+  .day-type-options { display: grid; grid-template-columns: 1fr 1fr !important; }
+  .day-type-options button { min-height: 74px; border-radius: 15px; }
+  .day-section-heading p { font-size: 10px; line-height: 1.4; }
+  .exercise-picker-options { max-height: 260px; overflow: auto; }
+
+  .top-set-card-stack { gap: 12px; }
+  .top-set-card-stack > header { padding: 4px 2px; }
+  .top-set-card-stack > header h2 { font-size: 36px; }
+  .top-set-header-actions .button { min-height: 46px; }
+  .top-set-entry { padding: 18px !important; border-left-width: 6px; }
+  .top-set-entry h3 { font-size: 24px; }
+  .inline-log-exercise { position: fixed; inset: auto 0 0; z-index: 75; max-height: 88dvh; overflow: auto; padding: 20px 16px calc(22px + env(safe-area-inset-bottom)); border-radius: 26px 26px 0 0; background: #15201c; box-shadow: 0 -20px 60px #000b; }
+  .inline-log-exercise footer { display: grid; }
   .onboarding-simple { padding: 14px; }
   .onboarding-simple .onboarding-brand { margin-bottom: 14px; }
   .onboarding-simple .onboarding-grid { gap: 10px; }
