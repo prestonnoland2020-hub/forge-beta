@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
-import {summarizeCardioDraft, isRunningCardio} from '../lib/cardioSession';
+import {summarizeCardioDraft, isRunningCardio, formatCardioSummary} from '../lib/cardioSession';
 
 type TimeRange='4w'|'3m'|'6m'|'1y'|'all';
 type Mode='equivalent'|'actual';
@@ -17,7 +17,7 @@ export function RunningPerformanceChart({range,rangeLabel}:{range:TimeRange;rang
   const [target,setTarget]=useState<Target>('5k');
   const [mode,setMode]=useState<Mode>('equivalent');
   const [activePoint,setActivePoint]=useState<number|null>(null);
-  const efforts=useMemo<RunEffort[]>(()=>records.flatMap(record=>(record.cardioSessions||[]).filter(session=>isRunningCardio(session)).map(session=>{const totals=summarizeCardioDraft(session);return{date:record.date,label:new Date(`${record.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),distance:totals.distance,seconds:totals.minutes*60,kind:session.summary}})).filter(effort=>effort.distance>0&&effort.seconds>0),[records]);
+  const efforts=useMemo<RunEffort[]>(()=>records.flatMap(record=>(record.cardioSessions||[]).filter(session=>isRunningCardio(session)).map(session=>{const totals=summarizeCardioDraft(session);return{date:record.date,label:new Date(`${record.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),distance:totals.distance,seconds:totals.minutes*60,kind:formatCardioSummary(session)}})).filter(effort=>effort.distance>0&&effort.seconds>0),[records]);
   const data=useMemo(()=>{
     const now=Date.now();
     const cutoff=rangeDays[range]===Infinity?-Infinity:now-rangeDays[range]*86400000;

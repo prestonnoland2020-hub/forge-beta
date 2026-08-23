@@ -1,6 +1,6 @@
 import { RunningPerformanceChart } from './RunningPerformanceChart';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
-import { cardioMiles, enduranceGroup, summarizeCardioDraft } from '../lib/cardioSession';
+import { cardioMiles, enduranceGroup, summarizeCardioDraft , formatCardioSummary} from '../lib/cardioSession';
 
 type TimeRange = '4w' | '3m' | '6m' | '1y' | 'all';
 
@@ -9,7 +9,7 @@ const formatDuration=(minutes:number)=>`${Math.floor(minutes/60)?`${Math.floor(m
 
 export function CardioInsightsPanel({range,rangeLabel,frequencyOnly=false,hideFrequency=false}:{range:TimeRange;rangeLabel:string;frequencyOnly?:boolean;hideFrequency?:boolean}){
   const {records}=useWorkoutHistory();
-  const loggedSessions=records.flatMap(record=>(record.cardioSessions||[]).map(draft=>{const totals=summarizeCardioDraft(draft);return{date:record.date,activity:enduranceGroup(draft),minutes:totals.minutes,recoveryMinutes:totals.recoveryMinutes,miles:cardioMiles(draft)||undefined,detail:draft.summary}}));
+  const loggedSessions=records.flatMap(record=>(record.cardioSessions||[]).map(draft=>{const totals=summarizeCardioDraft(draft);return{date:record.date,activity:enduranceGroup(draft),minutes:totals.minutes,recoveryMinutes:totals.recoveryMinutes,miles:cardioMiles(draft)||undefined,detail:formatCardioSummary(draft)}}));
   const sessions=loggedSessions;
   const now=Date.now();
   const cutoff=rangeDays[range]===Infinity?-Infinity:now-rangeDays[range]*86400000;

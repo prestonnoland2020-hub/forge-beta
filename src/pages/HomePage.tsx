@@ -5,7 +5,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { openCoachBubble } from '../features/training/coachService';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
-import { cardioMiles } from '../lib/cardioSession';
+import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
 
 const todayIso = () => {
   const now = new Date();
@@ -70,7 +70,7 @@ export function HomePage() {
     </section>}
 
     <section className="feed-support-grid" aria-label="Training overview">
-      <article className="feed-card compact-card"><header><span>LAST ACTIVITY</span><Link to="/history">View all</Link></header>{priorWorkout ? <><div className="compact-activity"><span className="feed-icon muted-icon">✓</span><div><strong>{priorWorkout.title}</strong><small>{shortDate(priorWorkout.date)} · {priorWorkout.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Cardio'}</small></div></div><div className="compact-result-list">{priorSets.slice(0, 2).map(set => <div key={set.id || `${set.lift}-${set.weight}-${set.reps}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}{!priorSets.length && priorWorkout.cardioSessions?.slice(0, 1).map(session => <div key={session.id}><span>{session.activity}</span><strong>{session.summary}</strong></div>)}</div></> : <p className="feed-empty-copy">Nothing logged yet.</p>}</article>
+      <article className="feed-card compact-card"><header><span>LAST ACTIVITY</span><Link to="/history">View all</Link></header>{priorWorkout ? <><div className="compact-activity"><span className="feed-icon muted-icon">✓</span><div><strong>{priorWorkout.title}</strong><small>{shortDate(priorWorkout.date)} · {priorWorkout.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Cardio'}</small></div></div><div className="compact-result-list">{priorSets.slice(0, 2).map(set => <div key={set.id || `${set.lift}-${set.weight}-${set.reps}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}{!priorSets.length && priorWorkout.cardioSessions?.slice(0, 1).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}</div></> : <p className="feed-empty-copy">Nothing logged yet.</p>}</article>
       <article className="feed-card compact-card"><header><span>LAST 7 DAYS</span><Link to="/insights">Insights</Link></header><div className="week-score"><strong>{weekRecords.length}</strong><span>active {weekRecords.length === 1 ? 'day' : 'days'}</span></div><div className="feed-metric-row small"><div><strong>{weekTopSets}</strong><span>Top sets</span></div><div><strong>{weekMiles ? weekMiles.toFixed(1) : '0'}</strong><span>Miles</span></div></div></article>
       <article className="feed-card compact-card goal-card"><header><span>GOAL FOCUS</span><Link to="/goals">Goals</Link></header>{primaryGoal ? <><strong className="goal-name">{primaryGoal.title}</strong><p>{goalReason}{primaryGoal.date ? ` · ${shortDate(primaryGoal.date)}` : ''}</p><div className="goal-target"><span>TARGET</span><strong>{primaryGoal.target}</strong></div></> : <><p className="feed-empty-copy">No goal set.</p><Link className="feed-text-link" to="/goals">Create a goal →</Link></>}</article>
     </section>

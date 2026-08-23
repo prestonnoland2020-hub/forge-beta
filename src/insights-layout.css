@@ -26,9 +26,9 @@
 .overview-chart-point:hover .overview-point-dot,.overview-chart-point:focus .overview-point-dot{r:8px;stroke-width:4;filter:drop-shadow(0 0 6px rgba(255,255,255,.28))}
 .overview-chart-tooltip{position:absolute;z-index:3;display:grid;gap:2px;min-width:118px;padding:9px 11px;transform:translate(-50%,calc(-100% - 10px));pointer-events:none;background:#eef4f1;color:#07100c;border-radius:7px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
 .overview-chart-tooltip:after{content:"";position:absolute;left:50%;bottom:-5px;width:10px;height:10px;transform:translateX(-50%) rotate(45deg);background:#eef4f1}
-.overview-chart-tooltip span{font-size:7px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#52605a}
+.overview-chart-tooltip span{font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#52605a}
 .overview-chart-tooltip strong{font:800 18px var(--display);line-height:1}
-.overview-chart-tooltip small{font-size:8px;color:#52605a}
+.overview-chart-tooltip small{font-size:10px;color:#52605a}
 @media(max-width:620px){.overview-chart-tooltip{min-width:100px;padding:7px 9px}.overview-chart-tooltip strong{font-size:16px}}
 
 /* Weekly mileage: the number an endurance athlete steers by. */
@@ -41,7 +41,7 @@
 .weekly-mileage-note{margin:0;color:var(--muted);font-size:11px}
 @media(max-width:900px){
   .weekly-mileage-bars{height:150px;gap:3px}
-  .weekly-mileage-bars b{font-size:9px}
+  .weekly-mileage-bars b{font-size:11px}
   /* Twelve week labels will not fit a phone; show every other one. */
   .weekly-mileage-bars>div:nth-child(even) span{visibility:hidden}
 }

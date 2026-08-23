@@ -94,9 +94,9 @@ body {
   /* Four peer metrics, so all four read the same. One of them used to be picked out
      in accent for no reason the user could see. */
   .classic-calendar .calendar-kpis strong { font: 800 19px var(--sans) !important; color: var(--text); }
-  .classic-calendar .calendar-kpis span { font-size: 8px; font-weight: 900; letter-spacing: .04em; }
+  .classic-calendar .calendar-kpis span { font-size:10px; font-weight: 900; letter-spacing: .04em; }
   .classic-calendar .weekday-row, .classic-calendar .calendar-grid { gap: 4px; }
-  .classic-calendar .weekday-row span { padding: 0 0 4px; font-size: 9px; }
+  .classic-calendar .weekday-row span { padding: 0 0 4px; font-size:11px; }
   .classic-calendar .calendar-grid { border: 0 !important; }
   .classic-calendar .calendar-grid > button, .classic-calendar .calendar-grid > i { aspect-ratio: 1; min-height: 0 !important; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 0 !important; border-radius: 10px; padding: 3px !important; background: #101815 !important; color: #65716c; font-size: 13px; text-align: center; }
   .classic-calendar .calendar-grid > i { background: transparent !important; }
@@ -125,7 +125,7 @@ body {
   .day-editor-panel { touch-action: pan-y; }
   .day-editor-panel > header { padding: 20px 18px; gap: 12px; }
   .day-editor-panel h2 { font-size: 38px; }
-  .mobile-swipe-hint { display: block; margin-top: 6px; color: var(--muted); font-size: 9px; }
+  .mobile-swipe-hint { display: block; margin-top: 6px; color: var(--muted); font-size:11px; }
   .day-order-actions { display: grid; grid-template-columns: 1fr 1fr auto; width: 100%; }
   .day-editor-panel > header .day-order-actions button { min-height: 42px; min-width: 0; }
   .day-editor-basics, .day-editor-section { padding: 18px; }
@@ -317,7 +317,7 @@ body {
   white-space: nowrap;
 }
 @media (max-width: 360px) {
-  .bottom-nav a small { font-size: 9px; }
+  .bottom-nav a small { font-size:11px; }
 }
 
 /* ---------------------------------------------------------------------------

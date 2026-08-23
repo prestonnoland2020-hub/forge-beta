@@ -10,3 +10,8 @@ migration/exports/
 *.tsbuildinfo
 /bash
 /fitness-platform@0.1.0
+audit.mjs
+inspect.mjs
+seed.mjs
+rebuild.sh
+kill_preview.sh

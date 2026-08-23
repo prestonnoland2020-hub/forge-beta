@@ -345,3 +345,54 @@ details>summary::-webkit-details-marker{display:none}
   .feed-metric-row strong,.completed-day-results strong{font-size:23px}
   .button{min-height:48px}
 }
+
+/* ------------------------------------------------- single-column grid guard
+   An implicit `1fr` track is `minmax(auto, 1fr)`, so one child with a wide
+   min-content — a long exercise name, a cardio summary — stretches the track
+   and pushes the whole row past the viewport. Every stack that holds free text
+   needs the track allowed to shrink. */
+.history-log-list>button,.compact-result-list>div,.saved-cardio-list>div,
+.cardio-log-saved>div,.review-result,.review-cardio,.today-workout-items>label,
+.plan-day-list>button,.recent-workout-picker button{min-width:0}
+.history-log-what,.compact-result-list span,.compact-result-list strong,
+.cardio-log-saved strong,.today-workout-items>label>span{min-width:0}
+
+/* Free text that can be arbitrarily long clamps to two lines rather than
+   either clipping mid-word or forcing its container wide. */
+.history-log-what em,.cardio-log-saved small,.feed-card-header em,
+.compact-activity small{
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;white-space:normal;overflow-wrap:anywhere;
+}
+
+/* Calendar cells stay a legal tap target on the narrowest phones, where seven
+   equal columns would otherwise squeeze them below 38px. */
+.calendar-grid>button,.calendar-grid>a{min-height:40px}
+/* Seven square cells cannot each clear 38px on a 320px screen unless the
+   surrounding padding gives way, so the container tightens rather than the
+   tap target shrinking. 320 - 16 page - 16 card - 12 gaps = 39px per cell. */
+@media(max-width:360px){
+  /* Selectors match the ones in the mobile pass exactly, so this wins on order
+     rather than by escalating specificity further. */
+  .history-calendar.classic-calendar{padding:8px!important}
+  .app-main .page{padding-inline:8px}
+  .calendar-grid{gap:2px!important;grid-template-columns:repeat(7,minmax(0,1fr))}
+  .calendar-grid>button,.calendar-grid>i,.calendar-grid>a{min-width:0;font-size:12px}
+  .weekday-row span{font-size:10px;padding:5px 1px}
+}
+
+/* Below this the two-column program header cannot give the heading a usable
+   measure, so it stacks rather than compressing to an unreadable column. */
+@media(max-width:1100px){.simple-program-head{grid-template-columns:1fr}}
+
+/* --------------------------------------------------------------- tap targets
+   Controls inherited from earlier passes ranged from 26px to 34px. A pointer
+   tolerates that; a thumb does not, and mixed sizes read as unfinished. One
+   floor for every control — 38px pointer, 44px touch. Calendar cells are square
+   by design and size themselves from the grid, so they opt out. */
+button:not(.calendar-grid>button):not(.nav-icon),
+select,input:not([type=checkbox]):not([type=radio]){min-height:38px}
+@media(hover:none),(max-width:760px){
+  button:not(.calendar-grid>button):not(.nav-icon),
+  select,input:not([type=checkbox]):not([type=radio]){min-height:44px}
+}
