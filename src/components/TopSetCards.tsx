@@ -18,13 +18,18 @@ type Props = {
   onAdd: () => void;
   onRemove: (index: number) => void;
   onCreateExercise: (name: string, muscles: string[]) => void;
+  /* Sets that Forge prefilled from today's recommendation open collapsed —
+     the plan is a reference, not the thing taking over the logging screen. */
+  collapsible?: boolean;
+  planLabel?: string;
 };
 
 const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${set.weight}::${set.reps}`;
 
 const strengthMuscles = ['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps','Triceps','Forearms','Abs'];
 
-export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onCreateExercise }: Props) {
+export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onCreateExercise, collapsible = false, planLabel }: Props) {
+  const [expanded, setExpanded] = useState(!collapsible);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<LoggedTopSet | null>(null);
   const [creatingExercise, setCreatingExercise] = useState(false);
@@ -60,8 +65,21 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
     setCreateError('');
   };
 
+  const loggedCount = sets.filter(set => set.lift && loggedKeys.includes(setKey(set))).length;
+  const named = sets.map(set => set.lift).filter(Boolean);
+  const preview = named.slice(0, 2).join(', ') + (named.length > 2 ? `, +${named.length - 2}` : '');
+
+  if (collapsible && !expanded) return <section className="top-set-card-stack collapsed">
+    <button type="button" className="top-set-collapsed-bar" onClick={() => setExpanded(true)}>
+      <span className="eyebrow">{planLabel || 'FROM TODAY’S PLAN'}</span>
+      <strong>{sets.length} top {sets.length === 1 ? 'set' : 'sets'}</strong>
+      {preview && <small>{preview}</small>}
+      <b>{loggedCount ? `${loggedCount}/${sets.length} logged` : 'Open'}</b>
+    </button>
+  </section>;
+
   return <section className="top-set-card-stack">
-    <header><div><span className="eyebrow">TOP SETS</span><h2>{sets.length} {sets.length === 1 ? 'top set' : 'top sets'}</h2><p>Choose an exercise, then record the weight and reps you completed.</p></div><div className="top-set-header-actions"><button type="button" className="button ghost" onClick={onAdd}>＋ Add top set</button></div></header>
+    <header><div><span className="eyebrow">TOP SETS</span><h2>{sets.length} {sets.length === 1 ? 'top set' : 'top sets'}</h2><p>Choose an exercise, then record the weight and reps you completed.</p></div><div className="top-set-header-actions"><button type="button" className="button ghost" onClick={onAdd}>＋ Add top set</button>{collapsible && <button type="button" className="button ghost" onClick={() => setExpanded(false)}>Collapse</button>}</div></header>
     {creatingExercise && <section className="inline-log-exercise" aria-label="Add an exercise to your library">
       <header><div><span className="eyebrow">NEW STRENGTH EXERCISE</span><h3>Add it once. Log it now.</h3><p>The muscle mapping keeps future split recommendations accurate.</p></div><button type="button" className="text-button" onClick={() => setCreatingExercise(false)}>Cancel</button></header>
       <label>Exercise name<input autoFocus value={newExerciseName} onChange={event => { setNewExerciseName(event.target.value); setCreateError(''); }} placeholder="e.g. Dumbbell incline press" /></label>
