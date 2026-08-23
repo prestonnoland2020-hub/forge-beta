@@ -6,13 +6,33 @@ import { athlete, friends, splitDays } from '../data/demo';
 import { CardioBuilder } from '../components/CardioBuilder';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { TopSetHistory } from '../components/TopSetHistory';
-import { useWorkoutHistory, type LoggedTopSet } from '../features/training/WorkoutHistoryProvider';
+import { useWorkoutHistory, type LoggedTopSet, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import type { CardioLogDraft } from '../lib/cardioSession';
+import { formatCardioSummary, type CardioLogDraft } from '../lib/cardioSession';
 import { exerciseCategory, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { LastPerformanceBanner } from '../components/LastPerformance';
 import { TopSetCards } from '../components/TopSetCards';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
+
+function CompletedDayReview({record,unit}:{record:WorkoutRecord;unit:string}) {
+  const completedTopSets=(record.topSets||[]).filter(set=>set.completed!==false);
+  const topSets=completedTopSets.length?completedTopSets:(record.lift&&record.weight&&record.reps?[{muscle:record.muscles.find(muscle=>muscle!=='Cardio')||'Strength',lift:record.lift,weight:record.weight,reps:record.reps,calculatedMax:record.calculatedMax,completed:true}]:[]);
+  const cardio=record.cardioSessions||[];
+  if(!topSets.length&&!cardio.length)return null;
+  return <div className="completed-day-review-grid">
+    {topSets.length>0&&<section className="completed-day-review-block">
+      <header><span>TOP SETS</span><b>{topSets.length}</b></header>
+      <div className="completed-day-review-list">{topSets.map((set,index)=>{
+        const max=set.calculatedMax??calculateEstimatedOneRepMax(set.weight,set.reps);
+        return <article key={`${set.lift}-${index}`}><div><strong>{set.lift}</strong><small>{set.muscle}</small></div><div><b>{set.weight} {unit} × {set.reps}</b><small>{set.reps===1?`Real 1RM ${set.weight} ${unit}`:max?`Calculated max ${max} ${unit}`:'Calculated max unavailable'}</small></div></article>;
+      })}</div>
+    </section>}
+    {cardio.length>0&&<section className="completed-day-review-block">
+      <header><span>CARDIO</span><b>{cardio.length}</b></header>
+      <div className="completed-day-review-list">{cardio.map((session,index)=><article key={session.id||`${session.activity}-${index}`}><div><strong>{session.activity||session.structure}</strong><small>{session.structure}</small></div><div className="completed-cardio-summary"><b>{formatCardioSummary(session)}</b>{session.structure==='intervals'&&<small>{session.intervalActuals?.filter(rep=>rep.completed).length||0} completed reps</small>}</div></article>)}</div>
+    </section>}
+  </div>;
+}
 
 export function WorkoutPage() {
   const navigate=useNavigate();
@@ -100,7 +120,17 @@ export function WorkoutPage() {
   const openReview=()=>{setSaved(false);if(editingRecord){setSaveMessage('');setReviewing(true);return}const hasQuickLoggedTopSet=quickLoggedKeys.length>0;const hasContext=Boolean(bodyWeight||notes.trim()||effort);if(!completedTopSets.length&&!lift&&!hasCardio&&!hasQuickLoggedTopSet&&!hasContext){setSaveMessage('Add a result or session detail before finishing the day.');return}setSaveMessage('');setReviewing(true)};
   const removeWorkout=async()=>{if(!editingRecord||!window.confirm(`Delete the workout record for ${todayShort}? This permanently removes it from History and Insights.`))return;setSaveMessage('');const removed=await deleteRecord(editingRecord.id);if(removed)navigate('/history');else setSaveMessage('The workout could not be deleted. Check the sync message and try again.')};
   if(editId&&!editingRecord)return <div className="narrow stack-xl"><PageIntro eyebrow="WORKOUT HISTORY" title="Workout not found" copy="This workout may have been removed from this device."/><section className="card"><Link className="button" to="/history">Return to History</Link></section></div>;
-  if(completedOnEntry)return <div className="narrow stack-xl workout-editor completed-workout-entry"><PageIntro eyebrow={todayLong.toUpperCase()} title="Today is already logged" copy="Forge will not build a second workout on top of a completed day."/><section className="card completed-day-card"><span className="completed-day-check">✓</span><div><span className="eyebrow">TODAY · COMPLETE</span><h2>{completedOnEntry.title}</h2><p>{completedOnEntry.muscles.filter(muscle=>muscle!=='Cardio').join(' · ')||(completedOnEntry.hasCardio?'Cardio':'Completed training')}</p></div><div className="completed-day-results"><div><strong>{completedOnEntry.topSets?.filter(set=>set.completed!==false).length||0}</strong><span>Top sets</span></div><div><strong>{completedOnEntry.cardioSessions?.length||0}</strong><span>Cardio</span></div></div><footer><Link className="button" to={`/workout?edit=${completedOnEntry.id}`}>Review or edit today</Link><Link className="button ghost" to="/history">Open history</Link></footer></section><p className="completed-day-note">Need to add another result? Open today and add it to the same training day so your split advances only once.</p></div>;
+  if(completedOnEntry)return <div className="narrow stack-xl workout-editor completed-workout-entry">
+    <PageIntro eyebrow={todayLong.toUpperCase()} title="Today is already logged" copy="Forge will not build a second workout on top of a completed day."/>
+    <section className="card completed-day-card">
+      <span className="completed-day-check">✓</span>
+      <div><span className="eyebrow">TODAY · COMPLETE</span><h2>{completedOnEntry.title}</h2><p>{completedOnEntry.muscles.filter(muscle=>muscle!=='Cardio').join(' · ')||(completedOnEntry.hasCardio?'Cardio':'Completed training')}</p></div>
+      <div className="completed-day-results"><div><strong>{completedOnEntry.topSets?.filter(set=>set.completed!==false).length||0}</strong><span>Top sets</span></div><div><strong>{completedOnEntry.cardioSessions?.length||0}</strong><span>Cardio</span></div></div>
+      <CompletedDayReview record={completedOnEntry} unit={weightUnit}/>
+      <footer><Link className="button" to={`/workout?edit=${completedOnEntry.id}`}>Review or edit today</Link><Link className="button ghost" to="/history">Open history</Link></footer>
+    </section>
+    <p className="completed-day-note">Need to add another result? Open today and add it to the same training day so your split advances only once.</p>
+  </div>;
   return <div className="narrow stack-xl workout-editor"><PageIntro eyebrow={todayLong.toUpperCase()} title={editingRecord?'Edit training day':requestedDate?'Add a training day':"Log today's workout"} copy={editingRecord?'Update the saved results for this day. History and insights will refresh automatically.':requestedDate?'Log anything you completed on this date. It will be saved as one editable training day.':'Start with the plan, repeat a previous session, or record only what you performed.'} />
     {editingRecord&&<section className="coach-loaded"><div><span>EDITING COMPLETED SESSION</span><strong>{editingRecord.title}</strong><small>Saving replaces this session on {todayShort}; it will not create a duplicate.</small></div><div className="button-row"><Link to="/history">Cancel</Link><button type="button" className="text-button danger" onClick={removeWorkout}>Delete workout</button></div></section>}
     {searchParams.get('source')==='recommendation'&&recommendation&&<section className="coach-loaded"><div><span>SAVED DAILY RECOMMENDATION</span><strong>{recommendation.splitDay.name} · {topSets.length} selected top {topSets.length===1?'set':'sets'}</strong><small>Today, Log, and Coach are using recommendation {recommendation.id?.slice(0,8)||recommendation.date}. Record actual results; only completed items advance progression.</small></div><button className="text-button" onClick={()=>openCoachBubble('Why is this my saved workout today?')}>Why this workout?</button></section>}

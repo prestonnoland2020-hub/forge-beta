@@ -20,10 +20,10 @@ body {
 .app-main { background: radial-gradient(circle at 92% 0, rgba(167, 210, 45, .11), transparent 26rem); }
 .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections {
   border-color: #35443d !important;
-  border-radius: 22px !important;
+  border-radius: 16px !important;
   background-color: #15201c !important;
 }
-.button { border-radius: 14px; }
+.button { border-radius: 10px; }
 .card:hover, .feed-card:hover { border-color: #4a5c42; }
 .completed-day-card { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; padding: 28px !important; border-left: 7px solid var(--accent) !important; }
 .completed-day-check { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 18px; background: var(--accent); color: #07100d; font-size: 28px; font-weight: 1000; }
@@ -34,21 +34,38 @@ body {
 .completed-day-results > div + div { border-left: 1px solid #35443d; }
 .completed-day-results strong { color: var(--accent); font: 800 28px var(--display); }
 .completed-day-results span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+.completed-day-review-grid { grid-column: 1 / -1; display: grid; gap: 12px; }
+.completed-day-review-block { overflow: hidden; border: 1px solid #35443d; border-radius: 16px; background: #0a1310; }
+.completed-day-review-block > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #35443d; }
+.completed-day-review-block > header span { color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.completed-day-review-block > header b { color: var(--accent); font: 800 18px var(--display); }
+.completed-day-review-list { display: grid; }
+.completed-day-review-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 16px; }
+.completed-day-review-list article + article { border-top: 1px solid #283831; }
+.completed-day-review-list article > div { display: grid; gap: 3px; min-width: 0; }
+.completed-day-review-list article > div:last-child { text-align: right; }
+.completed-day-review-list strong, .completed-day-review-list b { color: var(--text); line-height: 1.25; }
+.completed-day-review-list small { color: var(--muted); font-size: 10px; line-height: 1.35; }
+.completed-cardio-summary { max-width: 440px; }
 .completed-day-card footer { grid-column: 1 / -1; display: flex; gap: 10px; }
 
 @media (max-width: 700px) {
-  .page { padding: 18px 14px calc(104px + env(safe-area-inset-bottom)); }
-  .page-intro { margin-bottom: 2px; }
-  .page-intro h2 { font-size: 38px !important; letter-spacing: -.015em; }
+  .app-main .page { width: min(100%, 500px); margin-inline: auto; padding: 12px 12px calc(98px + env(safe-area-inset-bottom)); }
+  .stack-xl { gap: 14px; }
+  .page-intro { margin-bottom: 4px; }
+  .page-intro h2 { font-size: 32px !important; letter-spacing: -.01em; }
   .page-intro p { display: none; }
-  .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list { border-radius: 24px !important; }
-  .card { padding: 18px; }
+  .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list { border-radius: 16px !important; }
+  .card { padding: 16px; }
+  .button { min-height: 48px; padding: 14px; font-size: 14px; }
   .bottom-nav { background: rgba(12, 24, 19, .97) !important; border-top-color: #35443d !important; backdrop-filter: blur(18px); }
   .coach-bubble-launcher { box-shadow: 0 0 0 5px #07100d, 0 0 0 8px var(--accent); }
 
-  .completed-day-card { grid-template-columns: 44px 1fr; padding: 20px !important; border-left-width: 6px !important; }
+  .completed-day-card { grid-template-columns: 44px 1fr; gap: 14px; padding: 16px !important; border-left-width: 5px !important; }
   .completed-day-check { width: 44px; height: 44px; border-radius: 14px; font-size: 22px; }
   .completed-day-card footer { display: grid; }
+  .completed-day-review-list article { gap: 10px; padding: 13px 14px; }
+  .completed-cardio-summary { max-width: 55vw; }
 
   .history-page { gap: 14px; }
   .history-calendar { padding: 20px 14px !important; touch-action: pan-y; }
