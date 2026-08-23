@@ -55,7 +55,6 @@ export function ExerciseLibrary() {
 
   return <div className="exercise-library stack-lg">
     <section className="simple-library-head">
-      <div><span className="eyebrow">EXERCISES</span><h2>Your movements</h2><p>Pick, map, and manage the exercises Forge can recommend.</p></div>
       <div className="button-row"><button className="button" onClick={() => open()}>＋ Add exercise</button><button className="button ghost" onClick={() => openCoachBubble('Help me create an exercise for my library.')}>Ask Forge</button></div>
     </section>
     {editing !== null && <div className="mobile-editor-backdrop" role="presentation">

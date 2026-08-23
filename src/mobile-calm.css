@@ -50,11 +50,18 @@ body {
 .completed-day-card footer { grid-column: 1 / -1; display: flex; gap: 10px; }
 .classic-streak { display: none; }
 
-@media (max-width: 700px) {
-  .app-main .page { width: min(100%, 500px); margin-inline: auto; padding: 12px 12px calc(98px + env(safe-area-inset-bottom)); }
+/* One mobile-shell breakpoint, matching where the sidebar gives way to the bottom
+   nav in styles.css / home-simple.css / simplified-platform.css. This pass used to
+   stop at 700px, so 701–900px got a bottom nav with no mobile layout behind it. */
+@media (max-width: 900px) {
+  .app-main .page { width: min(100%, 560px); margin-inline: auto; padding: 12px var(--gutter) calc(98px + env(safe-area-inset-bottom)); }
   .stack-xl { gap: 14px; }
+  /* The sticky top bar already names the section, so the page intro repeated it in
+     32px condensed caps and ate a quarter of the viewport. Keep the title, drop
+     the duplicate eyebrow, and leave room for any action the intro carries. */
   .page-intro { margin-bottom: 4px; }
-  .page-intro h2 { font-size: 32px !important; letter-spacing: -.01em; }
+  .page-intro h2 { font-size: 26px !important; line-height: 1.06; letter-spacing: -.01em; }
+  .page-intro > div > .eyebrow { display: none; }
   .page-intro p { display: none; }
   .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list { border-radius: 16px !important; }
   .card { padding: 16px; }
@@ -83,8 +90,9 @@ body {
   .classic-calendar .history-toolbar h3 { font: 800 21px var(--sans); letter-spacing: 0; }
   .classic-calendar .calendar-kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 12px; border: 0; border-radius: 0 !important; overflow: visible; background: transparent !important; }
   .classic-calendar .calendar-kpis > div { display: grid; gap: 2px; padding: 9px 2px !important; text-align: center; border: 0 !important; border-radius: 10px; background: #09120f; }
-  .classic-calendar .calendar-kpis strong { font: 800 17px var(--sans) !important; color: var(--text); }
-  .classic-calendar .calendar-kpis > div:nth-child(2) strong { color: var(--accent); }
+  /* Four peer metrics, so all four read the same. One of them used to be picked out
+     in accent for no reason the user could see. */
+  .classic-calendar .calendar-kpis strong { font: 800 19px var(--sans) !important; color: var(--text); }
   .classic-calendar .calendar-kpis span { font-size: 8px; font-weight: 900; letter-spacing: .04em; }
   .classic-calendar .weekday-row, .classic-calendar .calendar-grid { gap: 4px; }
   .classic-calendar .weekday-row span { padding: 0 0 4px; font-size: 9px; }
@@ -97,7 +105,6 @@ body {
   .classic-calendar .calendar-markers i { width: 6px; height: 6px; }
   .classic-calendar .calendar-legend { justify-content: center; gap: 16px; margin: 12px 0 0; font-size: 10px; }
   .simple-day-preview { border-left: 5px solid var(--accent) !important; }
-  .history-table-card { display: none; }
 
   .desktop-plan-settings { display: none !important; }
   .mobile-plan-settings { display: block; padding: 0 !important; overflow: hidden; }
@@ -180,4 +187,108 @@ body {
   .connection-actions { grid-auto-flow: row; }
   .activity-connection article { display: grid; }
   .activity-connection .connection-actions { width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile-first ergonomics pass.
+   Loaded last on purpose: it settles the tap-target, legibility and overflow
+   problems that the earlier per-feature stylesheets each solved differently.
+   --------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  /* Nothing may push the page sideways.
+     These single-column grids used an implicit `1fr` column, which is
+     minmax(auto,1fr): one child with a wide min-content (a two-button row that
+     will not wrap, a filter strip) set the column width, and every sibling was
+     stretched to match. That is what pushed Exercises 43px past the viewport. */
+  .stack-xl, .stack-lg, .forge-feed, .exercise-library, .connection-stack,
+  .simple-profile, .history-page, .insights-pro, .long-plan {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-main .page > *, .app-main .page > * > * { min-width: 0; }
+  .simple-library-head .button-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .simple-library-head .button { min-width: 0; }
+  .library-filters, .library-table-card { min-width: 0; }
+
+  /* Legibility floor. 6–9px labels were unreadable on a phone. */
+  .eyebrow, .field-caption { font-size: 11px; letter-spacing: .1em; }
+  .feed-identity small, .compact-card > header > span,
+  .today-workout-items small, .feed-empty-row small,
+  .feed-metric-row span, .feed-status,
+  .classic-streak article span, .classic-calendar .calendar-kpis span,
+  .calendar-legend, .exercise-mobile-main small,
+  .history-data-table th, .library-table-card th { font-size: 10px; }
+  .classic-calendar .weekday-row span { font-size: 10px; }
+  .today-workout-items em, .feed-empty-row em,
+  .compact-activity small, .compact-result-list span { font-size: 12px; }
+
+  /* Tap-target floor of 44px for anything that is actually a control.
+     Deliberately scoped to controls — inline text links keep their own size. */
+  .bottom-nav a { min-height: var(--tap); align-content: center; }
+  .range-options button, .progress-domain-filter button, .library-filters button,
+  .plan-tabs button, .plan-tabs a, .profile-tabs button, .insight-tabs button,
+  .question-chips button, .same-day-sessions button, .segmented button,
+  .table-status, .exercise-mobile-row > .table-status,
+  .history-toolbar button, .icon-button, .text-button,
+  .connection-actions button { min-height: var(--tap); }
+  .question-chips button { padding: 11px 14px; font-size: 12px; }
+  .table-status, .exercise-mobile-row > .table-status { min-width: var(--tap); font-size: 11px; }
+  /* Card-header and section-header links: keep the small type, grow the target. */
+  .feed-card-header a, .compact-card > header a, .feed-text-link,
+  .feed-welcome > a, .goal-card > .feed-text-link {
+    display: inline-flex; align-items: center; min-height: var(--tap); padding-inline: 2px;
+  }
+
+  /* Rows of filters/tabs scroll horizontally instead of overflowing the page. */
+  .library-filters, .plan-tabs, .profile-tabs, .insight-tabs, .range-options {
+    display: flex; flex-wrap: nowrap; overflow-x: auto;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .library-filters::-webkit-scrollbar, .plan-tabs::-webkit-scrollbar,
+  .profile-tabs::-webkit-scrollbar, .insight-tabs::-webkit-scrollbar,
+  .range-options::-webkit-scrollbar { display: none; }
+  .library-filters button, .plan-tabs button, .plan-tabs a,
+  .profile-tabs button, .insight-tabs button { flex: 0 0 auto; white-space: nowrap; }
+
+  /* Three domains have to fit the width, not get clipped mid-word. */
+  .progress-domain-filter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+  .progress-domain-filter button { justify-content: center; gap: 5px; padding: 11px 4px; font-size: 12px; }
+
+  /* The floating coach button sat on top of the content it was explaining. */
+  .coach-bubble-shell { bottom: calc(80px + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 900px) {
+  /* Avatar doubles as the profile link in the top bar, so it needs a real target. */
+  .top-actions .avatar { width: var(--tap); height: var(--tap); }
+  /* Nav labels were 8px — the app's primary navigation, below the legible floor. */
+  .bottom-nav small { font-size: 11px; }
+  .bottom-nav a > span { width: 26px; height: 24px; }
+  /* Axis ticks stay small but readable. */
+  .overview-progress-plot svg text { font-size: 10px; }
+}
+
+@media (max-width: 900px) {
+  /* Scrollable strips get a soft right edge so it reads as "more this way"
+     instead of a chip that looks arbitrarily chopped off. */
+  .library-filters, .plan-tabs, .profile-tabs, .insight-tabs, .range-options, .question-chips {
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
+  }
+  /* Exercises: the page header now lives in the page intro, so this row is
+     just its actions. */
+  .simple-library-head { display: grid; }
+}
+
+@media (min-width: 901px) {
+  /* Long names used to wrap onto three lines in the sidebar footer. */
+  .sidebar-foot > div:nth-child(2) { min-width: 0; }
+  .sidebar-foot strong, .sidebar-foot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@media (max-width: 900px) {
+  /* Completed-workout receipt: the check mark was vertically centred against a
+     multi-line heading, so it floated below the title it belongs to. */
+  .completed-day-card { align-items: start; }
+  .completed-day-card h2 { font-size: 24px; line-height: 1.08; }
+  .completed-day-check { margin-top: 2px; }
 }
