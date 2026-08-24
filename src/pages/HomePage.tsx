@@ -66,7 +66,7 @@ export function HomePage() {
 
     {completedToday ? <section className="feed-card today-focus-card completed">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon completed">✓</span><div><small>TODAY · COMPLETE</small><strong>{completedToday.title}</strong></div></div><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></header>
-      <div className="feed-metric-row"><div><strong>{completedSets.length}</strong><span>Top sets</span></div><div><strong>{completedToday.cardioSessions?.length || 0}</strong><span>Cardio</span></div><div><strong>{completedToday.effort || '—'}</strong><span>Effort</span></div></div>
+      <div className="feed-metric-row"><div><strong>{completedSets.length}</strong><span>{completedSets.length === 1 ? 'Lift' : 'Lifts'}</span></div><div><strong>{completedToday.cardioSessions?.length || 0}</strong><span>Cardio</span></div></div>
       {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <div className="today-data-points">
         {completedSets.map((set, index) => <div key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}
         {(completedToday.cardioSessions || []).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}

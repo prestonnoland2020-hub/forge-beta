@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { addDaysIso, createNote, defaultBufferDays, isBufferActive, needsFollowUp, type AthleteNote, type NoteFollowUp } from '../features/training/athleteNotesService';
+import { applyCheckIn, createNote, defaultBufferDays, isBufferActive, needsFollowUp, type AthleteNote, type NoteFollowUp } from '../features/training/athleteNotesService';
 
 /* The coach's body log: what the athlete has told Forge about pain, injury,
    and fatigue. Every entry carries a buffer window that recommendations and
    the AI coach train around, and daily check-ins keep it honest. */
-const todayIso = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const formatDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const kindLabel: Record<AthleteNote['kind'], string> = { injury: 'Injury', fatigue: 'Fatigue', other: 'Limitation' };
 
@@ -35,16 +34,7 @@ export function CoachBodyLog({ notes, upsert, prefill, onPrefillConsumed }: {
     setAdding(false); setArea(''); setText('');
   };
 
-  const checkIn = (note: AthleteNote, feeling: NoteFollowUp['feeling']) => {
-    const followUps = [...note.followUps, { date: todayIso(), feeling }];
-    /* Worse extends the buffer; two straight "better" days end it early. */
-    let bufferUntil = note.bufferUntil;
-    let status: AthleteNote['status'] = note.status;
-    if (feeling === 'worse') bufferUntil = addDaysIso(todayIso(), defaultBufferDays(note.kind));
-    const lastTwo = followUps.slice(-2);
-    if (lastTwo.length === 2 && lastTwo.every(item => item.feeling === 'better')) { status = 'cleared'; bufferUntil = todayIso(); }
-    upsert({ ...note, followUps, bufferUntil, status });
-  };
+  const checkIn = (note: AthleteNote, feeling: NoteFollowUp['feeling']) => upsert(applyCheckIn(note, feeling));
 
   return <section className="card body-log-card">
     <header className="body-log-head">

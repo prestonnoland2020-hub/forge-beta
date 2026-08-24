@@ -87,6 +87,34 @@ export function createNote(kind: AthleteNote['kind'], note: string, area?: strin
   };
 }
 
+/* Advance a note from a daily check-in: "worse" restarts the buffer, and two
+   consecutive "better" days clear the note early. Shared by the chat check-in
+   and the body-log settings card so the rules can never drift apart. */
+export function applyCheckIn(note: AthleteNote, feeling: NoteFollowUp['feeling']): AthleteNote {
+  const followUps = [...note.followUps, { date: todayIso(), feeling }];
+  let bufferUntil = note.bufferUntil;
+  let status: AthleteNote['status'] = note.status;
+  if (feeling === 'worse') bufferUntil = addDaysIso(todayIso(), defaultBufferDays(note.kind));
+  const lastTwo = followUps.slice(-2);
+  if (lastTwo.length === 2 && lastTwo.every(item => item.feeling === 'better')) { status = 'cleared'; bufferUntil = todayIso(); }
+  return { ...note, followUps, bufferUntil, status };
+}
+
+/* Best-effort body-area extraction from a plain sentence, so a chat message
+   like "my right knee hurt on squats" files under "right knee". Compound
+   areas sit before their parent word so "lower back" wins over "back". */
+const bodyAreas = ['neck', 'upper back', 'lower back', 'shoulder', 'rotator cuff', 'chest', 'elbow', 'forearm', 'wrist', 'hand', 'hip flexor', 'hip', 'groin', 'it band', 'quad', 'hamstring', 'knee', 'calf', 'shin', 'achilles', 'ankle', 'foot', 'glute', 'bicep', 'tricep', 'back'];
+export function extractArea(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  for (const area of bodyAreas) {
+    const index = lower.indexOf(area);
+    if (index < 0) continue;
+    const side = /\b(left|right)\s*$/.exec(lower.slice(Math.max(0, index - 12), index))?.[1];
+    return side ? `${side} ${area}` : area;
+  }
+  return undefined;
+}
+
 /* Compact context block for every coach request. */
 export const notesForCoachContext = (notes: AthleteNote[]) => notes.filter(isNoteActive).map(note => ({
   kind: note.kind, area: note.area || null, note: note.note, reported: note.reportedAt,

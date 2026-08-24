@@ -78,7 +78,12 @@ export function WeekPulse() {
     return list;
   }, []).filter((item, index, all) => index === 0 ? all.length < 4 || item.index > 0 : true);
   const axisSteps = [peak, peak / 2, 0];
-  const unitLabel = lens === 'run' ? 'mi' : 'sets';
+  const unitLabel = lens === 'run' ? 'mi' : 'lifts';
+  /* Tap a point to read it: value + week, pinned above the dot. */
+  const [picked, setPicked] = useState<number | null>(null);
+  useEffect(() => { setPicked(null); }, [lens]);
+  const pickedWeek = picked === null ? null : weeks[picked];
+  const tipX = picked === null ? 0 : Math.min(Math.max(x(picked), 34), W - AXIS - 30);
 
   return <section className="feed-card week-pulse-card">
     <header className="week-pulse-head">
@@ -95,7 +100,7 @@ export function WeekPulse() {
         <div><span>Time</span><strong>{formatHours(current.cardioMinutes)}</strong></div>
         <div><span>Sessions</span><strong>{current.runs}</strong></div>
       </> : <>
-        <div><span>Top sets</span><strong>{current.sets}</strong></div>
+        <div><span>Lifts</span><strong>{current.sets}</strong></div>
         <div><span>Sessions</span><strong>{current.sessions}</strong></div>
         <div><span>Heaviest</span><strong>{heaviest ? <>{heaviest.weight} <small>{weightUnit}</small></> : '—'}</strong></div>
       </>}
@@ -109,7 +114,13 @@ export function WeekPulse() {
         </g>)}
         <path className="week-pulse-area" d={areaPath} />
         <polyline className="week-pulse-line" points={linePoints} fill="none" />
-        {values.map((value, index) => <circle key={index} className="week-pulse-dot" cx={x(index)} cy={y(value)} r={index === values.length - 1 ? 5 : 3} />)}
+        {values.map((value, index) => <g key={index} className={picked === index ? 'week-pulse-point picked' : 'week-pulse-point'} onClick={() => setPicked(current => current === index ? null : index)}>
+          <circle className="week-pulse-hit" cx={x(index)} cy={y(value)} r={13} />
+          <circle className="week-pulse-dot" cx={x(index)} cy={y(value)} r={index === values.length - 1 || picked === index ? 5 : 3} />
+        </g>)}
+        {picked !== null && pickedWeek && <g className="week-pulse-tip" pointerEvents="none">
+          <text x={tipX} y={Math.max(12, y(values[picked]) - 12)} textAnchor="middle">{lens === 'run' ? `${values[picked]} mi` : `${values[picked]} lifts`} · {new Date(`${pickedWeek.start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</text>
+        </g>}
         {monthLabels.map(item => <text key={item.label + item.index} className="week-pulse-month" x={x(item.index)} y={H - 6}>{item.label}</text>)}
       </svg>
     </div>
