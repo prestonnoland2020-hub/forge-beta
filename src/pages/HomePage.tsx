@@ -6,6 +6,9 @@ import { openCoachBubble } from '../features/training/coachService';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
+import { WeekPulse } from '../components/WeekPulse';
+import { useAthleteNotes } from '../features/training/useAthleteNotes';
+import { isBufferActive } from '../features/training/athleteNotesService';
 
 const todayIso = () => {
   const now = new Date();
@@ -19,6 +22,8 @@ export function HomePage() {
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
   const { goals } = useGoals();
+  const { notes } = useAthleteNotes();
+  const bufferedNotes = notes.filter(isBufferActive);
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const currentDate = todayIso();
   const completedToday = records.find(record => record.date === currentDate);
@@ -54,10 +59,18 @@ export function HomePage() {
   return <div className="forge-feed">
     <header className="feed-welcome"><div><span>{greeting}, {firstName}</span><h2>Today’s training</h2></div><Link to="/history">See activity</Link></header>
     {syncError && <div className="save-confirmation save-warning">Your workout is ready here. Account sync will retry automatically.</div>}
+    {bufferedNotes.length > 0 && <Link className="buffer-banner" to="/coach">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 2.8 19.5a1 1 0 0 0 .87 1.5h16.66a1 1 0 0 0 .87-1.5L12 3Z"/><path d="M12 10v4M12 17.5v.5"/></svg>
+      <span>Training around {bufferedNotes.map(note => note.area || note.kind).join(', ')} — check in on Coach</span>
+    </Link>}
 
     {completedToday ? <section className="feed-card today-focus-card completed">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon completed">✓</span><div><small>TODAY · COMPLETE</small><strong>{completedToday.title}</strong></div></div><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></header>
       <div className="feed-metric-row"><div><strong>{completedSets.length}</strong><span>Top sets</span></div><div><strong>{completedToday.cardioSessions?.length || 0}</strong><span>Cardio</span></div><div><strong>{completedToday.effort || '—'}</strong><span>Effort</span></div></div>
+      {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <div className="today-data-points">
+        {completedSets.map((set, index) => <div key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}
+        {(completedToday.cardioSessions || []).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}
+      </div>}
       <footer><Link className="button" to={`/workout?edit=${completedToday.id}`}>Review today</Link><Link className="feed-text-link" to="/history">Open history →</Link></footer>
     </section> : <section className="feed-card today-focus-card">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || 'Cardio and recovery'}</em></div></div></header>
@@ -69,9 +82,11 @@ export function HomePage() {
       <footer><Link className="button" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} →</Link><button className="feed-coach-button" onClick={() => openCoachBubble('Explain today’s workout briefly and tell me the one thing that matters most.')}>Ask Forge</button></footer>
     </section>}
 
+    <WeekPulse />
+
     <section className="feed-support-grid" aria-label="Training overview">
       <article className="feed-card compact-card"><header><span>LAST ACTIVITY</span><Link to="/history">View all</Link></header>{priorWorkout ? <><div className="compact-activity"><span className="feed-icon muted-icon">✓</span><div><strong>{priorWorkout.title}</strong><small>{shortDate(priorWorkout.date)} · {priorWorkout.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Cardio'}</small></div></div><div className="compact-result-list">{priorSets.slice(0, 2).map(set => <div key={set.id || `${set.lift}-${set.weight}-${set.reps}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}{!priorSets.length && priorWorkout.cardioSessions?.slice(0, 1).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}</div></> : <p className="feed-empty-copy">Nothing logged yet.</p>}</article>
-      <article className="feed-card compact-card"><header><span>LAST 7 DAYS</span><Link to="/insights">Insights</Link></header><div className="week-score"><strong>{weekRecords.length}</strong><span>active {weekRecords.length === 1 ? 'day' : 'days'}</span></div><div className="feed-metric-row small"><div><strong>{weekTopSets}</strong><span>Top sets</span></div><div><strong>{weekMiles ? weekMiles.toFixed(1) : '0'}</strong><span>Miles</span></div></div></article>
+      
       <article className="feed-card compact-card goal-card"><header><span>GOAL FOCUS</span><Link to="/goals">Goals</Link></header>{primaryGoal ? <><strong className="goal-name">{primaryGoal.title}</strong><p>{goalReason}{primaryGoal.date ? ` · ${shortDate(primaryGoal.date)}` : ''}</p><div className="goal-target"><span>TARGET</span><strong>{primaryGoal.target}</strong></div></> : <><p className="feed-empty-copy">No goal set.</p><Link className="feed-text-link" to="/goals">Create a goal →</Link></>}</article>
     </section>
   </div>;

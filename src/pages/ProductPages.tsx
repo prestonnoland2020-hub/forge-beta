@@ -42,6 +42,19 @@ function CompletedDayReview({record,unit}:{record:WorkoutRecord;unit:string}) {
 }
 
 export function WorkoutPage() {
+  /* The editor initializes its state from the record being edited, so it must
+     remount whenever the edit target changes (SPA navigation from the
+     completed-day card, History links) or when the record it needs arrives
+     from the async history load. Keying the editor handles both. */
+  const [searchParams]=useSearchParams();
+  const {records,loading}=useWorkoutHistory();
+  const editParam=searchParams.get('edit');
+  const recordReady=editParam?records.some(record=>record.id===editParam):false;
+  if(editParam&&loading&&!recordReady)return <div className="narrow stack-xl"><section className="card"><p className="muted">Loading workout…</p></section></div>;
+  return <WorkoutEditor key={`${editParam||'new'}:${recordReady?'1':'0'}:${searchParams.get('date')||''}`}/>;
+}
+
+function WorkoutEditor() {
   const navigate=useNavigate();
   const {addRecord,updateRecord,deleteRecord,records}=useWorkoutHistory();
   const {exercises,addExercise}=useTrainingLibrary();
@@ -51,7 +64,7 @@ export function WorkoutPage() {
   const [searchParams]=useSearchParams();
   const editId=searchParams.get('edit');const editingRecord=editId?records.find(record=>record.id===editId):undefined;
   const today=new Date();const todayIso=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;const requestedDate=searchParams.get('date');const sessionIso=editingRecord?.date||(requestedDate&&/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)?requestedDate:todayIso);const sessionDate=new Date(`${sessionIso}T12:00:00`);const todayLong=sessionDate.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'});const todayShort=sessionDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
-  const completedOnEntry=useRef(!editId&&!requestedDate?records.find(record=>record.date===todayIso):undefined).current;
+  const completedOnEntry=!editId&&!requestedDate?records.find(record=>record.date===todayIso):undefined;
   const muscleOptions = ['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps','Triceps','Forearms','Abs','Cardio'];
   const savedPlan=(()=>{try{return JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:Array<{name:string;dayType:string;muscles?:string[];exercises?:string[]}>}|null}catch{return null}})();const savedDays=savedPlan?.days||[];const recommendationIndex=Math.max(0,(recommendation?.splitDay.position||1)-1);const [selectedPlanDay,setSelectedPlanDay]=useState(recommendationIndex);const savedDay=savedDays[selectedPlanDay];const plannedDay=recommendation?{name:recommendation.splitDay.name,type:recommendation.splitDay.type[0].toUpperCase()+recommendation.splitDay.type.slice(1),muscles:recommendation.splitDay.muscles,exercises:recommendation.splitDay.exercises}:savedDay?{name:savedDay.name,type:savedDay.dayType[0].toUpperCase()+savedDay.dayType.slice(1),muscles:savedDay.muscles||[],exercises:savedDay.exercises||[]}:setup?.splitDays.find(day=>day.type!=='Rest');
   const [muscles,setMuscles]=useState<string[]>(editingRecord?.muscles??['Quads','Hamstrings','Glutes']);

@@ -43,6 +43,8 @@ export function OnboardingPage() {
   const location = useLocation();
   const suggestedName = String(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '');
   const [step, setStep] = useState(0);
+  const [disclaimerChecked, setDisclaimerChecked] = useState(false);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [data, setData] = useState<AthleteSetup>(() => ({ ...blank, ...(setup || {}), displayName: setup?.displayName || suggestedName }));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -84,6 +86,22 @@ export function OnboardingPage() {
       setError(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
     }
   };
+
+  if (!isEditing && !disclaimerAccepted) return <main className="onboarding-shell onboarding-simple">
+    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>BEFORE YOU START</span></header>
+    <div className="onboarding-grid single">
+      <section className="onboarding-card disclaimer-card">
+        <div className="setup-heading"><span className="eyebrow">READ THIS FIRST</span><h2>Train hard. Train honestly. Know the limits.</h2></div>
+        <div className="disclaimer-copy">
+          <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
+          <p>Strength and endurance training carry real risk. Check with a physician before starting or changing a program — especially with a heart condition, injury, chronic illness, or during pregnancy. Stop any exercise that causes pain, dizziness, or unusual shortness of breath.</p>
+          <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue on the Coach tab so training can work around it — and see a professional when something does not resolve.</p>
+        </div>
+        <label className="setup-check safety full"><input type="checkbox" checked={disclaimerChecked} onChange={event => setDisclaimerChecked(event.target.checked)} /><span><strong>I understand and accept this.</strong><small>Forge provides training guidance, not medical advice.</small></span></label>
+        <footer className="setup-actions"><span /><button className="button" disabled={!disclaimerChecked} onClick={() => { setDisclaimerAccepted(true); window.scrollTo(0, 0); }}>Continue to setup →</button></footer>
+      </section>
+    </div>
+  </main>;
 
   return <main className="onboarding-shell onboarding-simple">
     <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing ? 'EDIT PROFILE' : `SETUP ${step + 1} OF 2`}</span></header>

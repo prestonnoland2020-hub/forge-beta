@@ -470,3 +470,267 @@ select,input:not([type=checkbox]):not([type=radio]){min-height:38px}
    dark page with unreadable headings between them. */
 :root{background:var(--bg)}
 body{background-color:var(--bg);color:var(--text)}
+
+/* ------------------------------------------------------------ center action
+   The Log tab is the raised center action, Strava-style: a filled accent
+   circle that floats above the bar. Other tabs keep icon-over-label. */
+.bottom-nav a.nav-log-action{overflow:visible}
+.bottom-nav a.nav-log-action::before{display:none}
+.nav-log-circle{
+  width:46px;height:46px;border-radius:50%;
+  background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;
+  margin-top:-22px;
+  border:4px solid var(--surface-0);
+  box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 35%, transparent),0 2px 6px rgba(0,0,0,.35);
+  transition:transform var(--dur) var(--ease),filter var(--dur) var(--ease);
+}
+.nav-log-circle svg{width:22px;height:22px}
+.bottom-nav a.nav-log-action:active .nav-log-circle{transform:scale(.94)}
+.bottom-nav a.nav-log-action.active .nav-log-circle{filter:brightness(1.08)}
+.bottom-nav a.nav-log-action small{color:var(--ink-3);font-size:10px;font-weight:700}
+.bottom-nav a.nav-log-action.active small{color:var(--accent)}
+
+/* ------------------------------------------------------------------ You tab
+   Identity header + segmented views (Progress / Goals / Activities). */
+.you-header{display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+.you-identity{display:flex;align-items:center;gap:var(--s3);min-width:0}
+.you-identity>span:last-child{display:grid;gap:2px;min-width:0}
+.you-identity strong{font:800 20px/1.1 var(--display);letter-spacing:.02em;text-transform:uppercase;color:var(--ink)}
+.you-identity small{color:var(--ink-2);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.you-settings{
+  width:42px;height:42px;border-radius:50%;flex:none;
+  display:grid;place-items:center;color:var(--ink-2);
+  border:1px solid var(--hairline);background:var(--surface-1);
+}
+.you-settings svg{width:20px;height:20px}
+.you-tabs{
+  display:flex;gap:var(--s4);
+  border-bottom:1px solid var(--hairline);
+  overflow-x:auto;scrollbar-width:none;
+}
+.you-tabs::-webkit-scrollbar{display:none}
+.you-tabs a{
+  padding:var(--s2) 2px var(--s3);
+  font:800 14px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-3);border-bottom:2px solid transparent;margin-bottom:-1px;
+  white-space:nowrap;min-height:38px;display:inline-flex;align-items:center;
+}
+.you-tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
+.you-tab-body{display:grid;gap:var(--s5)}
+.you-page .page-intro{display:none}
+
+/* On the phone, the You surface carries its own identity header, so the
+   duplicate page-title bar collapses out of the way on those routes. */
+@media (max-width:900px){ .topbar.topbar-collapsed-mobile{display:none} }
+
+/* ------------------------------------------------------------- goal density
+   The goal card leads with numbers; explanation folds behind a disclosure. */
+.goal-stat-row{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  border:1px solid var(--hairline);border-radius:var(--r-md);
+  background:var(--surface-2);overflow:hidden;
+}
+.goal-stat-row>div{padding:var(--s3) var(--s3);display:grid;gap:2px;border-right:1px solid var(--hairline);min-width:0}
+.goal-stat-row>div:last-child{border-right:0}
+.goal-stat-row span{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--ink-3);white-space:nowrap}
+.goal-stat-row strong{font:800 clamp(17px,4.6vw,22px)/1.15 var(--display);letter-spacing:.02em;color:var(--ink);overflow-wrap:anywhere}
+.goal-stat-row .goal-value-current strong{color:var(--accent)}
+.goal-stat-row .goal-value-difference.close strong{color:var(--mint,#58d68d)}
+.goal-head-side{display:grid;gap:4px;justify-items:end;text-align:right;flex:none}
+.goal-head-side small{color:var(--ink-3);font-size:11px;white-space:nowrap}
+.goal-sources-details{border:1px solid var(--hairline);border-radius:var(--r-md);background:var(--surface-1)}
+.goal-sources-details summary{
+  cursor:pointer;list-style:none;padding:var(--s3);
+  font-size:12px;font-weight:700;color:var(--ink-2);
+  display:flex;align-items:center;gap:var(--s2);min-height:40px;
+}
+.goal-sources-details summary::before{content:'▸';color:var(--ink-3);transition:transform var(--dur) var(--ease)}
+.goal-sources-details[open] summary::before{transform:rotate(90deg)}
+.goal-sources-details summary::-webkit-details-marker{display:none}
+.goal-sources-details>div{padding:0 var(--s3) var(--s3);display:grid;gap:2px}
+.goal-sources-details>div span{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--ink-3)}
+.goal-sources-details>div p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+@media (max-width:560px){
+  .goal-stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .goal-stat-row>div{border-bottom:1px solid var(--hairline)}
+  .goal-stat-row>div:nth-child(2n){border-right:0}
+  .goal-stat-row>div:nth-last-child(-n+2){border-bottom:0}
+}
+
+/* Goals list header: one row, small count, action on the right. */
+.compact-goal-list>header{display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+.compact-goal-list>header h2{font-size:17px;margin:2px 0 0;letter-spacing:.04em}
+.compact-goal-list>header .button{flex:none}
+.compact-goal-list{padding:var(--s4)}
+.compact-goal-select{padding:var(--s3) var(--s3)}
+/* Goal card header: title left, status pill + dates right. */
+.goal-progress-card>header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s3);flex-wrap:wrap}
+.goal-progress-card>header h3{font-size:clamp(22px,6vw,30px);margin:2px 0 0}
+.goal-progress-card>header b{
+  display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  padding:5px 9px;border-radius:999px;border:1px solid var(--hairline-strong);color:var(--ink-2);background:var(--surface-2);
+}
+.goal-progress-card>header b.on-track{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+
+/* Goal coach: prompt chips scroll in one row; entry stays compact. */
+.goal-coach-prompts{display:flex;gap:var(--s2);overflow-x:auto;scrollbar-width:none;padding-bottom:2px;flex-wrap:nowrap}
+.goal-coach-prompts::-webkit-scrollbar{display:none}
+.goal-coach-prompts button{flex:none;white-space:nowrap;font-size:12.5px;padding:9px 13px;min-height:38px}
+.goal-coach-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s2);align-items:end}
+.goal-coach-entry textarea{min-height:44px}
+.goal-coach-entry .button{min-height:44px;padding:0 16px}
+.goal-coach-inline{display:grid;gap:var(--s3)}
+
+/* ---------------------------------------------------------------- week pulse
+   This week's totals with a 12-week filled trend, Strava-style. */
+.week-pulse-card{display:grid;gap:var(--s3)}
+.week-pulse-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+.week-pulse-chips{display:flex;gap:var(--s2)}
+.week-pulse-chips button{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12.5px;font-weight:700;color:var(--ink-2);
+  border:1px solid var(--hairline-strong);border-radius:999px;
+  background:var(--surface-1);padding:7px 13px;min-height:36px;
+  transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease);
+}
+.week-pulse-chips button svg{width:16px;height:16px}
+.week-pulse-chips button.active{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
+.week-pulse-more{font-size:12px;font-weight:800;color:var(--accent);white-space:nowrap}
+.week-pulse-title{font-size:18px;margin:0;letter-spacing:.03em}
+.week-pulse-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3)}
+.week-pulse-stats>div{display:grid;gap:1px;min-width:0}
+.week-pulse-stats span{font-size:11px;color:var(--ink-3);font-weight:700;white-space:nowrap}
+.week-pulse-stats strong{font:800 clamp(19px,5vw,24px)/1.15 var(--display);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.week-pulse-stats strong small{font-size:.62em;color:var(--ink-2);font-weight:700}
+.week-pulse-plot{position:relative;min-width:0}
+.week-pulse-plot svg{display:block;width:100%;height:auto}
+.week-pulse-caption{font-size:11px;color:var(--ink-3);font-weight:700}
+.week-pulse-grid line{stroke:var(--hairline);stroke-width:1}
+.week-pulse-grid text{fill:var(--ink-3);font-size:10px;font-weight:600}
+.week-pulse-area{fill:color-mix(in srgb,var(--accent) 16%,transparent)}
+.week-pulse-line{stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.week-pulse-dot{fill:var(--surface-1);stroke:var(--accent);stroke-width:2}
+.week-pulse-dot:last-of-type{fill:var(--accent)}
+.week-pulse-month{fill:var(--ink-3);font-size:10px;font-weight:700;letter-spacing:.06em}
+
+/* Compact data points on the completed-today card. */
+.today-data-points{display:grid;gap:0;border-top:1px solid var(--hairline)}
+.today-data-points>div{
+  display:flex;justify-content:space-between;align-items:baseline;gap:var(--s3);
+  padding:9px 0;border-bottom:1px solid var(--hairline);min-width:0;
+}
+.today-data-points>div:last-child{border-bottom:0}
+.today-data-points span{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.today-data-points strong{font:800 14px var(--display);letter-spacing:.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------------------------------------------------------------- AI cardio
+   Describe-it box: the fastest way to log cardio. Reflection reads back what
+   will be saved before anything is committed. */
+.cardio-ai-box{
+  display:grid;gap:var(--s2);
+  border:1px solid color-mix(in srgb,var(--accent) 35%,var(--hairline));
+  border-radius:var(--r-md);padding:var(--s3);
+  background:linear-gradient(140deg,color-mix(in srgb,var(--accent) 7%,var(--surface-1)),var(--surface-1) 55%);
+}
+.cardio-ai-label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.cardio-ai-label svg{width:15px;height:15px}
+.cardio-ai-box textarea{min-height:52px;font-size:14px}
+.cardio-ai-actions{display:flex;align-items:center;gap:var(--s3)}
+.cardio-ai-actions small{color:var(--ink-3);font-size:11.5px}
+.cardio-ai-reflection{
+  margin:0;display:grid;gap:3px;font-size:13px;line-height:1.5;color:var(--ink);
+  border-left:3px solid var(--accent);padding:6px 0 6px var(--s3);
+}
+.cardio-ai-reflection b{font-size:10px;letter-spacing:.1em;color:var(--accent)}
+.cardio-ai-reflection.local{border-left-color:var(--ink-3)}
+.cardio-ai-reflection.local b{color:var(--ink-3)}
+
+/* ------------------------------------------------------------------ body log
+   Coach learnings: injuries, fatigue, limitations — with buffer windows. */
+.body-log-card{display:grid;gap:var(--s3)}
+.body-log-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+.body-log-head h3{margin:2px 0 0;font-size:19px}
+.body-log-copy{margin:0;font-size:13px;color:var(--ink-2);line-height:1.5}
+.body-log-form{display:grid;gap:var(--s3);border:1px solid var(--hairline);border-radius:var(--r-md);padding:var(--s3);background:var(--surface-1)}
+.body-log-form-row{display:grid;grid-template-columns:1fr 1.4fr;gap:var(--s3)}
+.body-log-buffer{display:flex;gap:var(--s2);flex-wrap:wrap}
+.body-log-buffer button{
+  border:1px solid var(--hairline-strong);background:var(--surface-1);color:var(--ink-2);
+  border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;min-height:38px;
+}
+.body-log-buffer button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-wash)}
+.body-log-list{display:grid;gap:var(--s3)}
+.body-log-note{border:1px solid var(--hairline);border-radius:var(--r-md);padding:var(--s3);display:grid;gap:var(--s2);background:var(--surface-1)}
+.body-log-note>header{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.body-log-note>header strong{font:800 15px var(--display);letter-spacing:.03em}
+.body-log-note>header small{color:var(--ink-3);font-size:11px}
+.body-log-note>header .text-button{margin-left:auto;min-height:32px}
+.body-log-note>p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.body-log-kind{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid var(--hairline-strong);color:var(--ink-2)}
+.body-log-kind.injury{color:#ff9f6e;border-color:color-mix(in srgb,#ff9f6e 45%,transparent);background:color-mix(in srgb,#ff9f6e 10%,transparent)}
+.body-log-kind.fatigue{color:#7ec8ff;border-color:color-mix(in srgb,#7ec8ff 45%,transparent);background:color-mix(in srgb,#7ec8ff 10%,transparent)}
+.body-log-followup{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;border-top:1px solid var(--hairline);padding-top:var(--s2)}
+.body-log-followup>span{font-size:12.5px;font-weight:700;color:var(--ink)}
+.body-log-followup>div{display:flex;gap:var(--s2)}
+.body-log-followup>div button{
+  border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);
+  border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:700;min-height:38px;
+}
+.body-log-followup>div button:first-child{border-color:color-mix(in srgb,var(--mint,#58d68d) 55%,transparent);color:var(--mint,#58d68d)}
+.body-log-followup>div button:last-child{border-color:color-mix(in srgb,#ff9f6e 55%,transparent);color:#ff9f6e}
+.body-log-last{color:var(--ink-3);font-size:11.5px}
+.body-log-empty{margin:0;font-size:13px;color:var(--ink-3)}
+.body-log-history summary{cursor:pointer;font-size:12px;color:var(--ink-3);font-weight:700;min-height:36px;display:flex;align-items:center}
+.body-log-history p{margin:4px 0;font-size:12.5px;color:var(--ink-3)}
+.notification-settings header h3{margin:2px 0 0;font-size:19px}
+.notification-note{display:block;margin-top:var(--s2);color:var(--ink-3);font-size:12px;line-height:1.5}
+
+/* Buffer banner on Today. */
+.buffer-banner{
+  display:flex;align-items:center;gap:var(--s2);
+  border:1px solid color-mix(in srgb,#ff9f6e 40%,transparent);
+  background:color-mix(in srgb,#ff9f6e 8%,var(--surface-1));
+  color:var(--ink);border-radius:var(--r-md);padding:var(--s2) var(--s3);
+  font-size:13px;font-weight:600;min-height:44px;
+}
+.buffer-banner svg{width:18px;height:18px;color:#ff9f6e;flex:none}
+
+/* The Coach tab IS the coach — no floating bubble on top of it. */
+.coach-bubble-hidden{display:none}
+/* Coach quick questions scroll on one line. */
+.coach-page .question-chips{display:flex;gap:var(--s2);overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap;padding-bottom:2px}
+.coach-page .question-chips::-webkit-scrollbar{display:none}
+.coach-page .question-chips button{flex:none;white-space:nowrap}
+.coach-page .composer-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s2);align-items:end}
+.coach-page .composer-entry .button{min-height:46px}
+
+/* Onboarding disclaimer. */
+.onboarding-grid.single{grid-template-columns:minmax(0,640px);justify-content:center}
+.disclaimer-card{display:grid;gap:var(--s4)}
+.disclaimer-copy{display:grid;gap:var(--s3)}
+.disclaimer-copy p{margin:0;font-size:14px;line-height:1.65;color:var(--ink-2)}
+.disclaimer-copy p strong{color:var(--ink)}
+
+/* 320px: the workout-source options can't hold three fixed columns. */
+@media (max-width:355px){
+  .source-options{grid-template-columns:minmax(0,1fr)}
+  .source-options button{min-height:64px}
+  .workout-date strong{font-size:18px}
+}
+.source-options{grid-template-columns:repeat(3,minmax(0,1fr))}
+.workout-date{min-width:0}
+.workout-date strong{overflow-wrap:anywhere}
+
+/* 320px: keep the compact source card inside the viewport. */
+.compact-workout-source .workout-date{flex-wrap:wrap;min-width:0}
+.compact-workout-source .workout-date>*{min-width:0}
+.compact-workout-source .workout-date .eyebrow{overflow-wrap:anywhere}
+.compact-workout-source .source-options{grid-template-columns:repeat(3,minmax(0,1fr))}
+.compact-workout-source .source-options button{min-width:0}
+@media (max-width:355px){
+  .compact-workout-source .source-options{grid-template-columns:minmax(0,1fr)}
+}
+
+/* Primary line inside checklist rows reads at full ink in both modes. */
+.today-workout-items strong,.feed-empty-row strong{color:var(--ink)}

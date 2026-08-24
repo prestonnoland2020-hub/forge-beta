@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import type { CardioLogDraft } from '../lib/cardioSession';
+import { parseCardioDescription } from '../lib/cardioParse';
+import { requestCardioParse } from '../features/training/coachService';
 
 /* Cardio logging is manual, the way the original Apps Script CardioLog tab was:
    one row per line — type, distance, unit, time — and intervals are just more
@@ -102,6 +104,10 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lines, setLines] = useState<CardioLine[]>([blankLine(1)]);
   const [note, setNote] = useState('');
+  const [aiText, setAiText] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiReflection, setAiReflection] = useState('');
+  const [aiSource, setAiSource] = useState<'ai' | 'local' | ''>('');
 
   useEffect(() => onEntriesChange?.(savedEntries.length > 0, savedEntries), [savedEntries, onEntriesChange]);
 
@@ -118,8 +124,23 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
   });
   const removeLine = (id: number) => setLines(current => current.length > 1 ? current.filter(line => line.id !== id) : current);
 
-  const reset = () => { setLines([blankLine(1)]); setNote(''); setEditingId(null); setOpen(false); };
-  const startNew = () => { setLines([blankLine(1)]); setNote(''); setEditingId(null); setOpen(true); };
+  const reset = () => { setLines([blankLine(1)]); setNote(''); setEditingId(null); setOpen(false); setAiText(''); setAiReflection(''); setAiSource(''); };
+  const startNew = () => { setLines([blankLine(1)]); setNote(''); setEditingId(null); setOpen(true); setAiText(''); setAiReflection(''); setAiSource(''); };
+
+  /* The AI box: describe the workout, Forge reads it back as editable rows. */
+  const logWithAi = async () => {
+    const description = aiText.trim();
+    if (!description || aiBusy) return;
+    setAiBusy(true); setAiReflection('');
+    const local = parseCardioDescription(description);
+    const parsed = await requestCardioParse(description, { savedCardioTypes: typeOptions, plannedToday: plannedSummary || null }, local);
+    if (!parsed.rows.length) { setAiReflection(parsed.reflection || 'Could not read a workout from that.'); setAiSource(parsed.source); setAiBusy(false); return; }
+    setLines(parsed.rows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) })));
+    if (parsed.note && !note) setNote(parsed.note);
+    setAiReflection(parsed.reflection);
+    setAiSource(parsed.source);
+    setAiBusy(false);
+  };
 
   const editEntry = (entry: CardioLogDraft) => {
     setLines(linesFromDraft(entry));
@@ -169,6 +190,15 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
     {!open && <button type="button" className="button secondary wide" onClick={startNew}>＋ {savedEntries.length ? 'Add another cardio entry' : 'Add cardio'}</button>}
 
     {open && <div className="cardio-log-composer">
+      <div className="cardio-ai-box">
+        <span className="cardio-ai-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/><circle cx="12" cy="12" r="4"/></svg>Describe it — Forge logs it</span>
+        <textarea rows={2} value={aiText} onChange={event => setAiText(event.target.value)} placeholder="“4 mile run in 32:10, last mile hard” or “6x400m at 90s with 2 min jog, 1 mile warmup”" />
+        <div className="cardio-ai-actions">
+          <button type="button" className="button small-button" disabled={aiBusy || !aiText.trim()} onClick={logWithAi}>{aiBusy ? 'Reading…' : 'Log it'}</button>
+          <small>Rows fill in below — check them, then save.</small>
+        </div>
+        {aiReflection && <p className={`cardio-ai-reflection${aiSource === 'local' ? ' local' : ''}`}><b>{aiSource === 'ai' ? 'FORGE' : 'QUICK PARSE'}</b>{aiReflection}</p>}
+      </div>
       <datalist id="cardio-type-options">{typeOptions.map(option => <option value={option} key={option} />)}</datalist>
 
       <div className="cardio-log-lines">

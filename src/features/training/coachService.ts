@@ -7,6 +7,8 @@ export type ForgeCoachRequest = {
   context: Record<string, unknown>;
 };
 
+export type ParsedCardioRows = { reflection: string; note: string; rows: Array<{ cardioType: string; distance: number; unit: string; timeMinutes: number }> };
+
 export type ForgeCoachResponse = {
   answer: string;
   source: 'ai' | 'local';
@@ -36,4 +38,23 @@ export async function requestForgeCoach(request: ForgeCoachRequest, localFallbac
     return { answer: localFallback, source: 'local', error: detail };
   }
   return { answer: String(data.answer), source: 'ai', workout: data.workout };
+}
+
+/* The AI cardio box: send the athlete's description, get structured rows plus
+   a read-back reflection. Callers supply a local parse as the fallback so the
+   box still works in demo mode and offline. */
+export async function requestCardioParse(description: string, context: Record<string, unknown>, localFallback: ParsedCardioRows): Promise<ParsedCardioRows & { source: 'ai' | 'local'; error?: string }> {
+  if (isDemoMode) return { ...localFallback, source: 'local' };
+  try {
+    const { data, error } = await supabase.functions.invoke('forge-coach', { body: { question: description, scope: 'cardio-log', context } });
+    if (error || !data?.cardio?.rows?.length) {
+      let detail = 'The AI logger did not return rows.';
+      const response = (error as { context?: Response } | null)?.context;
+      if (response) { try { const body = await response.clone().json(); if (typeof body?.error === 'string') detail = body.error; } catch { /* keep default */ } }
+      return { ...localFallback, source: 'local', error: detail };
+    }
+    return { reflection: String(data.cardio.reflection || ''), note: String(data.cardio.note || ''), rows: data.cardio.rows, source: 'ai' };
+  } catch {
+    return { ...localFallback, source: 'local', error: 'The AI logger is unreachable right now.' };
+  }
 }

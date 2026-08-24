@@ -8,6 +8,48 @@ const corsHeaders = {
 const outputText = (response: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }) =>
   response.output?.flatMap(item => item.content || []).find(item => item.type === 'output_text')?.text || '';
 
+const cardioLogSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    reflection: { type: 'string' },
+    note: { type: 'string' },
+    rows: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 16,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          cardioType: { type: 'string' },
+          distance: { type: 'number', minimum: 0 },
+          unit: { type: 'string', enum: ['miles', 'km', 'meters', 'yards', 'minutes', 'calories', 'reps', 'floors'] },
+          timeMinutes: { type: 'number', minimum: 0 },
+        },
+        required: ['cardioType', 'distance', 'unit', 'timeMinutes'],
+      },
+    },
+  },
+  required: ['reflection', 'note', 'rows'],
+};
+
+const cardioLogInstructions = `You convert an athlete's plain-language description of a COMPLETED cardio workout into structured log rows for the Forge training log.
+
+OUTPUT
+- rows: one row per distinct effort. A steady workout is one row. Interval work becomes one row per repeat, or one row per distinct segment (warmup, repeats, cooldown) — identical repeats are separate rows so the log matches what was performed.
+- Each row: cardioType (Run, Walk, Bike, Rowing, Swimming, Elliptical, Stair Climber, Jump Rope — reuse the athlete's own activity name when it is clearly an activity), distance (0 when only time is known), unit, timeMinutes (decimal minutes; 0 when only distance is known).
+- Prefer the athlete's interval detail over a synced device summary when both are given, but keep totals consistent with what they stated. If their stated total conflicts with the sum of described segments, trust the segments and flag the difference in the note.
+- Rest between intervals is NOT a row; describe a notable rest scheme in the note.
+- note: one short line of useful context from their words (surface, feel, rest scheme, weather). Empty string when there is nothing beyond the numbers.
+- reflection: 1–2 plain sentences confirming exactly what will be logged, like a training partner reading it back ("Logged as 6 × 400 m at ~90 s each plus a 1-mile warmup — 2.5 miles total."). Never state numbers the athlete did not give or that cannot be computed from what they gave.
+
+RULES
+- Never fabricate distance, time, or pace. A missing value is 0, not a guess.
+- "5k" means 5 km. Bare repeat distances in a running context ("400s", "6x800") are meters.
+- Use the athlete's units; meters for track repeats and rowing, yards for swimming unless they said meters.
+- If the description is not a cardio workout, return one row with cardioType "Run", distance 0, timeMinutes 0, and a reflection saying you could not read a workout from it.`;
+
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
@@ -17,12 +59,13 @@ Deno.serve(async request => {
     const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData.user) throw new Error('Authentication required.');
     const body = await request.json();
-    const question = String(body.question || '').trim().slice(0, 1000);
+    const question = String(body.question || '').trim().slice(0, 2000);
     if (!question) throw new Error('Ask Forge a question first.');
     const context = JSON.stringify(body.context || {}).slice(0, 30000);
     const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userData.user.id));
     const safetyIdentifier = Array.from(new Uint8Array(identifierBytes)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32);
     const workoutScope = String(body.scope || '') === 'workout';
+    const cardioScope = String(body.scope || '') === 'cardio-log';
     const aiResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')!}`, 'Content-Type': 'application/json' },
@@ -30,9 +73,12 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: 'forge-coach-v3',
-        reasoning: { effort: 'medium' },
-        text: workoutScope ? {
+        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v3',
+        reasoning: { effort: cardioScope ? 'low' : 'medium' },
+        text: cardioScope ? {
+          verbosity: 'low',
+          format: { type: 'json_schema', name: 'forge_cardio_log', strict: true, schema: cardioLogSchema },
+        } : workoutScope ? {
           verbosity: 'low',
           format: {
             type: 'json_schema',
@@ -67,7 +113,7 @@ Deno.serve(async request => {
             },
           },
         } : { verbosity: 'low' },
-        instructions: `You are Forge Coach: a direct, evidence-first strength and conditioning coach inside the athlete's training log.
+        instructions: cardioScope ? cardioLogInstructions : `You are Forge Coach: a direct, evidence-first strength and conditioning coach inside the athlete's training log.
 
 SUCCESS CRITERIA
 Give the athlete one clear answer that agrees with Forge's saved data and deterministic calculations. Be useful, specific, and candid. Never manufacture certainty.
@@ -96,19 +142,26 @@ COACHING RULES
 - For a recap or goal check, identify the real trend and the most important gap. Empty encouragement is not coaching.
 - A weekly plan covers today through Sunday only. Today must match the deterministic recommendation. Avoid back-to-back demanding sessions and account for work already completed this week. If later-day evidence is insufficient, say what is missing instead of filling space.
 - For running goals, use a supplied race-model assessment unchanged. Exact-distance hard efforts are primary evidence; recovery runs, volume, consistency, and fatigue only support interpretation. Never infer a race result from an ordinary run.
+- When athleteHealthNotes are supplied, they are constraints the athlete reported (injury, pain, fatigue). Respect every active note: never program work that loads a reported issue while its buffer is active, follow the buffer's guidance, and encourage an honest check-in on how it feels. A cleared or expired note is history, not a current restriction.
 
 RESPONSE STYLE
 Answer the question first. Normal answers are 2–4 short sentences and under 120 words. Weekly plans use one concise line per day and stay under 220 words. Use plain language, minimal formatting, and no generic executive-summary filler, AI disclaimer, motivational padding, or medical diagnosis.
 
 WORKOUT SCOPE
 Return one editable cardio/circuit using only exact movement names and units in availableLibrary. Honor selected movements when supplied; otherwise choose a balanced assortment supported by the request, goals, recent work, and limitations. HYROX simulations alternate Run with functional stations when Run is available. Do not turn every conditioning request into running. Keep targets realistic, use each movement's saved unit, and explain the assortment briefly.`,
-        input: `Scope: ${String(body.scope || 'training')}\nAthlete question: ${question}\nVerified context JSON: ${context}`,
+        input: cardioScope
+          ? `Athlete's description of the completed cardio workout: ${question}\nContext JSON (may include a synced device summary and the athlete's saved cardio types): ${context}`
+          : `Scope: ${String(body.scope || 'training')}\nAthlete question: ${question}\nVerified context JSON: ${context}`,
       }),
     });
     if (!aiResponse.ok) throw new Error(`Coach service failed (${aiResponse.status}).`);
     const responseBody = await aiResponse.json();
     const answer = outputText(responseBody);
     if (!answer) throw new Error('Coach returned no answer.');
+    if (cardioScope) {
+      const parsed = JSON.parse(answer);
+      return Response.json({ answer: String(parsed.reflection), cardio: { reflection: String(parsed.reflection), note: String(parsed.note || ''), rows: parsed.rows } }, { headers: corsHeaders });
+    }
     if (workoutScope) {
       const workout = JSON.parse(answer);
       return Response.json({ answer: String(workout.answer), workout: { title: workout.title, rounds: workout.rounds, roundRestSeconds: workout.roundRestSeconds, stations: workout.stations } }, { headers: corsHeaders });

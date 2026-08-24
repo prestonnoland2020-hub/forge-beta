@@ -1,32 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <linearGradient id="ground" x1="0" y1="0" x2="0.55" y2="1">
-      <stop offset="0" stop-color="#2C3330"/><stop offset="1" stop-color="#121614"/>
-    </linearGradient>
-    <radialGradient id="sheen" cx="0.28" cy="0.16" r="0.85">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F2F5F3"/><stop offset="1" stop-color="#C6CEC9"/>
-    </linearGradient>
-    <filter id="drop" x="-30%" y="-30%" width="160%" height="180%">
-      <feDropShadow dx="0" dy="9" stdDeviation="10" flood-color="#000000" flood-opacity="0.38"/>
-    </filter>
-    <clipPath id="tile"><rect width="512" height="512" rx="114.5"/></clipPath>
-  </defs>
-  <g clip-path="url(#tile)">
-    <rect width="512" height="512" fill="url(#ground)"/>
-    <rect width="512" height="512" fill="url(#sheen)"/>
-    <rect width="512" height="512" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.55"/>
-  </g>
-  <g filter="url(#drop)" fill="url(#steel)">
-    <rect x="104" y="214" width="32"  height="84"  rx="9"/>
-    <rect x="144" y="196" width="38"  height="120" rx="11"/>
-    <rect x="182" y="232" width="14"  height="48"  rx="4"/>
-    <rect x="196" y="244" width="120" height="24"  rx="6"/>
-    <rect x="316" y="232" width="14"  height="48"  rx="4"/>
-    <rect x="330" y="196" width="38"  height="120" rx="11"/>
-    <rect x="376" y="214" width="32"  height="84"  rx="9"/>
+  <rect width="512" height="512" rx="116" fill="#0C1210"/>
+  <g fill="#D7FF45">
+    <rect x="142" y="118" width="62" height="272" rx="9"/>
+    <rect x="142" y="118" width="174" height="54" rx="9"/>
+    <rect x="142" y="232" width="126" height="48" rx="9"/>
+    <rect x="326" y="99" width="24" height="92" rx="7"/>
+    <rect x="360" y="77" width="30" height="136" rx="8"/>
   </g>
 </svg>
