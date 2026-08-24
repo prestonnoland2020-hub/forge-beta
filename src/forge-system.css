@@ -800,3 +800,15 @@ body{background-color:var(--bg);color:var(--text)}
 .source-options button{min-width:0;padding-inline:8px}
 .source-options button b{font-size:clamp(11px,3.2vw,14px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .source-options button span{font-size:9.5px;letter-spacing:.1em}
+
+/* The embedded quick-log used a fixed negative margin to overlay reserved
+   padding in the card above it; any height drift stacked it on the card's
+   footer. It flows in normal document order now. */
+.accent-card:has(+.quick-log-top-sets.embedded){padding-bottom:25px}
+.quick-log-top-sets.embedded{position:static;margin-top:0;padding:0 2px}
+@media(max-width:700px){.accent-card:has(+.quick-log-top-sets.embedded){padding-bottom:16px}.quick-log-top-sets.embedded{margin-top:0}}
+
+/* Completed-day data rows share the card's inner gutter instead of sitting
+   on the border. */
+.today-data-points>div{padding:10px 22px}
+@media(max-width:600px){.today-data-points>div{padding:9px 15px}}

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
+import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 
 type SplitDay={name:string;dayType:string;muscles?:string[];exercises?:string[];cardioPolicy?:'none'|'forge'|'planned';cardio?:PlannedCardio[]};
@@ -36,7 +37,8 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
 }
 
 export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}:{goals:CreatedGoal[];profile:AdaptiveProfile;splitDays:SplitDay[];rhythm?:'rolling'|'weekly'}){
-  const active=useMemo(()=>buildLongRangePlan(goals,profile,12)[0],[goals,profile]);const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm):[],[active,splitDays,goals,profile,rhythm]);if(!active)return null;
+  const {records}=useWorkoutHistory();
+  const active=useMemo(()=>buildLongRangePlan(goals,profile,12,records)[0],[goals,profile,records]);const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm):[],[active,splitDays,goals,profile,rhythm]);if(!active)return null;
   return <div className="simple-program"><section className="simple-program-head"><div><span className="eyebrow">THIS WEEK · OBJECTIVE</span><h2>{active.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{active.strengthExercise||'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{active.mileage?`${active.mileage} mi this week`:'Not scheduled'}</strong></div></div></section><section className="card simple-week-schedule"><header><div><span className="eyebrow">YOUR SCHEDULE</span><h3>What to do this week</h3></div></header><div>{sessions.map(session=><article className={`stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{dateText(session.date)}</time><div><span className="session-tags">{/* kind arrives pre-joined, e.g. "Strength + Forge · Quality"; each part is
        its own fact and deserves its own chip rather than one wrapping label. */
       [...session.kind.split(' · '),session.stress,...(session.scaled?['Scaled']:[])].filter(Boolean).map((tag,index)=><i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{session.title}</strong><small>{session.metric?`${session.metric} · ${session.detail}`:session.detail}</small></div><b>{session.stress==='Rest'?'Rest':'›'}</b></article>)}</div></section><details className="card scaling-explainer"><summary><div><span className="eyebrow">HOW CARDIO ADAPTS</span><strong>Scaling rules</strong></div><b>＋</b></summary><div><p><b>Weekly volume:</b> resets only with the calendar week, never when a rolling split wraps.</p><p><b>Long run:</b> appears no more than once in each calendar week.</p><p><b>Steady workouts:</b> duration changes.</p><p><b>Intervals:</b> repetition count changes while work quality and recovery remain recognizable.</p><p><b>Circuits:</b> round count changes before station technique is altered.</p><p>Completed results, recovery, weekly volume, and goal phase shape the next prescription. Saved templates stay unchanged; only the scheduled dose scales.</p></div></details></div>;

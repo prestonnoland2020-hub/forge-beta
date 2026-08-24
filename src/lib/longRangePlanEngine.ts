@@ -7,8 +7,24 @@ const num=(value?:string)=>Number(String(value||'').replace(/[^0-9.]/g,''))||0;
 const dateLabel=(date:Date)=>date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 const enduranceScale=(goal?:CreatedGoal)=>{const name=(goal?.exercise||goal?.title||'').toLowerCase();if(name.includes('marathon')&&!name.includes('half'))return 2.1;if(name.includes('half'))return 1.75;if(name.includes('10k'))return 1.5;if(name.includes('5k'))return 1.35;if(name.includes('mile'))return 1.2;return 1.3};
 
-export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,weeksRequested=16):PlanWeek[]{
-  const endurance=goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];const available=deadline?Math.max(4,Math.ceil((deadline-Date.now())/604800000)):weeksRequested;const total=Math.min(24,Math.max(8,Math.min(available,weeksRequested)));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;const currentStrength=num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
+export type PlanHistoryRecord={topSets?:Array<{lift:string;weight:number;reps:number;calculatedMax?:number;completed?:boolean}>};
+/* The baseline for the goal lift comes from LOGGED HISTORY first — the goal's
+   typed "current" field is only a fallback. An exact lift-name match wins;
+   a variant match ("Smith Machine Squat" for a Squat goal) fills in when the
+   exact lift has never been logged. */
+const historyMax=(records:PlanHistoryRecord[],exercise?:string)=>{
+  if(!exercise)return 0;const target=exercise.trim().toLowerCase();let exact=0;let variant=0;
+  records.forEach(record=>(record.topSets||[]).forEach(set=>{
+    if(set.completed===false||!set.lift||!set.weight)return;
+    const name=set.lift.trim().toLowerCase();
+    const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));
+    if(name===target){if(max>exact)exact=max}
+    else if(name.includes(target)||target.includes(name)){if(max>variant)variant=max}
+  }));
+  return exact||variant;
+};
+export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,weeksRequested=16,records:PlanHistoryRecord[]=[]):PlanWeek[]{
+  const endurance=goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];const available=deadline?Math.max(4,Math.ceil((deadline-Date.now())/604800000)):weeksRequested;const total=Math.min(24,Math.max(8,Math.min(available,weeksRequested)));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
   return Array.from({length:total},(_,index)=>{
     const week=index+1;const weekDate=new Date();weekDate.setHours(12,0,0,0);weekDate.setDate(weekDate.getDate()+index*7);const taper=Boolean(endurance)&&week>total-2;const test=week===total;const deload=!taper&&!test&&week%4===0;const progress=index/Math.max(1,total-1);const phase:PlanWeek['phase']=test?'Test':taper?'Taper':deload?'Deload':progress<.25?'Foundation':progress<.65?'Build':'Specific';const priorBuild=startMileage+(peak-startMileage)*Math.min(1,progress/.86);const mileage=Number((hasRunBaseline?(taper?priorBuild*(test?.55:.72):deload?priorBuild*.78:priorBuild):0).toFixed(1));const previous=index===0?startMileage:startMileage+(peak-startMileage)*Math.min(1,(index-1)/Math.max(1,total-1)/.86);const change=hasRunBaseline&&previous?Math.round((mileage-previous)/previous*100):0;const repDistance=intervalMenu[Math.min(intervalMenu.length-1,Math.floor(progress*intervalMenu.length))];
     const quality=!endurance?'No goal-driven cardio':!hasRunBaseline?'Establish a comfortable running baseline':taper?'4–6 relaxed strides with full recovery':test?`Goal effort assessment for ${endurance.exercise||'priority event'}`:phase==='Foundation'?`${6+Math.floor(index/2)} × ${repDistance} m controlled`:phase==='Build'?`${5+Math.floor(index/3)} × ${repDistance} m · threshold to goal effort`:deload?'Short fartlek · stop while fresh':`${4+Math.floor(index/4)} × ${repDistance} m · event-specific pace`;const longMiles=hasRunBaseline?Number(Math.max(profile.longestRunMiles,mileage*.3)*(taper?.72:test?.55:1)).toFixed(1):'0';const easyMinutes=hasRunBaseline?Math.round(Math.max(20,Math.min(70,mileage/Math.max(1,profile.runningDays)*10))):0;
