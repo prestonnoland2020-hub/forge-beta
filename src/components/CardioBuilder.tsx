@@ -98,8 +98,22 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
   initialEntries?: CardioLogDraft[];
   plannedSummary?: string;
 } = {}) {
-  const { exercises } = useTrainingLibrary();
+  const { exercises, workouts } = useTrainingLibrary();
   const [savedEntries, setSavedEntries] = useState<CardioLogDraft[]>(initialEntries);
+  /* Circuits and saved cardio workouts log in one tap: the library template
+     becomes a completed entry (stations preserved), editable like any other. */
+  const savedTemplates = useMemo(() => workouts.filter(workout => workout.kind === 'Circuit' || (workout.kind === 'Cardio' && workout.plan)), [workouts]);
+  const logTemplate = (workout: typeof workouts[number]) => {
+    const plan = workout.plan as { stationEntries?: Array<{ name: string; target: string; unit: string }> } | undefined;
+    setSavedEntries(items => [...items, {
+      id: crypto.randomUUID(),
+      structure: workout.kind === 'Circuit' ? 'circuit' : 'steady',
+      activity: workout.name,
+      summary: workout.summary || workout.name,
+      prescription: {},
+      circuitStations: plan?.stationEntries?.map(station => ({ name: station.name, value: station.target, unit: station.unit })),
+    }]);
+  };
   const [open, setOpen] = useState(initialOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lines, setLines] = useState<CardioLine[]>([blankLine(1)]);
@@ -187,6 +201,7 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
     </div>}
 
     {!open && plannedSummary && <p className="cardio-log-planned"><span>PLANNED</span>{plannedSummary}</p>}
+    {!open && savedTemplates.length > 0 && <div className="cardio-template-row"><span className="field-caption">ONE-TAP FROM LIBRARY</span><div>{savedTemplates.slice(0, 6).map(workout => <button type="button" key={workout.id} onClick={() => logTemplate(workout)}>{workout.name}</button>)}</div></div>}
     {!open && <button type="button" className="button secondary wide" onClick={startNew}>＋ {savedEntries.length ? 'Add another cardio entry' : 'Add cardio'}</button>}
 
     {open && <div className="cardio-log-composer">

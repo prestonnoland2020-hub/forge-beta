@@ -146,14 +146,28 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   }
   const templates=selectedExercises.map(({exercise})=>({exercise:exercise.name,calculatedMax:0,exposureIndex:new Set(completed.filter(result=>result.lift===exercise.name).map(result=>result.date)).size}));
   const intelligence=buildTrainingIntelligence({records:input.records,recovery:input.recovery,templates,goalMaxByLift,today:new Date(`${input.date}T12:00:00`),loadBiasPercent:input.loadBiasPercent});
-  const topSets=selectedExercises.map(selection=>{
+  /* A cardio-only split day prescribes no strength: no top set appears on
+     Today or in the workout log for that day. */
+  const topSets=input.splitDay.type==='cardio'?[]:selectedExercises.map(selection=>{
     const target=intelligence.topSets.find(item=>item.exercise===selection.exercise.name)!;
     return{id:`top-${selection.exercise.id}-${normalized(selection.muscle).replace(/[^a-z0-9]+/g,'-')}`,muscle:selection.muscle,exercise:target.exercise,weight:target.weight,reps:target.reps,calculatedMax:target.calculatedMax,stage:target.stage,rationale:target.rationale,source:target.source,selected:!selection.optional,optional:selection.optional};
   });
 
-  const cardioCandidate=input.splitDay.type==='cardio'||input.splitDay.type==='mixed'
-    ?buildWeeklyCardio(input.goals,0,{profile:input.profile,history:input.runningHistory}).scheduled[0]
-    :undefined;
+  /* The split day's NAME owns its cardio role: a "Long Run" day gets the long
+     run, never the week's intervals. Unnamed cardio days take the highest-
+     priority scheduled session as before. */
+  const roleForDayName=(name:string):GeneratedSession['role']|null=>{const value=name.toLowerCase();if(value.includes('long'))return 'Long';if(value.includes('easy')||value.includes('aerobic')||value.includes('recovery'))return 'Easy';if(value.includes('quality')||value.includes('speed')||value.includes('interval')||value.includes('track')||value.includes('tempo'))return 'Quality';return null};
+  const cardioCandidate=(()=>{
+    if(input.splitDay.type!=='cardio'&&input.splitDay.type!=='mixed')return undefined;
+    const weekly=buildWeeklyCardio(input.goals,0,{profile:input.profile,history:input.runningHistory});
+    const wanted=roleForDayName(input.splitDay.name);
+    const pick=(role:GeneratedSession['role'])=>weekly.scheduled.find(session=>session.role===role)||weekly.deferred.find(session=>session.role===role);
+    if(wanted){
+      const found=pick(wanted)||(wanted==='Long'?pick('Easy'):undefined);
+      if(found)return{...found,status:'Scheduled' as const};
+    }
+    return weekly.scheduled[0];
+  })();
   const cardio=cardioCandidate?{id:`cardio-${cardioCandidate.id}`,title:cardioCandidate.title,summary:formatCardio(cardioCandidate),rationale:cardioCandidate.rationale,session:cardioCandidate,selected:true}:undefined;
   const lastCompletedDate=input.records.map(record=>record.date).sort().at(-1);
   const selectedCount=topSets.filter(set=>set.selected).length;

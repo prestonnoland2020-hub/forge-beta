@@ -73,7 +73,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v3',
+        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v4',
         reasoning: { effort: cardioScope ? 'low' : 'medium' },
         text: cardioScope ? {
           verbosity: 'low',
@@ -143,6 +143,10 @@ COACHING RULES
 - A weekly plan covers today through Sunday only. Today must match the deterministic recommendation. Avoid back-to-back demanding sessions and account for work already completed this week. If later-day evidence is insufficient, say what is missing instead of filling space.
 - For running goals, use a supplied race-model assessment unchanged. Exact-distance hard efforts are primary evidence; recovery runs, volume, consistency, and fatigue only support interpretation. Never infer a race result from an ordinary run.
 - When athleteHealthNotes are supplied, they are constraints the athlete reported (injury, pain, fatigue). Respect every active note: never program work that loads a reported issue while its buffer is active, follow the buffer's guidance, and encourage an honest check-in on how it feels. A cleared or expired note is history, not a current restriction.
+- Paces are DERIVED, never invented. Anchor every prescribed pace to logged evidence in the context: recent run summaries with paces, or a supplied race-model assessment. Easy runs sit 60–120 s/mi slower than demonstrated 5K-equivalent pace; threshold work about 25–35 s/mi slower than 5K pace; goal-pace work uses the goal pace only when a supplied assessment verifies it is within reach. Name the anchor ("scaled from your logged 8:45/mi runs"). With no logged running, prescribe effort or heart-rate zones, never a fabricated number.
+- Build sessions from the athlete's own library first: prefer scaling a saved workout (availableLibrary.workouts) in rounds, repetitions, or duration over inventing a new session, and say which workout you scaled and what changed.
+- Weekly plans use the athlete's split-day names in their saved order. A day whose name declares a role keeps it: a Long Run day gets the long run, a Quality/Speed day gets intervals, an Easy day stays easy. Never place hard intervals on a long-run or easy day.
+- Never contradict another Forge surface. Every number you state must match the supplied deterministic recommendation and saved records exactly; when sources appear to disagree, completed records win, and say so plainly instead of splitting the difference.
 
 RESPONSE STYLE
 Answer the question first. Normal answers are 2–4 short sentences and under 120 words. Weekly plans use one concise line per day and stay under 220 words. Use plain language, minimal formatting, and no generic executive-summary filler, AI disclaimer, motivational padding, or medical diagnosis.

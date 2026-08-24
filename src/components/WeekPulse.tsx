@@ -79,11 +79,10 @@ export function WeekPulse() {
   }, []).filter((item, index, all) => index === 0 ? all.length < 4 || item.index > 0 : true);
   const axisSteps = [peak, peak / 2, 0];
   const unitLabel = lens === 'run' ? 'mi' : 'lifts';
-  /* Tap a point to read it: value + week, pinned above the dot. */
+  /* Hover or tap a point to read it — the same tooltip Insights uses. */
   const [picked, setPicked] = useState<number | null>(null);
   useEffect(() => { setPicked(null); }, [lens]);
   const pickedWeek = picked === null ? null : weeks[picked];
-  const tipX = picked === null ? 0 : Math.min(Math.max(x(picked), 34), W - AXIS - 30);
 
   return <section className="feed-card week-pulse-card">
     <header className="week-pulse-head">
@@ -105,7 +104,7 @@ export function WeekPulse() {
         <div><span>Heaviest</span><strong>{heaviest ? <>{heaviest.weight} <small>{weightUnit}</small></> : '—'}</strong></div>
       </>}
     </div>
-    <div className="week-pulse-plot" ref={plotRef}>
+    <div className="week-pulse-plot" ref={plotRef} onMouseLeave={() => setPicked(null)}>
       <span className="week-pulse-caption">Past 12 weeks</span>
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Weekly ${lens === 'run' ? 'distance' : 'top sets'} for the past 12 weeks`}>
         {axisSteps.map((step, index) => <g key={index} className="week-pulse-grid">
@@ -114,15 +113,17 @@ export function WeekPulse() {
         </g>)}
         <path className="week-pulse-area" d={areaPath} />
         <polyline className="week-pulse-line" points={linePoints} fill="none" />
-        {values.map((value, index) => <g key={index} className={picked === index ? 'week-pulse-point picked' : 'week-pulse-point'} onClick={() => setPicked(current => current === index ? null : index)}>
+        {values.map((value, index) => <g key={index} className={picked === index ? 'week-pulse-point picked' : 'week-pulse-point'} tabIndex={0} role="button" aria-label={`Week of ${new Date(`${weeks[index].start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${value} ${unitLabel}`} onMouseEnter={() => setPicked(index)} onFocus={() => setPicked(index)} onClick={() => setPicked(current => current === index ? null : index)}>
           <circle className="week-pulse-hit" cx={x(index)} cy={y(value)} r={13} />
           <circle className="week-pulse-dot" cx={x(index)} cy={y(value)} r={index === values.length - 1 || picked === index ? 5 : 3} />
         </g>)}
-        {picked !== null && pickedWeek && <g className="week-pulse-tip" pointerEvents="none">
-          <text x={tipX} y={Math.max(12, y(values[picked]) - 12)} textAnchor="middle">{lens === 'run' ? `${values[picked]} mi` : `${values[picked]} lifts`} · {new Date(`${pickedWeek.start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</text>
-        </g>}
         {monthLabels.map(item => <text key={item.label + item.index} className="week-pulse-month" x={x(item.index)} y={H - 6}>{item.label}</text>)}
       </svg>
+      {picked !== null && pickedWeek && <div className="overview-chart-tooltip" style={{ left: `${x(picked) / W * 100}%`, top: `${(Math.max(18, y(values[picked])) + 18) / (H + 18) * 100}%` }}>
+        <span>Wk of {new Date(`${pickedWeek.start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <strong>{lens === 'run' ? values[picked].toFixed(values[picked] >= 10 ? 1 : 2) : values[picked]}</strong>
+        <small>{lens === 'run' ? 'miles' : 'lifts logged'}</small>
+      </div>}
     </div>
   </section>;
 }

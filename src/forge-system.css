@@ -812,3 +812,51 @@ body{background-color:var(--bg);color:var(--text)}
    on the border. */
 .today-data-points>div{padding:10px 22px}
 @media(max-width:600px){.today-data-points>div{padding:9px 15px}}
+
+/* Goal insight expands inline under its row — the accordion scales as goals
+   are added instead of pushing one chart to the page bottom. */
+.compact-goal-table.slim .compact-goal-row{grid-template-columns:minmax(0,1fr) 44px;grid-auto-rows:auto}
+.compact-goal-table.slim .goal-row-detail{grid-column:1/-1;padding:var(--s2) 0 var(--s4);border-top:1px solid var(--hairline)}
+.goal-row-detail .goal-progress-card{border:0;box-shadow:none;background:transparent;padding:var(--s2) var(--s2) 0}
+
+/* One-tap circuit / saved-workout logging chips. */
+.cardio-template-row{display:grid;gap:6px}
+.cardio-template-row>div{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.cardio-template-row>div::-webkit-scrollbar{display:none}
+.cardio-template-row button{flex:none;min-height:38px;padding:8px 14px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-1);color:var(--ink);font-size:12.5px;font-weight:700}
+.cardio-template-row button:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Roadmap: the whole trajectory as one dense, scannable table. */
+.roadmap-card{display:grid;gap:var(--s3)}
+.roadmap-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s3);flex-wrap:wrap}
+.roadmap-head h3{margin:2px 0 0}
+.horizon-chips{display:flex;gap:6px;align-items:center}
+.horizon-chips button{min-height:36px;padding:7px 13px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-1);color:var(--ink-2);font-size:12px;font-weight:800}
+.horizon-chips button.active{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
+.horizon-chips .roadmap-export{color:var(--accent);border-style:dashed}
+.roadmap-table{display:grid;max-height:440px;overflow-y:auto;border:1px solid var(--hairline);border-radius:var(--r-sm)}
+.roadmap-row{display:grid;grid-template-columns:86px 52px 56px minmax(0,1.4fr) minmax(0,1fr);gap:var(--s3);align-items:center;padding:8px 12px;border-bottom:1px solid var(--hairline);font-size:12.5px}
+.roadmap-row:last-child{border-bottom:0}
+.roadmap-row.head{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--ink-3);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.roadmap-week{display:grid;line-height:1.25}
+.roadmap-week b{font:800 13px var(--display)}
+.roadmap-week small{color:var(--ink-3);font-size:10px;white-space:nowrap}
+.roadmap-miles,.roadmap-long{font-variant-numeric:tabular-nums;font-weight:700}
+.roadmap-run{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.roadmap-set{font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.roadmap-set b{color:var(--ink)}
+.roadmap-set small{color:var(--ink-3)}
+.roadmap-row.phase-deload .roadmap-week b,.roadmap-row.phase-taper .roadmap-week b{color:var(--info)}
+.roadmap-row.phase-test .roadmap-week b{color:var(--accent)}
+.roadmap-note{color:var(--ink-3)}
+@media(max-width:640px){.roadmap-row{grid-template-columns:74px 44px minmax(0,1.3fr) minmax(0,1fr)}.roadmap-long,.roadmap-row.head span:nth-child(3){display:none}}
+
+/* Roadmap cells: the projected max is the headline; labels truncate cleanly
+   instead of bleeding into the next column. */
+.roadmap-week{min-width:0}
+.roadmap-week small{overflow:hidden;text-overflow:ellipsis}
+.roadmap-set{display:grid;line-height:1.25;white-space:normal}
+.roadmap-set b{font:800 13px var(--display)}
+.roadmap-set small{color:var(--ink-3);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.roadmap-row{grid-template-columns:88px 46px 50px minmax(0,1.25fr) minmax(0,1fr)}
+@media(max-width:640px){.roadmap-row{grid-template-columns:80px 42px minmax(0,1.2fr) minmax(0,1fr)}}
