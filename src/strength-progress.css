@@ -1,6 +1,6 @@
 .strength-progress-layout{grid-template-columns:minmax(0,1.55fr) minmax(240px,.45fr)}
 .strength-chart-controls{display:flex;align-items:start;justify-content:space-between;gap:16px}
-.performance-mode{display:flex;width:max-content;margin:18px 0 8px;padding:4px;border:1px solid var(--line);border-radius:8px;background:#0b1210}
+.performance-mode{display:flex;width:max-content;margin:18px 0 8px;padding:4px;border:1px solid var(--line);border-radius:8px;background:var(--surface-sunken)}
 .performance-mode button{border:0;border-radius:6px;padding:9px 14px;background:transparent;color:var(--muted);font-size:11px;font-weight:800}
 .performance-mode button.active{background:var(--accent);color:var(--accent-ink)}
 .performance-line-chart{position:relative;height:320px;margin:16px 0 4px;color:var(--accent)}
@@ -23,7 +23,7 @@
 .performance-data[open] summary:after{content:'−'}
 .performance-data summary span{margin-left:auto;margin-right:12px;color:var(--muted);font-size:11px;font-weight:600}
 .performance-records{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px;margin-top:10px;padding-top:8px}
-.performance-records div{display:grid;gap:2px;padding:9px;border:1px solid var(--line);border-radius:7px;background:#0b1210}
+.performance-records div{display:grid;gap:2px;padding:9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-sunken)}
 .performance-records span,.performance-records small{font-size:10px;color:var(--muted)}
 .performance-records strong{font:800 17px var(--display);color:var(--accent)}
 .performance-empty{display:grid;place-items:center;min-height:280px;padding:30px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}

@@ -16,7 +16,7 @@
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b1210;
+  background: var(--surface-sunken);
 }
 .range-options button {
   min-width: 48px;

@@ -16,26 +16,41 @@
    ========================================================================== */
 
 :root{
-  /* Surfaces climb toward the viewer. Dark UI reads depth from surface
-     lightness and hairlines far better than from drop shadows. */
-  --surface-0:#0a0e0d;
-  --surface-1:#131a18;
-  --surface-2:#1a2320;
-  --surface-3:#212c28;
-  --surface-sunken:#080c0b;
-
-  --hairline:#222d29;
-  --hairline-strong:#31403a;
-
-  --ink:#eef4f1;
-  --ink-2:#9daba5;
-  --ink-3:#6d7a75;
-
+  /* Base palette. This is the DEFAULT only. The appearance settings override
+     these same names from `html[data-surface="…"]`, `html[data-mode="light"]`
+     and `:root[data-accent="…"]`, all of which outrank a bare `:root` — so the
+     system tokens below are derived FROM these names rather than defined
+     alongside them. Getting that backwards meant a card kept its dark green
+     while the rest of the app followed the chosen theme. */
+  --bg:#0a0e0d;
+  --panel:#131a18;
+  --panel-2:#1a2320;
+  --line:#222d29;
+  --text:#eef4f1;
+  --muted:#9daba5;
   --accent:#d7ff45;
   --accent-ink:#0e1305;
-  --accent-dim:#a8c92f;
-  --accent-wash:rgba(215,255,69,.10);
-  --accent-wash-strong:rgba(215,255,69,.18);
+
+  /* Surfaces climb toward the viewer. Dark UI reads depth from surface
+     lightness and hairlines far better than from drop shadows — and because
+     each step is mixed from the theme's own values, the same ladder holds in
+     light mode and in every accent. */
+  --surface-0:var(--bg);
+  --surface-1:var(--panel);
+  --surface-2:var(--panel-2);
+  --surface-3:color-mix(in srgb,var(--panel-2) 90%,var(--text) 9%);
+  --surface-sunken:color-mix(in srgb,var(--bg) 84%,var(--text) 3%);
+
+  --hairline:var(--line);
+  --hairline-strong:color-mix(in srgb,var(--line) 70%,var(--text) 20%);
+
+  --ink:var(--text);
+  --ink-2:var(--muted);
+  --ink-3:color-mix(in srgb,var(--muted) 74%,var(--bg));
+
+  --accent-dim:color-mix(in srgb,var(--accent) 78%,var(--bg));
+  --accent-wash:color-mix(in srgb,var(--accent) 10%,transparent);
+  --accent-wash-strong:color-mix(in srgb,var(--accent) 18%,transparent);
 
   --good:#58d68d;
   --warn:#f6c453;
@@ -53,20 +68,20 @@
   --ease:cubic-bezier(.2,.7,.3,1);
   --dur:150ms;
 
-  /* Legacy token names still read by ~50 older stylesheets. Repointing them
-     here upgrades those rules instead of leaving two systems fighting. */
-  --bg:var(--surface-0);
-  --panel:var(--surface-1);
-  --panel-2:var(--surface-2);
-  --line:var(--hairline);
-  --text:var(--ink);
-  --muted:var(--ink-2);
-  --card:var(--surface-1);
-  --border:var(--hairline);
+  /* Remaining legacy aliases still read by the older stylesheets. */
+  --card:var(--panel);
+  --border:var(--line);
   --success:var(--good);
   --warning:var(--warn);
   --gold:var(--accent);
   --accent-contrast:var(--accent-ink);
+}
+
+/* Light mode wants far softer shadows than a near-black ground does. */
+html[data-mode="light"]{
+  --shadow-1:0 1px 2px rgba(16,23,20,.08);
+  --shadow-2:0 6px 18px rgba(16,23,20,.10);
+  --shadow-3:0 18px 44px rgba(16,23,20,.18);
 }
 
 body{
@@ -162,7 +177,7 @@ body{
   font-size:14px;font-weight:800;letter-spacing:.01em;
   transition:transform var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);
 }
-.button:hover{background:#e4ff6b}
+.button:hover{background:color-mix(in srgb,var(--accent) 86%,#fff)}
 .button:active{transform:scale(.975)}
 .button:disabled{opacity:.4;transform:none}
 .button.secondary,.button.ghost{
@@ -449,3 +464,9 @@ select,input:not([type=checkbox]):not([type=radio]){min-height:38px}
   background:var(--surface-2);color:var(--ink-2);border:1px solid var(--hairline);
 }
 .session-tags i:first-child{background:var(--accent-wash);color:var(--accent);border-color:transparent}
+
+/* The page ground itself must follow the theme. `:root` and `body` were painted
+   with literal near-blacks, so a light theme produced white cards floating on a
+   dark page with unreadable headings between them. */
+:root{background:var(--bg)}
+body{background-color:var(--bg);color:var(--text)}

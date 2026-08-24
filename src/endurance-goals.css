@@ -25,7 +25,7 @@
   padding: 16px;
   border: 1px solid #3b4b45;
   border-radius: 10px;
-  background: #0b1210;
+  background: var(--surface-sunken);
 }
 
 .running-event-builder > div:first-child {
@@ -112,7 +112,7 @@
   padding: 9px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: #0b1210;
+  background: var(--surface-sunken);
 }
 
 .event-template li i {
@@ -122,7 +122,7 @@
   height: 24px;
   border-radius: 50%;
   background: var(--accent);
-  color: #07100d;
+  color: var(--surface-sunken);
   font-style: normal;
   font-weight: 900;
   font-size: 10px;
