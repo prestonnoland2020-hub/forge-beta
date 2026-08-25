@@ -1102,3 +1102,8 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .goal-assessment p{margin:0;font-size:13px;line-height:1.55;color:var(--ink)}
 .goal-assessment p b{color:var(--ink-2);font-weight:800}
 .goal-assessment small{color:var(--ink-3);font-size:11.5px;line-height:1.45}
+
+/* Old-UI chart chrome: gold top accent on insight cards, date strip under
+   every chart. */
+.ic-card{border-top:2px solid color-mix(in srgb,var(--accent) 33%,var(--hairline))}
+.ic-datebar{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);margin-top:-4px;padding-top:6px;border-top:1px solid var(--hairline)}

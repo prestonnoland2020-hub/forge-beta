@@ -118,21 +118,49 @@ export function InsightsClassic() {
     return rows.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
   }, [records, todayIso]);
 
-  const lineChart = (points: Array<{ date: string; value: number }>, height = 120) => {
+  /* The exact chart renderer from the original app: quadratic-midpoint
+     smoothing (straight when dense), vertical gradient area fill, 2px round
+     stroke, 2.4px dots with a haloed endpoint, nice ticks, and a three-date
+     strip under a hairline. viewBox 280x130 stretched to 150px tall. */
+  const lineChart = (points: Array<{ date: string; value: number }>, id: string) => {
     if (points.length < 2) return null;
-    const width = 320, left = 34, right = 8, top = 10, bottom = 20;
-    const values = points.map(point => point.value);
-    const min = Math.min(...values), max = Math.max(...values), pad = Math.max(1, (max - min) * .15);
-    const x = (index: number) => left + index * (width - left - right) / (points.length - 1);
-    const y = (value: number) => top + (1 - (value - (min - pad)) / ((max + pad) - (min - pad))) * (height - top - bottom);
-    const ticks = [max, (max + min) / 2, min];
-    return <svg viewBox={`0 0 ${width} ${height}`} className="ic-line" role="img">
-      {ticks.map((tick, index) => <g key={index}><line x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} className="ic-grid" /><text x={left - 5} y={y(tick) + 3} textAnchor="end" className="ic-axis">{Math.round(tick * 10) / 10}</text></g>)}
-      <polyline points={points.map((point, index) => `${x(index)},${y(point.value)}`).join(' ')} fill="none" className="ic-stroke" />
-      {points.map((point, index) => <circle key={point.date} cx={x(index)} cy={y(point.value)} r="3.5" className="ic-dot"><title>{shortDate(point.date)} · {point.value}</title></circle>)}
-      <text x={left} y={height - 4} className="ic-axis">{monthDay(points[0].date)}</text>
-      <text x={width - right} y={height - 4} textAnchor="end" className="ic-axis">{monthDay(points[points.length - 1].date)}</text>
-    </svg>;
+    const W = 280, H = 130, PL = 24, PR = 5, PT = 8, PB = 8;
+    const ts = points.map(point => new Date(`${point.date}T12:00:00`).getTime());
+    const minX = Math.min(...ts), maxX = Math.max(...ts);
+    const ys = points.map(point => point.value);
+    const rawSpan = (Math.max(...ys) - Math.min(...ys)) || 1;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawSpan / 3)));
+    const norm = rawSpan / 3 / mag;
+    const step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
+    const niceMin = Math.floor(Math.min(...ys) / step) * step;
+    const niceMax = Math.ceil(Math.max(...ys) / step) * step;
+    const ticks: number[] = [];
+    for (let v = niceMin; v <= niceMax + step * .001; v += step) ticks.push(Math.round(v * 10) / 10);
+    const xSpan = (maxX - minX) || 1, ySpan = (niceMax - niceMin) || 1;
+    const x = (t: number) => PL + ((t - minX) / xSpan) * (W - PL - PR);
+    const y = (value: number) => H - PB - ((value - niceMin) / ySpan) * (H - PT - PB);
+    const pts = points.map((point, index) => ({ x: x(ts[index]), y: y(point.value) }));
+    const dense = pts.length > 20;
+    let lineD = `M ${pts[0].x},${pts[0].y}`;
+    if (dense) lineD = 'M ' + pts.map(point => `${point.x},${point.y}`).join(' L ');
+    else for (let i = 1; i < pts.length; i++) { const point = pts[i]; const isLast = i === pts.length - 1; const endX = isLast ? point.x : (point.x + pts[i + 1].x) / 2; const endY = isLast ? point.y : (point.y + pts[i + 1].y) / 2; lineD += ` Q ${point.x},${point.y} ${endX},${endY}`; }
+    const areaD = `${lineD} L ${pts[pts.length - 1].x},${H - PB} L ${pts[0].x},${H - PB} Z`;
+    const gid = `icGrad-${id}`;
+    const last = pts[pts.length - 1];
+    const mid = minX + (maxX - minX) / 2;
+    const dateLabel = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return <>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150, display: 'block' }} role="img">
+        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" /><stop offset="100%" stopColor="var(--accent)" stopOpacity="0" /></linearGradient></defs>
+        {ticks.map((tick, index) => <g key={index}><line x1={PL} y1={y(tick)} x2={W - PR} y2={y(tick)} stroke="var(--hairline)" strokeWidth="1" /><text x={PL - 6} y={y(tick) + 3} fontSize="9" textAnchor="end" fill="var(--ink-3)">{tick}</text></g>)}
+        <path d={areaD} fill={`url(#${gid})`} stroke="none" />
+        <path d={lineD} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {!dense && pts.slice(0, -1).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="2.4" fill="var(--accent)" />)}
+        <circle cx={last.x} cy={last.y} r="7" fill="var(--accent)" opacity="0.18" />
+        <circle cx={last.x} cy={last.y} r="4" fill="var(--accent)" stroke="var(--surface-1)" strokeWidth="1.5" />
+      </svg>
+      <div className="ic-datebar"><span>{dateLabel(minX)}</span><span>{dateLabel(mid)}</span><span>{dateLabel(maxX)}</span></div>
+    </>;
   };
 
   return <div className="insights-classic">
@@ -154,7 +182,7 @@ export function InsightsClassic() {
 
     <section className="card ic-card">
       <header className="ic-head"><i /><h3>Weight trend · this month</h3></header>
-      {weightPoints.length >= 2 ? lineChart(weightPoints, 130) : <p className="ic-empty">Log body weight with a workout to see the trend.</p>}
+      {weightPoints.length >= 2 ? lineChart(weightPoints, 'weight') : <p className="ic-empty">Log body weight with a workout to see the trend.</p>}
     </section>
 
     <section className="card ic-card">
@@ -176,7 +204,7 @@ export function InsightsClassic() {
       <header className="ic-head"><i /><h3>PR progress</h3></header>
       <select value={selectedLift} onChange={event => setPrLift(event.target.value)}>{lifts.map(lift => <option key={lift}>{lift}</option>)}</select>
       <div className="ic-toggle" role="group" aria-label="PR metric">{([['1rm', '1RM'], ['calc', 'Calculated Max']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
-      {prSeries.length >= 2 ? lineChart(prSeries, 130) : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in the last 3 months. Try “Calculated Max” to include multi-rep sets.` : `Not enough ${selectedLift} sets in the last 3 months to chart.`}</p>}
+      {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in the last 3 months. Try “Calculated Max” to include multi-rep sets.` : `Not enough ${selectedLift} sets in the last 3 months to chart.`}</p>}
     </section>}
 
     {monthHistory.length > 0 && <section className="card ic-card">
