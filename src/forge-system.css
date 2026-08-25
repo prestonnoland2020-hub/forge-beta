@@ -1130,3 +1130,11 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .goal-assessment .ga-rows>div:last-child{border-bottom:0}
 .goal-assessment .ga-rows span{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
 .goal-assessment .ga-rows b{font-size:13px;font-weight:700;line-height:1.35;color:var(--ink);text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+
+/* ═══ INSIGHTS · actual numbers under the PR + Endurance charts ═══ */
+.ic-chart-kpis{margin-top:10px}
+.ic-chart-kpis .kpi-tile{border-top:2px solid color-mix(in srgb,var(--accent) 33%,var(--hairline))}
+.ic-chart-kpis .kpi-tile b{font-size:21px;overflow-wrap:anywhere}
+.ic-delta{font-weight:800}
+.ic-delta.up{color:var(--good)}
+.ic-delta.down{color:var(--warn)}

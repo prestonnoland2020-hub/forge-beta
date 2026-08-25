@@ -125,6 +125,33 @@ export function InsightsClassic() {
     }));
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value }));
   }, [records, selectedLift, prMode, rangeCutoffIso]);
+  /* Old-app parity: the chart is accompanied by the actual numbers — the best
+     entry in the window (raw weight ×reps, and its 1RM/calculated value) plus
+     the first-to-last change across the selected range. */
+  const rangeLabels: Record<'3m' | '6m' | '1y' | 'all', string> = { '3m': '3M', '6m': '6M', '1y': '1Y', all: 'All time' };
+  const prStats = useMemo(() => {
+    let best: { weight: number; reps: number; date: string; value: number } | null = null;
+    const entries: Array<{ date: string; value: number }> = [];
+    records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.topSets || []).forEach(set => {
+      if (set.completed === false || set.lift !== selectedLift || !set.weight) return;
+      if (prMode === '1rm' && set.reps !== 1) return;
+      const value = prMode === '1rm' ? set.weight : (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0);
+      if (!value) return;
+      entries.push({ date: record.date, value });
+      if (!best || value > best.value) best = { weight: set.weight, reps: set.reps, date: record.date, value };
+    }));
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    const delta = entries.length >= 2 ? Math.round((entries[entries.length - 1].value - entries[0].value) * 10) / 10 : null;
+    return { best: best as { weight: number; reps: number; date: string; value: number } | null, delta };
+  }, [records, selectedLift, prMode, rangeCutoffIso]);
+  const paceText = (value: number) => { let minutes = Math.floor(value); let seconds = Math.round((value - minutes) * 60); if (seconds === 60) { minutes += 1; seconds = 0; } return `${minutes}:${String(seconds).padStart(2, '0')}`; };
+  const endStats = useMemo(() => {
+    if (!enduranceSeries.length) return null;
+    const latest = enduranceSeries[enduranceSeries.length - 1];
+    const best = enduranceSeries.reduce((top, point) => (endMetric === 'pace' ? point.value < top.value : point.value > top.value) ? point : top, enduranceSeries[0]);
+    const delta = enduranceSeries.length >= 2 ? Number((latest.value - enduranceSeries[0].value).toFixed(endMetric === 'pace' ? 2 : 1)) : null;
+    return { latest, best, delta };
+  }, [enduranceSeries, endMetric]);
 
   /* ------------------------------------------------- PR history · month */
   const monthHistory = useMemo(() => {
@@ -189,12 +216,20 @@ export function InsightsClassic() {
       <div className="ic-toggle" role="group" aria-label="PR metric">{([['1rm', '1RM'], ['calc', 'Calculated Max']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
       <div className="ic-range" role="group" aria-label="Date range">{([['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', 'All']] as const).map(([value, label]) => <button type="button" key={value} className={prRange === value ? 'active' : ''} onClick={() => setPrRange(value)}>{label}</button>)}</div>
       {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in this range. Try “Calculated Max” to include multi-rep sets.` : `Not enough ${selectedLift} sets in this range to chart.`}</p>}
+      {prStats.best && <div className="kpi-grid ic-chart-kpis">
+        <div className="kpi-tile"><b>{prStats.best.weight} {unit}</b><span>Weight lifted</span><small>{prStats.best.reps > 1 ? `×${prStats.best.reps} reps · ` : ''}{shortDate(prStats.best.date)}</small></div>
+        <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === '1rm' ? '1RM' : 'Calculated max'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
+      </div>}
     </section>}
 
     <section className="card ic-card">
       <header className="ic-head"><i /><h3>Endurance</h3></header>
       <div className="ic-toggle" role="group" aria-label="Endurance metric">{([['miles', 'Miles / week'], ['pace', 'Best pace']] as const).map(([value, label]) => <button type="button" key={value} className={endMetric === value ? 'active' : ''} onClick={() => setEndMetric(value)}>{label}</button>)}</div>
       {enduranceSeries.length >= 2 ? <>{lineChart(enduranceSeries, 'end')}<p className="ic-sub">{endMetric === 'miles' ? 'Total miles each week' : 'Fastest weekly pace (min/mi) — lower is better'} · follows the range above</p></> : <p className="ic-empty">Not enough cardio in this range to chart.</p>}
+      {endStats && <div className="kpi-grid ic-chart-kpis">
+        <div className="kpi-tile"><b>{endMetric === 'miles' ? `${endStats.latest.value.toFixed(1)} mi` : `${paceText(endStats.latest.value)} /mi`}</b><span>{endMetric === 'miles' ? 'Latest week' : 'Latest best pace'}</span><small>Week of {shortDate(endStats.latest.date)}</small></div>
+        <div className="kpi-tile sage"><b>{endMetric === 'miles' ? `${endStats.best.value.toFixed(1)} mi` : `${paceText(endStats.best.value)} /mi`}</b><span>{endMetric === 'miles' ? 'Best week' : 'Best pace'}</span><small>Week of {shortDate(endStats.best.date)}</small>{endStats.delta !== null && <small className={(endMetric === 'pace' ? endStats.delta < 0 : endStats.delta > 0) ? 'ic-delta up' : endStats.delta === 0 ? 'ic-delta' : 'ic-delta down'}>{endStats.delta === 0 ? 'No change' : endMetric === 'pace' ? `${endStats.delta < 0 ? '−' : '+'}${paceText(Math.abs(endStats.delta))} /mi` : `${endStats.delta > 0 ? '+' : ''}${endStats.delta.toFixed(1)} mi`} · {rangeLabels[prRange]}</small>}</div>
+      </div>}
     </section>
 
     <div className="kpi-grid">
