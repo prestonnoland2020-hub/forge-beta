@@ -37,10 +37,14 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
       else if(role==='quality'&&!named.has('quality')){cardioByDay.set(slot,'quality');named.add('quality')}
       else if(role==='easy'){cardioByDay.set(slot,'easy')}
     });
+    /* Fallback runs SPREAD across the week instead of stacking onto the first
+       free days: each pick maximizes distance from already-placed runs. */
     const free=compatible.map(({index:slot})=>slot).filter(slot=>!cardioByDay.has(slot));
-    if(!named.has('quality')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(free.shift()!,'quality');
-    if(requestedRuns>1&&!named.has('long')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(free.pop()!,'long');
-    while(cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(free.shift()!,'easy');
+    const runDays=new Set(cardioByDay.keys());
+    const takeMostSpaced=()=>{let best=free[0],bestScore=-1;for(const slot of free){const score=runDays.size?Math.min(...[...runDays].map(day=>Math.abs(day-slot))):slot+1;if(score>bestScore){bestScore=score;best=slot}}free.splice(free.indexOf(best),1);runDays.add(best);return best};
+    if(!named.has('quality')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'quality');
+    if(requestedRuns>1&&!named.has('long')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'long');
+    while(cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'easy');
   }
   return weekDays.map(({date,day},index)=>{
     const type=day.dayType.toLowerCase();const attached=day.cardioPolicy==='planned'?day.cardio?.[0]:undefined;const scaled=attached?scaleCardio(attached,week,profile):null;const role=cardioByDay.get(index);let cardioText='';let cardioKind='';let cardioStress:'High'|'Moderate'|'Low'|undefined;
