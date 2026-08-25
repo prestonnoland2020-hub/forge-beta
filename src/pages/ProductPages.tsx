@@ -159,7 +159,7 @@ function WorkoutEditor() {
       <span className="completed-day-check">✓</span>
       <div><span className="eyebrow">TODAY · COMPLETE</span><h2>{completedOnEntry.title}</h2><p>{completedOnEntry.muscles.filter(muscle=>muscle!=='Cardio').join(' · ')||(completedOnEntry.hasCardio?'Cardio':'Completed training')}</p></div>
       <CompletedDayReview record={completedOnEntry} unit={weightUnit}/>
-      <footer><Link className="button" to={`/workout?edit=${completedOnEntry.id}`}>Review or edit today</Link><Link className="button ghost" to="/history">Open history</Link></footer>
+      <footer><Link className="button" to={`/workout?edit=${completedOnEntry.id}`}>Edit workout</Link><Link className="button ghost" to="/history">Open history</Link></footer>
     </section>
   </div>;
   return <div className="narrow stack-xl workout-editor"><PageIntro eyebrow={todayLong.toUpperCase()} title={editingRecord?'Edit training day':requestedDate?'Add a training day':"Log today's workout"} copy={editingRecord?'Update the saved results for this day. History and insights will refresh automatically.':requestedDate?'Log anything you completed on this date. It will be saved as one editable training day.':'Start with the plan, repeat a previous session, or record only what you performed.'} />

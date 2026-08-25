@@ -967,3 +967,64 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    and the logged-day card keeps a plain hairline instead of the lime bar. */
 .accent-card::before{display:none}
 .completed-day-card{border-left-width:1px !important;border-left-color:var(--hairline) !important}
+
+/* ================================================= old-UI density (mobile-first)
+   The original Forge web app ran cards at 12–16px padding, 6–10px gaps,
+   13px body text, and ~16px headers — twice as dense as this app had drifted.
+   This block restores that rhythm. */
+@media(max-width:600px){
+  .page{padding-top:12px}
+  .stack-xl{gap:11px}
+  .forge-feed{gap:11px}
+  .page .card{padding:13px 14px}
+  .feed-card-header{padding:11px 13px}
+  .week-pulse-card{padding:11px 13px;gap:8px}
+  .page-intro h2{font-size:clamp(21px,5.6vw,26px);margin:2px 0 4px}
+  .page-intro p{font-size:12px}
+  h3{font-size:16px}
+  .eyebrow,.field-caption{font-size:9.5px;letter-spacing:.12em}
+  .form-card{gap:11px}
+  .section-title{padding-bottom:9px;gap:11px}
+  .section-title>span{font-size:16px}
+  .metric{padding:12px 14px}
+  .simple-profile-stats>div{padding:11px 12px}
+  .feed-metric-row{margin:0}
+  .today-data-points>div{padding:7px 14px}
+  .compact-goal-list{padding:12px}
+  .goal-row-detail .goal-progress-card{padding:6px 0 0}
+  .goal-progress-card>header h3{font-size:19px}
+  .goal-sources-details summary{font-size:12px;min-height:38px}
+  .buffer-banner{padding:7px 11px;font-size:12px;min-height:38px}
+  .insights-pro{gap:11px}
+  .you-page{gap:11px}
+  .you-header{padding-bottom:0}
+}
+
+/* Plan head: one tight block instead of a tower. */
+.simple-program-head{padding:13px 15px;gap:10px;grid-template-columns:1fr;align-items:start;border-left-width:3px}
+.simple-program-head h2{font-size:clamp(22px,6vw,32px);margin:1px 0 2px}
+.simple-week-metrics{width:100%;grid-template-columns:1fr 1fr}
+.simple-week-metrics>div{padding:8px 11px;gap:1px}
+.simple-week-metrics strong{font-size:12.5px}
+.simple-week-metrics span{font-size:9px}
+
+/* Schedule rows: narrow date rail so prescriptions get the width. */
+.simple-week-schedule article{grid-template-columns:44px minmax(0,1fr) 10px;gap:0 9px;padding:8px 10px}
+.simple-week-schedule time{font-size:9.5px;line-height:1.35}
+.simple-week-schedule article>div>small{font-size:11.5px}
+
+/* Split builder: same treatment. */
+.day-card{grid-template-columns:36px 1fr}
+.day-index{font-size:14px}
+.day-content{padding:11px 13px}
+.tag-row{margin:4px 0 9px;gap:4px}
+.tag{padding:4px 7px;font-size:10px}
+.split-builder{gap:9px}
+.lift-list span{padding:7px 0;font-size:11.5px}
+
+/* Effort-trend chart: shorter proportional box. */
+.cardio-goal-chart svg{aspect-ratio:720/232}
+.cardio-goal-chart{padding:13px 14px}
+.cardio-goal-forecast{stroke:#57b9ff;stroke-width:3;stroke-dasharray:7 6}
+.cardio-goal-line-label.forecast{fill:#57b9ff}
+.goal-trajectory-chart.simple svg{max-height:190px}

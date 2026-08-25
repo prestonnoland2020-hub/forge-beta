@@ -71,7 +71,7 @@ export function HomePage() {
         {completedSets.map((set, index) => <div key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}
         {(completedToday.cardioSessions || []).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}
       </div>}
-      <footer><Link className="button" to={`/workout?edit=${completedToday.id}`}>Review today</Link><Link className="feed-text-link" to="/history">Open history →</Link></footer>
+      <footer><Link className="button" to={`/workout?edit=${completedToday.id}`}>Edit workout</Link><Link className="feed-text-link" to="/history">Open history →</Link></footer>
     </section> : <section className="feed-card today-focus-card">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || 'Cardio and recovery'}</em></div></div></header>
       <div className="today-workout-items">
