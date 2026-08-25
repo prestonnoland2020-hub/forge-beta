@@ -952,3 +952,18 @@ body{background-color:var(--bg);color:var(--text)}
 @keyframes nav-pop{0%{transform:scale(1)}45%{transform:scale(1.22)}75%{transform:scale(.96)}100%{transform:scale(1)}}
 html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 @media(prefers-reduced-motion:reduce){.bottom-nav a.active .nav-icon svg{animation:none}}
+
+/* Floating pill tab bar (Instagram's current shape): a detached capsule with
+   the active tab highlighted by its own circular chip. */
+@media(max-width:900px){
+  .bottom-nav{position:fixed;inset:auto 14px calc(10px + env(safe-area-inset-bottom));border:1px solid var(--hairline);border-radius:999px;background:color-mix(in srgb,var(--surface-1) 94%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:6px;box-shadow:var(--shadow-2);grid-template-columns:repeat(6,1fr)}
+  .bottom-nav a{min-height:44px}
+  .bottom-nav .nav-icon{width:42px;height:42px;border-radius:50%;transition:background var(--dur) var(--ease)}
+  .bottom-nav a.active .nav-icon{background:color-mix(in srgb,var(--ink) 13%,transparent)}
+  .coach-bubble-shell{bottom:calc(92px + env(safe-area-inset-bottom))}
+}
+
+/* No glow on the log flow: the editor cards lose the accent gradient stripe,
+   and the logged-day card keeps a plain hairline instead of the lime bar. */
+.accent-card::before{display:none}
+.completed-day-card{border-left-width:1px !important;border-left-color:var(--hairline) !important}
