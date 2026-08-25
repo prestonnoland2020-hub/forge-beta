@@ -262,7 +262,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     <header><div><span>{goal.type.toUpperCase()} · {goal.exercise || goal.metric}</span><h3>{goal.title}</h3></div><div className="goal-head-side"><b className={goalReached ? 'on-track' : ''}>{goalReached ? 'Goal reached' : 'In progress'}</b><small>{roadmap.weeksRemaining} wks left · {formatDate(goal.date)}</small></div></header>
     <section className="goal-stat-tiles">
       <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{currentEvidence?.date?formatDate(currentEvidence.date):'Best logged evidence'}</small></div>
-      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):aiEstimateLoading?'…':calculatedText}</strong><small>{goal.type==='Endurance'?'Forge AI assessment':'At goal date'}</small></div>
+      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?'Forge AI assessment':'At goal date'}</small></div>
       <div className="gst"><span>TARGET</span><strong>{formatGoalTarget(goal.target,goal.metric,goal.unit)}</strong><small>{formatDate(goal.date)}</small></div>
       <div className={`gst difference ${differenceStatus}`}><span>TO GO</span><strong>{differenceText}</strong><small>{roadmap.weeksRemaining} weeks remaining</small></div>
     </section>

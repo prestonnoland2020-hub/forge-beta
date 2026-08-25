@@ -1138,3 +1138,22 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ic-delta{font-weight:800}
 .ic-delta.up{color:var(--good)}
 .ic-delta.down{color:var(--warn)}
+
+/* ═══ GOALS · expanded row cleanup: no full-row wash/bar, tight header,
+   content inset from the edges so nothing overlaps the accent (2026-08-25) ═══ */
+.compact-goal-table.slim .compact-goal-row.active,
+.compact-goal-table.slim .compact-goal-row:hover{background:transparent;box-shadow:none}
+.compact-goal-table.slim .compact-goal-row.active .compact-goal-select{box-shadow:inset 2px 0 var(--accent);background:var(--accent-wash)}
+.compact-goal-table.slim .goal-row-detail{padding:10px 12px 16px;border-top:1px solid var(--hairline)}
+.goal-row-detail .goal-progress-card{padding:0;border:0;box-shadow:none;background:transparent;display:grid;gap:10px}
+.goal-row-detail .goal-progress-card>header{padding:2px 0 0;border-bottom:0;margin:0;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.goal-row-detail .goal-progress-card>header span{font-size:10px;letter-spacing:.11em}
+.goal-row-detail .goal-progress-card>header b{padding:5px 10px;font-size:10px}
+.goal-row-detail .goal-head-side{gap:3px}
+.goal-row-detail .goal-head-side small{font-size:10.5px}
+.goal-row-detail .goal-sources-details{margin:0}
+.goal-row-detail .goal-assessment{padding:12px 13px}
+@media (max-width:600px){
+  .compact-goal-table.slim .goal-row-detail{padding:8px 10px 14px}
+  .goal-row-detail .goal-progress-card{padding:0}
+}
