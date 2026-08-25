@@ -22,8 +22,10 @@ const primaryNav = [
   ['/history', 'Activities', 'history'],
 ] as const;
 
-/* The phone tab bar holds five slots, Strava-style: Log is the raised center
-   action, and Progress/Goals/Activities collapse into one "You" tab. */
+/* The phone tab bar is Instagram-shaped: six flat icon-only slots with a
+   rounded-square create button. Activities has its own slot; Progress/Goals
+   collapse into "You". The topbar still hides on You-family routes. */
+const youTabRoutes = ['/insights', '/goals', '/profile'];
 const youRoutes = ['/insights', '/goals', '/history', '/profile'];
 
 type NavGlyphName = typeof primaryNav[number][2] | 'library' | 'you';
@@ -53,7 +55,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const [coachExpanded, setCoachExpanded] = useState(false);
   const initials = (setup?.displayName || 'Forge Athlete').split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
   const titles: Record<string, string> = {
-    '/': 'Today', '/workout': 'Log workout', '/history': 'You', '/insights': 'You',
+    '/': 'Today', '/workout': 'Log workout', '/history': 'Activities', '/insights': 'You',
     '/coach': 'Coach', '/goals': 'You', '/plan': 'Plan', '/exercises': 'Exercises', '/profile': 'Profile',
   };
   const hasRecoveryData = recovery.confidence !== 'Low';
@@ -108,11 +110,12 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       <main className="page"><Outlet /></main>
     </div>
     <nav className="bottom-nav" aria-label="Mobile navigation">
-      <NavLink to="/" end><NavGlyph name="home"/><small>Today</small></NavLink>
-      <NavLink to="/plan"><NavGlyph name="calendar"/><small>Plan</small></NavLink>
-      <NavLink to="/workout" className={({ isActive }) => `nav-log-action${isActive ? ' active' : ''}`} aria-label="Log a workout"><span className="nav-log-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 6v12M6 12h12"/></svg></span><small>Log</small></NavLink>
-      <NavLink to="/coach"><NavGlyph name="coach"/><small>Coach</small></NavLink>
-      <NavLink to="/insights" className={youRoutes.some(route => location.pathname.startsWith(route)) ? 'active' : ''}><NavGlyph name="you"/><small>You</small></NavLink>
+      <NavLink to="/" end aria-label="Today"><NavGlyph name="home"/><small>Today</small></NavLink>
+      <NavLink to="/plan" aria-label="Plan"><NavGlyph name="calendar"/><small>Plan</small></NavLink>
+      <NavLink to="/workout" aria-label="Log a workout"><span className="nav-icon nav-create" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5.5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg></span><small>Log</small></NavLink>
+      <NavLink to="/coach" aria-label="Coach"><NavGlyph name="coach"/><small>Coach</small></NavLink>
+      <NavLink to="/history" aria-label="Activities"><NavGlyph name="history"/><small>Activities</small></NavLink>
+      <NavLink to="/insights" className={youTabRoutes.some(route => location.pathname.startsWith(route)) ? 'active' : ''} aria-label="You"><NavGlyph name="you"/><small>You</small></NavLink>
     </nav>
     {coachOpen && coachExpanded && <button className="coach-bubble-backdrop" type="button" aria-label="Close expanded Forge coach" onClick={() => setCoachExpanded(false)} />}
     <div className={`${coachExpanded ? 'coach-bubble-shell expanded' : 'coach-bubble-shell'}${location.pathname === '/coach' ? ' coach-bubble-hidden' : ''}`}>
