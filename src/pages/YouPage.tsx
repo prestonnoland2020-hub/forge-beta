@@ -25,7 +25,7 @@ export function YouPage() {
   const weekStart = new Date(now); weekStart.setHours(0, 0, 0, 0); weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
   const weekIso = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
   const weekRecords = records.filter(record => record.date >= weekIso);
-  const weekSets = weekRecords.reduce((total, record) => total + (record.topSets || []).filter(set => set.completed !== false).length, 0);
+  const weekSets = weekRecords.filter(record => (record.topSets || []).some(set => set.completed !== false) || (record.muscles || []).some(muscle => !['cardio', 'rest', 'none'].includes(muscle.trim().toLowerCase()))).length;
   const weekMiles = weekRecords.reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => sum + cardioMiles(session), 0), 0);
   const active = tabs.find(([to]) => pathname.startsWith(to))?.[0] || '/insights';
   return <div className="you-page stack-xl">

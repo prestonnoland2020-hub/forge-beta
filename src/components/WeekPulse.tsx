@@ -46,13 +46,16 @@ export function WeekPulse() {
       const miles = inWeek.reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => sum + cardioMiles(session), 0), 0);
       const cardioMinutes = inWeek.reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => sum + summarizeCardioDraft(session).minutes, 0), 0);
       const sets = inWeek.reduce((total, record) => total + (record.topSets || []).filter(set => set.completed !== false).length, 0);
+      /* A lift is a completed STRENGTH SESSION — a day whose split worked
+         strength muscles or logged a top set — not a count of top sets. */
+      const lifts = inWeek.filter(record => (record.topSets || []).some(set => set.completed !== false) || (record.muscles || []).some(muscle => !['cardio', 'rest', 'none'].includes(muscle.trim().toLowerCase()))).length;
       const runs = inWeek.reduce((total, record) => total + (record.cardioSessions || []).length, 0);
-      return { start, miles: Number(miles.toFixed(2)), cardioMinutes, sets, sessions: inWeek.length, runs };
+      return { start, miles: Number(miles.toFixed(2)), cardioMinutes, sets, lifts, sessions: inWeek.length, runs };
     });
   }, [records]);
 
   const hasMiles = weeks.some(week => week.miles > 0);
-  const hasSets = weeks.some(week => week.sets > 0);
+  const hasSets = weeks.some(week => week.lifts > 0);
   const [lens, setLens] = useState<Lens>(hasMiles || !hasSets ? 'run' : 'lift');
   const current = weeks[weeks.length - 1];
   const heaviest = useMemo(() => {
@@ -64,7 +67,7 @@ export function WeekPulse() {
     return best as { lift: string; weight: number } | null;
   }, [records, current.start]);
 
-  const values = weeks.map(week => lens === 'run' ? week.miles : week.sets);
+  const values = weeks.map(week => lens === 'run' ? week.miles : week.lifts);
   const peak = Math.max(1, ...values);
   const W = plotWidth, H = 130, PADX = 6, AXIS = 54, TOP = 12, BASE = H - 24;
   const span = W - PADX - AXIS;
@@ -99,14 +102,14 @@ export function WeekPulse() {
         <div><span>Time</span><strong>{formatHours(current.cardioMinutes)}</strong></div>
         <div><span>Sessions</span><strong>{current.runs}</strong></div>
       </> : <>
-        <div><span>Lifts</span><strong>{current.sets}</strong></div>
-        <div><span>Sessions</span><strong>{current.sessions}</strong></div>
+        <div><span>Lifts</span><strong>{current.lifts}</strong></div>
+        <div><span>Top sets</span><strong>{current.sets}</strong></div>
         <div><span>Heaviest</span><strong>{heaviest ? <>{heaviest.weight} <small>{weightUnit}</small></> : '—'}</strong></div>
       </>}
     </div>
     <div className="week-pulse-plot" ref={plotRef} onMouseLeave={() => setPicked(null)}>
       <span className="week-pulse-caption">Past 12 weeks</span>
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Weekly ${lens === 'run' ? 'distance' : 'top sets'} for the past 12 weeks`}>
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label={`Weekly ${lens === 'run' ? 'distance' : 'lift sessions'} for the past 12 weeks`}>
         {axisSteps.map((step, index) => <g key={index} className="week-pulse-grid">
           <line x1={PADX} y1={y(step)} x2={W - AXIS + 6} y2={y(step)} />
           <text x={W - AXIS + 10} y={y(step) + 4}>{Math.round(step * 10) / 10} {unitLabel}</text>
@@ -122,7 +125,7 @@ export function WeekPulse() {
       {picked !== null && pickedWeek && <div className="overview-chart-tooltip" style={{ left: `${x(picked) / W * 100}%`, top: `${(Math.max(18, y(values[picked])) + 18) / (H + 18) * 100}%` }}>
         <span>Wk of {new Date(`${pickedWeek.start}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         <strong>{lens === 'run' ? values[picked].toFixed(values[picked] >= 10 ? 1 : 2) : values[picked]}</strong>
-        <small>{lens === 'run' ? 'miles' : 'lifts logged'}</small>
+        <small>{lens === 'run' ? 'miles' : 'lift sessions'}</small>
       </div>}
     </div>
   </section>;

@@ -874,3 +874,28 @@ body{background-color:var(--bg);color:var(--text)}
 .simple-week-schedule article>div>small{order:3;flex-basis:100%;font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .simple-week-schedule article.stress-moderate{border-left-color:color-mix(in srgb,var(--accent) 38%,transparent)}
 .simple-week-schedule article.stress-low{border-left-color:var(--hairline-strong)}
+
+/* Finish-day review: label/value rows that can never overlap, whatever the
+   package's type width. */
+.workout-review .review-summary{display:grid;grid-template-columns:1fr;gap:0;padding:0;border:0}
+.workout-review .review-summary>div{display:flex;justify-content:space-between;align-items:baseline;gap:14px;border:0;padding:9px 0;border-bottom:1px solid var(--hairline);min-width:0}
+.workout-review .review-summary>div:last-child{border-bottom:0}
+.workout-review .review-summary span{flex:none;font-size:10px;letter-spacing:.1em;color:var(--ink-3)}
+.workout-review .review-summary strong{font:800 14px/1.35 var(--display);text-align:right;overflow-wrap:anywhere;letter-spacing:.02em}
+.workout-review>header h2{font-size:clamp(20px,5.5vw,27px);line-height:1.1}
+.workout-review>header p{font-size:13px}
+
+/* Effort-trend chart: scale proportionally (no empty bands from a fixed
+   280px height) and keep axis text legible once the 720-unit viewBox shrinks
+   to a phone. */
+.cardio-goal-chart svg{height:auto;aspect-ratio:720/300}
+@media(max-width:620px){
+  .cardio-goal-chart>header{flex-wrap:wrap;gap:2px 12px}
+  .cardio-goal-chart h3{font-size:18px}
+  .cardio-goal-chart>header small{font-size:11px}
+  .cardio-goal-grid text,.cardio-goal-date{font-size:17px}
+  .cardio-goal-line-label{font-size:17px}
+  .cardio-goal-actual{stroke-width:5}
+  .cardio-goal-point circle{stroke-width:4;r:6}
+  .cardio-goal-chart>footer{gap:8px 14px;font-size:10px}
+}
