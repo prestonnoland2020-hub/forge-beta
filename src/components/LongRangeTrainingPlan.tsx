@@ -42,8 +42,13 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     const free=compatible.map(({index:slot})=>slot).filter(slot=>!cardioByDay.has(slot));
     const runDays=new Set(cardioByDay.keys());
     const takeMostSpaced=()=>{let best=free[0],bestScore=-1;for(const slot of free){const score=runDays.size?Math.min(...[...runDays].map(day=>Math.abs(day-slot))):slot+1;if(score>bestScore){bestScore=score;best=slot}}free.splice(free.indexOf(best),1);runDays.add(best);return best};
-    if(!named.has('quality')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'quality');
-    if(requestedRuns>1&&!named.has('long')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'long');
+    /* Hard running never lands on a strength/mixed day: quality and the long
+       run only take PURE cardio days; mixed (e.g. leg) days get easy miles. */
+    const cardioOnly=new Set(compatible.filter(({entry})=>entry.day.dayType.toLowerCase()==='cardio'||entry.day.dayType.toLowerCase()==='rest').map(({index:slot})=>slot));
+    const takeMostSpacedFrom=(pool:number[])=>{let best=pool[0],bestScore=-1;for(const slot of pool){const score=runDays.size?Math.min(...[...runDays].map(day=>Math.abs(day-slot))):slot+1;if(score>bestScore){bestScore=score;best=slot}}free.splice(free.indexOf(best),1);runDays.add(best);return best};
+    const freeCardioOnly=()=>free.filter(slot=>cardioOnly.has(slot));
+    if(!named.has('quality')&&cardioByDay.size<requestedRuns&&freeCardioOnly().length)cardioByDay.set(takeMostSpacedFrom(freeCardioOnly()),'quality');
+    if(requestedRuns>1&&!named.has('long')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpacedFrom(freeCardioOnly().length?freeCardioOnly():free),'long');
     while(cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'easy');
   }
   return weekDays.map(({date,day},index)=>{
@@ -56,7 +61,10 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
        days train their own muscles — no squat-stage stamp on every row. */
     const dayLifts=(day.exercises||[]).filter(name=>bests.has(name)).sort((a,b)=>(bests.get(b)||0)-(bests.get(a)||0));
     const reps=week.strengthReps||6;
-    const dayTopSet=dayLifts.length?`${dayLifts[0]}: ${Math.max(5,Math.round((bests.get(dayLifts[0])!/(1+reps/30))*.97/5)*5)} × ${reps}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
+    /* Loads trend UP: ~0.6%/week on top of the logged best, eased on deload
+       weeks — the athlete gets stronger, never re-anchored to an old number. */
+    const progressFactor=(week.phase==='Deload'?0.94:1)*(1+Math.min(.12,(week.week-1)*0.006));
+    const dayTopSet=dayLifts.length?`${dayLifts[0]}: ${Math.max(5,Math.round((bests.get(dayLifts[0])!/(1+reps/30))*.97*progressFactor/5)*5)} × ${reps}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
     /* Every strength day carries a recommended top set from ITS mapped
        exercises and logged bests — the goal lift still leads its own day. */
     const strength=isPrimary?`${week.topSet}${week.strengthLoad?` · ${week.strengthFocus}`:''}`:dayTopSet?`Top set · ${dayTopSet}`:`${day.muscles?.filter(muscle=>muscle!=='Cardio').join(' + ')||'Accessory'} strength · map an exercise for a prescription`;return{date,kind:cardioKind?`${type==='mixed'?'Mixed':'Strength'} + ${cardioKind}`:(type==='mixed'?'Mixed':'Strength'),title:day.name,detail:cardioText?`${strength} · Cardio: ${cardioText}`:strength,goal:strengthGoal?.title||'Strength development',stress:cardioStress==='High'?'High':isPrimary?'High':'Moderate',scaled:Boolean(cardioText)};}

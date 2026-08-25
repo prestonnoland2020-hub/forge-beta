@@ -1157,3 +1157,17 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
   .compact-goal-table.slim .goal-row-detail{padding:8px 10px 14px}
   .goal-row-detail .goal-progress-card{padding:0}
 }
+
+/* ═══ PLAN · AI program chrome (2026-08-25) ═══ */
+.plan-generating{display:grid;gap:8px;justify-items:start}
+.plan-generating h3{margin:0;font:800 20px var(--display)}
+.plan-generating p{margin:0;color:var(--ink-2);font-size:13px;line-height:1.5;max-width:52ch}
+.plan-generating.busy h3::after{content:'';display:inline-block;width:14px;height:14px;margin-left:10px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:forge-spin .8s linear infinite;vertical-align:-2px}
+@keyframes forge-spin{to{transform:rotate(360deg)}}
+.ai-program-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:start}
+.ai-program-meta>div{display:grid;gap:6px;min-width:0}
+.ai-program-meta p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.ai-program-meta small{color:var(--ink-3);font-size:11px}
+.ai-program-meta .button{white-space:nowrap}
+.ai-program-error{grid-column:1/-1;color:var(--warn);font-size:11.5px}
+@media (max-width:600px){.ai-program-meta{grid-template-columns:1fr}.ai-program-meta .button{justify-self:start}}
