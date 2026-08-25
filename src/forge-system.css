@@ -1107,3 +1107,9 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    every chart. */
 .ic-card{border-top:2px solid color-mix(in srgb,var(--accent) 33%,var(--hairline))}
 .ic-datebar{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);margin-top:-4px;padding-top:6px;border-top:1px solid var(--hairline)}
+
+/* Insights range chips + the split-day picker on the log page. */
+.ic-range{display:flex;gap:6px}
+.ic-range button{flex:1;min-height:36px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-1);color:var(--ink-2);font-size:12px;font-weight:800}
+.ic-range button.active{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
+.plan-day-picker{display:grid;gap:6px;margin-top:2px}

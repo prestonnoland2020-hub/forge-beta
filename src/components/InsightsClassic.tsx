@@ -92,12 +92,31 @@ export function InsightsClassic() {
   const lifts = useMemo(() => [...bestByLift.keys()].sort(), [bestByLift]);
   const [prLift, setPrLift] = useState('');
   const [prMode, setPrMode] = useState<'1rm' | 'calc'>('calc');
+  const [prRange, setPrRange] = useState<'3m' | '6m' | '1y' | 'all'>('3m');
+  const rangeDays: Record<'3m' | '6m' | '1y' | 'all', number> = { '3m': 90, '6m': 182, '1y': 365, all: 3650 };
+  const rangeCutoffIso = useMemo(() => { const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - rangeDays[prRange]); return isoOf(cutoff); }, [prRange]);
+  /* Endurance, weekly and readable: miles per week, or the week's best pace. */
+  const [endMetric, setEndMetric] = useState<'miles' | 'pace'>('miles');
+  const enduranceSeries = useMemo(() => {
+    const byWeek = new Map<string, { miles: number; bestPace: number }>();
+    records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.cardioSessions || []).forEach(session => {
+      const miles = cardioMiles(session);
+      if (!miles) return;
+      const minutes = summarizeCardioDraft(session).minutes;
+      const week = weekStartIso(record.date);
+      const entry = byWeek.get(week) || { miles: 0, bestPace: Infinity };
+      entry.miles += miles;
+      if (minutes && miles >= 0.5) entry.bestPace = Math.min(entry.bestPace, minutes / miles);
+      byWeek.set(week, entry);
+    }));
+    return [...byWeek.entries()].sort(([a], [b]) => a.localeCompare(b))
+      .map(([week, entry]) => ({ date: week, value: endMetric === 'miles' ? Number(entry.miles.toFixed(1)) : entry.bestPace === Infinity ? 0 : Number(entry.bestPace.toFixed(2)) }))
+      .filter(point => point.value > 0);
+  }, [records, rangeCutoffIso, endMetric]);
   const selectedLift = prLift || lifts[0] || '';
   const prSeries = useMemo(() => {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 90);
-    const cutoffIso = isoOf(cutoff);
     const byDay = new Map<string, number>();
-    records.filter(record => record.date >= cutoffIso).forEach(record => (record.topSets || []).forEach(set => {
+    records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.topSets || []).forEach(set => {
       if (set.completed === false || set.lift !== selectedLift || !set.weight) return;
       if (prMode === '1rm' && set.reps !== 1) return;
       const value = prMode === '1rm' ? set.weight : (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0);
@@ -105,7 +124,7 @@ export function InsightsClassic() {
       byDay.set(record.date, Math.max(byDay.get(record.date) || 0, value));
     }));
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value }));
-  }, [records, selectedLift, prMode]);
+  }, [records, selectedLift, prMode, rangeCutoffIso]);
 
   /* ------------------------------------------------- PR history · month */
   const monthHistory = useMemo(() => {
@@ -124,7 +143,7 @@ export function InsightsClassic() {
      strip under a hairline. viewBox 280x130 stretched to 150px tall. */
   const lineChart = (points: Array<{ date: string; value: number }>, id: string) => {
     if (points.length < 2) return null;
-    const W = 280, H = 130, PL = 24, PR = 5, PT = 8, PB = 8;
+    const W = 280, H = 130, PL = 30, PR = 5, PT = 8, PB = 8;
     const ts = points.map(point => new Date(`${point.date}T12:00:00`).getTime());
     const minX = Math.min(...ts), maxX = Math.max(...ts);
     const ys = points.map(point => point.value);
@@ -152,7 +171,7 @@ export function InsightsClassic() {
     return <>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150, display: 'block' }} role="img">
         <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" /><stop offset="100%" stopColor="var(--accent)" stopOpacity="0" /></linearGradient></defs>
-        {ticks.map((tick, index) => <g key={index}><line x1={PL} y1={y(tick)} x2={W - PR} y2={y(tick)} stroke="var(--hairline)" strokeWidth="1" /><text x={PL - 6} y={y(tick) + 3} fontSize="9" textAnchor="end" fill="var(--ink-3)">{tick}</text></g>)}
+        {ticks.map((tick, index) => <g key={index}><line x1={PL} y1={y(tick)} x2={W - PR} y2={y(tick)} stroke="var(--hairline)" strokeWidth="1" /><text x={PL - 6} y={y(tick) + 3} fontSize="9" textAnchor="end" fill="var(--ink-3)">{step >= 1 ? Math.round(tick) : tick}</text></g>)}
         <path d={areaD} fill={`url(#${gid})`} stroke="none" />
         <path d={lineD} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {!dense && pts.slice(0, -1).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="2.4" fill="var(--accent)" />)}
@@ -164,6 +183,20 @@ export function InsightsClassic() {
   };
 
   return <div className="insights-classic">
+    {lifts.length > 0 && <section className="card ic-card">
+      <header className="ic-head"><i /><h3>PR progress</h3></header>
+      <select value={selectedLift} onChange={event => setPrLift(event.target.value)}>{lifts.map(lift => <option key={lift}>{lift}</option>)}</select>
+      <div className="ic-toggle" role="group" aria-label="PR metric">{([['1rm', '1RM'], ['calc', 'Calculated Max']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
+      <div className="ic-range" role="group" aria-label="Date range">{([['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', 'All']] as const).map(([value, label]) => <button type="button" key={value} className={prRange === value ? 'active' : ''} onClick={() => setPrRange(value)}>{label}</button>)}</div>
+      {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in this range. Try “Calculated Max” to include multi-rep sets.` : `Not enough ${selectedLift} sets in this range to chart.`}</p>}
+    </section>}
+
+    <section className="card ic-card">
+      <header className="ic-head"><i /><h3>Endurance</h3></header>
+      <div className="ic-toggle" role="group" aria-label="Endurance metric">{([['miles', 'Miles / week'], ['pace', 'Best pace']] as const).map(([value, label]) => <button type="button" key={value} className={endMetric === value ? 'active' : ''} onClick={() => setEndMetric(value)}>{label}</button>)}</div>
+      {enduranceSeries.length >= 2 ? <>{lineChart(enduranceSeries, 'end')}<p className="ic-sub">{endMetric === 'miles' ? 'Total miles each week' : 'Fastest weekly pace (min/mi) — lower is better'} · follows the range above</p></> : <p className="ic-empty">Not enough cardio in this range to chart.</p>}
+    </section>
+
     <div className="kpi-grid">
       <div className="kpi-tile gold"><b>{kpi.liftDays}</b><span>Lift days</span></div>
       <div className="kpi-tile sage"><b>{kpi.cardioDays}</b><span>Cardio days</span></div>
@@ -172,18 +205,6 @@ export function InsightsClassic() {
       <div className="kpi-tile"><b>{kpi.adherence}%</b><span>Days logged</span></div>
       <div className="kpi-tile"><b>{kpi.sessions}</b><span>Total sessions</span></div>
     </div>
-
-    <section className="card ic-card">
-      <header className="ic-head"><i /><h3>8-week training consistency</h3></header>
-      <p className="ic-sub">{perWeek.toFixed(1)} sessions/week · Active in {activeWeeks} of {completedWeeks.length} completed weeks</p>
-      <div className="ic-bars">{weeks.map(week => { const total = week.lift + week.cardio; return <div key={week.startIso}><em>{total || ''}</em><div className="ic-bar"><i style={{ height: `${week.cardio / weekPeak * 100}%` }} className="cardio" /><i style={{ height: `${week.lift / weekPeak * 100}%` }} className="lift" /></div><span>{monthDay(week.startIso)}</span></div>; })}</div>
-      <footer className="ic-legend"><span><i className="lift" />Lift</span><span><i className="cardio" />Cardio</span></footer>
-    </section>
-
-    <section className="card ic-card">
-      <header className="ic-head"><i /><h3>Weight trend · this month</h3></header>
-      {weightPoints.length >= 2 ? lineChart(weightPoints, 'weight') : <p className="ic-empty">Log body weight with a workout to see the trend.</p>}
-    </section>
 
     <section className="card ic-card">
       <header className="ic-head"><i /><h3>Muscle group frequency</h3></header>
@@ -198,18 +219,6 @@ export function InsightsClassic() {
     {prTiles.length > 0 && <section className="card ic-card">
       <header className="ic-head"><i /><h3>Personal records</h3></header>
       <div className="ic-pr-grid">{prTiles.map(([lift, best]) => <div key={lift}><b>{best.weight} {unit} ×{best.reps}</b><span>{lift}</span><small>{shortDate(best.date)}</small></div>)}</div>
-    </section>}
-
-    {lifts.length > 0 && <section className="card ic-card">
-      <header className="ic-head"><i /><h3>PR progress</h3></header>
-      <select value={selectedLift} onChange={event => setPrLift(event.target.value)}>{lifts.map(lift => <option key={lift}>{lift}</option>)}</select>
-      <div className="ic-toggle" role="group" aria-label="PR metric">{([['1rm', '1RM'], ['calc', 'Calculated Max']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
-      {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in the last 3 months. Try “Calculated Max” to include multi-rep sets.` : `Not enough ${selectedLift} sets in the last 3 months to chart.`}</p>}
-    </section>}
-
-    {monthHistory.length > 0 && <section className="card ic-card">
-      <header className="ic-head"><i /><h3>PR history · this month</h3></header>
-      <div className="ic-history">{monthHistory.map((row, index) => <div key={`${row.lift}-${row.date}-${index}`}><div><strong>{row.lift}</strong><small>{shortDate(row.date)}</small></div><b>{row.weight} {unit} ×{row.reps}</b></div>)}</div>
     </section>}
   </div>;
 }
