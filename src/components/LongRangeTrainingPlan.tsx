@@ -59,6 +59,7 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
 export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}:{goals:CreatedGoal[];profile:AdaptiveProfile;splitDays:SplitDay[];rhythm?:'rolling'|'weekly'}){
   const {records}=useWorkoutHistory();
   const [horizon,setHorizon]=useState<12|26|52>(12);
+  const [openWeek,setOpenWeek]=useState<number|null>(null);
   const roadmap=useMemo(()=>buildLongRangePlan(goals,profile,horizon,records),[goals,profile,records,horizon]);
   const active=roadmap[0];const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm):[],[active,splitDays,goals,profile,rhythm]);
   const exportRoadmap=()=>{
@@ -70,12 +71,15 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
        its own fact and deserves its own chip rather than one wrapping label. */
       [...session.kind.split(' · '),session.stress,...(session.scaled?['Scaled']:[])].filter(Boolean).map((tag,index)=><i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{session.title}</strong><small>{session.metric?`${session.metric} · ${session.detail}`:session.detail}</small></div><b>{session.stress==='Rest'?'Rest':'›'}</b></article>)}</div></section><section className="card roadmap-card"><header className="roadmap-head"><div><span className="eyebrow">ROADMAP TO GOAL</span><h3>Where the plan takes you</h3></div><div className="horizon-chips" role="group" aria-label="Roadmap horizon">{([[12,'12 wks'],[26,'6 mo'],[52,'1 yr']] as const).map(([weeks,label])=><button type="button" key={weeks} className={horizon===weeks?'active':''} onClick={()=>setHorizon(weeks)}>{label}</button>)}<button type="button" className="roadmap-export" onClick={exportRoadmap}>Export ↓</button></div></header>
 <div className="roadmap-table" role="table"><div className="roadmap-row head" role="row"><span>Week</span><span>Miles</span><span>Long</span><span>Hard run</span><span>Top set · proj. max</span></div>
-{roadmap.map(week=><div className={`roadmap-row phase-${week.phase.toLowerCase()}`} role="row" key={week.week}>
+{roadmap.map(week=><div key={week.week} className="roadmap-week-group">
+<button type="button" className={`roadmap-row phase-${week.phase.toLowerCase()}${openWeek===week.week?' open':''}`} onClick={()=>setOpenWeek(current=>current===week.week?null:week.week)} aria-expanded={openWeek===week.week}>
   <span className="roadmap-week"><b>{week.week}</b><small>{week.start} · {week.phase}</small></span>
   <span className="roadmap-miles">{week.mileage?week.mileage:'—'}</span>
   <span className="roadmap-long">{/^\d/.test(week.longRun)?week.longRun.split(' ')[0]+' mi':'—'}</span>
   <span className="roadmap-run">{week.quality}</span>
   <span className="roadmap-set">{week.strengthLoad?<><b>{week.calculatedMax} max</b><small>{week.strengthLoad}×{week.strengthReps}{week.strengthGoal?` · goal ${week.strengthGoal}`:''}</small></>:'—'}</span>
+</button>
+{openWeek===week.week&&<div className="roadmap-days">{weekCalendar(week,splitDays,goals,profile,rhythm).map(session=><div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US',{weekday:'short'})}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
 </div>)}</div>
 <small className="roadmap-note">Loads and paces regenerate from completed work — this is the current trajectory to {goals[0]?.title||'your goals'}, not a promise.</small></section>
 <details className="card scaling-explainer"><summary><div><span className="eyebrow">HOW CARDIO ADAPTS</span><strong>Scaling rules</strong></div><b>＋</b></summary><div><p><b>Weekly volume:</b> resets only with the calendar week, never when a rolling split wraps.</p><p><b>Long run:</b> appears no more than once in each calendar week.</p><p><b>Steady workouts:</b> duration changes.</p><p><b>Intervals:</b> repetition count changes while work quality and recovery remain recognizable.</p><p><b>Circuits:</b> round count changes before station technique is altered.</p><p>Completed results, recovery, weekly volume, and goal phase shape the next prescription. Saved templates stay unchanged; only the scheduled dose scales.</p></div></details></div>;
