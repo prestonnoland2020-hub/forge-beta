@@ -1113,3 +1113,20 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ic-range button{flex:1;min-height:36px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-1);color:var(--ink-2);font-size:12px;font-weight:800}
 .ic-range button.active{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
 .plan-day-picker{display:grid;gap:6px;margin-top:2px}
+
+/* ═══ GOALS · phone-first stat tiles + stacked assessment (2026-08-25) ═══ */
+.goal-stat-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.goal-stat-tiles .gst{display:grid;gap:3px;align-content:start;padding:11px 12px;border:1px solid var(--hairline);border-top:2px solid color-mix(in srgb,var(--accent) 33%,var(--hairline));border-radius:var(--r-sm);background:var(--surface);min-width:0}
+.goal-stat-tiles .gst span{font-size:9.5px;font-weight:800;letter-spacing:.1em;color:var(--ink-3);white-space:nowrap}
+.goal-stat-tiles .gst strong{font:800 clamp(16px,4.8vw,21px)/1.12 var(--display);letter-spacing:.01em;color:var(--ink);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.goal-stat-tiles .gst small{font-size:10.5px;color:var(--ink-3);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.goal-stat-tiles .gst.current strong{color:var(--accent)}
+.goal-stat-tiles .gst.difference.close strong{color:var(--mint,#58d68d)}
+@media (min-width:720px){.goal-stat-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}.goal-stat-tiles .gst strong{font-size:19px}}
+.goal-row-detail .goal-stat-tiles{gap:7px}
+.goal-row-detail .goal-stat-tiles .gst{padding:9px 11px}
+.goal-assessment .ga-rows{display:grid;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
+.goal-assessment .ga-rows>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid var(--hairline);min-width:0}
+.goal-assessment .ga-rows>div:last-child{border-bottom:0}
+.goal-assessment .ga-rows span{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.goal-assessment .ga-rows b{font-size:13px;font-weight:700;line-height:1.35;color:var(--ink);text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}

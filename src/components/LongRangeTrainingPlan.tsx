@@ -18,7 +18,7 @@ function scaleCardio(plan:PlannedCardio,week:PlanWeek,profile:AdaptiveProfile){
   return{summary:cardioPlanSummary(next),reason:`Scaled for ${week.phase.toLowerCase()} phase${profile.readiness<75?' and current recovery':''}.`};
 }
 
-function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly'):CalendarSession[]{
+function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map()):CalendarSession[]{
   const strengthGoal=goals.find(goal=>goal.type==='Strength');const enduranceGoal=goals.find(goal=>goal.type==='Endurance');const start=new Date(`${week.startDate}T12:00:00`);const cycle=splitDays.length?splitDays:[{name:'Strength',dayType:'strength'},{name:'Easy cardio',dayType:'cardio'},{name:'Rest',dayType:'rest'}];let strengthIndex=0;
   const weekDays=Array.from({length:7},(_,index)=>{const date=new Date(start);date.setDate(start.getDate()+index);const absoluteDay=Math.floor(date.getTime()/86400000);const cycleIndex=rhythm==='rolling'?((absoluteDay%cycle.length)+cycle.length)%cycle.length:index%cycle.length;return{date,day:cycle[cycleIndex]};});
   const compatible=weekDays.map((entry,index)=>({entry,index})).filter(({entry})=>entry.day.dayType.toLowerCase()!=='rest'||entry.day.cardioPolicy!=='none');
@@ -54,7 +54,12 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     if(type==='strength'||type==='mixed'){const isPrimary=strengthIndex++===0;
     /* The goal lift appears ONCE a week, on the primary strength day. Other
        days train their own muscles — no squat-stage stamp on every row. */
-    const strength=isPrimary?`${week.topSet}${week.strengthLoad?` · ${week.strengthFocus}`:''}`:`${day.muscles?.filter(muscle=>muscle!=='Cardio').join(' + ')||'Accessory'} strength · no goal-lift top set`;return{date,kind:cardioKind?`${type==='mixed'?'Mixed':'Strength'} + ${cardioKind}`:(type==='mixed'?'Mixed':'Strength'),title:day.name,detail:cardioText?`${strength} · Cardio: ${cardioText}`:strength,goal:strengthGoal?.title||'Strength development',stress:cardioStress==='High'?'High':isPrimary?'High':'Moderate',scaled:Boolean(cardioText)};}
+    const dayLifts=(day.exercises||[]).filter(name=>bests.has(name)).sort((a,b)=>(bests.get(b)||0)-(bests.get(a)||0));
+    const reps=week.strengthReps||6;
+    const dayTopSet=dayLifts.length?`${dayLifts[0]}: ${Math.max(5,Math.round((bests.get(dayLifts[0])!/(1+reps/30))*.97/5)*5)} × ${reps}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
+    /* Every strength day carries a recommended top set from ITS mapped
+       exercises and logged bests — the goal lift still leads its own day. */
+    const strength=isPrimary?`${week.topSet}${week.strengthLoad?` · ${week.strengthFocus}`:''}`:dayTopSet?`Top set · ${dayTopSet}`:`${day.muscles?.filter(muscle=>muscle!=='Cardio').join(' + ')||'Accessory'} strength · map an exercise for a prescription`;return{date,kind:cardioKind?`${type==='mixed'?'Mixed':'Strength'} + ${cardioKind}`:(type==='mixed'?'Mixed':'Strength'),title:day.name,detail:cardioText?`${strength} · Cardio: ${cardioText}`:strength,goal:strengthGoal?.title||'Strength development',stress:cardioStress==='High'?'High':isPrimary?'High':'Moderate',scaled:Boolean(cardioText)};}
     if(cardioText)return{date,kind:cardioKind,title:day.name,detail:`${cardioText}${scaled?` · ${scaled.reason}`:' · Scheduled from this calendar week’s mileage and long-run requirement.'}`,goal:enduranceGoal?.title||'Endurance development',stress:cardioStress||'Low',scaled:true};
     return{date,kind:'Flexible',title:day.name,detail:'No additional cardio is required to satisfy this week.',goal:enduranceGoal?.title||'Training balance',stress:'Low'};
   });
@@ -65,7 +70,8 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const [horizon,setHorizon]=useState<12|26|52>(12);
   const [openWeek,setOpenWeek]=useState<number|null>(null);
   const roadmap=useMemo(()=>buildLongRangePlan(goals,profile,horizon,records),[goals,profile,records,horizon]);
-  const active=roadmap[0];const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm):[],[active,splitDays,goals,profile,rhythm]);
+  const bests=useMemo(()=>{const map=new Map<string,number>();records.forEach(record=>(record.topSets||[]).forEach(set=>{if(set.completed===false||!set.lift||!set.weight)return;const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));if(max>(map.get(set.lift)||0))map.set(set.lift,max)}));return map},[records]);
+  const active=roadmap[0];const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests):[],[active,splitDays,goals,profile,rhythm,bests]);
   const exportRoadmap=()=>{
     const lines=['FORGE ROADMAP TO GOAL',`${roadmap.length} weeks · ${goals.map(goal=>goal.title).join(' · ')||'Baseline development'}`,'',...roadmap.flatMap(week=>[`WEEK ${week.week} · ${week.start} · ${week.phase.toUpperCase()}`,`  Volume: ${week.mileage?`${week.mileage} mi`:'no scheduled running'}${week.change?` (${week.change>0?'+':''}${week.change}%)`:''}`,`  Long run: ${week.longRun}`,`  Hard run: ${week.quality}`,`  Top set: ${week.strengthLoad?`${week.strengthExercise} ${week.strengthLoad} × ${week.strengthReps} · projected max ${week.calculatedMax}${week.strengthGoal?` / goal ${week.strengthGoal}`:''}`:week.topSet}`,''])];
     const blob=new Blob([lines.join('\n')],{type:'text/plain'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`forge-roadmap-${roadmap.length}-weeks.txt`;link.click();URL.revokeObjectURL(url);
@@ -83,7 +89,7 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   <span className="roadmap-run">{week.quality}</span>
   <span className="roadmap-set">{week.strengthLoad?<><b>{week.calculatedMax} max</b><small>{week.strengthLoad}×{week.strengthReps}{week.strengthGoal?` · goal ${week.strengthGoal}`:''}</small></>:'—'}</span>
 </button>
-{openWeek===week.week&&<div className="roadmap-days">{weekCalendar(week,splitDays,goals,profile,rhythm).map(session=><div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US',{weekday:'short'})}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
+{openWeek===week.week&&<div className="roadmap-days">{weekCalendar(week,splitDays,goals,profile,rhythm,bests).map(session=><div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US',{weekday:'short'})}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
 </div>)}</div>
 <small className="roadmap-note">Loads and paces regenerate from completed work — this is the current trajectory to {goals[0]?.title||'your goals'}, not a promise.</small></section>
 <details className="card scaling-explainer"><summary><div><span className="eyebrow">HOW CARDIO ADAPTS</span><strong>Scaling rules</strong></div><b>＋</b></summary><div><p><b>Weekly volume:</b> resets only with the calendar week, never when a rolling split wraps.</p><p><b>Long run:</b> appears no more than once in each calendar week.</p><p><b>Steady workouts:</b> duration changes.</p><p><b>Intervals:</b> repetition count changes while work quality and recovery remain recognizable.</p><p><b>Circuits:</b> round count changes before station technique is altered.</p><p>Completed results, recovery, weekly volume, and goal phase shape the next prescription. Saved templates stay unchanged; only the scheduled dose scales.</p></div></details></div>;
