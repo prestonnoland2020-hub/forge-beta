@@ -105,8 +105,12 @@ export function InsightsClassic() {
       const minutes = summarizeCardioDraft(session).minutes;
       const week = weekStartIso(record.date);
       const entry = byWeek.get(week) || { miles: 0, bestPace: Infinity };
+      /* Weekly mileage and best pace are RUNNING stats — synced rides, swims,
+         and gym work keep their own day entries but stay out of this chart. */
+      const runShaped = !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(session.activity || '');
+      if (!runShaped) return;
       entry.miles += miles;
-      if (minutes && miles >= 0.5) entry.bestPace = Math.min(entry.bestPace, minutes / miles);
+      if (minutes && miles >= 0.5 && minutes / miles >= 4 && minutes / miles <= 18) entry.bestPace = Math.min(entry.bestPace, minutes / miles);
       byWeek.set(week, entry);
     }));
     return [...byWeek.entries()].sort(([a], [b]) => a.localeCompare(b))

@@ -5,6 +5,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { openCoachBubble } from '../features/training/coachService';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
+import { StravaActivityReview } from '../components/StravaActivityReview';
 import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
 import { WeekPulse } from '../components/WeekPulse';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
@@ -59,6 +60,7 @@ export function HomePage() {
   return <div className="forge-feed">
     <header className="feed-welcome"><div><span>{greeting}, {firstName}</span><h2>Today’s training</h2></div><Link to="/history">See activity</Link></header>
     {syncError && <div className="save-confirmation save-warning">Your workout is ready here. Account sync will retry automatically.</div>}
+    <StravaActivityReview />
     {bufferedNotes.length > 0 && <Link className="buffer-banner" to="/coach">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 2.8 19.5a1 1 0 0 0 .87 1.5h16.66a1 1 0 0 0 .87-1.5L12 3Z"/><path d="M12 10v4M12 17.5v.5"/></svg>
       <span>Training around {bufferedNotes.map(note => note.area || note.kind).join(', ')} — check in on Coach</span>

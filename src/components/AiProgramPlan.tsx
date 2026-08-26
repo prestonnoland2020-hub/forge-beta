@@ -101,8 +101,13 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const recentRuns = useMemo(() => {
     const runs: Array<{ date: string; activity: string; miles: number; minutes: number; pace: string }> = [];
     records.slice(0, 60).forEach(record => (record.cardioSessions || []).forEach(session => {
+      /* Pace anchoring uses RUN-shaped work only — a synced ride or swim at
+         3:00/mi must never become the athlete's "logged easy pace". */
+      if (/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(session.activity || '')) return;
       const miles = cardioMiles(session); const minutes = summarizeCardioDraft(session).minutes;
       if (!miles || !minutes) return;
+      const paceCheck = minutes / miles;
+      if (paceCheck < 4 || paceCheck > 18) return;
       const paceMinutes = minutes / miles;
       runs.push({ date: record.date, activity: session.activity || 'Run', miles: Math.round(miles * 100) / 100, minutes: Math.round(minutes * 10) / 10, pace: `${Math.floor(paceMinutes)}:${String(Math.round((paceMinutes % 1) * 60)).padStart(2, '0')}/mi` });
     }));

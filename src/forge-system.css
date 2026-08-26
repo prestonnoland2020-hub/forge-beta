@@ -1171,3 +1171,16 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ai-program-meta .button{white-space:nowrap}
 .ai-program-error{grid-column:1/-1;color:var(--warn);font-size:11.5px}
 @media (max-width:600px){.ai-program-meta{grid-template-columns:1fr}.ai-program-meta .button{justify-self:start}}
+
+/* ═══ STRAVA · synced-activity review card on Today (2026-08-26) ═══ */
+.strava-review{display:grid;gap:10px;border-top:2px solid color-mix(in srgb,#fc4c02 55%,var(--hairline))}
+.strava-review header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.strava-review header>div{display:grid;gap:4px;min-width:0}
+.strava-review header .eyebrow{color:#fc7c4c}
+.strava-review header strong{font:800 15px/1.3 var(--display);letter-spacing:.01em;overflow-wrap:anywhere}
+.strava-review-badge{flex:none;font-size:9.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;padding:4px 9px;border-radius:999px;color:#fc7c4c;border:1px solid color-mix(in srgb,#fc4c02 45%,transparent)}
+.strava-review p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.strava-review textarea{width:100%;resize:vertical;min-height:52px}
+.strava-review-reflection{color:var(--ink-2);font-size:12px;line-height:1.45;border-left:2px solid var(--accent);padding-left:10px}
+.strava-review footer{display:flex;gap:10px;flex-wrap:wrap}
+.strava-review footer .button{flex:1;min-width:150px}

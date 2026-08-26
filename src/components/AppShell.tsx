@@ -8,6 +8,8 @@ import { useDailyRecommendation } from '../features/training/DailyRecommendation
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { needsFollowUp } from '../features/training/athleteNotesService';
 import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyMorningWorkout } from '../lib/notifications';
+import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
+import { importStravaActivities } from '../features/training/stravaImportService';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
    standalone exercise library that duplicated what the Log screen already does;
@@ -48,7 +50,28 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const location = useLocation();
   const { recovery } = useAdaptiveTraining();
   const { setup } = useProfileSetup();
-  const { loading: historyLoading, syncing, syncError, retrySync } = useWorkoutHistory();
+  const { loading: historyLoading, syncing, syncError, retrySync, records: stravaRecords, addRecord: stravaAddRecord } = useWorkoutHistory();
+  /* Strava auto-sync: when connected, new activities flow into the log on
+     app open without a tap — throttled to every 6 hours, always silent. It
+     waits for history to load: importing against an empty record set would
+     defeat dedupe and double-log synced activities. */
+  useEffect(() => {
+    if (isDemoMode || historyLoading) return;
+    const throttleKey = 'forge-strava-auto-sync';
+    const last = Number(localStorage.getItem(throttleKey) || 0);
+    if (Date.now() - last < 6 * 3600000) return;
+    let active = true;
+    void (async () => {
+      try {
+        const status = await getActivityConnection();
+        if (!active || !status.connected) return;
+        localStorage.setItem(throttleKey, String(Date.now()));
+        await syncStravaActivities();
+        if (active) await importStravaActivities(stravaRecords, stravaAddRecord);
+      } catch { /* silent — manual sync remains in Profile → Connections */ }
+    })();
+    return () => { active = false; };
+  }, [historyLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   const { recommendation } = useDailyRecommendation();
   const { notes } = useAthleteNotes();
   const [coachOpen, setCoachOpen] = useState(false);
