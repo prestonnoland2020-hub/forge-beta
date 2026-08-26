@@ -149,7 +149,14 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
     const local = parseCardioDescription(description);
     const parsed = await requestCardioParse(description, { savedCardioTypes: typeOptions, plannedToday: plannedSummary || null }, local);
     if (!parsed.rows.length) { setAiReflection(parsed.reflection || 'Could not read a workout from that.'); setAiSource(parsed.source); setAiBusy(false); return; }
-    setLines(parsed.rows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) })));
+    const rows = parsed.rows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
+    const noteText = parsed.note && !note ? parsed.note : note;
+    /* "Log it" logs it. The rows used to land in the composer for a second
+       confirming tap, and a session that never got that tap was thrown away
+       on save. It commits straight to the day now and stays editable in the
+       list above. */
+    if (commit(rows, noteText)) { reset(); setAiReflection(parsed.reflection); setAiSource(parsed.source); setAiBusy(false); return; }
+    setLines(rows);
     if (parsed.note && !note) setNote(parsed.note);
     setAiReflection(parsed.reflection);
     setAiSource(parsed.source);
@@ -165,9 +172,13 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
 
   const summary = summarize(lines);
 
-  const save = () => {
-    const filled = lines.filter(line => Number(line.distance) > 0 || clockToMinutes(line.time) > 0);
-    if (!filled.length) return;
+  /* One commit path for every way a session gets logged — typed rows, the AI
+     box, a library template. Logging IS saving: the entry lands in the day
+     immediately rather than waiting on a second button, which is how a
+     session got typed in and then silently dropped. */
+  const commit = (sourceLines: CardioLine[], noteText: string) => {
+    const filled = sourceLines.filter(line => Number(line.distance) > 0 || clockToMinutes(line.time) > 0);
+    if (!filled.length) return false;
     const legacyIntervals = filled.map(line => ({
       cardioType: line.cardioType.trim() || 'Cardio',
       unit: line.unit,
@@ -179,11 +190,12 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
       structure: 'steady',
       activity: legacyIntervals[0].cardioType,
       summary: summarize(filled),
-      prescription: { legacyIntervals, distanceUnit: legacyIntervals[0].unit, note: note.trim() || undefined },
+      prescription: { legacyIntervals, distanceUnit: legacyIntervals[0].unit, note: noteText.trim() || undefined },
     };
     setSavedEntries(items => editingId ? items.map(item => item.id === editingId ? draft : item) : [...items, draft]);
-    reset();
+    return true;
   };
+  const save = () => { if (commit(lines, note)) reset(); };
 
   return <section className="card form-card cardio-log">
     <div className="section-title compact-title">
@@ -210,7 +222,7 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
         <textarea rows={2} value={aiText} onChange={event => setAiText(event.target.value)} placeholder="“4 mile run in 32:10, last mile hard” or “6x400m at 90s with 2 min jog, 1 mile warmup”" />
         <div className="cardio-ai-actions">
           <button type="button" className="button small-button" disabled={aiBusy || !aiText.trim()} onClick={logWithAi}>{aiBusy ? 'Reading…' : 'Log it'}</button>
-          <small>Rows fill in below — check them, then save.</small>
+          <small>Logs straight to today — edit it above if anything is off.</small>
         </div>
         {aiReflection && <p className={`cardio-ai-reflection${aiSource === 'local' ? ' local' : ''}`}><b>{aiSource === 'ai' ? 'FORGE' : 'QUICK PARSE'}</b>{aiReflection}</p>}
       </div>
