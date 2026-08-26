@@ -1308,3 +1308,37 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
   /* At the foot of the tab this is a footnote, not a heading. */
   .plan-studio .mobile-plan-settings{margin-top:var(--s3)}
 }
+
+/* ============================================ history log, grouped by month
+   The log was one flat run of every session ever, paged twelve at a time, so
+   reaching last spring meant tapping "Show 12 more" a dozen times. Months are
+   collapsed headers now — the newest opens on arrival, the rest are one tap —
+   and a closed month renders no rows, so five years of history costs nothing
+   to scroll past. A search opens every group, since a hit hidden inside a
+   collapsed month reads as no result at all. */
+.history-log-months{display:grid;gap:8px}
+.history-log-month{border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:clip}
+.history-month-toggle{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) 20px;align-items:center;gap:10px;width:100%;min-height:48px;padding:10px 14px;border:0;background:var(--surface-2);color:var(--ink);text-align:left;cursor:pointer}
+.history-log-month.open .history-month-toggle{border-bottom:1px solid var(--hairline)}
+.history-month-name{font:800 13.5px var(--display);letter-spacing:.01em;white-space:nowrap}
+.history-month-meta{color:var(--ink-3);font-size:11.5px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.history-month-toggle>b{justify-self:end;color:var(--ink-3);font:700 17px/1 var(--display)}
+.history-log-month.open .history-month-toggle>b{color:var(--accent)}
+.history-log-month .history-log-list{border:0;border-radius:0}
+
+/* ============================================ split day editor, condensed
+   The exercise picker carried its own row of muscle filter chips directly
+   under the day's own muscle selection — two controls, same job, opposite
+   ends of the same card — and then listed the entire library behind them. The
+   day's muscles are the filter now, they moved to the top of the editor where
+   the choice actually belongs, and the separate "selected for this day" chip
+   panel is gone: the picker already ticks what is chosen, so restating it was
+   a third copy of the same information. */
+.muscle-groups-section .compact-muscle-picker{margin-top:2px}
+.exercise-selector-section .exercise-multi-picker{margin-top:2px}
+/* Without the filter row above it the list can breathe, but it still must not
+   run longer than a thumb-scroll before the section below it. */
+.exercise-picker-options{max-height:none}
+@media(max-width:900px){
+  .muscle-groups-section .muscle-chip{padding:8px 13px;font-size:12px}
+}
