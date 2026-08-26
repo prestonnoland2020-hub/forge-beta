@@ -78,14 +78,26 @@ export async function generateAiPlan(context: Record<string, unknown>): Promise<
    actually log: beat a prescription and everything scales up; miss one and
    the wave holds steady instead of assuming progress. Max week attempts the
    PR + ~5-10 lb (2.5 kg steps for metric athletes). */
-export const WAVE_REPS = [8, 6, 4, 2] as const;
-export const waveSlot = (weekIndex: number) => ({ reps: WAVE_REPS[weekIndex % 4], isMax: weekIndex % 4 === 3 });
-export function wavePrescription(best: number, weekIndex: number, metric = false): { weight: number; reps: number; isMax: boolean } {
+/* Preston's system: a 5-WEEK wave — 8, 6, 4, 2, then MAX WEEK (a true 1RM
+   attempt). The running deload lands on the 2-rep week so the max attempt
+   always follows a lighter week. */
+export const WAVE_REPS = [8, 6, 4, 2, 1] as const;
+export const WAVE_LENGTH = WAVE_REPS.length;
+export const waveSlot = (weekIndex: number) => ({ reps: WAVE_REPS[weekIndex % WAVE_LENGTH], isMax: weekIndex % WAVE_LENGTH === WAVE_LENGTH - 1 });
+/* Max week is a TRUE 1RM attempt — strength goals track Real 1RM, which only
+   a 1-rep set can register. The attempt targets the current best + 5-10 lb
+   (2.5 kg steps for metric athletes). */
+export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0): { weight: number; reps: number; isMax: boolean } {
   const step = metric ? 2.5 : 5;
   const bump = metric ? 3.75 : 7.5;
   const { reps, isMax } = waveSlot(weekIndex);
-  const target = isMax ? best + bump : best;
-  const weight = Math.max(step, Math.ceil(target / (1 + reps / 30) / step) * step);
+  if (isMax) {
+    /* "A rep higher than last PR by 5-10": a real logged single anchors the
+       attempt directly; without one, the estimated max stands in. */
+    const attempt = bestSingle ? bestSingle + bump : (best + bump) / (1 + 1 / 30);
+    return { weight: Math.max(step, Math.ceil(attempt / step) * step), reps: 1, isMax };
+  }
+  const weight = Math.max(step, Math.ceil(best / (1 + reps / 30) / step) * step);
   return { weight, reps, isMax };
 }
 

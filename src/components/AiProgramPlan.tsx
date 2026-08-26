@@ -77,7 +77,7 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     if (index === longIndex) { runKind = 'Long run'; runText = `${week.longRunMiles} ${distanceUnit} @ ${week.longRunPace}`; runStress = 'Moderate'; }
     else if (index === qualityIndex) { runKind = 'Quality'; runText = `${week.quality}${week.qualityPace ? ` @ ${week.qualityPace}` : ''}`; runStress = 'High'; }
     else if (easySet.has(index)) { runKind = 'Easy run'; runText = `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`; runStress = 'Low'; }
-    const strengthText = topSet ? `Top set · ${topSet.exercise}: ${topSet.weight} × ${topSet.reps}` : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
+    const strengthText = topSet ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${topSet.exercise}: ${topSet.weight} × ${topSet.reps}` : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
     if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const };
     if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const };
     if (strengthText) return { date, kind: type === 'mixed' ? 'Mixed' : 'Strength', title: day.name, detail: strengthText, stress: 'Moderate' as const };
@@ -102,7 +102,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   /* Generation UX: ~44s of API time gets staged narration instead of a dead
      spinner, and a generation orphaned by backgrounding the phone retries
      once when the app comes back. */
-  const GEN_STAGES = ['Reading your logged bests and real paces…', 'Scaling weekly mileage from what you actually run…', 'Writing the 8/6/4/2 wave from your calc maxes…', 'Placing runs around your split — never speed work on leg day…', 'Checking every load against your PRs…'];
+  const GEN_STAGES = ['Reading your calculated maxes and real paces…', 'Scaling weekly mileage from what you actually run…', 'Writing the 8/6/4/2/1 wave from your calc maxes…', 'Placing runs around your split — never speed work on leg day…', 'Checking every load against your calc maxes…'];
   const [stageIndex, setStageIndex] = useState(0);
   const generateStartedAt = useRef(0);
   const backgroundRetried = useRef(false);
@@ -114,6 +114,29 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const generatingStage = GEN_STAGES[stageIndex];
 
   const bests = useMemo(() => { const map = new Map<string, number>(); records.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false || !set.lift || !set.weight) return; const max = set.calculatedMax || epley(set.weight, set.reps); if (max > (map.get(set.lift) || 0)) map.set(set.lift, max); })); return map; }, [records]);
+  /* True logged singles — Real 1RMs — anchor max-week attempts directly. */
+  const bestSingles = useMemo(() => { const map = new Map<string, number>(); records.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false || !set.lift || !set.weight || set.reps !== 1) return; if (set.weight > (map.get(set.lift) || 0)) map.set(set.lift, set.weight); })); return map; }, [records]);
+  /* Which set each number came from. A calc max of 380 is a conclusion drawn
+     from something like 315 × 6, and showing that set is the difference
+     between a number the athlete trusts and one that looks invented. */
+  type MaxSource = { max: number; weight: number; reps: number; date: string };
+  const maxSources = useMemo(() => {
+    const map = new Map<string, MaxSource>();
+    records.forEach(record => (record.topSets || []).forEach(set => {
+      if (set.completed === false || !set.lift || !set.weight) return;
+      const max = set.calculatedMax || epley(set.weight, set.reps);
+      if (max > (map.get(set.lift)?.max || 0)) map.set(set.lift, { max, weight: set.weight, reps: set.reps, date: record.date });
+    }));
+    return map;
+  }, [records]);
+  const singleSources = useMemo(() => {
+    const map = new Map<string, { weight: number; date: string }>();
+    records.forEach(record => (record.topSets || []).forEach(set => {
+      if (set.completed === false || !set.lift || !set.weight || set.reps !== 1) return;
+      if (set.weight > (map.get(set.lift)?.weight || 0)) map.set(set.lift, { weight: set.weight, date: record.date });
+    }));
+    return map;
+  }, [records]);
   const recentRuns = useMemo(() => {
     const runs: Array<{ date: string; activity: string; distance: number; unit: string; minutes: number; pace: string }> = [];
     records.slice(0, 60).forEach(record => (record.cardioSessions || []).forEach(session => {
@@ -156,13 +179,20 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     setGenerating(true); setError(''); generateStartedAt.current = Date.now();
     try {
       const context = {
-        blockWeeks: 8,
+        blockWeeks: 10,
         units: metric ? 'metric' : 'imperial',
         today: new Date().toISOString().slice(0, 10),
         goals: goals.map(goal => ({ type: goal.type, title: goal.title, exercise: goal.exercise, metric: goal.metric, target: goal.target, current: goal.current, deadline: goal.date })),
         profile: { weeklyMileage: profile.weeklyMileage, minWeeklyMileage, maxWeeklyMileage, runningDays: profile.runningDays, longestRunMiles: profile.longestRunMiles, readiness: profile.readiness },
         splitDays: splitDays.map((day, index) => ({ position: index + 1, name: day.name, type: day.dayType, muscles: day.muscles || [], exercises: day.exercises || [] })),
+        /* Two distinct numbers, named so the model cannot conflate them: a
+           calc max is an Epley estimate from any rep count, a real 1RM is an
+           actual logged single. Legacy key names ride along so a not-yet
+           redeployed function still reads them. */
+        calcMaxes: Object.fromEntries(bests),
+        realOneRepMaxes: Object.fromEntries(bestSingles),
         loggedBests: Object.fromEntries(bests),
+        loggedSingles: Object.fromEntries(bestSingles),
         recentRuns,
       };
       const plan = await generateAiPlan(context);
@@ -220,7 +250,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     <section className={`card plan-generating${generating ? ' busy' : ''}`}>
       <span className="eyebrow">AI PROGRAM</span>
       <h3>{generating ? 'Building your program…' : 'Your program isn’t built yet'}</h3>
-      <p>{generating ? generatingStage : error || 'Forge builds an 8-week block from your goals, split, and logged training.'}</p>
+      <p>{generating ? generatingStage : error || 'Forge builds a 10-week block — two full 8/6/4/2/1 waves — from your goals, split, and logged training.'}</p>
       {generating && <small className="plan-generating-eta">Takes about a minute — it’s reading everything you’ve logged.</small>}
       {!generating && <button type="button" className="button" onClick={() => void regenerate()}>Generate program</button>}
     </section>
@@ -240,7 +270,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       topSets: (item.topSets || []).map(set => {
         const best = bests.get(set.exercise);
         if (!best) return set;
-        const live = wavePrescription(best, index, metric);
+        const live = wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0);
         if (live.weight !== set.weight || live.reps !== set.reps) liveAdjusted = true;
         return { ...set, weight: live.weight, reps: live.reps };
       }),
@@ -254,8 +284,37 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const headline = (item: AiPlanWeek) => { const sets = [...(item.topSets || [])]; const goalSet = sets.find(set => strengthGoal && (set.exercise === strengthGoal.exercise || (strengthGoal.exercise || '').toLowerCase().includes(set.exercise.toLowerCase()))); const lead = goalSet || sets.sort((a, b) => epley(b.weight, b.reps) - epley(a.weight, a.reps))[0]; return lead; };
 
   return <div className="simple-program ai-program">
-    <section className="simple-program-head"><div><span className="eyebrow">WEEK {week.week} OF {plan.weeks.length} · {week.phase.toUpperCase()}</span><h2>{week.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{headline(week)?.exercise || strengthGoal?.exercise || 'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{week.mileage ? `${week.mileage} ${metric ? 'km' : 'mi'} this week` : 'Not scheduled'}</strong></div></div></section>
+    <section className="simple-program-head"><div><span className="eyebrow">WEEK {week.week} OF {plan.weeks.length} · {weekIndex % 5 === 4 ? 'MAX WEEK' : week.phase.toUpperCase()}</span><h2>{weekIndex % 5 === 4 ? 'Max Week' : week.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{headline(week)?.exercise || strengthGoal?.exercise || 'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{week.mileage ? `${week.mileage} ${metric ? 'km' : 'mi'} this week` : 'Not scheduled'}</strong></div></div></section>
     <section className="card ai-program-meta"><div><span className="eyebrow">AI PROGRAM · GENERATED {generatedLabel.toUpperCase()}</span><p>{plan.summary}</p>{week.note ? <small>{week.note}</small> : null}{liveAdjusted ? <small className="ai-program-adjusted">Loads updated from your latest logged sets — the wave follows what you actually lift.</small> : null}</div>{canGenerate ? <button type="button" className="button secondary" disabled={generating} onClick={() => void regenerate()}>{generating ? generatingStage.split('…')[0] + '…' : 'Refresh plan'}</button> : null}{error ? <small className="ai-program-error">{error} — showing the stored block.</small> : null}</section>
+    {(() => {
+      /* The block's thesis, stated in numbers. Preston's system trains off a
+         CALCULATED max — an Epley estimate from a set of 6 or 8 — and the
+         only reason that estimate matters is that max week converts it into a
+         real single, which is the one thing a Real 1RM goal can register.
+         Showing the calc max, the real 1RM, and the attempt that bridges them
+         is what makes the plan legible as progress rather than arithmetic. */
+      const lead = headline(week);
+      const best = lead ? bests.get(lead.exercise) : undefined;
+      if (!lead || !best) return null;
+      const unit = metric ? 'kg' : 'lb';
+      const source = maxSources.get(lead.exercise);
+      const single = singleSources.get(lead.exercise);
+      const maxIndexes = plan.weeks.map((_, index) => index).filter(index => index % 5 === 4);
+      const nextMax = maxIndexes.find(index => index >= weekIndex) ?? maxIndexes[maxIndexes.length - 1];
+      if (nextMax === undefined) return null;
+      const attempt = wavePrescription(best, nextMax, metric, bestSingles.get(lead.exercise) || 0);
+      const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const maxWeekDate = (() => { const date = new Date(`${stored.startDate}T12:00:00`); date.setDate(date.getDate() + nextMax * 7); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })();
+      return <section className="card max-ledger">
+        <header><span className="eyebrow">{lead.exercise.toUpperCase()} · WHAT THIS BLOCK IS FOR</span><h3>Turning a calculated max into a real one</h3></header>
+        <div className="ledger-rail">
+          <div><span>Calc max now</span><strong>{best} {unit}</strong><small>{source ? `estimated from ${source.weight} × ${source.reps} on ${shortDate(source.date)}` : 'from your best logged set'}</small></div>
+          <div><span>Real 1RM on record</span><strong className={single ? '' : 'ledger-empty'}>{single ? `${single.weight} ${unit}` : 'None yet'}</strong><small>{single ? `logged ${shortDate(single.date)}` : 'no single logged for this lift'}</small></div>
+          <div className="ledger-target"><span>Max week attempt</span><strong>{attempt.weight} × 1</strong><small>week {nextMax + 1} · {maxWeekDate}</small></div>
+        </div>
+        <p>Weeks 1–4 train at what your <strong>{best} {unit}</strong> calculated max says you can already handle — the same estimate expressed at 8, 6, 4, then 2 reps. Max week cashes it in: {single ? <>a single above your real <strong>{single.weight} {unit}</strong>.</> : <>your first real single on this lift.</>} A logged single is the only set a Real 1RM goal counts, and it raises the calc max the next wave anchors to.</p>
+      </section>;
+    })()}
     {(() => {
       const lead = headline(week);
       const best = lead ? bests.get(lead.exercise) : undefined;
@@ -264,8 +323,8 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       const unit = metric ? 'kg' : 'lb';
       return <details className="card wave-explainer"><summary><div><span className="eyebrow">WHY THESE NUMBERS</span><strong>How Forge computed {lead.exercise} {lead.weight} × {lead.reps}</strong></div><b>＋</b></summary><div className="wave-explainer-body">
         <div><b>1</b><p>Your best logged {lead.exercise} implies a calculated max of <strong>{best} {unit}</strong> (weight × (1 + reps ÷ 30)).</p></div>
-        <div><b>2</b><p>This is {slot.isMax ? <>the <strong>max week</strong> of the 8/6/4/2 wave — a 2-rep PR attempt ~5–10 {unit} above that max</> : <>an <strong>{slot.reps}-rep week</strong> of the 8/6/4/2 wave — the same max expressed at {slot.reps} reps</>}.</p></div>
-        <div><b>3</b><p>That converts to <strong>{lead.weight} × {lead.reps}</strong>. Beat it and every number rises with your new best; miss it and the wave holds instead of assuming progress.</p></div>
+        <div><b>2</b><p>This is {slot.isMax ? <>the <strong>max week</strong> — a true <strong>1RM attempt</strong> ~5–10 {unit} above your last PR</> : <>an <strong>{slot.reps}-rep week</strong> of the 8/6/4/2/1 wave — the same max expressed at {slot.reps} reps</>}.</p></div>
+        <div><b>3</b><p>That converts to <strong>{lead.weight} × {lead.reps}</strong>. Beat it and every number rises with your new best; miss it and the wave holds instead of assuming progress. The week after a max attempt stays at your current numbers until the new PR is actually logged — then the whole wave steps up.</p></div>
       </div></details>;
     })()}
     <section className="card simple-week-schedule"><header><div><span className="eyebrow">YOUR SCHEDULE</span><h3>What to do this week</h3></div></header><div>{sessions.map(session => <article className={`stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{dateText(session.date)}</time><div><span className="session-tags">{[...session.kind.split(' + '), session.stress].filter(Boolean).map((tag, index) => <i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{session.title}</strong><small>{session.detail}</small></div><b>{session.stress === 'Rest' ? 'Rest' : '›'}</b></article>)}</div></section>
@@ -273,7 +332,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       <div className="roadmap-table" role="table"><div className="roadmap-row head" role="row"><span>Week</span><span>Miles</span><span>Long</span><span>Hard run</span><span>Top set · proj. max</span></div>
         {plan.weeks.map((item, index) => { const lead = headline(item); const startLabel = (() => { const date = new Date(`${stored.startDate}T12:00:00`); date.setDate(date.getDate() + index * 7); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })(); return <div key={item.week} className="roadmap-week-group">
           <button type="button" className={`roadmap-row phase-${item.phase.toLowerCase()}${openWeek === item.week ? ' open' : ''}`} onClick={() => setOpenWeek(current => current === item.week ? null : item.week)} aria-expanded={openWeek === item.week}>
-            <span className="roadmap-week"><b>{item.week}</b><small>{startLabel} · {item.phase}</small></span>
+            <span className="roadmap-week"><b>{item.week}</b><small>{startLabel}{index % 5 === 4 ? <i className="max-week-tag">MAX WEEK</i> : ` · ${item.phase}`}</small></span>
             <span className="roadmap-miles">{item.mileage || '—'}</span>
             <span className="roadmap-long">{item.longRunMiles ? `${item.longRunMiles} ${metric ? 'km' : 'mi'}` : '—'}</span>
             <span className="roadmap-run">{item.quality}</span>
@@ -281,6 +340,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
           </button>
           {openWeek === item.week && <div className="roadmap-days">{aiWeekSessions(item, stored.startDate, index, splitDays, rhythm, anchor, metric ? 'km' : 'mi').map(session => <div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US', { weekday: 'short' })}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
         </div>; })}</div>
-      <small className="roadmap-note">Built from your goals, split, logged bests, and real paces. The next block generates itself from what you actually log.</small></section>
+      <small className="roadmap-note">Built from your goals, split, calculated maxes, and real paces. The next block generates itself from what you actually log.</small></section>
   </div>;
 }

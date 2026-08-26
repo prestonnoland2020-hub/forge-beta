@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { exerciseCategory, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
 
@@ -13,7 +14,17 @@ export function GoalBuilder({ onClose, onSave, initialGoal }: { onClose:()=>void
   const {setup}=useProfileSetup();
   const initialType=goalTypes.find(item=>item.label===initialGoal?.type)?.id ?? 'strength';
   const [step,setStep]=useState(initialGoal?2:1); const [type,setType]=useState(initialType);
-  const [exercise,setExercise]=useState(initialGoal?.exercise ?? 'Squat'); const [metric,setMetric]=useState(initialGoal?.type==='Strength'?'Real 1RM':initialGoal?.metric ?? 'Real 1RM');
+  /* Goal exercises come ONLY from the athlete's exercise library — free-typed
+     or hardcoded names create data that can never match logged sets. An
+     editing goal whose exercise predates the library stays selectable so old
+     goals never silently re-point at a different lift. */
+  const {exercises:libraryExercises}=useTrainingLibrary();
+  const goalExerciseOptions=useMemo(()=>{
+    const names=libraryExercises.filter(item=>item.enabled&&item.kind==='Strength'&&exerciseCategory(item)==='Strength').map(item=>item.name).sort((a,b)=>a.localeCompare(b));
+    const current=initialGoal?.exercise;
+    return current&&!names.includes(current)?[current,...names]:names;
+  },[libraryExercises,initialGoal?.exercise]);
+  const [exercise,setExercise]=useState(initialGoal?.exercise ?? ''); const [metric,setMetric]=useState(initialGoal?.type==='Strength'?'Real 1RM':initialGoal?.metric ?? 'Real 1RM');
   const [current,setCurrent]=useState(initialGoal?.current ?? ''); const [target,setTarget]=useState(initialGoal?.target?.split(' ')[0] ?? ''); const [unit,setUnit]=useState(initialGoal?.unit ?? initialGoal?.target?.split(' ').slice(1).join(' ') ?? 'lb');
   const [targetDate,setTargetDate]=useState(initialGoal?.date ?? (()=>{const date=new Date();date.setDate(date.getDate()+84);return date.toISOString().slice(0,10)})());
   const [connection,setConnection]=useState(initialGoal?.connection ?? setup?.splitDays.find(day=>day.type!=='Rest')?.name ?? 'No fixed day');
@@ -70,13 +81,11 @@ export function GoalBuilder({ onClose, onSave, initialGoal }: { onClose:()=>void
 <strong>{title}</strong>
 </div>{type==='strength'&&<div className="field-grid">
 <label>Goal exercise<select value={exercise} onChange={e=>setExercise(e.target.value)}>
-<option>Squat</option>
-<option>Bench Press</option>
-<option>Deadlift</option>
-<option>Hack Squat</option>
-<option>Pull Ups</option>
+<option value="">Choose from your exercise library</option>
+{goalExerciseOptions.map(name=><option key={name}>{name}</option>)}
 </select>
 </label>
+{!goalExerciseOptions.length&&<small className="goal-exercise-hint">Your library has no strength exercises yet — add one from the Log page and it appears here.</small>}
 <label>Progress metric<select value="Real 1RM" disabled aria-label="Strength progress metric">
 <option>Real 1RM</option>
 </select>

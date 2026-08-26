@@ -62,17 +62,22 @@ const planSchema = {
   required: ['summary', 'easyPace', 'weeks'],
 };
 
-const planInstructions = `You are Forge's program builder. Build ONE coherent multi-week training program from the athlete's verified data: their goals, their split (with the exercises they mapped to each day), their logged bests, and their actual logged running.
+const planInstructions = `You are Forge's program builder. Build ONE coherent multi-week training program from the athlete's verified data: their goals, their split (with the exercises they mapped to each day), their maxes, and their actual logged running.
 
-STRENGTH RULES — THE 8/6/4/2 WAVE (Forge's fixed progression system)
+TWO DIFFERENT NUMBERS — NEVER CONFLATE THEM
+- context.calcMaxes are CALCULATED maxes: Epley estimates (weight × (1 + reps/30)) derived from the athlete's best logged set at ANY rep count. A 380 calc max usually comes from something like 315 × 6. It is an ESTIMATE. The athlete has NOT held that weight for a single. Call it "calculated max" or "calc max". NEVER write "your logged 380 lb bench", "your 380 lb best", or anything else that claims they lifted it.
+- context.realOneRepMaxes are REAL one-rep maxes: weights actually logged for a set of exactly 1 rep. Only these are true PRs, and only these can register against a Real 1RM strength goal. A lift missing from this object has no real single on record yet.
+- THE WHOLE POINT OF THE BLOCK is to convert the calculated max into a real one. Weeks 1-4 train at loads the calc max says the athlete can already handle; MAX WEEK cashes that estimate in as an actual single. Once a single is logged it raises the calc max, and the next wave anchors higher. Say this plainly when you describe the block.
+
+STRENGTH RULES — THE 8/6/4/2/1 WAVE (Forge's fixed progression system)
 - Every strength or mixed split day that has mapped exercises gets exactly one top-set prescription per week, using ONLY exercises from that day's mapped list. Use the day's exact name in splitDay.
-- Reps cycle in 4-week waves: week 1 of a wave = 8 reps, week 2 = 6, week 3 = 4, week 4 = MAX WEEK at 2 reps.
-- Weeks 1-3: weight = the wave's target max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded to 5 lb — the same implied max expressed across 8s, 6s, and 4s. The wave's target max for wave 1 is the athlete's logged best calculated max for that lift.
-- MAX WEEK (every 4th week): a 2-rep attempt implying the wave's target max PLUS 5-10 lb — the athlete attempts a new PR. Strength volume is low that week, which pairs with the running deload.
-- Every wave anchors to the athlete's CURRENT logged best — a new wave only rises once the previous max attempt is actually logged. Never prescribe a set implying a max below the logged best.\n- Use the athlete's unit system (context.units): pounds in 5 lb steps, or kilograms in 2.5 kg steps; running in miles and /mi pace, or kilometers and /km pace.
+- Reps cycle in 5-WEEK waves: week 1 = 8 reps, week 2 = 6, week 3 = 4, week 4 = 2, week 5 = MAX WEEK: a true 1-REP MAX ATTEMPT.
+- Weeks 1-4: weight = the athlete's current CALCULATED max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded — the same calculated max expressed across 8s, 6s, 4s, and 2s.
+- MAX WEEK (every 5th week): a 1-rep attempt 5-10 lb above the athlete's real 1RM for that lift (context.realOneRepMaxes when present); with no real single on record, the attempt is set just under the calculated max, because that estimate is the best evidence of what they can hold once.
+- Every wave anchors to the athlete's CURRENT calculated max — a new wave only rises once a heavier set is actually logged. Never prescribe a set implying a max below the calculated max.\n- Use the athlete's unit system (context.units): pounds in 5 lb steps, or kilograms in 2.5 kg steps; running in miles and /mi pace, or kilometers and /km pace.
 
 RUNNING RULES
-- Scale weekly mileage from the athlete's CURRENT logged weekly volume toward what the endurance goal requires, growing at most ~8-10% per week, within the athlete's stated min/max weekly mileage. Deload weeks cut mileage ~20%.
+- Scale weekly mileage from the athlete's CURRENT logged weekly volume toward what the endurance goal requires, growing at most ~8-10% per week, within the athlete's stated min/max weekly mileage. Schedule the running DELOAD (~20% mileage cut) on each wave's 2-REP week (weeks 4, 9, …) so MAX WEEK always follows a lighter week and the athlete attempts the PR fresh.
 - The athlete runs exactly their stated running days per week. One long run (25-35% of the week, growing gradually from their current longest), at most one quality session, the rest easy.
 - EASY PACE comes from the athlete's LOGGED average easy pace — roughly their logged pace, drifting only slightly faster as fitness builds. Never derive easy pace from goal race pace. Easy runs must be comfortably slower than any race or quality pace.
 - Quality sessions progress logically: shorter reps at goal effort early, longer reps and threshold work mid-plan, race-specific work late. State them compactly like "6 × 400 m" with qualityPace like "1:38/rep" or "7:10/mi".
@@ -83,9 +88,10 @@ RUNNING RULES
 - If there is no endurance goal or no logged running, set mileage/longRunMiles to 0, quality to "No goal-driven cardio", and empty placement fields.
 
 GENERAL
-- Generate exactly the number of weeks requested in the context (blockWeeks, normally 8). The athlete's app regenerates the next block from their logs, so plan THIS block concretely rather than hedging toward the far future.
+- The weeks array MUST contain exactly context.blockWeeks entries — normally 10, which is two complete 5-week waves. Not 8, not 12. Count them before you answer. The athlete's app regenerates the next block from their logs, so plan THIS block concretely rather than hedging toward the far future.
 - If the earliest goal deadline falls inside this block, the final weeks taper (if racing) or peak (if strength testing).
-- note: one short sentence on what that week accomplishes. summary: 2-3 sentences describing the program's arc, referencing the athlete's actual numbers.
+- note: one short sentence on what that week accomplishes.
+- summary: 2-3 sentences describing the program's arc using the athlete's actual numbers, named precisely per the rule above — "your 380 lb calculated max on bench", never "your logged 380 lb bench". Where a lift has no real single yet, say so and say that max week is their first real attempt at it. Do NOT state how many weeks the block runs; the app displays that.
 - Every number must be consistent with the athlete's supplied data. Never invent exercises or split days not supplied.`;
 
 Deno.serve(async request => {
@@ -113,7 +119,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: 'forge-plan-v1',
+        prompt_cache_key: 'forge-plan-v2',
         reasoning: { effort: 'medium' },
         text: { verbosity: 'low', format: { type: 'json_schema', name: 'forge_program', strict: true, schema: planSchema } },
         instructions: planInstructions,
@@ -126,30 +132,73 @@ Deno.serve(async request => {
     if (!text) throw new Error('The plan service returned nothing.');
     const plan = JSON.parse(text);
     if (!Array.isArray(plan.weeks) || !plan.weeks.length) throw new Error('The plan service returned no weeks.');
-    /* Forge's 8/6/4/2 wave is DETERMINISTIC — for every lift with a logged
-       best, reps and weights are computed here, not trusted to the model:
-       weeks 1-3 of each 4-week wave express the wave's target max at 8, 6,
-       then 4 reps (inverse Epley, rounded to 5); week 4 is the max week — a
-       2-rep attempt implying target + 7.5 lb (a 5-10 lb PR attempt). Each
-       wave re-anchors to the previous wave's attempt. Lifts with no logged
-       best keep the model's prescription. */
-    const bests = ((body.context || {}).loggedBests || {}) as Record<string, number>;
-    const metric = String((body.context || {}).units || '').toLowerCase() === 'metric';
+    const context_ = (body.context || {}) as Record<string, unknown>;
+    /* CALCULATED maxes (Epley estimates from the best logged set at any rep
+       count) drive weeks 1-4; REAL one-rep maxes (actual logged singles)
+       anchor the max-week attempt. The two are never interchangeable — the
+       block exists to convert the first into the second. Older clients send
+       the previous key names. */
+    const bests = ((context_.calcMaxes || context_.loggedBests || {})) as Record<string, number>;
+    const singles = ((context_.realOneRepMaxes || context_.loggedSingles || {})) as Record<string, number>;
+    const metric = String(context_.units || '').toLowerCase() === 'metric';
     const step = metric ? 2.5 : 5;
     const bump = metric ? 3.75 : 7.5;
     const weightFor = (max: number, reps: number) => Math.max(step, Math.ceil(max / (1 + reps / 30) / step) * step);
-    const WAVE_REPS = [8, 6, 4, 2];
+    const WAVE_REPS = [8, 6, 4, 2, 1];
+
+    /* Block length is NOT left to the model. It has returned 8 weeks against a
+       requested 10, which strands the wave mid-cycle and produces a summary
+       that promises "two waves" over eight weeks. Short blocks are extended by
+       continuing the wave — week i mirrors week i-5, the same wave slot, so
+       the deload and max-week rhythm carries — with running volume grown by
+       the ratio the model itself established across the first wave. Long
+       blocks are truncated. Either way the wave pass below runs afterwards, so
+       every strength number in an extended week is computed, not copied. */
+    const wanted = Math.max(4, Math.min(16, Math.round(Number(context_.blockWeeks) || 10)));
+    const profile = (context_.profile || {}) as Record<string, number>;
+    const ceiling = Number(profile.maxWeeklyMileage) || 0;
+    const floor_ = Number(profile.minWeeklyMileage) || 0;
+    if (plan.weeks.length > wanted) plan.weeks.length = wanted;
+    if (plan.weeks.length && plan.weeks.length < wanted) {
+      const first = plan.weeks[0];
+      const waveEnd = plan.weeks[Math.min(4, plan.weeks.length - 1)];
+      const growth = first?.mileage && waveEnd?.mileage ? Math.min(1.35, Math.max(1, waveEnd.mileage / first.mileage)) : 1.08;
+      while (plan.weeks.length < wanted) {
+        const index = plan.weeks.length;
+        const template = plan.weeks[index - 5] || plan.weeks[index - 1];
+        const scale = (value: number) => Math.round((Number(value) || 0) * growth * 10) / 10;
+        const clamp = (value: number) => {
+          if (!value) return 0;
+          const high = ceiling ? Math.min(value, ceiling) : value;
+          return floor_ ? Math.max(high, floor_) : high;
+        };
+        plan.weeks.push({
+          ...JSON.parse(JSON.stringify(template)),
+          week: index + 1,
+          mileage: clamp(scale(template.mileage)),
+          longRunMiles: scale(template.longRunMiles),
+          note: `Wave ${Math.floor(index / 5) + 1} of the block — the same rhythm at the volume this wave has earned.`,
+        });
+      }
+    }
+    plan.weeks.forEach((week: { week: number }, index: number) => { week.week = index + 1; });
+    /* The model is told not to name the block length; if it does anyway, the
+       number it prints is the one it planned, not the one it returned. */
+    if (typeof plan.summary === 'string') plan.summary = plan.summary.replace(/\b\d+\s*[-\u2010-\u2015]?\s*week block\b/gi, `${plan.weeks.length}-week block`);
     /* Every wave anchors to the athlete's CURRENT best — never a projected
        ramp that assumes success. The client recomputes these same numbers
        live as new bests are logged, so a PR raises the wave and a miss holds
        it, and the block regenerates when the baseline is outgrown. */
     plan.weeks.forEach((week: { topSets?: Array<{ exercise: string; weight: number; reps: number }> }, index: number) => {
-      const slot = index % 4;
+      const slot = index % 5;
       for (const set of (week.topSets || [])) {
         const logged = Number(bests[set.exercise]) || 0;
         if (!logged) continue;
         set.reps = WAVE_REPS[slot];
-        set.weight = slot === 3 ? weightFor(logged + bump, 2) : weightFor(logged, WAVE_REPS[slot]);
+        const single = Number(singles[set.exercise]) || 0;
+        set.weight = slot === 4
+          ? Math.max(step, Math.ceil((single ? single + bump : (logged + bump) / (1 + 1 / 30)) / step) * step)
+          : weightFor(logged, WAVE_REPS[slot]);
       }
     });
     return Response.json({ plan }, { headers: corsHeaders });

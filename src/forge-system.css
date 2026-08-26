@@ -1213,3 +1213,62 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .wave-explainer-body p strong{color:var(--ink);font-variant-numeric:tabular-nums}
 .second-session-hint{display:block;color:var(--ink-3);font-size:11px;line-height:1.5;margin-top:2px}
 .completed-day-card footer{flex-wrap:wrap}
+.goal-exercise-hint{display:block;color:var(--ink-3);font-size:11.5px;line-height:1.45;margin-top:-4px}
+.max-week-tag{font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.09em;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:4px;padding:1px 5px}
+
+/* ================================================= floating-chrome clearance
+   Two elements float over the bottom of every page: the pill tab bar (72px
+   plus the home-indicator inset) and the Ask Forge bubble, which sits above
+   it and reaches 144px up from the viewport floor. Page padding must clear
+   the TALLER of the two, or the last card's controls — "Show 6 more", a goal's
+   Edit button, the final roadmap rows — sit under the bubble and cannot be
+   tapped. mobile-calm.css had quietly re-declared that padding at 98px through
+   a more specific selector, which cleared the tab bar and nothing else. One
+   token owns the number now, and the rule matches that selector so a later
+   sheet cannot halve it again. */
+:root{--topbar-h:88px;--chrome-clear:132px}
+@media(max-width:900px){:root{--topbar-h:72px;--chrome-clear:calc(162px + env(safe-area-inset-bottom))}}
+.page,.app-main .page{padding-bottom:var(--chrome-clear)}
+
+/* The block roadmap was a 440px window with its own scrollbar, so on a ten-week
+   block the last weeks lived in a nested scroller the page could not move:
+   scrolling the page ran out while those rows were still under the tab bar,
+   and nothing could push them clear. The table flows with the page now, so the
+   clearance above governs it; `clip` keeps the rounded corners without making
+   a scroll container, which would strand the sticky header again. */
+.roadmap-table{max-height:none;overflow:clip}
+.roadmap-row.head{top:var(--topbar-h)}
+
+/* "Sep 23 · MAX WEEK" never fit the 88px week column, so the one row an athlete
+   most needs to spot rendered as "Sep 23 · ( MA…". The label wraps under the
+   date instead of being cut off. */
+.roadmap-week small{white-space:normal}
+.roadmap-week small .max-week-tag{display:inline-block;margin-top:3px}
+
+/* ==================================================== calc max → real 1RM
+   The wave trains off a CALCULATED max — an Epley estimate from a set of six
+   or eight — and the only reason that estimate matters is that max week turns
+   it into a real single, which is the one set a Real 1RM goal can register.
+   The plan read as arithmetic until those three numbers sat next to each
+   other, so they get their own card: what the estimate is, what has actually
+   been held for a single, and the attempt that bridges them. */
+.max-ledger{display:grid;gap:var(--s3)}
+.max-ledger header{display:grid;gap:2px}
+.max-ledger header h3{margin:0}
+.ledger-rail{display:grid;gap:0;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:clip}
+.ledger-rail>div{display:grid;gap:2px;padding:11px 13px;border-bottom:1px solid var(--hairline);border-left:3px solid transparent;min-width:0}
+.ledger-rail>div:last-child{border-bottom:0}
+.ledger-rail span{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.ledger-rail strong{font:800 21px/1.15 var(--display);font-variant-numeric:tabular-nums}
+.ledger-rail small{font-size:11px;line-height:1.4;color:var(--ink-3);overflow-wrap:anywhere}
+.ledger-rail .ledger-empty{color:var(--ink-3);font-size:17px}
+.ledger-rail .ledger-target{border-left-color:var(--accent);background:var(--accent-wash)}
+.ledger-rail .ledger-target strong{color:var(--accent)}
+.max-ledger>p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.max-ledger>p strong{color:var(--ink);font-variant-numeric:tabular-nums}
+@media(min-width:560px){
+  .ledger-rail{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ledger-rail>div{border-bottom:0;border-left:1px solid var(--hairline)}
+  .ledger-rail>div:first-child{border-left:0}
+  .ledger-rail .ledger-target{border-left-color:var(--accent)}
+}
