@@ -29,6 +29,8 @@ export const planFingerprint = (input: unknown) => {
 };
 
 const readLocal = (): StoredAiPlan | null => { try { return JSON.parse(localStorage.getItem(localKey) || 'null'); } catch { return null; } };
+/* Synchronous cache read for surfaces (Today, Coach) that align to the plan. */
+export const readLocalAiPlan = readLocal;
 const writeLocal = (stored: StoredAiPlan) => { try { localStorage.setItem(localKey, JSON.stringify(stored)); } catch { /* full */ } };
 
 export async function loadStoredAiPlan(hasUser: boolean): Promise<StoredAiPlan | null> {
@@ -47,11 +49,15 @@ export async function loadStoredAiPlan(hasUser: boolean): Promise<StoredAiPlan |
 
 export async function saveStoredAiPlan(stored: StoredAiPlan, hasUser: boolean): Promise<void> {
   writeLocal(stored);
+  window.dispatchEvent(new Event('forge-ai-plan-changed'));
   if (isDemoMode || !hasUser) return;
   try {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
     await supabase.from('training_plans').upsert({ owner_id: userData.user.id, payload: stored, horizon_weeks: stored.blockWeeks, generated_at: stored.generatedAt }, { onConflict: 'owner_id' });
+    /* Every block is kept — regeneration never destroys the record of what
+       the program used to prescribe. */
+    await supabase.from('training_plan_history').insert({ owner_id: userData.user.id, payload: stored, generated_at: stored.generatedAt });
   } catch { /* local copy still stands */ }
 }
 

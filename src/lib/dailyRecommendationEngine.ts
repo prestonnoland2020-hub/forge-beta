@@ -79,11 +79,11 @@ const formatCardio=(session:GeneratedSession)=>session.plan.structure==='Interva
     ?`${session.plan.activity} · ${session.plan.duration||session.plan.distance} ${session.plan.duration?'min':session.plan.distanceUnit||''} · ${session.plan.pace||'controlled effort'}`
     :`${session.title} · ${session.plan.rounds||1} rounds`;
 
-export function recommendationFingerprint(input:Omit<EngineInput,'recovery'|'profile'|'runningHistory'|'loadBiasPercent'> & {cycleRevision?:number;loadBiasPercent:number}){
+export function recommendationFingerprint(input:Omit<EngineInput,'recovery'|'profile'|'runningHistory'|'loadBiasPercent'> & {cycleRevision?:number;loadBiasPercent:number;aiPlanStamp?:string}){
   const history=input.records.slice(0,120).map(record=>[record.id,record.date,(record.topSets||[]).map(set=>[set.lift,set.weight,set.reps,set.completed]),(record.cardioSessions||[]).map(session=>[session.id,session.summary])]);
   const goals=input.goals.map(goal=>[goal.type,goal.title,goal.target,goal.date,goal.exercise]);
   const library=input.exercises.filter(exercise=>exercise.enabled).map(exercise=>[exercise.id,exercise.name,exercise.kind,exercise.muscles,exercise.detail]);
-  return stableHash(JSON.stringify([DAILY_RECOMMENDATION_VERSION,input.date,input.splitDay,input.cycleRevision||0,input.loadBiasPercent,history,goals,library]));
+  return stableHash(JSON.stringify([DAILY_RECOMMENDATION_VERSION,input.date,input.splitDay,input.cycleRevision||0,input.loadBiasPercent,input.aiPlanStamp||'',history,goals,library]));
 }
 
 export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:string}):DailyRecommendation{

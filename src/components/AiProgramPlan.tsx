@@ -5,6 +5,7 @@ import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
+import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { isDemoMode } from '../lib/env';
 import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
 import {
@@ -30,13 +31,22 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    split-day name), but two hard guards run regardless of what the AI said:
    the quality session never lands on a lower-body day, and if the AI chose
    one anyway it is relocated to the best non-lower day of the week. */
-function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly'): Session[] {
+function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }): Session[] {
   const cycle = splitDays.length ? splitDays : [{ name: 'Training', dayType: 'strength' }];
   const start = new Date(`${startIso}T12:00:00`); start.setDate(start.getDate() + weekIndex * 7);
+  /* The rotation is anchored to the LIVE split cursor: today shows the day
+     that is actually due (completion-driven — missed days hold it in place),
+     and every other date extends from there. Date arithmetic is only the
+     fallback when no cursor is available. */
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const todayAbsolute = Math.floor(today.getTime() / 86400000);
+  const anchorIndex = anchor ? cycle.findIndex((_, index) => index + 1 === anchor.position) : -1;
   const dayInfos = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(start); date.setDate(start.getDate() + index);
     const absoluteDay = Math.floor(date.getTime() / 86400000);
-    const cycleIndex = rhythm === 'rolling' ? ((absoluteDay % cycle.length) + cycle.length) % cycle.length : index % cycle.length;
+    const cycleIndex = rhythm !== 'rolling' ? index % cycle.length
+      : anchorIndex >= 0 ? (((anchorIndex + (absoluteDay - todayAbsolute)) % cycle.length) + cycle.length) % cycle.length
+      : ((absoluteDay % cycle.length) + cycle.length) % cycle.length;
     const day = cycle[cycleIndex];
     const topSet = (week.topSets || []).find(set => set.splitDay === day.name);
     return { date, day, topSet, lower: isLowerBodyDay(day, topSet) };
@@ -78,6 +88,8 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
 export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', minWeeklyMileage, maxWeeklyMileage }: { goals: CreatedGoal[]; profile: AdaptiveProfile; splitDays: SplitDay[]; rhythm?: 'rolling' | 'weekly'; minWeeklyMileage: number; maxWeeklyMileage: number }) {
   const { records } = useWorkoutHistory();
   const { user } = useAuth();
+  const { recommendation } = useDailyRecommendation();
+  const anchor = recommendation ? { position: recommendation.splitDay.position } : undefined;
   const [stored, setStored] = useState<StoredAiPlan | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -151,7 +163,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const { plan } = stored;
   const weekIndex = currentWeekIndex(stored);
   const week = plan.weeks[weekIndex];
-  const sessions = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm);
+  const sessions = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor);
   const strengthGoal = goals.find(goal => goal.type === 'Strength');
   const generatedLabel = new Date(stored.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const headline = (item: AiPlanWeek) => { const sets = [...(item.topSets || [])]; const goalSet = sets.find(set => strengthGoal && (set.exercise === strengthGoal.exercise || (strengthGoal.exercise || '').toLowerCase().includes(set.exercise.toLowerCase()))); const lead = goalSet || sets.sort((a, b) => epley(b.weight, b.reps) - epley(a.weight, a.reps))[0]; return lead; };
@@ -170,7 +182,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
             <span className="roadmap-run">{item.quality}</span>
             <span className="roadmap-set">{lead ? <><b>{epley(lead.weight, lead.reps)} max</b><small>{lead.exercise} {lead.weight}×{lead.reps}</small></> : '—'}</span>
           </button>
-          {openWeek === item.week && <div className="roadmap-days">{aiWeekSessions(item, stored.startDate, index, splitDays, rhythm).map(session => <div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US', { weekday: 'short' })}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
+          {openWeek === item.week && <div className="roadmap-days">{aiWeekSessions(item, stored.startDate, index, splitDays, rhythm, anchor).map(session => <div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US', { weekday: 'short' })}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
         </div>; })}</div>
       <small className="roadmap-note">Built from your goals, split, logged bests, and real paces. The next block generates itself from what you actually log.</small></section>
   </div>;

@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useAuth } from '../auth/AuthProvider';
+import { loadAthleteSettings, saveAthleteSettings } from '../profile/settingsSync';
 
 /* Appearance = one complete UI package. No sliders, no mixing: a package sets
    palette, type, shape, and chrome together, so every choice ships as a
@@ -52,11 +54,25 @@ function applyToRoot(settings: AppearanceSettings) {
 }
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  /* Captured BEFORE the persist effect writes a default — "fresh device"
+     means no stored choice existed at mount, not at effect time. */
+  const hadLocalChoice = useRef(Boolean(localStorage.getItem(storageKey)));
   const [settings, setSettings] = useState<AppearanceSettings>(readSettings);
   useEffect(() => { applyToRoot(settings); localStorage.setItem(storageKey, JSON.stringify(settings)); }, [settings]);
+  /* Fresh device: no local choice saved yet — adopt the synced one. */
+  useEffect(() => {
+    if (!user || hadLocalChoice.current) return;
+    let active = true;
+    void loadAthleteSettings().then(remote => {
+      const pkg = (remote?.appearance as { package?: unknown } | undefined)?.package;
+      if (active && isPackage(pkg)) setSettings({ package: pkg });
+    });
+    return () => { active = false; };
+  }, [user]);
   const value = useMemo(() => ({
     settings,
-    setPackage: (pkg: UiPackage) => setSettings({ package: pkg }),
+    setPackage: (pkg: UiPackage) => { setSettings({ package: pkg }); saveAthleteSettings({ appearance: { package: pkg } }); },
     reset: () => setSettings({ package: 'forge' }),
   }), [settings]);
   return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>;

@@ -64,11 +64,12 @@ const planSchema = {
 
 const planInstructions = `You are Forge's program builder. Build ONE coherent multi-week training program from the athlete's verified data: their goals, their split (with the exercises they mapped to each day), their logged bests, and their actual logged running.
 
-STRENGTH RULES
+STRENGTH RULES — THE 8/6/4/2 WAVE (Forge's fixed progression system)
 - Every strength or mixed split day that has mapped exercises gets exactly one top-set prescription per week, using ONLY exercises from that day's mapped list. Use the day's exact name in splitDay.
-- Loads must TREND UPWARD week over week toward the strength goal — the athlete gets stronger, never weaker. Deload weeks may drop volume/intensity ~7-10% once every 4th week, then the next week resumes ABOVE the pre-deload load.
-- WEEK 1 BASELINE: for each lift, the implied estimated max (weight × (1 + reps/30)) must be AT OR ABOVE the athlete's logged best implied max for that lift — convert their best to the prescribed rep count (logged 405×8 ≈ 513 max → a 6-rep prescription opens at ~425, never 405). Progress ~0.5-1.5% per week on big lifts. Round to 5 lb.
-- Rep targets may wave (e.g. 8s early, 5-6s mid, 3s late for a 1RM goal) but the estimated max implied by weight×reps must rise steadily toward the goal by its deadline. Never prescribe a set implying a LOWER max than the previous non-deload week.
+- Reps cycle in 4-week waves: week 1 of a wave = 8 reps, week 2 = 6, week 3 = 4, week 4 = MAX WEEK at 2 reps.
+- Weeks 1-3: weight = the wave's target max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded to 5 lb — the same implied max expressed across 8s, 6s, and 4s. The wave's target max for wave 1 is the athlete's logged best calculated max for that lift.
+- MAX WEEK (every 4th week): a 2-rep attempt implying the wave's target max PLUS 5-10 lb — the athlete attempts a new PR. Strength volume is low that week, which pairs with the running deload.
+- Each subsequent wave re-anchors: its target max = previous wave's attempt (5-10 lb above the one before). The athlete gets stronger every wave; never prescribe a set implying a max below the logged best.
 
 RUNNING RULES
 - Scale weekly mileage from the athlete's CURRENT logged weekly volume toward what the endurance goal requires, growing at most ~8-10% per week, within the athlete's stated min/max weekly mileage. Deload weeks cut mileage ~20%.
@@ -96,6 +97,12 @@ Deno.serve(async request => {
     const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData.user) throw new Error('Authentication required.');
     const body = await request.json();
+    /* Cooldown: a block was just generated — refuse rapid regeneration so a
+       stuck client or refresh-mashing cannot burn provider credits. */
+    const { data: existingPlan } = await userClient.from('training_plans').select('generated_at').maybeSingle();
+    if (existingPlan?.generated_at && Date.now() - new Date(existingPlan.generated_at).getTime() < 120000) {
+      return Response.json({ error: 'Your program was just generated. Wait a couple of minutes before refreshing again.' }, { status: 429, headers: corsHeaders });
+    }
     const context = JSON.stringify(body.context || {}).slice(0, 30000);
     const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userData.user.id));
     const safetyIdentifier = Array.from(new Uint8Array(identifierBytes)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -119,24 +126,28 @@ Deno.serve(async request => {
     if (!text) throw new Error('The plan service returned nothing.');
     const plan = JSON.parse(text);
     if (!Array.isArray(plan.weeks) || !plan.weeks.length) throw new Error('The plan service returned no weeks.');
-    /* Deterministic guarantee — "stronger, never weaker" is enforced in code,
-       not left to the model: every prescription's implied max is floored at the
-       athlete's logged best for that lift, and each non-deload week must edge
-       past the previous non-deload week. Deloads may dip ~8%. */
+    /* Forge's 8/6/4/2 wave is DETERMINISTIC — for every lift with a logged
+       best, reps and weights are computed here, not trusted to the model:
+       weeks 1-3 of each 4-week wave express the wave's target max at 8, 6,
+       then 4 reps (inverse Epley, rounded to 5); week 4 is the max week — a
+       2-rep attempt implying target + 7.5 lb (a 5-10 lb PR attempt). Each
+       wave re-anchors to the previous wave's attempt. Lifts with no logged
+       best keep the model's prescription. */
     const bests = ((body.context || {}).loggedBests || {}) as Record<string, number>;
-    const implied = (weight: number, reps: number) => weight * (1 + reps / 30);
     const weightFor = (max: number, reps: number) => Math.max(5, Math.ceil(max / (1 + reps / 30) / 5) * 5);
-    const lastMax: Record<string, number> = {};
-    for (const week of plan.weeks) {
-      const deload = week.phase === 'Deload' || week.phase === 'Taper';
+    const WAVE_REPS = [8, 6, 4, 2];
+    const PR_BUMP = 7.5;
+    plan.weeks.forEach((week: { topSets?: Array<{ exercise: string; weight: number; reps: number }> }, index: number) => {
+      const wave = Math.floor(index / 4);
+      const slot = index % 4;
       for (const set of (week.topSets || [])) {
         const logged = Number(bests[set.exercise]) || 0;
-        const previous = lastMax[set.exercise] || 0;
-        const floor = Math.max(logged, previous) * (deload ? 0.92 : previous ? 1.004 : 1);
-        if (floor && implied(set.weight, set.reps) < floor) set.weight = weightFor(floor, set.reps);
-        if (!deload) lastMax[set.exercise] = Math.max(previous, implied(set.weight, set.reps));
+        if (!logged) continue;
+        const waveTarget = logged + PR_BUMP * wave;
+        set.reps = WAVE_REPS[slot];
+        set.weight = slot === 3 ? weightFor(waveTarget + PR_BUMP, 2) : weightFor(waveTarget, WAVE_REPS[slot]);
       }
-    }
+    });
     return Response.json({ plan }, { headers: corsHeaders });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Plan generation failed.' }, { status: 400, headers: corsHeaders });
