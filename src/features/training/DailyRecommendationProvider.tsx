@@ -9,7 +9,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex } from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot } from './aiPlanService';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void};
 const Context=createContext<Value|null>(null);
@@ -45,13 +45,21 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const week=storedPlan.plan.weeks[currentWeekIndex(storedPlan)];
     const match=week?.topSets?.find(set=>set.splitDay===generatedBase.splitDay.name);
     if(!match)return generatedBase;
+    /* Live wave numbers: the program stores the block, but today's weight
+       always derives from the CURRENT logged best — a PR yesterday raises
+       today; a miss holds the wave in place. */
+    const weekIdx=currentWeekIndex(storedPlan);
+    let liveBest=0;records.forEach(record=>(record.topSets||[]).forEach(set=>{if(set.completed===false||set.lift!==match.exercise||!set.weight)return;const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));if(max>liveBest)liveBest=max}));
+    const metric=Boolean(setup?.units==='Metric');
+    const live=liveBest?wavePrescription(liveBest,weekIdx,metric):{weight:match.weight,reps:match.reps,isMax:waveSlot(weekIdx).isMax};
+    const slotLabel=live.isMax?'MAX WEEK — PR attempt':`${live.reps}-rep week`;
     let applied=false;
     const topSets=generatedBase.topSets.map(set=>{
       if(applied)return set;
       const isMatch=set.exercise===match.exercise||!generatedBase.topSets.some(other=>other.exercise===match.exercise)&&set===generatedBase.topSets[0];
       if(!isMatch)return set;
       applied=true;
-      return{...set,exercise:match.exercise,weight:match.weight,reps:match.reps,calculatedMax:Math.round(match.weight*(1+match.reps/30)),rationale:`Week ${week.week} of your program (${week.phase}).`};
+      return{...set,exercise:match.exercise,weight:live.weight,reps:live.reps,calculatedMax:Math.round(live.weight*(1+live.reps/30)),rationale:liveBest?`8/6/4/2 wave · week ${week.week} (${slotLabel}) · from your best calc max ${liveBest}.`:`Week ${week.week} of your program (${week.phase}).`};
     });
     return{...generatedBase,topSets};
   },[generatedBase,aiPlanStamp]); // eslint-disable-line react-hooks/exhaustive-deps

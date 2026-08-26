@@ -69,7 +69,7 @@ STRENGTH RULES — THE 8/6/4/2 WAVE (Forge's fixed progression system)
 - Reps cycle in 4-week waves: week 1 of a wave = 8 reps, week 2 = 6, week 3 = 4, week 4 = MAX WEEK at 2 reps.
 - Weeks 1-3: weight = the wave's target max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded to 5 lb — the same implied max expressed across 8s, 6s, and 4s. The wave's target max for wave 1 is the athlete's logged best calculated max for that lift.
 - MAX WEEK (every 4th week): a 2-rep attempt implying the wave's target max PLUS 5-10 lb — the athlete attempts a new PR. Strength volume is low that week, which pairs with the running deload.
-- Each subsequent wave re-anchors: its target max = previous wave's attempt (5-10 lb above the one before). The athlete gets stronger every wave; never prescribe a set implying a max below the logged best.
+- Every wave anchors to the athlete's CURRENT logged best — a new wave only rises once the previous max attempt is actually logged. Never prescribe a set implying a max below the logged best.\n- Use the athlete's unit system (context.units): pounds in 5 lb steps, or kilograms in 2.5 kg steps; running in miles and /mi pace, or kilometers and /km pace.
 
 RUNNING RULES
 - Scale weekly mileage from the athlete's CURRENT logged weekly volume toward what the endurance goal requires, growing at most ~8-10% per week, within the athlete's stated min/max weekly mileage. Deload weeks cut mileage ~20%.
@@ -134,18 +134,22 @@ Deno.serve(async request => {
        wave re-anchors to the previous wave's attempt. Lifts with no logged
        best keep the model's prescription. */
     const bests = ((body.context || {}).loggedBests || {}) as Record<string, number>;
-    const weightFor = (max: number, reps: number) => Math.max(5, Math.ceil(max / (1 + reps / 30) / 5) * 5);
+    const metric = String((body.context || {}).units || '').toLowerCase() === 'metric';
+    const step = metric ? 2.5 : 5;
+    const bump = metric ? 3.75 : 7.5;
+    const weightFor = (max: number, reps: number) => Math.max(step, Math.ceil(max / (1 + reps / 30) / step) * step);
     const WAVE_REPS = [8, 6, 4, 2];
-    const PR_BUMP = 7.5;
+    /* Every wave anchors to the athlete's CURRENT best — never a projected
+       ramp that assumes success. The client recomputes these same numbers
+       live as new bests are logged, so a PR raises the wave and a miss holds
+       it, and the block regenerates when the baseline is outgrown. */
     plan.weeks.forEach((week: { topSets?: Array<{ exercise: string; weight: number; reps: number }> }, index: number) => {
-      const wave = Math.floor(index / 4);
       const slot = index % 4;
       for (const set of (week.topSets || [])) {
         const logged = Number(bests[set.exercise]) || 0;
         if (!logged) continue;
-        const waveTarget = logged + PR_BUMP * wave;
         set.reps = WAVE_REPS[slot];
-        set.weight = slot === 3 ? weightFor(waveTarget + PR_BUMP, 2) : weightFor(waveTarget, WAVE_REPS[slot]);
+        set.weight = slot === 3 ? weightFor(logged + bump, 2) : weightFor(logged, WAVE_REPS[slot]);
       }
     });
     return Response.json({ plan }, { headers: corsHeaders });

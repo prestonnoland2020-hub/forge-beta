@@ -72,6 +72,23 @@ export async function generateAiPlan(context: Record<string, unknown>): Promise<
   return data.plan as AiPlan;
 }
 
+/* ── The 8/6/4/2 wave, shared by every surface ────────────────────────────
+   Weeks cycle 8 → 6 → 4 → 2(max attempt). Weights always derive from the
+   athlete's CURRENT best calculated max, so the plan reacts to what they
+   actually log: beat a prescription and everything scales up; miss one and
+   the wave holds steady instead of assuming progress. Max week attempts the
+   PR + ~5-10 lb (2.5 kg steps for metric athletes). */
+export const WAVE_REPS = [8, 6, 4, 2] as const;
+export const waveSlot = (weekIndex: number) => ({ reps: WAVE_REPS[weekIndex % 4], isMax: weekIndex % 4 === 3 });
+export function wavePrescription(best: number, weekIndex: number, metric = false): { weight: number; reps: number; isMax: boolean } {
+  const step = metric ? 2.5 : 5;
+  const bump = metric ? 3.75 : 7.5;
+  const { reps, isMax } = waveSlot(weekIndex);
+  const target = isMax ? best + bump : best;
+  const weight = Math.max(step, Math.ceil(target / (1 + reps / 30) / step) * step);
+  return { weight, reps, isMax };
+}
+
 /* How many plan weeks remain from today. Week 1 starts at startDate. */
 export const weeksRemaining = (stored: StoredAiPlan): number => {
   const start = new Date(`${stored.startDate}T12:00:00`).getTime();

@@ -1184,3 +1184,32 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .strava-review-reflection{color:var(--ink-2);font-size:12px;line-height:1.45;border-left:2px solid var(--accent);padding-left:10px}
 .strava-review footer{display:flex;gap:10px;flex-wrap:wrap}
 .strava-review footer .button{flex:1;min-width:150px}
+
+/* ═══ PLAN · baseline kickoff + generation narration (overnight batch) ═══ */
+.baseline-kickoff{display:grid;gap:11px;justify-items:start}
+.baseline-kickoff h3{margin:0;font:800 20px var(--display)}
+.baseline-kickoff p{margin:0;color:var(--ink-2);font-size:13px;line-height:1.55;max-width:56ch}
+.baseline-items{display:grid;width:100%;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
+.baseline-items>div{display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid var(--hairline);font-size:13px;line-height:1.4}
+.baseline-items>div:last-child{border-bottom:0}
+.baseline-items b{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:50%;border:1.5px solid var(--hairline-strong);font-size:12px;color:var(--ink-3)}
+.baseline-items .done b{color:var(--accent-ink,#101410);background:var(--accent);border-color:var(--accent)}
+.baseline-items .done span{color:var(--ink-3);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink-3) 55%,transparent)}
+.plan-generating-eta{color:var(--ink-3);font-size:11.5px}
+.ai-program-adjusted{color:var(--accent);font-size:11px;font-weight:700}
+
+/* ═══ Voice + why-this-number (overnight batch) ═══ */
+.topset-philosophy{display:block;margin-top:5px;color:var(--ink-3);font-size:11.5px;line-height:1.5;max-width:52ch}
+.wave-explainer summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none}
+.wave-explainer summary::-webkit-details-marker{display:none}
+.wave-explainer summary>div{display:grid;gap:3px;min-width:0}
+.wave-explainer summary strong{font:800 14px/1.3 var(--display)}
+.wave-explainer summary>b{flex:none;color:var(--ink-3);font-weight:600}
+.wave-explainer[open] summary>b{transform:rotate(45deg)}
+.wave-explainer-body{display:grid;gap:9px;margin-top:11px}
+.wave-explainer-body>div{display:flex;gap:11px;align-items:flex-start}
+.wave-explainer-body b{flex:none;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font-size:11px;font-weight:900}
+.wave-explainer-body p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.wave-explainer-body p strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.second-session-hint{display:block;color:var(--ink-3);font-size:11px;line-height:1.5;margin-top:2px}
+.completed-day-card footer{flex-wrap:wrap}
