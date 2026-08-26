@@ -7,7 +7,6 @@ import { useDailyRecommendation } from '../features/training/DailyRecommendation
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { StravaActivityReview } from '../components/StravaActivityReview';
 import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
-import { WeekPulse } from '../components/WeekPulse';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
 
@@ -84,7 +83,6 @@ export function HomePage() {
       <footer><Link className="button" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} →</Link><button className="feed-coach-button" onClick={() => openCoachBubble('Explain today’s workout briefly and tell me the one thing that matters most.')}>Ask Forge</button></footer>
     </section>}
 
-    <WeekPulse />
 
     <section className="feed-support-grid" aria-label="Training overview">
       <article className="feed-card compact-card"><header><span>LAST ACTIVITY</span><Link to="/history">View all</Link></header>{priorWorkout ? <><div className="compact-activity"><span className="feed-icon muted-icon">✓</span><div><strong>{priorWorkout.title}</strong><small>{shortDate(priorWorkout.date)} · {priorWorkout.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Cardio'}</small></div></div><div className="compact-result-list">{priorSets.slice(0, 2).map(set => <div key={set.id || `${set.lift}-${set.weight}-${set.reps}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}{priorWorkout.cardioSessions?.slice(0, 2).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}</div></> : <p className="feed-empty-copy">Nothing logged yet.</p>}</article>

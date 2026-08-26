@@ -1342,3 +1342,20 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 @media(max-width:900px){
   .muscle-groups-section .muscle-chip{padding:8px 13px;font-size:12px}
 }
+
+/* ======================================== history: the selected day, compact
+   The day preview sat below the week chart with a full-width "Edit day" button
+   taller than the results it introduced. It belongs directly under the
+   calendar — you tap a date, you read that date — and it only needs to be big
+   enough to show a couple of top sets. The mobile pass had stacked its header
+   and stretched the button edge to edge; here it stays a row with the action
+   at its natural size. */
+.compact-day-preview{gap:9px}
+.compact-day-preview>header{flex-direction:row;align-items:center;gap:12px}
+.compact-day-preview>header h2{font-size:17px;margin:1px 0 0}
+.compact-day-preview>header .eyebrow{font-size:9.5px}
+.compact-day-preview>header .button{width:auto;min-height:38px;padding:0 15px;font-size:12.5px;white-space:nowrap}
+.compact-day-preview>p{font-size:12.5px;margin:0}
+.compact-day-preview .recommendation-lineage{font-size:10.5px;line-height:1.4}
+.compact-day-preview .simple-preview-results>div{padding:8px 12px;font-size:12.5px}
+.compact-day-preview .selected-day-notes{font-size:12px}
