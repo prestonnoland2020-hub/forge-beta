@@ -11,7 +11,7 @@ import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, type AiPlanWeek, type StoredAiPlan,
+  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, type AiPlanWeek, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -70,14 +70,31 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     const poolIndex = easyPool.indexOf(info.day.name);
     if (poolIndex >= 0) { easyPool.splice(poolIndex, 1); easySet.add(index); }
   });
+  /* Pass 1.5 — one attempt per lift per max week. A rolling split can hit the
+     same day three times in seven days, which prescribed the same 1RM attempt
+     three times over. The attempt goes to that lift's cleanest session — no
+     long run, no quality work — and the day's other appearances drop back to
+     the heavy double the lift already earned. */
+  const attemptIndex = new Map<string, { index: number; cost: number }>();
+  dayInfos.forEach((info, index) => {
+    if (!info.topSet || info.topSet.reps !== 1 || !info.topSet.hold) return;
+    const cost = (index === longIndex ? 2 : 0) + (index === qualityIndex ? 3 : 0) + (easySet.has(index) ? 1 : 0);
+    const held = attemptIndex.get(info.topSet.exercise);
+    if (!held || cost < held.cost) attemptIndex.set(info.topSet.exercise, { index, cost });
+  });
   /* Pass 2 — render sessions. */
-  return dayInfos.map(({ date, day, topSet }, index) => {
+  return dayInfos.map(({ date, day, topSet: rawTopSet }, index) => {
+    const demoted = rawTopSet?.reps === 1 && rawTopSet.hold && attemptIndex.get(rawTopSet.exercise)?.index !== index;
+    const topSet = demoted && rawTopSet?.hold ? { ...rawTopSet, ...rawTopSet.hold } : rawTopSet;
     const type = day.dayType.toLowerCase();
     let runText = ''; let runKind = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
     if (index === longIndex) { runKind = 'Long run'; runText = `${week.longRunMiles} ${distanceUnit} @ ${week.longRunPace}`; runStress = 'Moderate'; }
     else if (index === qualityIndex) { runKind = 'Quality'; runText = `${week.quality}${week.qualityPace ? ` @ ${week.qualityPace}` : ''}`; runStress = 'High'; }
     else if (easySet.has(index)) { runKind = 'Easy run'; runText = `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`; runStress = 'Low'; }
-    const strengthText = topSet ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${topSet.exercise}: ${topSet.weight} × ${topSet.reps}` : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
+    const strengthText = topSet
+      ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${topSet.exercise}: ${topSet.weight} × ${topSet.reps}`
+        + (topSet.optionalMax ? ` · optional max ${topSet.optionalMax} × 1 if you're fresh` : '')
+      : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
     if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const };
     if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const };
     if (strengthText) return { date, kind: type === 'mixed' ? 'Mixed' : 'Strength', title: day.name, detail: strengthText, stress: 'Moderate' as const };
@@ -116,6 +133,12 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const bests = useMemo(() => { const map = new Map<string, number>(); records.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false || !set.lift || !set.weight) return; const max = set.calculatedMax || epley(set.weight, set.reps); if (max > (map.get(set.lift) || 0)) map.set(set.lift, max); })); return map; }, [records]);
   /* True logged singles — Real 1RMs — anchor max-week attempts directly. */
   const bestSingles = useMemo(() => { const map = new Map<string, number>(); records.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false || !set.lift || !set.weight || set.reps !== 1) return; if (set.weight > (map.get(set.lift) || 0)) map.set(set.lift, set.weight); })); return map; }, [records]);
+  /* Max week is tied to GOALS: only a lift with a Real 1RM goal owes a tested
+     single, because that is the only set the goal can register. Everything
+     else holds the double and offers the attempt. No strength goal at all and
+     every lift tests, or a calc max would never convert into a real one. */
+  const goalLifts = useMemo(() => goalLiftNames(goals), [goals]);
+  const testsThisBlock = (exercise: string) => goalLifts.size === 0 || goalLifts.has(exercise);
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */
@@ -191,6 +214,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
            redeployed function still reads them. */
         calcMaxes: Object.fromEntries(bests),
         realOneRepMaxes: Object.fromEntries(bestSingles),
+        goalLifts: [...goalLifts],
         loggedBests: Object.fromEntries(bests),
         loggedSingles: Object.fromEntries(bestSingles),
         recentRuns,
@@ -270,9 +294,12 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       topSets: (item.topSets || []).map(set => {
         const best = bests.get(set.exercise);
         if (!best) return set;
-        const live = wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0);
+        const live = wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, testsThisBlock(set.exercise));
         if (live.weight !== set.weight || live.reps !== set.reps) liveAdjusted = true;
-        return { ...set, weight: live.weight, reps: live.reps };
+        /* On a max week a tested lift also carries the double it falls back to
+           when the split hits that day more than once in the same week. */
+        const hold = live.reps === 1 ? wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, false) : undefined;
+        return { ...set, weight: live.weight, reps: live.reps, optionalMax: live.optionalMax, hold: hold && { weight: hold.weight, reps: hold.reps, optionalMax: hold.optionalMax } };
       }),
     })),
   };
@@ -302,18 +329,26 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       const maxIndexes = plan.weeks.map((_, index) => index).filter(index => index % 5 === 4);
       const nextMax = maxIndexes.find(index => index >= weekIndex) ?? maxIndexes[maxIndexes.length - 1];
       if (nextMax === undefined) return null;
-      const attempt = wavePrescription(best, nextMax, metric, bestSingles.get(lead.exercise) || 0);
+      const attempt = wavePrescription(best, nextMax, metric, bestSingles.get(lead.exercise) || 0, true);
       const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const maxWeekDate = (() => { const date = new Date(`${stored.startDate}T12:00:00`); date.setDate(date.getDate() + nextMax * 7); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })();
-      return <section className="card max-ledger">
-        <header><span className="eyebrow">{lead.exercise.toUpperCase()} · WHAT THIS BLOCK IS FOR</span><h3>Turning a calculated max into a real one</h3></header>
-        <div className="ledger-rail">
-          <div><span>Calc max now</span><strong>{best} {unit}</strong><small>{source ? `estimated from ${source.weight} × ${source.reps} on ${shortDate(source.date)}` : 'from your best logged set'}</small></div>
-          <div><span>Real 1RM on record</span><strong className={single ? '' : 'ledger-empty'}>{single ? `${single.weight} ${unit}` : 'None yet'}</strong><small>{single ? `logged ${shortDate(single.date)}` : 'no single logged for this lift'}</small></div>
-          <div className="ledger-target"><span>Max week attempt</span><strong>{attempt.weight} × 1</strong><small>week {nextMax + 1} · {maxWeekDate}</small></div>
+      /* When the calc max came from a single, it IS the real 1RM — the two
+         tiles show the same number, and calling that number "estimated" is
+         wrong. Say it was measured instead, so the match reads as agreement
+         rather than as a duplicated row. */
+      const measured = source?.reps === 1;
+      return <details className="card max-ledger">
+        <summary><div><span className="eyebrow">{lead.exercise.toUpperCase()} · WHAT THIS BLOCK IS FOR</span><strong>Calc max {best} {unit} → max week {attempt.weight} × 1</strong></div><b>＋</b></summary>
+        <div className="max-ledger-body">
+          <h3>Turning a calculated max into a real one</h3>
+          <div className="ledger-rail">
+            <div><span>Calc max now</span><strong>{best} {unit}</strong><small>{!source ? 'from your best logged set' : measured ? `measured — a real single on ${shortDate(source.date)}, not an estimate` : `estimated from ${source.weight} × ${source.reps} on ${shortDate(source.date)}`}</small></div>
+            <div><span>Real 1RM on record</span><strong className={single ? '' : 'ledger-empty'}>{single ? `${single.weight} ${unit}` : 'None yet'}</strong><small>{single ? `logged ${shortDate(single.date)}` : 'no single logged for this lift'}</small></div>
+            <div className="ledger-target"><span>Max week attempt</span><strong>{attempt.weight} × 1</strong><small>week {nextMax + 1} · {maxWeekDate}</small></div>
+          </div>
+          <p>Weeks 1–4 train at what your <strong>{best} {unit}</strong> calculated max says you can already handle — the same max expressed at 8, 6, 4, then 2 reps. Max week cashes it in: {single ? <>a single above your real <strong>{single.weight} {unit}</strong>.</> : <>your first real single on this lift.</>} A logged single is the only set a Real 1RM goal counts, and it raises the calc max the next wave anchors to.</p>
         </div>
-        <p>Weeks 1–4 train at what your <strong>{best} {unit}</strong> calculated max says you can already handle — the same estimate expressed at 8, 6, 4, then 2 reps. Max week cashes it in: {single ? <>a single above your real <strong>{single.weight} {unit}</strong>.</> : <>your first real single on this lift.</>} A logged single is the only set a Real 1RM goal counts, and it raises the calc max the next wave anchors to.</p>
-      </section>;
+      </details>;
     })()}
     {(() => {
       const lead = headline(week);
@@ -323,7 +358,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       const unit = metric ? 'kg' : 'lb';
       return <details className="card wave-explainer"><summary><div><span className="eyebrow">WHY THESE NUMBERS</span><strong>How Forge computed {lead.exercise} {lead.weight} × {lead.reps}</strong></div><b>＋</b></summary><div className="wave-explainer-body">
         <div><b>1</b><p>Your best logged {lead.exercise} implies a calculated max of <strong>{best} {unit}</strong> (weight × (1 + reps ÷ 30)).</p></div>
-        <div><b>2</b><p>This is {slot.isMax ? <>the <strong>max week</strong> — a true <strong>1RM attempt</strong> ~5–10 {unit} above your last PR</> : <>an <strong>{slot.reps}-rep week</strong> of the 8/6/4/2/1 wave — the same max expressed at {slot.reps} reps</>}.</p></div>
+        <div><b>2</b><p>This is {slot.isMax && testsThisBlock(lead.exercise) ? <>the <strong>max week</strong> — a true <strong>1RM attempt</strong> ~5–10 {unit} above your last PR</> : slot.isMax ? <>the <strong>max week</strong>, but {lead.exercise} has no Real 1RM goal, so it holds a <strong>heavy double</strong> rather than spending a test it doesn't owe — the single is offered if you're fresh</> : <>an <strong>{slot.reps}-rep week</strong> of the 8/6/4/2/1 wave — the same max expressed at {slot.reps} reps</>}.</p></div>
         <div><b>3</b><p>That converts to <strong>{lead.weight} × {lead.reps}</strong>. Beat it and every number rises with your new best; miss it and the wave holds instead of assuming progress. The week after a max attempt stays at your current numbers until the new PR is actually logged — then the whole wave steps up.</p></div>
       </div></details>;
     })()}

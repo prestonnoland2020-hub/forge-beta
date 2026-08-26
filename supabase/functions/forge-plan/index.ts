@@ -71,9 +71,10 @@ TWO DIFFERENT NUMBERS — NEVER CONFLATE THEM
 
 STRENGTH RULES — THE 8/6/4/2/1 WAVE (Forge's fixed progression system)
 - Every strength or mixed split day that has mapped exercises gets exactly one top-set prescription per week, using ONLY exercises from that day's mapped list. Use the day's exact name in splitDay.
-- Reps cycle in 5-WEEK waves: week 1 = 8 reps, week 2 = 6, week 3 = 4, week 4 = 2, week 5 = MAX WEEK: a true 1-REP MAX ATTEMPT.
+- Reps cycle in 5-WEEK waves: week 1 = 8 reps, week 2 = 6, week 3 = 4, week 4 = 2, week 5 = MAX WEEK.
 - Weeks 1-4: weight = the athlete's current CALCULATED max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded — the same calculated max expressed across 8s, 6s, 4s, and 2s.
-- MAX WEEK (every 5th week): a 1-rep attempt 5-10 lb above the athlete's real 1RM for that lift (context.realOneRepMaxes when present); with no real single on record, the attempt is set just under the calculated max, because that estimate is the best evidence of what they can hold once.
+- MAX WEEK IS TIED TO GOALS. Only a lift named in context.goalLifts — a lift the athlete holds a Real 1RM goal on — takes a tested single, because a logged single is the only set that goal can register. It gets a 1-rep attempt 5-10 lb above its real 1RM (context.realOneRepMaxes when present); with no real single on record the attempt sits just under the calculated max, the best evidence of what they can hold once.
+- Every OTHER lift on max week stays at 2 reps — a heavy double it already earned — rather than spending a testing session it does not owe. Six tested singles in one week is not a max week. If context.goalLifts is empty, every lift tests, or a calculated max would never convert into a real one.
 - Every wave anchors to the athlete's CURRENT calculated max — a new wave only rises once a heavier set is actually logged. Never prescribe a set implying a max below the calculated max.\n- Use the athlete's unit system (context.units): pounds in 5 lb steps, or kilograms in 2.5 kg steps; running in miles and /mi pace, or kilometers and /km pace.
 
 RUNNING RULES
@@ -119,7 +120,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: 'forge-plan-v2',
+        prompt_cache_key: 'forge-plan-v3',
         reasoning: { effort: 'medium' },
         text: { verbosity: 'low', format: { type: 'json_schema', name: 'forge_program', strict: true, schema: planSchema } },
         instructions: planInstructions,
@@ -140,6 +141,12 @@ Deno.serve(async request => {
        the previous key names. */
     const bests = ((context_.calcMaxes || context_.loggedBests || {})) as Record<string, number>;
     const singles = ((context_.realOneRepMaxes || context_.loggedSingles || {})) as Record<string, number>;
+    /* Max week belongs to the lifts the athlete holds a Real 1RM goal on —
+       a tested single is the only set that goal can register, and nothing
+       else owes one. An empty list means no strength goal exists yet, so
+       everything tests rather than nothing ever converting. */
+    const goalLifts = new Set((Array.isArray(context_.goalLifts) ? context_.goalLifts : []).map(String));
+    const tests = (exercise: string) => goalLifts.size === 0 || goalLifts.has(exercise);
     const metric = String(context_.units || '').toLowerCase() === 'metric';
     const step = metric ? 2.5 : 5;
     const bump = metric ? 3.75 : 7.5;
@@ -194,11 +201,12 @@ Deno.serve(async request => {
       for (const set of (week.topSets || [])) {
         const logged = Number(bests[set.exercise]) || 0;
         if (!logged) continue;
-        set.reps = WAVE_REPS[slot];
+        const attempt = slot === 4 && tests(set.exercise);
+        set.reps = attempt ? 1 : slot === 4 ? 2 : WAVE_REPS[slot];
         const single = Number(singles[set.exercise]) || 0;
-        set.weight = slot === 4
+        set.weight = attempt
           ? Math.max(step, Math.ceil((single ? single + bump : (logged + bump) / (1 + 1 / 30)) / step) * step)
-          : weightFor(logged, WAVE_REPS[slot]);
+          : weightFor(logged, set.reps);
       }
     });
     return Response.json({ plan }, { headers: corsHeaders });

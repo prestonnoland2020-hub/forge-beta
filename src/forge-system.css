@@ -1212,6 +1212,14 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .wave-explainer-body p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
 .wave-explainer-body p strong{color:var(--ink);font-variant-numeric:tabular-nums}
 .second-session-hint{display:block;color:var(--ink-3);font-size:11px;line-height:1.5;margin-top:2px}
+/* This card is a `44px 1fr` grid whose full-width children were each given
+   grid-column individually, so anything added later lands in the 44px check
+   column by implicit placement — the two-a-day hint wrapped one word per
+   line. Spanning is the default now; only the badge and the heading beside it
+   are column children, so the next child added here cannot hit the same trap. */
+.completed-day-card>*{grid-column:1/-1}
+.completed-day-card>.completed-day-check{grid-column:1;grid-row:1}
+.completed-day-card>.completed-day-check+div{grid-column:2/-1;grid-row:1}
 .completed-day-card footer{flex-wrap:wrap}
 .goal-exercise-hint{display:block;color:var(--ink-3);font-size:11.5px;line-height:1.45;margin-top:-4px}
 .max-week-tag{font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.09em;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:4px;padding:1px 5px}
@@ -1252,10 +1260,19 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    The plan read as arithmetic until those three numbers sat next to each
    other, so they get their own card: what the estimate is, what has actually
    been held for a single, and the attempt that bridges them. */
-.max-ledger{display:grid;gap:var(--s3)}
-.max-ledger header{display:grid;gap:2px}
-.max-ledger header h3{margin:0}
-.ledger-rail{display:grid;gap:0;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:clip}
+/* Collapsed by default: the derivation is reference material, not something
+   to scroll past every visit, so the summary carries the two numbers that
+   matter — the calc max and the attempt it is aimed at — and the working is
+   one tap away. */
+.max-ledger>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none}
+.max-ledger>summary::-webkit-details-marker{display:none}
+.max-ledger>summary>div{display:grid;gap:3px;min-width:0}
+.max-ledger>summary strong{font:800 14px/1.3 var(--display);font-variant-numeric:tabular-nums}
+.max-ledger>summary>b{flex:none;color:var(--ink-3);font-weight:600;transition:transform var(--dur) var(--ease)}
+.max-ledger[open]>summary>b{transform:rotate(45deg)}
+.max-ledger-body{display:grid;gap:var(--s3);margin-top:12px}
+.max-ledger-body h3{margin:0;font-size:15px}
+.max-ledger .ledger-rail{display:grid;gap:0;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:clip}
 .ledger-rail>div{display:grid;gap:2px;padding:11px 13px;border-bottom:1px solid var(--hairline);border-left:3px solid transparent;min-width:0}
 .ledger-rail>div:last-child{border-bottom:0}
 .ledger-rail span{font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
@@ -1264,11 +1281,30 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ledger-rail .ledger-empty{color:var(--ink-3);font-size:17px}
 .ledger-rail .ledger-target{border-left-color:var(--accent);background:var(--accent-wash)}
 .ledger-rail .ledger-target strong{color:var(--accent)}
-.max-ledger>p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
-.max-ledger>p strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.max-ledger-body p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+.max-ledger-body p strong{color:var(--ink);font-variant-numeric:tabular-nums}
 @media(min-width:560px){
   .ledger-rail{grid-template-columns:repeat(3,minmax(0,1fr))}
   .ledger-rail>div{border-bottom:0;border-left:1px solid var(--hairline)}
   .ledger-rail>div:first-child{border-left:0}
   .ledger-rail .ledger-target{border-left-color:var(--accent)}
+}
+
+/* ================================================== split tab: mileage first
+   The Split tab opened on a collapsed PLAN SETTINGS panel holding the plan
+   name, the schedule style, and the mileage bounds — three things to expand
+   past before reaching the split itself, when only the mileage range changes
+   with any regularity. The bounds sit open at the top now; the name and
+   schedule moved to a collapsed block at the foot of the tab. Desktop already
+   carries all four in its header row, so this pair is phone-only. */
+.mileage-bounds{display:none}
+.mileage-bounds>div:first-child{display:grid;gap:3px}
+.mileage-bounds>div:first-child small{color:var(--ink-3);font-size:11.5px;line-height:1.4}
+.mileage-bounds .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.mileage-bounds label{display:grid;gap:6px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.mileage-bounds input{font-variant-numeric:tabular-nums;font:800 19px var(--display)}
+@media(max-width:760px){
+  .mileage-bounds{display:grid}
+  /* At the foot of the tab this is a footnote, not a heading. */
+  .plan-studio .mobile-plan-settings{margin-top:var(--s3)}
 }

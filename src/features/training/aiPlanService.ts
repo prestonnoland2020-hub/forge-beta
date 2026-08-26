@@ -6,7 +6,9 @@ import { supabase } from '../../lib/supabase';
    It is stored (Supabase + local cache) and the Plan tab renders FROM STORAGE;
    a new block generates silently when this one runs low or inputs change. */
 
-export type AiPlanTopSet = { splitDay: string; exercise: string; weight: number; reps: number };
+/* optionalMax is client-side only: on a max week a lift with no Real 1RM goal
+   holds the double, and this carries the single it could attempt instead. */
+export type AiPlanTopSet = { splitDay: string; exercise: string; weight: number; reps: number; optionalMax?: number; hold?: { weight: number; reps: number; optionalMax?: number } };
 export type AiPlanWeek = {
   week: number; phase: 'Base' | 'Build' | 'Peak' | 'Deload' | 'Taper' | 'Race';
   mileage: number; longRunMiles: number; longRunPace: string; longRunDay: string;
@@ -87,18 +89,33 @@ export const waveSlot = (weekIndex: number) => ({ reps: WAVE_REPS[weekIndex % WA
 /* Max week is a TRUE 1RM attempt — strength goals track Real 1RM, which only
    a 1-rep set can register. The attempt targets the current best + 5-10 lb
    (2.5 kg steps for metric athletes). */
-export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0): { weight: number; reps: number; isMax: boolean } {
+/* A lift with a Real 1RM goal is the only one that MUST be tested: the goal
+   cannot move without a logged single, so max week exists for it. Every other
+   lift holds the heavy double instead of spending a testing session it does
+   not owe, and the single is offered as optional for the day the athlete
+   feels like taking it. With no strength goal set at all, nothing would ever
+   be tested and a calc max would never convert, so every lift tests. */
+export function goalLiftNames(goals: Array<{ type?: string; metric?: string; exercise?: string }>): Set<string> {
+  return new Set(goals.filter(goal => goal.type === 'Strength' && goal.exercise).map(goal => String(goal.exercise)));
+}
+
+export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = true): { weight: number; reps: number; isMax: boolean; optionalMax?: number } {
   const step = metric ? 2.5 : 5;
   const bump = metric ? 3.75 : 7.5;
   const { reps, isMax } = waveSlot(weekIndex);
-  if (isMax) {
-    /* "A rep higher than last PR by 5-10": a real logged single anchors the
-       attempt directly; without one, the estimated max stands in. */
+  /* "A rep higher than last PR by 5-10": a real logged single anchors the
+     attempt directly; without one, the estimated max stands in. */
+  const attemptWeight = () => {
     const attempt = bestSingle ? bestSingle + bump : (best + bump) / (1 + 1 / 30);
-    return { weight: Math.max(step, Math.ceil(attempt / step) * step), reps: 1, isMax };
+    return Math.max(step, Math.ceil(attempt / step) * step);
+  };
+  const loadFor = (count: number) => Math.max(step, Math.ceil(best / (1 + count / 30) / step) * step);
+  if (isMax) {
+    if (tests) return { weight: attemptWeight(), reps: 1, isMax: true };
+    /* Not a goal lift: hold week 4's double, offer the single. */
+    return { weight: loadFor(2), reps: 2, isMax: false, optionalMax: attemptWeight() };
   }
-  const weight = Math.max(step, Math.ceil(best / (1 + reps / 30) / step) * step);
-  return { weight, reps, isMax };
+  return { weight: loadFor(reps), reps, isMax };
 }
 
 /* How many plan weeks remain from today. Week 1 starts at startDate. */
