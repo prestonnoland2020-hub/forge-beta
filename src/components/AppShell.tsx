@@ -47,6 +47,29 @@ function NavGlyph({ name }: { name: NavGlyphName }) {
 }
 
 export function AppShell({ coach }: { coach?: ReactNode }) {
+  /* Deploy freshness for installed PWAs. iOS pins a Home-Screen app to the
+     shell it installed with, and GitHub Pages caches index.html — so a fix
+     can be live on the site while the icon on the phone still runs last
+     night's engine. version.json is fetched uncached on open and whenever the
+     app returns to the foreground; a mismatch surfaces one tap to reload. */
+  const [updateReady,setUpdateReady]=useState(false);
+  useEffect(()=>{
+    let last=0;
+    const check=async()=>{
+      if(Date.now()-last<60000)return;last=Date.now();
+      try{
+        const response=await fetch(`version.json?t=${Date.now()}`,{cache:'no-store'});
+        if(!response.ok)return;
+        const data=await response.json() as {build?:string};
+        if(data.build&&data.build!==__FORGE_BUILD__)setUpdateReady(true);
+      }catch{/* offline — try again later */}
+    };
+    void check();
+    const onVisible=()=>{if(document.visibilityState==='visible')void check()};
+    document.addEventListener('visibilitychange',onVisible);
+    return()=>document.removeEventListener('visibilitychange',onVisible);
+  },[]);
+
   const location = useLocation();
   const { recovery } = useAdaptiveTraining();
   const { setup } = useProfileSetup();
@@ -113,6 +136,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   }, [coachExpanded]);
 
   return <div className="app-frame">
+    {updateReady&&<button type="button" className="update-ready-pill" onClick={()=>window.location.reload()}>Forge updated · tap to refresh</button>}
     <aside className="sidebar">
       <NavLink className="brand" to="/" aria-label="Forge home"><span className="brand-mark"><i /></span><span>FORGE</span></NavLink>
       <nav className="side-nav" aria-label="Primary navigation">

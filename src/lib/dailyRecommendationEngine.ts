@@ -8,7 +8,11 @@ import { normalizeMuscleGroups } from './muscleGroups';
 import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
 
-export const DAILY_RECOMMENDATION_VERSION='completed-split-v2';
+/* Bump this whenever the engine's OUTPUT changes shape or policy — the daily
+   card is snapshotted to Supabase, and a stale snapshot with a matching
+   fingerprint outlives any code fix. plan-authoritative-v3: cardio comes from
+   the stored block, and rows saved by older engines must regenerate. */
+export const DAILY_RECOMMENDATION_VERSION='plan-authoritative-v3';
 
 export type RecommendationSplitDay={
   id?:string;

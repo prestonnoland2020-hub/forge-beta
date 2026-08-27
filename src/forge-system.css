@@ -1400,3 +1400,16 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .completed-day-card footer{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .completed-day-card footer>:first-child{grid-column:1/-1}
 .completed-day-card footer .button{min-height:44px;font-size:13px}
+
+/* ------------------------------------------------------- deploy freshness
+   Shown only when version.json says the site has moved past the shell this
+   install is running. Sits above the topbar, one tap, gone after reload. */
+.update-ready-pill{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);border-radius:999px;background:color-mix(in srgb,var(--surface-1) 92%,var(--accent));color:var(--ink);font:700 12px var(--display);letter-spacing:.02em;padding:9px 16px;box-shadow:var(--shadow-2);cursor:pointer}
+
+/* Regenerate today: deliberately tiny — a corner affordance for "this card
+   looks wrong", not a feature. It rebuilds the card from the current plan and
+   OVERWRITES the saved snapshot, so what comes back is fresh, not reloaded. */
+.feed-card-header{position:relative}
+.today-regen{position:absolute;top:0;right:0;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--hairline);border-radius:50%;background:none;color:var(--ink-3);cursor:pointer}
+.today-regen svg{width:14px;height:14px}
+.today-regen:active{color:var(--accent);transform:rotate(90deg)}
