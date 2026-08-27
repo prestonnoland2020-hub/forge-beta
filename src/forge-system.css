@@ -1413,3 +1413,11 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .today-regen{position:absolute;top:0;right:0;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--hairline);border-radius:50%;background:none;color:var(--ink-3);cursor:pointer}
 .today-regen svg{width:14px;height:14px}
 .today-regen:active{color:var(--accent);transform:rotate(90deg)}
+
+/* ---------------------------------------------- week schedule, lived-in
+   A day that happened gets its tick and shows the work; a past day with no
+   log reads as missed, quietly — the week is a record and a plan at once. */
+.simple-week-schedule article.is-done{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.simple-week-schedule article.is-done .session-done-tick{color:var(--accent);font-weight:900}
+.simple-week-schedule article.is-missed{opacity:.55}
+.simple-week-schedule article.is-missed small{font-style:italic}

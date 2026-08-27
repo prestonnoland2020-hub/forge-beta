@@ -7,12 +7,12 @@ import { isDemoMode } from '../../lib/env';
    localStorage stays the fast local cache; this table is what a fresh device
    hydrates from. */
 
-export type AthleteSettingsRow = { setup?: unknown; plan?: unknown; appearance?: unknown };
+export type AthleteSettingsRow = { setup?: unknown; plan?: unknown; appearance?: unknown; goals?: unknown };
 
 export async function loadAthleteSettings(): Promise<AthleteSettingsRow | null> {
   if (isDemoMode) return null;
   try {
-    const { data } = await supabase.from('athlete_settings').select('setup,plan,appearance').maybeSingle();
+    const { data } = await supabase.from('athlete_settings').select('setup,plan,appearance,goals').maybeSingle();
     return (data as AthleteSettingsRow | null) || null;
   } catch { return null; }
 }

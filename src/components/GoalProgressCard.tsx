@@ -244,15 +244,15 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      calculation available". The explanation now describes the number above
      it. */
   const trendPointCount=datedTrajectory.length;
+  /* Endurance gets the SAME projection treatment as lifts: linear trend over
+     the recent window, evaluated at the goal date, clamped to sane bounds
+     (never faster than slightly beyond the best logged effort). */
+  const enduranceProjection=goal.type==='Endurance'&&shownProgress.length>=2?(()=>{const first=new Date(`${shownProgress[0].date}T12:00:00`).getTime();const pts=shownProgress.map(item=>({x:(new Date(`${item.date}T12:00:00`).getTime()-first)/86400000,y:item.value}));const mx=pts.reduce((sum,pt)=>sum+pt.x,0)/pts.length,my=pts.reduce((sum,pt)=>sum+pt.y,0)/pts.length;const den=pts.reduce((sum,pt)=>sum+(pt.x-mx)**2,0);const slope=den?pts.reduce((sum,pt)=>sum+(pt.x-mx)*(pt.y-my),0)/den:0;const gx=(deadlineMs-first)/86400000;const raw=my+slope*(gx-mx);const best=Math.min(...pts.map(pt=>pt.y)),worst=Math.max(...pts.map(pt=>pt.y));return Math.round(Math.max(Math.min(raw,worst*1.05),Math.min(best*.94,target)))})():0;
   const projectedSource=goal.type==='Endurance'
     ?`${aiEstimate?`Legacy race assessment · ${aiEstimate.confidence} confidence`:aiEstimateLoading?'Legacy assessment in progress':aiEstimateError||(enduranceProjection?`Trend across ${shownProgress.length} logged efforts`:'No legacy assessment available')}${aiEstimate?` · ${aiEstimate.reason}`:''}`
     :predictedAtDeadline
       ?`Trend across ${trendPointCount} check-in${trendPointCount===1?'':'s'}, carried to ${formatDate(goal.date)}`
       :`Not enough logged history to project yet — ${trendPointCount<2?'two check-ins':'a clearer trend'} would give one`;
-  /* Endurance gets the SAME projection treatment as lifts: linear trend over
-     the recent window, evaluated at the goal date, clamped to sane bounds
-     (never faster than slightly beyond the best logged effort). */
-  const enduranceProjection=goal.type==='Endurance'&&shownProgress.length>=2?(()=>{const first=new Date(`${shownProgress[0].date}T12:00:00`).getTime();const pts=shownProgress.map(item=>({x:(new Date(`${item.date}T12:00:00`).getTime()-first)/86400000,y:item.value}));const mx=pts.reduce((sum,pt)=>sum+pt.x,0)/pts.length,my=pts.reduce((sum,pt)=>sum+pt.y,0)/pts.length;const den=pts.reduce((sum,pt)=>sum+(pt.x-mx)**2,0);const slope=den?pts.reduce((sum,pt)=>sum+(pt.x-mx)*(pt.y-my),0)/den:0;const gx=(deadlineMs-first)/86400000;const raw=my+slope*(gx-mx);const best=Math.min(...pts.map(pt=>pt.y)),worst=Math.max(...pts.map(pt=>pt.y));return Math.round(Math.max(Math.min(raw,worst*1.05),Math.min(best*.94,target)))})():0;
   const chartValues=[target,calculated,...shownProgress.map(item=>item.value),...(predictedAtDeadline?[predictedAtDeadline]:[])].filter(value=>Number.isFinite(value)&&value>0);const minValue=Math.min(...chartValues),maxValue=Math.max(...chartValues),padding=Math.max(1,(maxValue-minValue)*.12);const chartY=(value:number)=>goal.type==='Endurance'?plotTop+(value-(minValue-padding))/Math.max(1,(maxValue+padding)-(minValue-padding))*(plotBot-plotTop):plotBot-(value-(minValue-padding))/Math.max(1,(maxValue+padding)-(minValue-padding))*(plotBot-plotTop);const evidencePoints=shownProgress.map(item=>`${chartX(item.date)},${chartY(item.value)}`).join(' ');const trajectoryStatus=goalReached?'Goal reached':goal.type==='Endurance'?(calculated?(calculated<=target?'On track':'More progress needed'):enduranceProjection?(enduranceProjection<=target?'On track':'More progress needed'):'Assessment needed'):!predictedAtDeadline?'More data needed':lowerIsBetter?predictedAtDeadline<=target?'On track':'More progress needed':predictedAtDeadline>=target?'On track':strengthForecast&&strengthForecast.predicted>calculated?'Progressing':'More progress needed';
 
   const askCoach = async () => {

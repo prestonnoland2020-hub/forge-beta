@@ -363,7 +363,21 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         <div><b>3</b><p>That converts to <strong>{lead.weight} × {lead.reps}</strong>. Beat it and every number rises with your new best; miss it and the wave holds instead of assuming progress. The week after a max attempt stays at your current numbers until the new PR is actually logged — then the whole wave steps up.</p></div>
       </div></details>;
     })()}
-    <section className="card simple-week-schedule"><header><div><span className="eyebrow">YOUR SCHEDULE</span><h3>What to do this week</h3></div></header><div>{sessions.map(session => <article className={`stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{dateText(session.date)}</time><div><span className="session-tags">{[...session.kind.split(' + '), session.stress].filter(Boolean).map((tag, index) => <i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{session.title}</strong><small>{session.detail}</small></div><b>{session.stress === 'Rest' ? 'Rest' : '›'}</b></article>)}</div></section>
+    <section className="card simple-week-schedule"><header><div><span className="eyebrow">YOUR SCHEDULE</span><h3>What to do this week</h3></div></header><div>{sessions.map(session => {
+      /* The week reflects what actually happened: a day with logged training
+         gets its tick and shows what was done; a past day with nothing is
+         marked missed rather than pretending it is still coming. Future days
+         stay prescriptive. */
+      const iso = session.date.toISOString().slice(0, 10);
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const logged = records.find(record => record.date === iso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0 || record.muscles.some(muscle => muscle !== 'Cardio')));
+      const missed = !logged && iso < todayIso && session.stress !== 'Rest';
+      const doneDetail = logged ? [
+        ...(logged.topSets || []).filter(set => set.completed !== false).slice(0, 2).map(set => `${set.lift} ${set.weight}×${set.reps}`),
+        ...(logged.cardioSessions || []).slice(0, 1).map(cardioSession => cardioSession.summary || cardioSession.activity),
+      ].filter(Boolean).join(' · ') : '';
+      return <article className={`stress-${session.stress.toLowerCase()}${logged ? ' is-done' : ''}${missed ? ' is-missed' : ''}`} key={session.date.toISOString()}><time>{dateText(session.date)}</time><div><span className="session-tags">{[...session.kind.split(' + '), session.stress].filter(Boolean).map((tag, index) => <i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{logged ? (logged.title || session.title) : session.title}</strong><small>{logged ? (doneDetail || 'Logged') : missed ? `Missed — ${session.detail}` : session.detail}</small></div><b className={logged ? 'session-done-tick' : ''}>{logged ? '✓' : missed ? '·' : session.stress === 'Rest' ? 'Rest' : '›'}</b></article>;
+    })}</div></section>
     <section className="card roadmap-card"><header className="roadmap-head"><div><span className="eyebrow">THIS BLOCK</span><h3>Where the block takes you</h3></div></header>
       <div className="roadmap-table" role="table"><div className="roadmap-row head" role="row"><span>Week</span><span>Miles</span><span>Long</span><span>Hard run</span><span>Top set · proj. max</span></div>
         {plan.weeks.map((item, index) => { const lead = headline(item); const startLabel = (() => { const date = new Date(`${stored.startDate}T12:00:00`); date.setDate(date.getDate() + index * 7); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })(); return <div key={item.week} className="roadmap-week-group">
