@@ -161,11 +161,27 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
      run, never the week's intervals. Unnamed cardio days take the highest-
      priority scheduled session as before. */
   const roleForDayName=(name:string):GeneratedSession['role']|null=>{const value=name.toLowerCase();if(value.includes('long'))return 'Long';if(value.includes('easy')||value.includes('aerobic')||value.includes('recovery'))return 'Easy';if(value.includes('quality')||value.includes('speed')||value.includes('interval')||value.includes('track')||value.includes('tempo'))return 'Quality';return null};
+  /* The same lower-body rule the plan generator enforces, applied where the
+     Today card is actually built: this fell through to weekly.scheduled[0] on
+     a mixed day with a non-role name, which put 4 × 200 m at goal-mile pace on
+     a quads/glutes/hamstrings day. Muscles decide, never the day's name —
+     speed work does not share a day with heavy legs. */
+  const LOWER_MUSCLES=['Quads','Hamstrings','Glutes','Calves'];
+  const lowerBodyDay=normalizeMuscleGroups(input.splitDay.muscles).some(muscle=>LOWER_MUSCLES.includes(muscle))
+    ||selectedExercises.some(selection=>/squat|deadlift|lunge|leg press|rdl/i.test(selection.exercise.name))
+    ||/\bleg/i.test(input.splitDay.name);
   const cardioCandidate=(()=>{
     if(input.splitDay.type!=='cardio'&&input.splitDay.type!=='mixed')return undefined;
     const weekly=buildWeeklyCardio(input.goals,0,{profile:input.profile,history:input.runningHistory});
     const wanted=roleForDayName(input.splitDay.name);
     const pick=(role:GeneratedSession['role'])=>weekly.scheduled.find(session=>session.role===role)||weekly.deferred.find(session=>session.role===role);
+    if(lowerBodyDay){
+      /* Easy running only. Even a day NAMED "speed" takes the easy run when
+         its muscles are legs — the athlete mislabeling a day must not earn
+         them intervals on squat day. */
+      const easy=pick('Easy')||weekly.scheduled.find(session=>session.role!=='Quality');
+      return easy?{...easy,status:'Scheduled' as const,rationale:`${easy.rationale||''} Easy only today — speed work never shares a day with heavy leg training.`.trim()}:undefined;
+    }
     if(wanted){
       const found=pick(wanted)||(wanted==='Long'?pick('Easy'):undefined);
       if(found)return{...found,status:'Scheduled' as const};

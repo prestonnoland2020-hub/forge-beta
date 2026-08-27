@@ -44,8 +44,36 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const storedPlan=readLocalAiPlan();
     if(!generatedBase||!storedPlan)return generatedBase;
     const week=storedPlan.plan.weeks[currentWeekIndex(storedPlan)];
+    if(!week)return generatedBase;
+    /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
+       second opinion that could contradict the block — 4 × 200 m on a leg
+       day the plan had given an easy run. With a stored plan, today's cardio
+       is exactly the plan's placement for this split day: long run on
+       longRunDay, quality on qualityDay (never on a lower-body day), the
+       plan's easy run on its easy days, and NOTHING anywhere else. */
+    const dayName=generatedBase.splitDay.name;
+    const LOWER=['Quads','Hamstrings','Glutes','Calves'];
+    const lowerBody=(generatedBase.splitDay.muscles||[]).some(muscle=>LOWER.includes(muscle))
+      ||(week.topSets||[]).some(set=>set.splitDay===dayName&&/squat|deadlift|lunge|leg press|rdl/i.test(set.exercise))
+      ||/\bleg/i.test(dayName);
+    const planSession=(role:'Long'|'Quality'|'Easy',title:string,summary:string,rationale:string,plan:Record<string,unknown>):NonNullable<DailyRecommendation['cardio']>=>({
+      id:`plan-cardio-${role.toLowerCase()}-${week.week}`,title,summary,rationale,selected:true,
+      session:{id:`plan-${role.toLowerCase()}-${week.week}`,goal:'AI program',event:'Custom Run',role,title,phase:week.phase,week:week.week,
+        plan:{id:Date.now(),targetSource:'Goal generated',...plan} as never,
+        rationale,placement:dayName,stress:role==='Quality'?'High':role==='Long'?'Moderate':'Low',progression:'',scaleNotes:[],status:'Scheduled'},
+    });
+    const planCardio=(()=>{
+      if(week.longRunMiles>0&&week.longRunDay===dayName)
+        return planSession('Long','Long run',`Long Run · ${week.longRunMiles} mi @ ${week.longRunPace}`,`Week ${week.week} long run from your program.`,{structure:'Steady',activity:'Long Run',distance:String(week.longRunMiles),distanceUnit:'miles',pace:week.longRunPace});
+      if(week.quality&&!/no goal/i.test(week.quality)&&week.qualityDay===dayName&&!lowerBody)
+        return planSession('Quality',week.quality,`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`,`Week ${week.week} quality session from your program.`,{structure:'Custom',activity:'Quality Run',customTarget:`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`});
+      if(week.easyMinutes>0&&(week.easyDays||[]).includes(dayName))
+        return planSession('Easy','Easy run',`Easy Run · ${week.easyMinutes} min @ ${week.easyPace}`,`Week ${week.week} easy volume from your program${lowerBody?' — easy only alongside heavy legs':''}.`,{structure:'Steady',activity:'Easy Run',duration:String(week.easyMinutes),pace:week.easyPace});
+      return undefined;
+    })();
+    const cardioBase={...generatedBase,cardio:planCardio};
     const match=week?.topSets?.find(set=>set.splitDay===generatedBase.splitDay.name);
-    if(!match)return generatedBase;
+    if(!match)return cardioBase;
     /* Live wave numbers: the program stores the block, but today's weight
        always derives from the CURRENT logged best — a PR yesterday raises
        today; a miss holds the wave in place. */
@@ -59,14 +87,14 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const live=liveBest?wavePrescription(liveBest,weekIdx,metric,liveSingle,tests):{weight:match.weight,reps:match.reps,isMax:waveSlot(weekIdx).isMax,optionalMax:undefined};
     const slotLabel=live.isMax?'MAX WEEK — 1RM attempt':live.optionalMax?`heavy double · optional max ${live.optionalMax} × 1`:`${live.reps}-rep week`;
     let applied=false;
-    const topSets=generatedBase.topSets.map(set=>{
+    const topSets=cardioBase.topSets.map(set=>{
       if(applied)return set;
       const isMatch=set.exercise===match.exercise||!generatedBase.topSets.some(other=>other.exercise===match.exercise)&&set===generatedBase.topSets[0];
       if(!isMatch)return set;
       applied=true;
       return{...set,exercise:match.exercise,weight:live.weight,reps:live.reps,calculatedMax:Math.round(live.weight*(1+live.reps/30)),rationale:liveBest?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${liveBest}.`:`Week ${week.week} of your program (${week.phase}).`};
     });
-    return{...generatedBase,topSets};
+    return{...cardioBase,topSets};
   },[generatedBase,aiPlanStamp]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{if(isDemoMode||!user){setStored(current=>current?.status==='completed'||current?.inputFingerprint===inputFingerprint?current:generated);return}let active=true;setLoading(true);void loadDailyRecommendation(user.id,date).then(async existing=>{if(!active)return;if(existing?.status==='completed'||existing?.inputFingerprint===inputFingerprint){setStored(existing);return}const saved=await saveDailyRecommendation(user.id,generated);if(active)setStored(saved)}).then(()=>{if(active)setSyncError(null)}).catch(error=>{if(active){setStored(generated);setSyncError(error instanceof Error?error.message:'Could not save today’s recommendation.')}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user,date,inputFingerprint,generated]);
   const persist=useCallback((next:DailyRecommendation)=>{setStored(next);if(!isDemoMode&&user)void saveDailyRecommendation(user.id,next).then(setStored).catch(error=>setSyncError(error instanceof Error?error.message:'Could not save recommendation choices.'))},[user]);

@@ -21,11 +21,22 @@ export function InsightsClassic() {
   const unit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const todayIso = isoOf(new Date());
 
-  /* ------------------------------------------------ KPI tiles (last 30 days) */
+  /* One range, every card. The 3M/6M/1Y/All chips used to steer only the two
+     charts while the tiles kept private windows — KPIs at 30 days, frequency
+     at 56 — so the page showed three different time periods at once and none
+     of them said so. */
+  const [prRange, setPrRange] = useState<'3m' | '6m' | '1y' | 'all'>('3m');
+  const rangeDays: Record<'3m' | '6m' | '1y' | 'all', number> = { '3m': 90, '6m': 182, '1y': 365, all: 3650 };
+  const rangeCutoffIso = useMemo(() => { const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - rangeDays[prRange]); return isoOf(cutoff); }, [prRange]);
+  /* ------------------------------------------------ KPI tiles (follow the range) */
   const kpi = useMemo(() => {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffIso = isoOf(cutoff);
-    const window = records.filter(record => record.date >= cutoffIso);
+    const window = records.filter(record => record.date >= rangeCutoffIso);
+    /* % logged is honest about the denominator: the range's day count, but
+       never before the athlete's first record — 87% of a real span, not 3%
+       of a decade they weren't logging. */
+    const firstIso = records.length ? records[records.length - 1].date : todayIso;
+    const spanStart = firstIso > rangeCutoffIso ? firstIso : rangeCutoffIso;
+    const spanDays = Math.max(1, Math.round((new Date(`${todayIso}T12:00:00`).getTime() - new Date(`${spanStart}T12:00:00`).getTime()) / 86400000) + 1);
     const liftDays = new Set(window.filter(isStrengthSession).map(record => record.date)).size;
     const cardioDays = new Set(window.filter(hasCardioSession).map(record => record.date)).size;
     const miles = window.reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => sum + cardioMiles(session), 0), 0);
@@ -33,8 +44,8 @@ export function InsightsClassic() {
     const weightEnd = weights.length ? weights[weights.length - 1].bodyWeight! : null;
     const weightChange = weights.length >= 2 ? weights[weights.length - 1].bodyWeight! - weights[0].bodyWeight! : null;
     const daysLogged = new Set(window.map(record => record.date)).size;
-    return { liftDays, cardioDays, miles, weightEnd, weightChange, adherence: Math.round(daysLogged / 30 * 100), sessions: window.length };
-  }, [records]);
+    return { liftDays, cardioDays, miles, weightEnd, weightChange, adherence: Math.min(100, Math.round(daysLogged / spanDays * 100)), sessions: window.length };
+  }, [records, rangeCutoffIso, todayIso]);
 
   /* --------------------------------------------------- 8-week consistency */
   const weeks = useMemo(() => {
@@ -61,11 +72,9 @@ export function InsightsClassic() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [records, todayIso]);
 
-  /* ------------------------------------------- frequency (last 8 weeks) */
+  /* --------------------------------------- frequency (follows the range) */
   const frequency = useMemo(() => {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 56);
-    const cutoffIso = isoOf(cutoff);
-    const window = records.filter(record => record.date >= cutoffIso);
+    const window = records.filter(record => record.date >= rangeCutoffIso);
     const muscles = new Map<string, number>();
     window.forEach(record => (record.muscles || []).forEach(muscle => { if (muscle !== 'Cardio') muscles.set(muscle, (muscles.get(muscle) || 0) + 1); }));
     const cardioTypes = new Map<string, number>();
@@ -74,7 +83,7 @@ export function InsightsClassic() {
       muscles: [...muscles.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
       cardio: [...cardioTypes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
     };
-  }, [records]);
+  }, [records, rangeCutoffIso]);
 
   /* ------------------------------------------------------ PRs (all time) */
   const bestByLift = useMemo(() => {
@@ -86,15 +95,24 @@ export function InsightsClassic() {
     }));
     return best;
   }, [records]);
-  const prTiles = [...bestByLift.entries()].sort((a, b) => b[1].weight - a[1].weight).slice(0, 4);
+  /* The Personal Records card shows the best set INSIDE the selected range;
+     the lift picker below keeps the all-time list so no lift disappears from
+     the chart dropdown when the window narrows. */
+  const rangedBestByLift = useMemo(() => {
+    const best = new Map<string, { weight: number; reps: number; date: string }>();
+    records.forEach(record => { if (record.date < rangeCutoffIso) return; (record.topSets || []).forEach(set => {
+      if (set.completed === false || !set.lift || !set.weight) return;
+      const current = best.get(set.lift);
+      if (!current || set.weight > current.weight) best.set(set.lift, { weight: set.weight, reps: set.reps, date: record.date });
+    }); });
+    return best;
+  }, [records, rangeCutoffIso]);
+  const prTiles = [...rangedBestByLift.entries()].sort((a, b) => b[1].weight - a[1].weight).slice(0, 4);
 
   /* --------------------------------------------------------- PR progress */
   const lifts = useMemo(() => [...bestByLift.keys()].sort(), [bestByLift]);
   const [prLift, setPrLift] = useState('');
   const [prMode, setPrMode] = useState<'1rm' | 'calc'>('calc');
-  const [prRange, setPrRange] = useState<'3m' | '6m' | '1y' | 'all'>('3m');
-  const rangeDays: Record<'3m' | '6m' | '1y' | 'all', number> = { '3m': 90, '6m': 182, '1y': 365, all: 3650 };
-  const rangeCutoffIso = useMemo(() => { const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - rangeDays[prRange]); return isoOf(cutoff); }, [prRange]);
   /* Endurance, weekly and readable: miles per week, or the week's best pace. */
   const [endMetric, setEndMetric] = useState<'miles' | 'pace'>('miles');
   const enduranceSeries = useMemo(() => {
@@ -249,12 +267,12 @@ export function InsightsClassic() {
 
     <section className="card ic-card">
       <header className="ic-head"><i /><h3>Muscle group frequency</h3></header>
-      {frequency.muscles.length ? <div className="ic-freq">{frequency.muscles.map(([muscle, count]) => { const peak = frequency.muscles[0][1]; return <div key={muscle}><span>{muscle}</span><div className="ic-track"><i style={{ width: `${count / peak * 100}%` }} /></div><b>{count}</b></div>; })}</div> : <p className="ic-empty">No strength sessions in the last 8 weeks.</p>}
+      {frequency.muscles.length ? <div className="ic-freq">{frequency.muscles.map(([muscle, count]) => { const peak = frequency.muscles[0][1]; return <div key={muscle}><span>{muscle}</span><div className="ic-track"><i style={{ width: `${count / peak * 100}%` }} /></div><b>{count}</b></div>; })}</div> : <p className="ic-empty">No strength sessions in this range.</p>}
     </section>
 
     <section className="card ic-card">
       <header className="ic-head"><i /><h3>Cardio type frequency</h3></header>
-      {frequency.cardio.length ? <div className="ic-freq muted">{frequency.cardio.map(([type, count]) => { const peak = frequency.cardio[0][1]; return <div key={type}><span>{type}</span><div className="ic-track"><i style={{ width: `${count / peak * 100}%` }} /></div><b>{count}</b></div>; })}</div> : <p className="ic-empty">No cardio in the last 8 weeks.</p>}
+      {frequency.cardio.length ? <div className="ic-freq muted">{frequency.cardio.map(([type, count]) => { const peak = frequency.cardio[0][1]; return <div key={type}><span>{type}</span><div className="ic-track"><i style={{ width: `${count / peak * 100}%` }} /></div><b>{count}</b></div>; })}</div> : <p className="ic-empty">No cardio in this range.</p>}
     </section>
 
     {prTiles.length > 0 && <section className="card ic-card">
