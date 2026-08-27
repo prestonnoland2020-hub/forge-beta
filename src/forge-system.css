@@ -1359,3 +1359,44 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .compact-day-preview .recommendation-lineage{font-size:10.5px;line-height:1.4}
 .compact-day-preview .simple-preview-results>div{padding:8px 12px;font-size:12.5px}
 .compact-day-preview .selected-day-notes{font-size:12px}
+
+/* ================================================== the finished-day recap
+   What you see after logging: previously a flat stack where the lift name,
+   the load and the calculated max all read at the same weight, the pace broke
+   mid-token, and three full-width buttons carried more visual weight than the
+   session they sat under. The session is the subject here.
+
+   A stat strip states the day in four numbers, each row puts the identity
+   left and the measurement right on a baseline of tabular figures, and a set
+   that beats every previous calculated max for that lift is flagged — that is
+   the one thing worth spotting without opening History. */
+.day-recap-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:clip;background:var(--hairline)}
+/* Four across on a phone truncates "Best calc max" to "BEST CA…". Two rows of
+   two keeps every label whole and gives the figures room. */
+@media(max-width:520px){.day-recap-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.day-recap-stats>div{padding:12px 13px}.day-recap-stats strong{font-size:22px}}
+.day-recap-stats>div{display:grid;gap:3px;padding:11px 12px;background:var(--surface-2);min-width:0}
+.day-recap-stats span{font-size:9px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-recap-stats strong{display:flex;align-items:baseline;gap:3px;font:800 20px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.day-recap-stats strong i{font-style:normal;font-size:10.5px;font-weight:800;color:var(--ink-3);letter-spacing:.04em}
+
+.day-recap .completed-day-review-list article{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 14px;padding:11px 13px}
+.day-recap .completed-day-review-list article>div:first-child{display:grid;gap:2px;min-width:0}
+.day-recap .completed-day-review-list article>div:first-child strong{font:800 14px/1.2 var(--display);color:var(--ink);overflow-wrap:anywhere}
+.day-recap .completed-day-review-list article>div:first-child small{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+.day-recap .completed-day-review-list article>div:last-child{display:grid;gap:2px;justify-items:end;text-align:right;min-width:0}
+.day-recap .completed-day-review-list article>div:last-child b{font:800 16px/1.15 var(--display);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+/* The multiplier is punctuation between two numbers, not a number itself. */
+.day-recap .completed-day-review-list article>div:last-child b em{font-style:normal;font-weight:700;color:var(--ink-3);padding:0 1px}
+.day-recap .completed-day-review-list article>div:last-child small{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+/* A pace like "9:40 /mi" must never break across the slash. */
+.day-recap .completed-cardio-summary b{white-space:normal;text-wrap:balance;font-size:14.5px}
+
+.day-recap article.is-pr{background:var(--accent-wash);box-shadow:inset 2px 0 var(--accent)}
+.day-recap article.is-pr>div:last-child b{color:var(--accent)}
+.day-recap .pr-flag{grid-column:1;justify-self:start;margin-top:1px;font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.14em;color:var(--accent-ink,#101410);background:var(--accent);border-radius:3px;padding:2px 6px}
+
+/* One primary action; the other two share a row instead of stacking into
+   three identical slabs taller than the recap above them. */
+.completed-day-card footer{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.completed-day-card footer>:first-child{grid-column:1/-1}
+.completed-day-card footer .button{min-height:44px;font-size:13px}

@@ -8,23 +8,43 @@ import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { TopSetHistory } from '../components/TopSetHistory';
 import { useWorkoutHistory, type LoggedTopSet, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { formatCardioSummary, type CardioLogDraft } from '../lib/cardioSession';
+import { cardioMiles, formatCardioSummary, summarizeCardioDraft, type CardioLogDraft } from '../lib/cardioSession';
 import { exerciseCategory, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { LastPerformanceBanner } from '../components/LastPerformance';
 import { TopSetCards } from '../components/TopSetCards';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 
-function CompletedDayReview({record,unit}:{record:WorkoutRecord;unit:string}) {
+function CompletedDayReview({record,unit,records,metric}:{record:WorkoutRecord;unit:string;records:WorkoutRecord[];metric:boolean}) {
   const completedTopSets=(record.topSets||[]).filter(set=>set.completed!==false);
   const topSets=completedTopSets.length?completedTopSets:(record.lift&&record.weight&&record.reps?[{muscle:record.muscles.find(muscle=>muscle!=='Cardio')||'Strength',lift:record.lift,weight:record.weight,reps:record.reps,calculatedMax:record.calculatedMax,completed:true}]:[]);
   const cardio=record.cardioSessions||[];
   if(!topSets.length&&!cardio.length)return null;
-  return <div className="completed-day-review-grid">
+  const maxOf=(set:{weight:number;reps:number;calculatedMax?:number})=>set.calculatedMax??calculateEstimatedOneRepMax(set.weight,set.reps)??0;
+  /* A set that beats every previous calc max for that lift is the whole point
+     of the session — it should be the first thing the eye lands on, not a
+     number you have to compare by hand against History. */
+  const priorBest=(lift:string)=>records.reduce((best,item)=>item.id===record.id?best:(item.topSets||[]).reduce((inner,set)=>set.completed!==false&&set.lift===lift?Math.max(inner,maxOf(set)):inner,best),0);
+  const distance=cardio.reduce((total,session)=>total+cardioMiles(session),0)*(metric?1.609344:1);
+  const minutes=cardio.reduce((total,session)=>total+summarizeCardioDraft(session).minutes,0);
+  const bestMax=topSets.reduce((best,set)=>Math.max(best,maxOf(set)),0);
+  const stats=[
+    topSets.length?{key:'sets',label:'Top sets',value:String(topSets.length),suffix:''}:null,
+    bestMax?{key:'max',label:'Best calc max',value:String(bestMax),suffix:unit}:null,
+    distance>=0.05?{key:'distance',label:'Distance',value:distance.toFixed(distance<10?2:1),suffix:metric?'km':'mi'}:null,
+    minutes>=0.5?{key:'time',label:'Moving time',value:minutes>=60?`${Math.floor(minutes/60)}:${String(Math.round(minutes%60)).padStart(2,'0')}`:String(Math.round(minutes)),suffix:minutes>=60?'hr':'min'}:null,
+  ].filter(Boolean) as Array<{key:string;label:string;value:string;suffix:string}>;
+  return <div className="completed-day-review-grid day-recap">
+    {stats.length>0&&<div className="day-recap-stats">{stats.map(stat=><div key={stat.key}><span>{stat.label}</span><strong>{stat.value}{stat.suffix?<i>{stat.suffix}</i>:null}</strong></div>)}</div>}
     {topSets.length>0&&<section className="completed-day-review-block">
       <header><span>TOP SETS</span><b>{topSets.length}</b></header>
       <div className="completed-day-review-list">{topSets.map((set,index)=>{
-        const max=set.calculatedMax??calculateEstimatedOneRepMax(set.weight,set.reps);
-        return <article key={`${set.lift}-${index}`}><div><strong>{set.lift}</strong><small>{set.muscle}</small></div><div><b>{set.weight} {unit} × {set.reps}</b><small>{set.reps===1?`Real 1RM ${set.weight} ${unit}`:max?`Calculated max ${max} ${unit}`:'Calculated max unavailable'}</small></div></article>;
+        const max=maxOf(set);
+        const isPr=max>0&&max>priorBest(set.lift);
+        return <article className={isPr?'is-pr':''} key={`${set.lift}-${index}`}>
+          <div><strong>{set.lift}</strong><small>{set.muscle}</small></div>
+          <div><b>{set.weight} {unit} <em>×</em> {set.reps}</b><small>{set.reps===1?`Real 1RM ${set.weight} ${unit}`:max?`Calc max ${max} ${unit}`:'Calculated max unavailable'}</small></div>
+          {isPr&&<i className="pr-flag" title="Best calculated max on record">PR</i>}
+        </article>;
       })}</div>
     </section>}
     {cardio.length>0&&<section className="completed-day-review-block">
@@ -35,7 +55,10 @@ function CompletedDayReview({record,unit}:{record:WorkoutRecord;unit:string}) {
            measurements only. */
         const detail=formatCardioSummary(session).replace(new RegExp(`^${session.activity.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*·\\s*`),'');
         const lineCount=Array.isArray(session.prescription.legacyIntervals)?(session.prescription.legacyIntervals as unknown[]).length:0;
-        return <article key={session.id||`${session.activity}-${index}`}><div><strong>{session.activity||'Cardio'}</strong>{lineCount>1&&<small>{lineCount} lines</small>}</div><div className="completed-cardio-summary"><b>{detail||formatCardioSummary(session)}</b>{session.prescription.note?<small>{String(session.prescription.note)}</small>:null}</div></article>;
+        return <article key={session.id||`${session.activity}-${index}`}>
+          <div><strong>{session.activity||'Cardio'}</strong>{lineCount>1&&<small>{lineCount} segments</small>}</div>
+          <div className="completed-cardio-summary"><b>{detail||formatCardioSummary(session)}</b>{session.prescription.note?<small>{String(session.prescription.note)}</small>:null}</div>
+        </article>;
       })}</div>
     </section>}
   </div>;
@@ -152,12 +175,20 @@ function WorkoutEditor() {
      set. It used to live only in component state until "Finish Day" — so a
      session that was typed in but never carried through the finish flow was
      lost with no error and nothing to show for it. */
-  const cardioSignature=useRef(JSON.stringify((editingRecord?.cardioSessions||[]).map(entry=>`${entry.id}:${entry.summary}`)));
+  /* Today's saved day, if there is one. Cardio logged earlier has to come BACK
+     into the builder — otherwise reopening the log shows an empty cardio
+     section over a day that already has sessions, which reads as "it did not
+     save" and invites logging the same run twice. */
+  const todayRecord=records.find(record=>record.date===sessionIso);
+  const cardioKey=(entries:CardioLogDraft[]=[])=>JSON.stringify(entries.map(entry=>`${entry.id}:${entry.summary}`));
+  const cardioSignature=useRef(cardioKey(editingRecord?.cardioSessions??todayRecord?.cardioSessions));
   const persistCardio=(entries:CardioLogDraft[])=>{
-    const signature=JSON.stringify(entries.map(entry=>`${entry.id}:${entry.summary}`));
+    const signature=cardioKey(entries);
     if(signature===cardioSignature.current)return;
-    cardioSignature.current=signature;
     const target=editingRecord||records.find(record=>record.date===sessionIso);
+    /* Adopting what is already stored is not a change worth writing back. */
+    if(target&&signature===cardioKey(target.cardioSessions)){cardioSignature.current=signature;return}
+    cardioSignature.current=signature;
     if(target){
       const {id,...saved}=target;
       const muscles=Array.from(new Set([...(saved.muscles||[]).filter(muscle=>muscle!=='Cardio'),...(entries.length?['Cardio']:[])]));
@@ -210,7 +241,7 @@ function WorkoutEditor() {
     <section className="card completed-day-card">
       <span className="completed-day-check">✓</span>
       <div><span className="eyebrow">TODAY · COMPLETE</span><h2>{completedOnEntry.title}</h2><p>{completedOnEntry.muscles.filter(muscle=>muscle!=='Cardio').join(' · ')||(completedOnEntry.hasCardio?'Cardio':'Completed training')}</p></div>
-      <CompletedDayReview record={completedOnEntry} unit={weightUnit}/>
+      <CompletedDayReview record={completedOnEntry} unit={weightUnit} records={records} metric={weightUnit==='kg'}/>
       <footer><Link className="button" to={`/workout?edit=${completedOnEntry.id}&cardio=1`}>＋ Add a session</Link><Link className="button ghost" to={`/workout?edit=${completedOnEntry.id}`}>Edit workout</Link><Link className="button ghost" to="/history">Open history</Link></footer>
       <small className="second-session-hint">Two-a-day? “Add a session” opens today’s log so an evening run or extra lift lands on the same training day.</small>
     </section>
@@ -227,7 +258,7 @@ function WorkoutEditor() {
     {topSets.length>0&&<TopSetCards collapsible={workoutSource==='plan'&&!editingRecord} planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={quickLoggedKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={addBlankTopSet} onRemove={removeTopSet} onCreateExercise={createExerciseForTopSet}/>}
     {!topSets.length&&manualTopSet&&<div className="quick-log-top-sets embedded">{[manualTopSet].map(set=>{const logged=quickLoggedKeys.includes(topSetKey(set));return <div className="quick-log-row" key={topSetKey(set)}><span><strong>{set.lift}</strong><small>{set.muscle} · {set.weight} {weightUnit} ×{set.reps}</small></span><button type="button" className={logged?'button ghost':'button'} disabled={logged} onClick={()=>quickLogTopSet(set)}>{logged?'Saved ✓':'Save top set'}</button></div>})}{quickLogMessage&&<small className="quick-log-message">{quickLogMessage}</small>}</div>}
     {topSets.length>0&&<details className="card form-card add-top-set-card"><summary><h3>Add another top set</h3><p>Choose a muscle group from {plannedDay?.name||'this workout'} first. Exercise choices stay inside that split-day mapping.</p></summary><div className="field-grid"><label>Muscle group<select value={newTopSetMuscle} onChange={event=>{setNewTopSetMuscle(event.target.value);setLift('')}}><option value="">Choose muscle group</option>{sourceMuscles.filter(muscle=>muscle!=='Cardio').map(muscle=><option key={muscle}>{muscle}</option>)}</select></label><label>Exercise<select value={lift} onChange={event=>setLift(event.target.value)} disabled={!newTopSetMuscle}><option value="">Choose exercise</option>{topSetExerciseOptions.filter(exercise=>!topSets.some(set=>set.lift===exercise.name)).map(exercise=><option key={exercise.id}>{exercise.name}</option>)}</select></label><label>Weight ({weightUnit})<input value={weight} onChange={event=>setWeight(event.target.value)} inputMode="decimal"/></label><label>Reps<input value={reps} onChange={event=>setReps(event.target.value)} inputMode="numeric"/></label></div><button type="button" className="button" disabled={!newTopSetMuscle||!lift||!Number(weight)||!Number(reps)} onClick={addAnotherTopSet}>Add completed top set</button></details>}
-    <CardioBuilder sectionNumber={cardioOnlyDay?"01":"02"} onEntriesChange={(hasEntries,entries)=>{setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions} plannedSummary={workoutSource==='plan'&&recommendation?.cardio?.selected?recommendation.cardio.summary:undefined}/>
+    <CardioBuilder sectionNumber={cardioOnlyDay?"01":"02"} onEntriesChange={(hasEntries,entries)=>{setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions??todayRecord?.cardioSessions} plannedSummary={workoutSource==='plan'&&recommendation?.cardio?.selected?recommendation.cardio.summary:undefined}/>
     <section className="card form-card session-details"><div className="section-title compact-title"><span>03</span><div><h3>Session Details</h3><p>Review the context Forge will save with this workout.</p></div></div><div className="derived-muscles"><div><span className="field-caption">MUSCLE GROUPS</span><small>{manualMuscles?'Manually adjusted':workoutSource==='plan'?'Highlighted from today’s split workout':'Automatically derived from the selected workout and logged work'}</small></div>{!manualMuscles?<button className="text-button" onClick={startAdjustingMuscles}>Adjust</button>:<button className="text-button" onClick={()=>setManualMuscles(false)}>Use automatic</button>}<div className={manualMuscles?'muscle-picker editable':'muscle-picker automatic'}>{manualMuscles?muscleOptions.map(m=><button key={m} className={displayedMuscles.includes(m)?'muscle-chip active':'muscle-chip'} onClick={()=>chooseMuscle(m)}>{m}</button>):muscleOptions.map(m=><span className={displayedMuscles.includes(m)?'muscle-chip active':'muscle-chip muted'} key={m}>{m}</span>)}</div></div><div className="field-grid session-context"><label className="body-checkin">Today's body weight <span>Optional check-in used for body-weight trends</span><div className="weight-input"><input value={bodyWeight} onChange={e=>setBodyWeight(e.target.value)} inputMode="decimal" /><b>{weightUnit}</b></div></label><label>Session effort<select value={effort} onChange={e=>setEffort(e.target.value)}><option value="">Not recorded</option><option>Easy</option><option>Moderate</option><option>Hard</option><option>Max effort</option></select></label></div><label>Workout notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4} placeholder="How did the session feel? Add anything the numbers do not capture." /></label></section>
     {saveMessage&&<div className={saved?'save-confirmation':'save-confirmation save-warning'} role="status">{saveMessage}{saved&&<> <Link to="/history">View day in History →</Link></>}</div>}<button className="button wide save-workout" onClick={saveWorkout}>{saved?'Day finished ✓':'Finish Day →'}</button></div>;
 }

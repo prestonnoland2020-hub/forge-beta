@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import type { CardioLogDraft } from '../lib/cardioSession';
 import { parseCardioDescription } from '../lib/cardioParse';
@@ -123,6 +123,15 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
   const [aiReflection, setAiReflection] = useState('');
   const [aiSource, setAiSource] = useState<'ai' | 'local' | ''>('');
 
+  /* History loads asynchronously, so the day's saved sessions can arrive after
+     this mounts. Adopt them once rather than sitting empty over a day that
+     already has cardio on it. */
+  const adopted = useRef(false);
+  useEffect(() => {
+    if (adopted.current || !initialEntries.length) return;
+    adopted.current = true;
+    setSavedEntries(current => current.length ? current : initialEntries);
+  }, [initialEntries]);
   useEffect(() => onEntriesChange?.(savedEntries.length > 0, savedEntries), [savedEntries, onEntriesChange]);
 
   const typeOptions = useMemo(() => {
