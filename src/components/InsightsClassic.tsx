@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
+import { cardioMiles, summarizeCardioDraft, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 
 /* Insights rebuilt on the original Forge web app's structure: KPI tiles,
@@ -102,7 +102,6 @@ export function InsightsClassic() {
     records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.cardioSessions || []).forEach(session => {
       const miles = cardioMiles(session);
       if (!miles) return;
-      const minutes = summarizeCardioDraft(session).minutes;
       const week = weekStartIso(record.date);
       const entry = byWeek.get(week) || { miles: 0, bestPace: Infinity };
       /* Weekly mileage and best pace are RUNNING stats — synced rides, swims,
@@ -110,7 +109,10 @@ export function InsightsClassic() {
       const runShaped = !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(session.activity || '');
       if (!runShaped) return;
       entry.miles += miles;
-      if (minutes && miles >= 0.5 && minutes / miles >= 4 && minutes / miles <= 18) entry.bestPace = Math.min(entry.bestPace, minutes / miles);
+      /* A pace only counts when one continuous segment covered at least a
+         mile — no whole-session averages over interval days. */
+      const pace = bestRunPaceMinutesPerMile(session);
+      if (pace) entry.bestPace = Math.min(entry.bestPace, pace);
       byWeek.set(week, entry);
     }));
     return [...byWeek.entries()].sort(([a], [b]) => a.localeCompare(b))
@@ -229,7 +231,7 @@ export function InsightsClassic() {
     <section className="card ic-card">
       <header className="ic-head"><i /><h3>Endurance</h3></header>
       <div className="ic-toggle" role="group" aria-label="Endurance metric">{([['miles', 'Miles / week'], ['pace', 'Best pace']] as const).map(([value, label]) => <button type="button" key={value} className={endMetric === value ? 'active' : ''} onClick={() => setEndMetric(value)}>{label}</button>)}</div>
-      {enduranceSeries.length >= 2 ? <>{lineChart(enduranceSeries, 'end')}<p className="ic-sub">{endMetric === 'miles' ? 'Total miles each week' : 'Fastest weekly pace (min/mi) — lower is better'} · follows the range above</p></> : <p className="ic-empty">Not enough cardio in this range to chart.</p>}
+      {enduranceSeries.length >= 2 ? <>{lineChart(enduranceSeries, 'end')}<p className="ic-sub">{endMetric === 'miles' ? 'Total miles each week' : 'Fastest continuous mile-plus effort (min/mi) — lower is better'} · follows the range above</p></> : <p className="ic-empty">Not enough cardio in this range to chart.</p>}
       {endStats && <div className="kpi-grid ic-chart-kpis">
         <div className="kpi-tile"><b>{endMetric === 'miles' ? `${endStats.latest.value.toFixed(1)} mi` : `${paceText(endStats.latest.value)} /mi`}</b><span>{endMetric === 'miles' ? 'Latest week' : 'Latest best pace'}</span><small>Week of {shortDate(endStats.latest.date)}</small></div>
         <div className="kpi-tile sage"><b>{endMetric === 'miles' ? `${endStats.best.value.toFixed(1)} mi` : `${paceText(endStats.best.value)} /mi`}</b><span>{endMetric === 'miles' ? 'Best week' : 'Best pace'}</span><small>Week of {shortDate(endStats.best.date)}</small>{endStats.delta !== null && <small className={(endMetric === 'pace' ? endStats.delta < 0 : endStats.delta > 0) ? 'ic-delta up' : endStats.delta === 0 ? 'ic-delta' : 'ic-delta down'}>{endStats.delta === 0 ? 'No change' : endMetric === 'pace' ? `${endStats.delta < 0 ? '−' : '+'}${paceText(Math.abs(endStats.delta))} /mi` : `${endStats.delta > 0 ? '+' : ''}${endStats.delta.toFixed(1)} mi`} · {rangeLabels[prRange]}</small>}</div>

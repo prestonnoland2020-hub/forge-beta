@@ -145,8 +145,21 @@ Deno.serve(async request => {
        a tested single is the only set that goal can register, and nothing
        else owes one. An empty list means no strength goal exists yet, so
        everything tests rather than nothing ever converting. */
-    const goalLifts = new Set((Array.isArray(context_.goalLifts) ? context_.goalLifts : []).map(String));
-    const tests = (exercise: string) => goalLifts.size === 0 || goalLifts.has(exercise);
+    /* Same alias fold the client uses: a "Squat" goal claims a "Back Squat"
+       prescription — one lift, two eras of naming. */
+    const LIFT_ALIASES: string[][] = [
+      ['squat', 'back squat', 'barbell squat', 'barbell back squat'],
+      ['bench', 'bench press', 'barbell bench press', 'flat bench', 'flat bench press'],
+      ['deadlift', 'conventional deadlift', 'barbell deadlift'],
+      ['standing overhead press', 'overhead press', 'military press', 'strict press', 'ohp'],
+      ['pull ups', 'pull-ups', 'pullups', 'pull up', 'pullup'],
+      ['smith machine incline bench', 'smith machine incline bench press', 'smith machine incline press'],
+    ];
+    const aliasKey = new Map<string, string>();
+    LIFT_ALIASES.forEach(group => group.forEach(name => aliasKey.set(name, group[0])));
+    const liftKey = (name: string) => { const plain = String(name || '').trim().toLowerCase().replace(/\s+/g, ' '); return aliasKey.get(plain) || plain; };
+    const goalLifts = new Set((Array.isArray(context_.goalLifts) ? context_.goalLifts : []).map(name => liftKey(String(name))));
+    const tests = (exercise: string) => goalLifts.size === 0 || goalLifts.has(liftKey(exercise));
     const metric = String(context_.units || '').toLowerCase() === 'metric';
     const step = metric ? 2.5 : 5;
     const bump = metric ? 3.75 : 7.5;
@@ -199,11 +212,12 @@ Deno.serve(async request => {
     plan.weeks.forEach((week: { topSets?: Array<{ exercise: string; weight: number; reps: number }> }, index: number) => {
       const slot = index % 5;
       for (const set of (week.topSets || [])) {
-        const logged = Number(bests[set.exercise]) || 0;
+        const findByKey = (table: Record<string, number>) => Number(table[set.exercise]) || Number(Object.entries(table).find(([name]) => liftKey(name) === liftKey(set.exercise))?.[1]) || 0;
+        const logged = findByKey(bests);
         if (!logged) continue;
         const attempt = slot === 4 && tests(set.exercise);
         set.reps = attempt ? 1 : slot === 4 ? 2 : WAVE_REPS[slot];
-        const single = Number(singles[set.exercise]) || 0;
+        const single = findByKey(singles);
         set.weight = attempt
           ? Math.max(step, Math.ceil((single ? single + bump : (logged + bump) / (1 + 1 / 30)) / step) * step)
           : weightFor(logged, set.reps);

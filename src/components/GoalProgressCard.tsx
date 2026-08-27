@@ -130,7 +130,11 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     }
   } else if (goal.type === 'Body Composition') {
     records.filter(record => record.bodyWeight).forEach(record => {const point={ date: record.date, value: record.bodyWeight!, label: 'Body-weight check-in' };trajectoryEvidence.push(point);demonstratedTrajectory.push(point)});
-    const latest = [...records].reverse().find(record => record.bodyWeight);
+    /* "Current" is the NEWEST check-in. records arrive newest-first, so the
+       old reverse().find() was returning the FIRST body weight ever logged —
+       a daily logger saw a reading from last January labelled current. Max by
+       date, no ordering assumption. */
+    const latest = records.filter(record => record.bodyWeight).sort((a, b) => b.date.localeCompare(a.date))[0];
     currentEvidence = latest?.bodyWeight ? { date: latest.date, value: latest.bodyWeight, label: 'Body-weight check-in' } : entered ? { date: '', value: entered, label: 'Starting result you entered' } : undefined;
   } else if (goal.type === 'Endurance') {
     const demonstrated: GoalEvidence[] = entered ? [{ date: '', value: entered, label: 'Starting result you entered' }] : [];
@@ -234,6 +238,17 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const regression=goal.type==='Body Composition'&&datedTrajectory.length>=2?(()=>{const points=datedTrajectory.map(item=>({x:(new Date(`${item.date}T12:00:00`).getTime()-chartStartMs)/86400000,y:item.value}));const meanX=points.reduce((sum,item)=>sum+item.x,0)/points.length,meanY=points.reduce((sum,item)=>sum+item.y,0)/points.length;const denominator=points.reduce((sum,item)=>sum+(item.x-meanX)**2,0);const slope=denominator?points.reduce((sum,item)=>sum+(item.x-meanX)*(item.y-meanY),0)/denominator:0;const intercept=meanY-slope*meanX;const deadlineX=(deadlineMs-chartStartMs)/86400000;return{slope,intercept,predicted:intercept+slope*deadlineX}})():null;
   const strengthForecast=goal.type==='Strength'?buildStrengthForecast(datedTrajectory,calculated,goal.date):null;
   const predictedAtDeadline=strengthForecast?.predicted??regression?.predicted;
+  /* The PROJECTED tile shows the trend forecast, but its explainer used to
+     describe calculatedEvidence — a different quantity that does not exist for
+     a body-composition goal. So the tile read "192.3 lb" over the words "No
+     calculation available". The explanation now describes the number above
+     it. */
+  const trendPointCount=datedTrajectory.length;
+  const projectedSource=goal.type==='Endurance'
+    ?`${aiEstimate?`Legacy race assessment · ${aiEstimate.confidence} confidence`:aiEstimateLoading?'Legacy assessment in progress':aiEstimateError||(enduranceProjection?`Trend across ${shownProgress.length} logged efforts`:'No legacy assessment available')}${aiEstimate?` · ${aiEstimate.reason}`:''}`
+    :predictedAtDeadline
+      ?`Trend across ${trendPointCount} check-in${trendPointCount===1?'':'s'}, carried to ${formatDate(goal.date)}`
+      :`Not enough logged history to project yet — ${trendPointCount<2?'two check-ins':'a clearer trend'} would give one`;
   /* Endurance gets the SAME projection treatment as lifts: linear trend over
      the recent window, evaluated at the goal date, clamped to sane bounds
      (never faster than slightly beyond the best logged effort). */
@@ -259,7 +274,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   };
 
   return <article className={`goal-progress-card goal-tracker-simple${goal.type==='Endurance'?' endurance-goal':''}${goalReached?' goal-complete':''}`}>
-    <header><div><span>{goal.type.toUpperCase()} · {goal.exercise || goal.metric}</span><h3>{goal.title}</h3></div><div className="goal-head-side"><b className={goalReached ? 'on-track' : ''}>{goalReached ? 'Goal reached' : 'In progress'}</b><small>{roadmap.weeksRemaining} wks left · {formatDate(goal.date)}</small></div></header>
+    <header><div><span>{goal.type.toUpperCase()}{goal.type==='Body Composition'?(goal.metric?` · ${goal.metric}`:''):` · ${goal.exercise||goal.metric}`}</span><h3>{goal.title}</h3></div><div className="goal-head-side"><b className={goalReached ? 'on-track' : ''}>{goalReached ? 'Goal reached' : 'In progress'}</b><small>{roadmap.weeksRemaining} wks left · {formatDate(goal.date)}</small></div></header>
     <section className="goal-stat-tiles">
       <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{currentEvidence?.date?formatDate(currentEvidence.date):'Best logged evidence'}</small></div>
       <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?'Forge AI assessment':'At goal date'}</small></div>
@@ -268,7 +283,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     </section>
     <details className="goal-sources-details"><summary>Where these numbers come from</summary>
       <div><span>CURRENT</span><p>{currentSource}{currentEvidence?.date ? ` · ${formatDate(currentEvidence.date)}` : ''}. The best performance your logged data demonstrates.</p></div>
-      <div><span>PROJECTED</span><p>{calculatedSource}{goal.type==='Endurance'?(aiEstimate?` · ${aiEstimate.reason}`:''):(calculatedEvidence?.date?` · ${formatDate(calculatedEvidence.date)}`:'')}. A goal-specific projection — it never substitutes unrelated workouts.</p></div>
+      <div><span>PROJECTED</span><p>{projectedSource}. A goal-specific projection — it never substitutes unrelated workouts.</p></div>
     </details>
     
     {(()=>{const statusOk=['Goal reached','On track','Progressing','AI assessed'].includes(trajectoryStatus);const projText=goal.type==='Endurance'?(calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText);return <section className="goal-assessment"><header><span>FORGE ASSESSMENT</span><b className={statusOk?'on-track':'behind'}>{trajectoryStatus}</b></header>

@@ -52,6 +52,30 @@ export function cardioMiles(draft:CardioLogDraft):number{
   const totals=summarizeCardioDraft(draft);return distanceMiles(totals.distance,unit);
 }
 
+/* The fastest CONTINUOUS running effort of at least one mile in a session,
+   in min/mi. "Best pace" used to be the whole-session average of anything
+   over half a mile — so an interval day whose rests went unlogged (2 × 400 m
+   as "0.5 mi in 2:26") published a 4:52/mi all-time best, while a genuinely
+   run 5:18 mile lost to arithmetic. A pace only counts here when one logged
+   segment actually covered the distance: per-interval for structured
+   sessions, whole-session for steady runs. Sanity bounds 4-18 min/mi. */
+export function bestRunPaceMinutesPerMile(draft:CardioLogDraft):number{
+  const consider=(miles:number,minutes:number,out:number[])=>{if(miles>=1&&minutes>0){const pace=minutes/miles;if(pace>=4&&pace<=18)out.push(pace)}};
+  const candidates:number[]=[];
+  const legacy=legacyCardioIntervals(draft);
+  if(legacy.length){
+    legacy.forEach(line=>{
+      const activity=String(line.cardioType||line.activity||draft.activity);
+      const unit=String(line.unit||line.distanceUnit||(isRunning(activity)?'miles':''));
+      if(isNonRunningCardio(activity)||/\bwalk\b/i.test(activity)||!isMileageInterval(activity,unit))return;
+      consider(distanceMiles(Number(line.distance)||0,unit),Number(line.time)||0,candidates);
+    });
+  }else if(!isNonRunningCardio(draft.activity)&&!/\bwalk\b/i.test(draft.activity)){
+    consider(cardioMiles(draft),summarizeCardioDraft(draft).minutes,candidates);
+  }
+  return candidates.length?Math.min(...candidates):0;
+}
+
 export function isRunningCardio(draft:CardioLogDraft):boolean{
   if(isNonRunningCardio(draft.activity)||/\bwalk\b/i.test(draft.activity))return false;
   const legacy=legacyCardioIntervals(draft);

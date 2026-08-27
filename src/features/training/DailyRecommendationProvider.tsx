@@ -10,6 +10,7 @@ import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
 import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames } from './aiPlanService';
+import { canonicalLiftKey } from '../../lib/liftAliases';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void};
 const Context=createContext<Value|null>(null);
@@ -49,12 +50,12 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        always derives from the CURRENT logged best — a PR yesterday raises
        today; a miss holds the wave in place. */
     const weekIdx=currentWeekIndex(storedPlan);
-    let liveBest=0;let liveSingle=0;records.forEach(record=>(record.topSets||[]).forEach(set=>{if(set.completed===false||set.lift!==match.exercise||!set.weight)return;const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));if(max>liveBest)liveBest=max;if(set.reps===1&&set.weight>liveSingle)liveSingle=set.weight}));
+    let liveBest=0;let liveSingle=0;records.forEach(record=>(record.topSets||[]).forEach(set=>{if(set.completed===false||!set.weight||canonicalLiftKey(set.lift)!==canonicalLiftKey(match.exercise))return;const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));if(max>liveBest)liveBest=max;if(set.reps===1&&set.weight>liveSingle)liveSingle=set.weight}));
     const metric=Boolean(setup?.units==='Metric');
     /* Max week belongs to lifts with a Real 1RM goal — the only set that goal
        can register. Others hold the double and are offered the single. */
     const goalLifts=goalLiftNames(goals);
-    const tests=goalLifts.size===0||goalLifts.has(match.exercise);
+    const tests=goalLifts.size===0||goalLifts.has(canonicalLiftKey(match.exercise));
     const live=liveBest?wavePrescription(liveBest,weekIdx,metric,liveSingle,tests):{weight:match.weight,reps:match.reps,isMax:waveSlot(weekIdx).isMax,optionalMax:undefined};
     const slotLabel=live.isMax?'MAX WEEK — 1RM attempt':live.optionalMax?`heavy double · optional max ${live.optionalMax} × 1`:`${live.reps}-rep week`;
     let applied=false;

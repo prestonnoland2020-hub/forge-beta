@@ -7,6 +7,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { isDemoMode } from '../lib/env';
+import { canonicalLiftKey } from '../lib/liftAliases';
 import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
@@ -138,7 +139,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      else holds the double and offers the attempt. No strength goal at all and
      every lift tests, or a calc max would never convert into a real one. */
   const goalLifts = useMemo(() => goalLiftNames(goals), [goals]);
-  const testsThisBlock = (exercise: string) => goalLifts.size === 0 || goalLifts.has(exercise);
+  const testsThisBlock = (exercise: string) => goalLifts.size === 0 || goalLifts.has(canonicalLiftKey(exercise));
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */
@@ -292,7 +293,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((item, index) => ({
       ...item,
       topSets: (item.topSets || []).map(set => {
-        const best = bests.get(set.exercise);
+        const best = bests.get(set.exercise) ?? [...bests.entries()].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(set.exercise))?.[1];
         if (!best) return set;
         const live = wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, testsThisBlock(set.exercise));
         if (live.weight !== set.weight || live.reps !== set.reps) liveAdjusted = true;

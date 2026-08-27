@@ -6,6 +6,7 @@ import type { RecoveryState } from './recoveryEngine';
 import { buildWeeklyCardio, type GeneratedSession } from './cardioEngine';
 import { normalizeMuscleGroups } from './muscleGroups';
 import { buildTrainingIntelligence } from './trainingIntelligence';
+import { canonicalLiftKey } from './liftAliases';
 
 export const DAILY_RECOMMENDATION_VERSION='completed-split-v2';
 
@@ -69,7 +70,10 @@ type EngineInput={
   loadBiasPercent:number;
 };
 
-const normalized=(value:string)=>value.trim().toLowerCase();
+/* Alias-aware: a split day mapped to "Back Squat" on a phone that predates a
+   legacy import must still resolve to the athlete's imported "Squat" — same
+   lift, different era of the app. */
+const normalized=(value:string)=>canonicalLiftKey(value);
 const strengthResults=(records:WorkoutRecord[])=>records.flatMap(record=>(record.topSets||[]).filter(set=>set.completed!==false&&set.lift&&set.weight>0&&set.reps>0).map(set=>({date:record.date,lift:set.lift,muscle:set.muscle})));
 const stableHash=(value:string)=>{let hash=2166136261;for(let index=0;index<value.length;index++){hash^=value.charCodeAt(index);hash=Math.imul(hash,16777619)}return(hash>>>0).toString(36)};
 const goalTarget=(goal:CreatedGoal)=>Number(String(goal.target||'').replace(/[^0-9.]/g,''))||0;

@@ -34,16 +34,13 @@ export function HistoryPage({embedded=false}:{embedded?:boolean}={}){
       label:`${months[Number(key.slice(5,7))-1]} ${key.slice(0,4)}`,
       miles:items.reduce((total,record)=>total+(record.cardioSessions||[]).reduce((sum,session)=>sum+cardioMiles(session),0),0)}));
   },[shownRecords]);
+  /* Preston's call: EVERY month arrives collapsed, the newest included — the
+     log opens as a table of contents, one tap deep. Searching still opens
+     everything, since a hit inside a collapsed month reads as no result. */
   const [openMonths,setOpenMonths]=useState<string[]>([]);
-  const newestMonth=logGroups[0]?.key??'';
-  /* Searching opens everything — a hit hidden inside a collapsed month reads
-     as no result at all. */
   const searching=Boolean(query.trim());
-  const isMonthOpen=(key:string)=>searching||openMonths.includes(key)||(!openMonths.length&&key===newestMonth);
-  const toggleMonth=(key:string)=>setOpenMonths(current=>{
-    const base=current.length?current:[newestMonth];
-    return base.includes(key)?base.filter(item=>item!==key):[...base,key];
-  });
+  const isMonthOpen=(key:string)=>searching||openMonths.includes(key);
+  const toggleMonth=(key:string)=>setOpenMonths(current=>current.includes(key)?current.filter(item=>item!==key):[...current,key]);
   const monthStrengthDays=new Set(monthRecords.filter(hasStrength).map(record=>record.date)).size;const monthCardioDays=new Set(monthRecords.filter(hasCardio).map(record=>record.date)).size;const monthMiles=monthRecords.reduce((total,record)=>total+(record.cardioSessions||[]).reduce((sum,session)=>sum+cardioMiles(session),0),0);const monthWeights=monthRecords.map(record=>record.bodyWeight).filter((value):value is number=>typeof value==='number'&&value>0);const monthAverageWeight=monthWeights.length?monthWeights.reduce((sum,value)=>sum+value,0)/monthWeights.length:null;
   const calendarTouchStart=useRef<number|null>(null);
   const streaks=useMemo(()=>{const activeDays=[...new Set(trainingRecords.map(record=>record.date))].sort();if(!activeDays.length)return{current:0,best:0};const dayNumber=(date:string)=>Math.floor(new Date(`${date}T12:00:00`).getTime()/86400000);let best=1,run=1;for(let index=1;index<activeDays.length;index+=1){run=dayNumber(activeDays[index])-dayNumber(activeDays[index-1])===1?run+1:1;best=Math.max(best,run)}let current=1;for(let index=activeDays.length-1;index>0;index-=1){if(dayNumber(activeDays[index])-dayNumber(activeDays[index-1])!==1)break;current+=1}const latestGap=dayNumber(iso(now.getFullYear(),now.getMonth(),now.getDate()))-dayNumber(activeDays[activeDays.length-1]);return{current:latestGap<=1?current:0,best}},[trainingRecords,now]);

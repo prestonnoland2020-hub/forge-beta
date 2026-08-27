@@ -1,6 +1,7 @@
 import { createContext,useContext,useEffect,useState,type ReactNode } from 'react';
 import type { PlannedCardio } from '../../components/CardioPlanBuilder';
 import { isDemoMode } from '../../lib/env';
+import { canonicalLiftKey } from '../../lib/liftAliases';
 import { normalizeMuscleGroups } from '../../lib/muscleGroups';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
@@ -40,8 +41,14 @@ export function TrainingLibraryProvider({children}:{children:ReactNode}){
     const saved=JSON.parse(localStorage.getItem(key)||'{}');
     const savedExercises=Array.isArray(saved.exercises)?saved.exercises.map((item:Partial<LibraryExercise>,index:number)=>normalizeExercise(item,Date.now()+index)):[];
     const needsCircuitSeed=(saved.circuitLibraryVersion||0)<circuitLibraryVersion;
-    const existingNames=new Set(savedExercises.map((item:LibraryExercise)=>item.name.trim().toLowerCase()));
-    const exercises=needsCircuitSeed?[...savedExercises,...starterExercises.filter(item=>!existingNames.has(item.name.toLowerCase()))]:(savedExercises.length?savedExercises:starterExercises);
+    /* Heal duplicates already persisted: when two saved rows are the same lift
+       under different names (imported "Squat" beside starter "Back Squat"),
+       the imported/custom one is the athlete's — the starter drops. */
+    const byKey=new Map<string,LibraryExercise>();
+    savedExercises.forEach((item:LibraryExercise)=>{const k=canonicalLiftKey(item.name);const held=byKey.get(k);if(!held||(item.custom&&!held.custom))byKey.set(k,item)});
+    const dedupedSaved=savedExercises.filter((item:LibraryExercise)=>byKey.get(canonicalLiftKey(item.name))===item);
+    const existingNames=new Set(dedupedSaved.map((item:LibraryExercise)=>canonicalLiftKey(item.name)));
+    const exercises=needsCircuitSeed?[...dedupedSaved,...starterExercises.filter(item=>!existingNames.has(canonicalLiftKey(item.name)))]:(dedupedSaved.length?dedupedSaved:starterExercises);
     return{exercises,workouts:Array.isArray(saved.workouts)?saved.workouts:starterWorkouts,circuitLibraryVersion};
   }catch{return{exercises:starterExercises,workouts:starterWorkouts,circuitLibraryVersion}}});
 
@@ -49,7 +56,11 @@ export function TrainingLibraryProvider({children}:{children:ReactNode}){
   useEffect(()=>{if(isDemoMode||!user)return;let active=true;void supabase.from('exercise_library').select('*').eq('owner_id',user.id).order('name').then(({data,error})=>{
     if(!active||error||!data?.length)return;
     const imported=data.map((row,index)=>normalizeExercise({id:-(index+1),name:row.name,kind:row.kind,muscles:row.muscle_groups,detail:row.detail||'Imported from legacy Google Sheets',enabled:row.enabled,custom:true,defaultTarget:row.default_target,defaultUnit:row.default_unit},-(index+1)));
-    setState(value=>{const remoteNames=new Set(imported.map(item=>item.name.trim().toLowerCase()));return{...value,exercises:[...imported,...value.exercises.filter(item=>!remoteNames.has(item.name.trim().toLowerCase()))]}});
+    /* Alias-aware: an imported "Squat" makes the starter "Back Squat" a
+       duplicate, not a different lift. Filtering by canonical key also heals
+       libraries that already persisted both — the merge runs on every signed-in
+       load, so the duplicate starter drops out the next time the app opens. */
+    setState(value=>{const remoteNames=new Set(imported.map(item=>canonicalLiftKey(item.name)));return{...value,exercises:[...imported,...value.exercises.filter(item=>!remoteNames.has(canonicalLiftKey(item.name)))]}});
   });return()=>{active=false}},[user]);
 
   const addExercise=(exercise:Omit<LibraryExercise,'id'>)=>{const next=normalizeExercise({...exercise,id:Date.now()},Date.now());setState(value=>({...value,exercises:[...value.exercises,next]}));if(!isDemoMode&&user)void supabase.from('exercise_library').insert({owner_id:user.id,name:next.name,kind:next.kind,muscle_groups:next.muscles,detail:next.detail,enabled:next.enabled,default_target:next.defaultTarget||null,default_unit:next.defaultUnit||null}).then(({error})=>{if(error)console.warn('Exercise sync failed',error.message)});return next};
