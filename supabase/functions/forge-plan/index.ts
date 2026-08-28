@@ -80,7 +80,8 @@ STRENGTH RULES — THE 8/6/4/2/1 WAVE (Forge's fixed progression system)
 
 RUNNING RULES
 - Scale weekly mileage from the athlete's CURRENT logged weekly volume toward what the endurance goal requires, growing at most ~8-10% per week, within the athlete's stated min/max weekly mileage. Schedule the running DELOAD (~20% mileage cut) on each wave's 2-REP week (weeks 4, 9, …) so MAX WEEK always follows a lighter week and the athlete attempts the PR fresh.
-- The athlete runs exactly their stated running days per week. One long run (25-35% of the week, growing gradually from their current longest), at most one quality session, the rest easy.
+- THE ATHLETE RUNS THEIR STATED NUMBER OF DAYS PER WEEK — context.profile.runningDays, every week, no fewer. One long run (25-35% of the week, growing gradually from their current longest), at most one quality session, and EVERY REMAINING RUN DAY IS AN EASY RUN listed in easyDays by split-day name. easyDays is only empty when runningDays is 1-2 and the long run and quality already account for them; with 7 running days it must name 5 more days. easyMinutes must be greater than 0 whenever easyDays is non-empty.
+- weekly mileage must land INSIDE context.profile.minWeeklyMileage..maxWeeklyMileage every single week, deloads included. A week below the athlete's stated floor is not a deload, it is a mistake.
 - EASY PACE comes from the athlete's LOGGED average easy pace — roughly their logged pace, drifting only slightly faster as fitness builds. Never derive easy pace from goal race pace. Easy runs must be comfortably slower than any race or quality pace.
 - Quality sessions progress logically: shorter reps at goal effort early, longer reps and threshold work mid-plan, race-specific work late. State them compactly like "6 × 400 m" with qualityPace like "1:38/rep" or "7:10/mi".
 - PLACEMENT: name days using the athlete's exact split-day names. Runs may be placed on ANY split day, including strength days as an easy double, so the athlete hits their stated running days per week. The long run gets its own day (longRunDay) with no other running and ideally light or no lifting.
@@ -207,6 +208,39 @@ Deno.serve(async request => {
       }
     }
     plan.weeks.forEach((week: { week: number }, index: number) => { week.week = index + 1; });
+    /* RUN DAYS AND MILEAGE ARE THE ATHLETE'S, NOT THE MODEL'S. Asked for 7
+       running days inside a 14-25 mile range, it returned easyDays: [] and
+       11.1 miles — two runs a week, so most split days showed no cardio at
+       all. Enforced here: mileage clamped into range, easy runs filled onto
+       the split days not already carrying the long run or the quality
+       session. The client applies the identical correction at render, so a
+       block stored before this existed heals without regeneration. */
+    const runningDays = Math.max(0, Math.min(7, Math.round(Number(profile.runningDays) || 0)));
+    if (runningDays) {
+      const dayList = (Array.isArray(context_.splitDays) ? context_.splitDays : []) as Array<{ name?: string; type?: string }>;
+      const isRest = (day: { name?: string; type?: string }) => /rest/i.test(String(day.type || '')) || /^\s*rest\b/i.test(String(day.name || ''));
+      const paceMinutes = (pace: string) => { const match = String(pace || '').match(/(\d+):(\d{2})/); return match ? Number(match[1]) + Number(match[2]) / 60 : 0; };
+      plan.weeks.forEach((week: Record<string, unknown>) => {
+        let mileage = Number(week.mileage) || 0;
+        if (!mileage) return;
+        if (ceiling) mileage = Math.min(mileage, ceiling);
+        if (floor_) mileage = Math.max(mileage, floor_);
+        week.mileage = Math.round(mileage * 10) / 10;
+        const hasLong = Number(week.longRunMiles) > 0 && Boolean(week.longRunDay);
+        const quality = String(week.quality || '');
+        const hasQuality = Boolean(quality) && !/no goal/i.test(quality) && Boolean(week.qualityDay);
+        const taken = new Set([hasLong ? String(week.longRunDay) : '', hasQuality ? String(week.qualityDay) : ''].filter(Boolean));
+        const needed = Math.max(0, runningDays - (hasLong ? 1 : 0) - (hasQuality ? 1 : 0));
+        const kept = (Array.isArray(week.easyDays) ? week.easyDays as string[] : []).filter(name => dayList.some(day => day.name === name) && !taken.has(name));
+        const fill = dayList.filter(day => !isRest(day) && day.name && !taken.has(String(day.name)) && !kept.includes(String(day.name))).map(day => String(day.name));
+        week.easyDays = [...kept, ...fill].slice(0, needed);
+        if ((week.easyDays as string[]).length && !(Number(week.easyMinutes) || 0)) {
+          const spare = Math.max(0, mileage - (Number(week.longRunMiles) || 0) - (hasQuality ? 3 : 0));
+          const perRun = spare / (week.easyDays as string[]).length;
+          week.easyMinutes = Math.max(10, Math.min(90, Math.round((perRun * (paceMinutes(String(week.easyPace || '')) || 9.5)) / 5) * 5));
+        }
+      });
+    }
     /* The model is told not to name the block length; if it does anyway, the
        number it prints is the one it planned, not the one it returned. */
     if (typeof plan.summary === 'string') plan.summary = plan.summary.replace(/\b\d+\s*[-\u2010-\u2015]?\s*week block\b/gi, `${plan.weeks.length}-week block`);

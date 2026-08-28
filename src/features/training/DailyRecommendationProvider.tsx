@@ -9,7 +9,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax } from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning } from './aiPlanService';
 import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void};
@@ -42,7 +42,16 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      recompute when goals arrive. Without this the memo ran once against an
      empty goals list and the athlete's goal lift held a double on max week. */
   const goalStamp=useMemo(()=>goals.filter(goal=>goal.type==='Strength').map(goal=>`${goal.exercise}`).sort().join('|'),[goals]);
-  const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp}),[date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
+  /* A daily row is keyed to the athlete's running preferences and split, not
+     just the date: a snapshot saved when the split had not loaded said "no
+     cardio today" and outlived the correction, because the fingerprint never
+     mentioned those inputs. */
+  /* The overlay reads the split list and the athlete's running preferences to
+     place cardio. Both arrive asynchronously, so the memo must recompute when
+     they do — otherwise it decides "no run today" against an empty split and
+     never revisits it. */
+  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage]);
+  const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   const generatedBase=useMemo(()=>buildDailyRecommendation({date,splitDay,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,inputFingerprint}),[date,splitDay,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,inputFingerprint]);
   /* The stored AI program is authoritative for today's numbers: when its
      current week prescribes a top set for this split day, that exercise,
@@ -51,8 +60,12 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const generated=useMemo(()=>{
     const storedPlan=readLocalAiPlan();
     if(!generatedBase||!storedPlan)return generatedBase;
-    const week=storedPlan.plan.weeks[currentWeekIndex(storedPlan)];
-    if(!week)return generatedBase;
+    const rawWeek=storedPlan.plan.weeks[currentWeekIndex(storedPlan)];
+    if(!rawWeek)return generatedBase;
+    /* Same correction the Plan page applies: the athlete's stated running days
+       and mileage floor decide the week, so Today never comes up empty on a
+       day the plan simply forgot to schedule. */
+    const week=resolveWeekRunning(rawWeek,days,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0});
     /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
        second opinion that could contradict the block — 4 × 200 m on a leg
        day the plan had given an easy run. With a stored plan, today's cardio
@@ -133,7 +146,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:Math.round(wave.weight*(1+wave.reps/30)),rationale:wave.rationale};
     });
     return{...cardioBase,topSets};
-  },[generatedBase,aiPlanStamp,goalStamp]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[generatedBase,aiPlanStamp,goalStamp,planInputsStamp]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{if(isDemoMode||!user){setStored(current=>current?.status==='completed'||current?.inputFingerprint===inputFingerprint?current:generated);return}let active=true;setLoading(true);void loadDailyRecommendation(user.id,date).then(async existing=>{if(!active)return;if(forceRegenerate.current&&existing?.status!=='completed'){forceRegenerate.current=false;const saved=await saveDailyRecommendation(user.id,generated);if(active)setStored(saved);return}forceRegenerate.current=false;if(existing?.status==='completed'||(existing?.algorithmVersion===DAILY_RECOMMENDATION_VERSION&&existing?.inputFingerprint===inputFingerprint)){setStored(existing);return}const saved=await saveDailyRecommendation(user.id,generated);if(active)setStored(saved)}).then(()=>{if(active)setSyncError(null)}).catch(error=>{if(active){setStored(generated);setSyncError(error instanceof Error?error.message:'Could not save today’s recommendation.')}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user,date,inputFingerprint,generated]);
   const persist=useCallback((next:DailyRecommendation)=>{setStored(next);if(!isDemoMode&&user)void saveDailyRecommendation(user.id,next).then(setStored).catch(error=>setSyncError(error instanceof Error?error.message:'Could not save recommendation choices.'))},[user]);
   const recommendation=stored||generated;

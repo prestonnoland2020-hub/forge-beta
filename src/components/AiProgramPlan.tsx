@@ -12,7 +12,7 @@ import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, type AiPlanWeek, type StoredAiPlan,
+  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolveWeekRunning, type AiPlanWeek, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -318,7 +318,11 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   let liveAdjusted = false;
   const plan = {
     ...storedPlanData,
-    weeks: storedPlanData.weeks.map((item, index) => ({
+    weeks: storedPlanData.weeks.map((rawItem, index) => {
+      /* The athlete's stated run days and mileage floor are enforced here too,
+         so a block generated before the rule existed still shows every run. */
+      const item = resolveWeekRunning(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage });
+      return {
       ...item,
       topSets: (item.topSets || []).map(raw => {
         const owner = dayGoalLift.get(raw.splitDay) || dayGoalLift.get(splitDayKey(raw.splitDay));
@@ -333,7 +337,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         const hold = live.reps === 1 ? wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, false) : undefined;
         return { ...set, weight: live.weight, reps: live.reps, hold: hold && { weight: hold.weight, reps: hold.reps } };
       }),
-    })),
+    }; }),
   };
   const weekIndex = currentWeekIndex(stored);
   const week = plan.weeks[weekIndex];
@@ -362,19 +366,23 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
 
   return <div className="simple-program ai-program">
     <section className="simple-program-head"><div><span className="eyebrow">WEEK {week.week} OF {plan.weeks.length} · {weekIndex % 5 === 4 ? 'MAX WEEK' : week.phase.toUpperCase()}</span><h2>{weekIndex % 5 === 4 ? 'Max Week' : week.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{goalLiftEntries.length ? goalLiftEntries.map(entry => entry.name).join(' · ') : headline(week)?.exercise || 'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{week.mileage ? `${week.mileage} ${metric ? 'km' : 'mi'} this week` : 'Not scheduled'}</strong></div></div></section>
-    <section className="card ai-program-meta"><div><span className="eyebrow">AI PROGRAM · GENERATED {generatedLabel.toUpperCase()}</span><p>{plan.summary}</p>{week.note ? <small>{week.note}</small> : null}{liveAdjusted ? <small className="ai-program-adjusted">Loads updated from your latest logged sets — the wave follows what you actually lift.</small> : null}</div><div className="plan-actions">
+    {/* The block's numbers are stated by the ledgers and the schedule below;
+        this card is the two actions and the stamp that says which block they
+        act on. The generated summary was an essay repeating what those cards
+        already show. */}
+    <section className="card ai-program-meta compact"><div><span className="eyebrow">AI PROGRAM · GENERATED {generatedLabel.toUpperCase()}</span>{generating ? <small className="ai-program-progress">{generatingStage}</small> : null}</div><div className="plan-actions">
       {/* Saving is a local pin — it needs no backend, so it is offered
           wherever a block exists. Refreshing calls the plan service. */}
       {stored.saved
         ? <span className="plan-saved-badge" title={stored.savedAt ? `Saved ${new Date(stored.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : undefined}>✓ Plan saved</span>
         : <button type="button" className="button" disabled={generating} onClick={() => void savePlan()}>Save plan</button>}
-      {canGenerate ? <button type="button" className="button secondary" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? generatingStage.split('…')[0] + '…' : 'Refresh plan'}</button> : null}
+      {canGenerate ? <button type="button" className="button secondary" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Generating…' : 'Generate plan'}</button> : null}
     </div>{error ? <small className="ai-program-error">{error} — showing the stored block.</small> : null}
     {refreshAsk ? <div className="plan-refresh-confirm" role="alertdialog" aria-label="Confirm plan refresh">
-      <strong>Are you sure you want to refresh your plan?</strong>
+      <strong>Are you sure you want to generate a new plan?</strong>
       <small>{stored.saved ? 'This replaces the block you saved with a newly built one. It cannot be undone.' : 'This builds a new block from your current goals, split, and logged bests. The plan you are looking at is replaced.'}</small>
       <div className="plan-refresh-actions">
-        <button type="button" className="button" onClick={() => void confirmRefresh()}>Yes, refresh</button>
+        <button type="button" className="button" onClick={() => void confirmRefresh()}>Yes, generate</button>
         <button type="button" className="button ghost" onClick={() => setRefreshAsk(false)}>No, keep this plan</button>
       </div>
     </div> : null}</section>

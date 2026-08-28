@@ -116,6 +116,49 @@ export function goalLiftNames(goals: Array<{ type?: string; metric?: string; exe
 export const testsOneRepMax = (exercise: string, goalLifts: Set<string>): boolean =>
   goalLifts.has(canonicalLiftKey(exercise));
 
+/* RUNNING VOLUME AND RUN DAYS BELONG TO THE ATHLETE, NOT THE MODEL. The
+   generator is told to use every stated running day and to stay inside the
+   stated weekly-mileage range; it does not always comply. Preston runs 7 days
+   a week with a 14-mile floor and got a block with easyDays: [] and 11.1
+   miles — two running days, so most split days showed no cardio at all.
+   Asking is not enforcing, so the week is corrected here, on the way to the
+   screen: mileage clamped into range, and easy runs filled onto the split
+   days that are not already carrying the long run or the quality session.
+   Applied at render as well as at generation, so a block already stored on a
+   device heals without being regenerated. */
+export type SplitDayRef = { name: string; type?: string; dayType?: string };
+const paceToMinutes = (pace?: string): number => {
+  const match = String(pace || '').match(/(\d+):(\d{2})/);
+  return match ? Number(match[1]) + Number(match[2]) / 60 : 0;
+};
+export function resolveWeekRunning<T extends AiPlanWeek>(week: T, splitDays: SplitDayRef[], athlete: { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number }): T {
+  const runningDays = Math.max(0, Math.min(7, Math.round(Number(athlete.runningDays) || 0)));
+  const floorMiles = Number(athlete.minWeeklyMileage) || 0;
+  const ceilingMiles = Number(athlete.maxWeeklyMileage) || 0;
+  let mileage = Number(week.mileage) || 0;
+  /* A block with no running at all is a strength-only block — leave it. */
+  if (!runningDays || !mileage) return week;
+  if (ceilingMiles) mileage = Math.min(mileage, ceilingMiles);
+  if (floorMiles) mileage = Math.max(mileage, floorMiles);
+  const isRest = (day: SplitDayRef) => /rest/i.test(String(day.type ?? day.dayType ?? '')) || /^\s*rest\b/i.test(day.name);
+  const hasLong = Number(week.longRunMiles) > 0 && Boolean(week.longRunDay);
+  const hasQuality = Boolean(week.quality) && !/no goal/i.test(week.quality) && Boolean(week.qualityDay);
+  const taken = new Set([hasLong ? week.longRunDay : '', hasQuality ? week.qualityDay : ''].filter(Boolean));
+  const needed = Math.max(0, runningDays - (hasLong ? 1 : 0) - (hasQuality ? 1 : 0));
+  /* Keep the days the plan already chose, then fill from the remaining split
+     days in cycle order — never a rest day, never a day already running. */
+  const kept = (week.easyDays || []).filter(name => splitDays.some(day => day.name === name) && !taken.has(name));
+  const fill = splitDays.filter(day => !isRest(day) && !taken.has(day.name) && !kept.includes(day.name)).map(day => day.name);
+  const easyDays = [...kept, ...fill].slice(0, needed);
+  let easyMinutes = Number(week.easyMinutes) || 0;
+  if (easyDays.length && !easyMinutes) {
+    const spare = Math.max(0, mileage - (Number(week.longRunMiles) || 0) - (hasQuality ? 3 : 0));
+    const perRun = spare / easyDays.length;
+    easyMinutes = Math.max(10, Math.min(90, Math.round((perRun * (paceToMinutes(week.easyPace) || 9.5)) / 5) * 5));
+  }
+  return { ...week, mileage: Math.round(mileage * 10) / 10, easyDays, easyMinutes };
+}
+
 export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = false): { weight: number; reps: number; isMax: boolean } {
   const step = metric ? 2.5 : 5;
   const bump = metric ? 3.75 : 7.5;

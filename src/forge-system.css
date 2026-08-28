@@ -1440,3 +1440,18 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .plan-refresh-confirm small { color: var(--text-muted, #8b8f8a); font-size: 12.5px; line-height: 1.45; }
 .plan-refresh-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .plan-refresh-actions .button { flex: 1 1 auto; min-width: 140px; }
+
+/* The AI program card carries the block stamp and its two actions — the
+   generated summary duplicated the ledgers and schedule below it. */
+.ai-program-meta.compact { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ai-program-meta.compact > div:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ai-program-progress { color: var(--text-muted, #8b8f8a); font-size: 12px; }
+
+/* Today keeps its own mark on the calendar: a filled dot under the number,
+   distinct from the selection ring so both read at once when they land on
+   the same day. */
+.classic-calendar .calendar-grid button.is-today > span:first-child { position: relative; font-weight: 800; color: var(--accent, #d4ff3f); }
+.classic-calendar .calendar-grid button.is-today::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 5px; width: 14px; height: 2px; border-radius: 2px; background: var(--accent, #d4ff3f); }
+.classic-calendar .calendar-grid button.is-today.trained::after { display: none; }
+.classic-calendar .calendar-grid button.is-today { background: color-mix(in srgb, var(--accent, #d4ff3f) 9%, transparent); }
+.classic-calendar .calendar-grid button.is-today.selected { background: color-mix(in srgb, var(--accent, #d4ff3f) 16%, transparent); }
