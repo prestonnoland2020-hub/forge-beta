@@ -16,6 +16,9 @@ export type AiPlanWeek = {
   mileage: number; longRunMiles: number; longRunPace: string; longRunDay: string;
   quality: string; qualityPace: string; qualityDay: string;
   easyDays: string[]; easyMinutes: number; easyPace: string;
+  /* Miles for each entry in easyDays, derived so the week's parts add up to
+     its stated mileage. Client-side: a stored plan predates this field. */
+  easyRuns?: number[];
   topSets: AiPlanTopSet[]; note: string;
 };
 export type AiPlan = { summary: string; easyPace: string; weeks: AiPlanWeek[] };
@@ -131,32 +134,110 @@ const paceToMinutes = (pace?: string): number => {
   const match = String(pace || '').match(/(\d+):(\d{2})/);
   return match ? Number(match[1]) + Number(match[2]) / 60 : 0;
 };
-export function resolveWeekRunning<T extends AiPlanWeek>(week: T, splitDays: SplitDayRef[], athlete: { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number }): T {
+export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number; weeklyMileage?: number };
+
+const round1 = (value: number) => Math.round(value * 10) / 10;
+
+/* Miles a quality session actually covers, including warm-up and cool-down.
+   The model writes these as prose ("6 × 400 m", "3 × 1 mi (5.8 mi total with
+   warm-up/cool-down)", "20 min threshold"), and the week cannot be balanced
+   without turning that back into a number. */
+export const qualitySessionMiles = (quality: string, paceMinutes: number): number => {
+  const text = String(quality || '');
+  if (!text || /no goal/i.test(text)) return 0;
+  const stated = text.match(/([\d.]+)\s*(?:mi|miles)\s*total/i);
+  if (stated) return round1(Number(stated[1]));
+  const reps = text.match(/(\d+)\s*[x\u00d7]\s*([\d.]+)\s*(m|mi|mile|miles|km)\b/i);
+  if (reps) {
+    const unit = reps[3].toLowerCase();
+    const each = unit === 'm' ? Number(reps[2]) / 1609.34 : unit === 'km' ? Number(reps[2]) * 0.621371 : Number(reps[2]);
+    return round1(Number(reps[1]) * each + 2);
+  }
+  const minutes = text.match(/(\d+)\s*min/i);
+  if (minutes) return round1(Number(minutes[1]) / (paceMinutes || 9.5) + 2);
+  return 0;
+};
+
+/* THE WEEK'S RUNNING IS ARITHMETIC, NOT PROSE. Two things were wrong and they
+   compounded: the model wrote ONE easyMinutes for every easy day, so four
+   different days all read "45 min"; and nothing ever checked that the pieces
+   summed to the week's stated mileage. A 15.5-mile week was really scheduling
+   5 + 5.8 + 4 x 4.7 = 29.6 miles — double its own header and past the 25-mile
+   ceiling the athlete set.
+
+   So the volume is computed here instead: a weekly target that ramps from
+   what the athlete currently runs toward their stated maximum (deload on each
+   wave's 2-rep week), a long run held to a sane share of it, the quality
+   session measured from its own description, and the remainder split across
+   the easy days as DISTANCES at the athlete's easy pace. mileage is then set
+   to what was actually scheduled, so the number on the card is the sum of the
+   runs under it. */
+export function resolveWeekRunning<T extends AiPlanWeek>(
+  week: T,
+  splitDays: SplitDayRef[],
+  athlete: RunningAthlete,
+  block?: { weekIndex?: number; blockWeeks?: number },
+): T {
   const runningDays = Math.max(0, Math.min(7, Math.round(Number(athlete.runningDays) || 0)));
   const floorMiles = Number(athlete.minWeeklyMileage) || 0;
   const ceilingMiles = Number(athlete.maxWeeklyMileage) || 0;
-  let mileage = Number(week.mileage) || 0;
   /* A block with no running at all is a strength-only block — leave it. */
-  if (!runningDays || !mileage) return week;
-  if (ceilingMiles) mileage = Math.min(mileage, ceilingMiles);
-  if (floorMiles) mileage = Math.max(mileage, floorMiles);
+  if (!runningDays || !(Number(week.mileage) || 0)) return week;
+
+  /* Which days run: the plan's long run and quality keep their days, and the
+     rest of the athlete's stated run days are easy, never a rest day. */
   const isRest = (day: SplitDayRef) => /rest/i.test(String(day.type ?? day.dayType ?? '')) || /^\s*rest\b/i.test(day.name);
-  const hasLong = Number(week.longRunMiles) > 0 && Boolean(week.longRunDay);
-  const hasQuality = Boolean(week.quality) && !/no goal/i.test(week.quality) && Boolean(week.qualityDay);
+  /* A run only counts toward the week if its day is actually in the week. On a
+     rolling cycle that is not 7 days long the days rotate, so the long run can
+     sit outside a given week — counting it there is what made the header claim
+     miles the schedule never showed. */
+  const present = (name?: string) => Boolean(name) && splitDays.some(day => day.name === name);
+  const hasLong = Number(week.longRunMiles) > 0 && present(week.longRunDay);
+  const hasQuality = Boolean(week.quality) && !/no goal/i.test(week.quality) && present(week.qualityDay);
   const taken = new Set([hasLong ? week.longRunDay : '', hasQuality ? week.qualityDay : ''].filter(Boolean));
   const needed = Math.max(0, runningDays - (hasLong ? 1 : 0) - (hasQuality ? 1 : 0));
-  /* Keep the days the plan already chose, then fill from the remaining split
-     days in cycle order — never a rest day, never a day already running. */
   const kept = (week.easyDays || []).filter(name => splitDays.some(day => day.name === name) && !taken.has(name));
   const fill = splitDays.filter(day => !isRest(day) && !taken.has(day.name) && !kept.includes(day.name)).map(day => day.name);
   const easyDays = [...kept, ...fill].slice(0, needed);
-  let easyMinutes = Number(week.easyMinutes) || 0;
-  if (easyDays.length && !easyMinutes) {
-    const spare = Math.max(0, mileage - (Number(week.longRunMiles) || 0) - (hasQuality ? 3 : 0));
-    const perRun = spare / easyDays.length;
-    easyMinutes = Math.max(10, Math.min(90, Math.round((perRun * (paceToMinutes(week.easyPace) || 9.5)) / 5) * 5));
+
+  /* The weekly target: start from what they actually run now and climb toward
+     the ceiling they set, so a block finishes at the top of their range
+     instead of hovering near the floor. Every wave's 2-rep week deloads. */
+  const weekIndex = Math.max(0, Number(block?.weekIndex) || 0);
+  const blockWeeks = Math.max(1, Number(block?.blockWeeks) || 10);
+  const clampMiles = (value: number) => {
+    const high = ceilingMiles ? Math.min(value, ceilingMiles) : value;
+    return floorMiles ? Math.max(high, floorMiles) : high;
+  };
+  const startMiles = clampMiles(Number(athlete.weeklyMileage) || floorMiles || Number(week.mileage) || 0);
+  const progress = blockWeeks > 1 ? Math.min(1, weekIndex / (blockWeeks - 1)) : 0;
+  const climb = ceilingMiles ? startMiles + (ceilingMiles - startMiles) * progress : startMiles;
+  const target = clampMiles(round1(weekIndex % 5 === 3 ? climb * 0.8 : climb));
+
+  const pace = paceToMinutes(week.easyPace) || 9.5;
+  /* The long run is a share of the week, not an independent number. */
+  const longRunMiles = hasLong ? round1(Math.min(Math.max(Number(week.longRunMiles), target * 0.25), target * 0.35)) : 0;
+  const qualityMiles = hasQuality ? qualitySessionMiles(String(week.quality), pace) : 0;
+
+  /* Whatever is left is easy volume, split into real distances. */
+  const easyTotal = Math.max(0, round1(target - longRunMiles - qualityMiles));
+  const easyRuns: number[] = [];
+  if (easyDays.length && easyTotal > 0) {
+    const base = Math.max(1, Math.floor((easyTotal / easyDays.length) * 2) / 2);
+    for (let index = 0; index < easyDays.length; index++) easyRuns.push(base);
+    let spare = round1(easyTotal - base * easyDays.length);
+    for (let index = 0; spare >= 0.5 - 1e-9 && index < easyDays.length * 4; index++) {
+      easyRuns[index % easyDays.length] = round1(easyRuns[index % easyDays.length] + 0.5);
+      spare = round1(spare - 0.5);
+    }
+  } else if (easyDays.length) {
+    for (let index = 0; index < easyDays.length; index++) easyRuns.push(1);
   }
-  return { ...week, mileage: Math.round(mileage * 10) / 10, easyDays, easyMinutes };
+
+  /* The header equals the sum of what is actually scheduled beneath it. */
+  const scheduled = round1(longRunMiles + qualityMiles + easyRuns.reduce((total, miles) => total + miles, 0));
+  const easyMinutes = easyRuns.length ? Math.round((easyRuns[0] * pace) / 5) * 5 : 0;
+  return { ...week, mileage: scheduled, longRunMiles: longRunMiles || week.longRunMiles, easyDays, easyRuns, easyMinutes };
 }
 
 export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = false): { weight: number; reps: number; isMax: boolean } {

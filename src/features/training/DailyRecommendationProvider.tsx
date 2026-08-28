@@ -65,7 +65,11 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Same correction the Plan page applies: the athlete's stated running days
        and mileage floor decide the week, so Today never comes up empty on a
        day the plan simply forgot to schedule. */
-    const week=resolveWeekRunning(rawWeek,days,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0});
+    /* The same seven-day window the Plan page measures, rotated to start on the
+       day being shown, so both surfaces quote the identical distance. */
+    const windowStart=Math.max(0,days.findIndex(day=>day.name===generatedBase.splitDay.name));
+    const windowDays=days.length?Array.from({length:Math.min(7,days.length)},(_,offset)=>days[(windowStart+offset)%days.length]):days;
+    const week=resolveWeekRunning(rawWeek,windowDays,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage},{weekIndex:currentWeekIndex(storedPlan),blockWeeks:storedPlan.plan.weeks.length});
     /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
        second opinion that could contradict the block — 4 × 200 m on a leg
        day the plan had given an easy run. With a stored plan, today's cardio
@@ -88,8 +92,14 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
         return planSession('Long','Long run',`Long Run · ${week.longRunMiles} mi @ ${week.longRunPace}`,`Week ${week.week} long run from your program.`,{structure:'Steady',activity:'Long Run',distance:String(week.longRunMiles),distanceUnit:'miles',pace:week.longRunPace});
       if(week.quality&&!/no goal/i.test(week.quality)&&week.qualityDay===dayName&&!lowerBody)
         return planSession('Quality',week.quality,`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`,`Week ${week.week} quality session from your program.`,{structure:'Custom',activity:'Quality Run',customTarget:`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`});
-      if(week.easyMinutes>0&&(week.easyDays||[]).includes(dayName))
-        return planSession('Easy','Easy run',`Easy Run · ${week.easyMinutes} min @ ${week.easyPace}`,`Week ${week.week} easy volume from your program${lowerBody?' — easy only alongside heavy legs':''}.`,{structure:'Steady',activity:'Easy Run',duration:String(week.easyMinutes),pace:week.easyPace});
+      if((week.easyDays||[]).includes(dayName)){
+        /* Today's easy run is the distance this day was allotted, at the
+           athlete's easy pace — the same number the week's mileage sums. */
+        const easyIndex=(week.easyDays||[]).indexOf(dayName);
+        const miles=week.easyRuns?.[easyIndex>=0?easyIndex:0];
+        if(miles)return planSession('Easy','Easy run',`Easy Run · ${miles} mi @ ${week.easyPace}`,`Week ${week.week} easy volume from your program${lowerBody?' — easy only alongside heavy legs':''}.`,{structure:'Steady',activity:'Easy Run',distance:String(miles),distanceUnit:'miles',pace:week.easyPace});
+        if(week.easyMinutes>0)return planSession('Easy','Easy run',`Easy Run · ${week.easyMinutes} min @ ${week.easyPace}`,`Week ${week.week} easy volume from your program${lowerBody?' — easy only alongside heavy legs':''}.`,{structure:'Steady',activity:'Easy Run',duration:String(week.easyMinutes),pace:week.easyPace});
+      };
       return undefined;
     })();
     const cardioBase={...generatedBase,cardio:planCardio};

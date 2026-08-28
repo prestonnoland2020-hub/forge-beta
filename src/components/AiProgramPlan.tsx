@@ -33,6 +33,25 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    split-day name), but two hard guards run regardless of what the AI said:
    the quality session never lands on a lower-body day, and if the AI chose
    one anyway it is relocated to the best non-lower day of the week. */
+/* Which split days land inside a given plan week. A rolling cycle that is not
+   7 days long rotates, so an 8-day split shows only 7 of its days in any one
+   week — the volume math has to agree with the schedule about which. */
+function weekCycleDays(startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }): SplitDay[] {
+  const cycle = splitDays.length ? splitDays : [{ name: 'Training', dayType: 'strength' } as SplitDay];
+  const start = new Date(`${startIso}T12:00:00`); start.setDate(start.getDate() + weekIndex * 7);
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const todayAbsolute = Math.floor(today.getTime() / 86400000);
+  const anchorIndex = anchor ? cycle.findIndex((_, index) => index + 1 === anchor.position) : -1;
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start); date.setDate(start.getDate() + index);
+    const absoluteDay = Math.floor(date.getTime() / 86400000);
+    const cycleIndex = rhythm !== 'rolling' ? index % cycle.length
+      : anchorIndex >= 0 ? (((anchorIndex + (absoluteDay - todayAbsolute)) % cycle.length) + cycle.length) % cycle.length
+      : ((absoluteDay % cycle.length) + cycle.length) % cycle.length;
+    return cycle[cycleIndex];
+  });
+}
+
 function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi'): Session[] {
   const cycle = splitDays.length ? splitDays : [{ name: 'Training', dayType: 'strength' }];
   const start = new Date(`${startIso}T12:00:00`); start.setDate(start.getDate() + weekIndex * 7);
@@ -92,7 +111,15 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     let runText = ''; let runKind = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
     if (index === longIndex) { runKind = 'Long run'; runText = `${week.longRunMiles} ${distanceUnit} @ ${week.longRunPace}`; runStress = 'Moderate'; }
     else if (index === qualityIndex) { runKind = 'Quality'; runText = `${week.quality}${week.qualityPace ? ` @ ${week.qualityPace}` : ''}`; runStress = 'High'; }
-    else if (easySet.has(index)) { runKind = 'Easy run'; runText = `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`; runStress = 'Low'; }
+    else if (easySet.has(index)) {
+      runKind = 'Easy run';
+      /* Each easy day carries its own distance — the same number the week's
+         mileage is built from — never one duration copied onto every day. */
+      const easyIndex = (week.easyDays || []).indexOf(day.name);
+      const miles = week.easyRuns?.[easyIndex >= 0 ? easyIndex : 0];
+      runText = miles ? `${miles} ${distanceUnit} @ ${week.easyPace}` : `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`;
+      runStress = 'Low';
+    }
     const strengthText = topSet
       ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${topSet.exercise}: ${topSet.weight} × ${topSet.reps}`
       : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
@@ -321,7 +348,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* The athlete's stated run days and mileage floor are enforced here too,
          so a block generated before the rule existed still shows every run. */
-      const item = resolveWeekRunning(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage });
+      const item = resolveWeekRunning(rawItem, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor), { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length });
       return {
       ...item,
       topSets: (item.topSets || []).map(raw => {
