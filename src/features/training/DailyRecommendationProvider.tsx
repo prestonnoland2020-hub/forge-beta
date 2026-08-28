@@ -9,8 +9,8 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames } from './aiPlanService';
-import { canonicalLiftKey } from '../../lib/liftAliases';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax } from './aiPlanService';
+import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void};
 const Context=createContext<Value|null>(null);
@@ -58,7 +58,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const dayName=generatedBase.splitDay.name;
     const LOWER=['Quads','Hamstrings','Glutes','Calves'];
     const lowerBody=(generatedBase.splitDay.muscles||[]).some(muscle=>LOWER.includes(muscle))
-      ||(week.topSets||[]).some(set=>set.splitDay===dayName&&/squat|deadlift|lunge|leg press|rdl/i.test(set.exercise))
+      ||(week.topSets||[]).some(set=>splitDayKey(set.splitDay)===splitDayKey(dayName)&&/squat|deadlift|lunge|leg press|rdl/i.test(set.exercise))
       ||/\bleg/i.test(dayName);
     const planSession=(role:'Long'|'Quality'|'Easy',title:string,summary:string,rationale:string,plan:Record<string,unknown>):NonNullable<DailyRecommendation['cardio']>=>({
       id:`plan-cardio-${role.toLowerCase()}-${week.week}`,title,summary,rationale,selected:true,
@@ -76,8 +76,13 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       return undefined;
     })();
     const cardioBase={...generatedBase,cardio:planCardio};
-    const match=week?.topSets?.find(set=>set.splitDay===generatedBase.splitDay.name);
-    if(!match)return cardioBase;
+    const rawMatch=week?.topSets?.find(set=>set.splitDay===generatedBase.splitDay.name)||week?.topSets?.find(set=>splitDayKey(set.splitDay)===splitDayKey(generatedBase.splitDay.name));
+    if(!rawMatch)return cardioBase;
+    /* THE GOAL LIFT OWNS ITS DAY — same repair the Plan page applies, so
+       Today never prescribes a machine variation on a day that maps the
+       athlete's actual goal lift. */
+    const dayOwner=(generatedBase.splitDay.exercises||[]).find(name=>goalLiftNames(goals).has(canonicalLiftKey(name)));
+    const match=dayOwner&&canonicalLiftKey(dayOwner)!==canonicalLiftKey(rawMatch.exercise)?{...rawMatch,exercise:dayOwner}:rawMatch;
     /* Live wave numbers: the program stores the block, but today's weight
        always derives from the CURRENT logged best — a PR yesterday raises
        today; a miss holds the wave in place. */
@@ -87,9 +92,9 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Max week belongs to lifts with a Real 1RM goal — the only set that goal
        can register. Others hold the double and are offered the single. */
     const goalLifts=goalLiftNames(goals);
-    const tests=goalLifts.size===0||goalLifts.has(canonicalLiftKey(match.exercise));
-    const live=liveBest?wavePrescription(liveBest,weekIdx,metric,liveSingle,tests):{weight:match.weight,reps:match.reps,isMax:waveSlot(weekIdx).isMax,optionalMax:undefined};
-    const slotLabel=live.isMax?'MAX WEEK — 1RM attempt':live.optionalMax?`heavy double · optional max ${live.optionalMax} × 1`:`${live.reps}-rep week`;
+    const tests=testsOneRepMax(match.exercise,goalLifts);
+    const live=liveBest?wavePrescription(liveBest,weekIdx,metric,liveSingle,tests):{weight:match.weight,reps:match.reps,isMax:waveSlot(weekIdx).isMax&&tests};
+    const slotLabel=live.isMax?'MAX WEEK — 1RM attempt':waveSlot(weekIdx).isMax?'MAX WEEK — heavy double, no goal on this lift':`${live.reps}-rep week`;
     let applied=false;
     const topSets=cardioBase.topSets.map(set=>{
       if(applied)return set;

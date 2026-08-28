@@ -7,9 +7,10 @@ import { supabase } from '../../lib/supabase';
    It is stored (Supabase + local cache) and the Plan tab renders FROM STORAGE;
    a new block generates silently when this one runs low or inputs change. */
 
-/* optionalMax is client-side only: on a max week a lift with no Real 1RM goal
-   holds the double, and this carries the single it could attempt instead. */
-export type AiPlanTopSet = { splitDay: string; exercise: string; weight: number; reps: number; optionalMax?: number; hold?: { weight: number; reps: number; optionalMax?: number } };
+/* hold is client-side only: when a goal lift lands on a max week twice (the
+   split runs the same day twice a cycle), only ONE instance is the attempt —
+   the other carries the double it falls back to. */
+export type AiPlanTopSet = { splitDay: string; exercise: string; weight: number; reps: number; hold?: { weight: number; reps: number } };
 export type AiPlanWeek = {
   week: number; phase: 'Base' | 'Build' | 'Peak' | 'Deload' | 'Taper' | 'Race';
   mileage: number; longRunMiles: number; longRunPace: string; longRunDay: string;
@@ -102,7 +103,16 @@ export function goalLiftNames(goals: Array<{ type?: string; metric?: string; exe
   return new Set(goals.filter(goal => goal.type === 'Strength' && goal.exercise).map(goal => canonicalLiftKey(String(goal.exercise))));
 }
 
-export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = true): { weight: number; reps: number; isMax: boolean; optionalMax?: number } {
+/* THE RULE, IN ONE PLACE: a tested one-rep max exists ONLY to move a goal
+   forward. A lift the athlete holds a Real 1RM goal on is tested on max week.
+   Every other lift — no matter how heavy, how central to the day, or whether
+   any goal exists at all — is never tested and never offered a single. No
+   goal on a day means that day recommends its mapped work at the wave's rep
+   count, nothing more. There are no exceptions to fall back on. */
+export const testsOneRepMax = (exercise: string, goalLifts: Set<string>): boolean =>
+  goalLifts.has(canonicalLiftKey(exercise));
+
+export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = false): { weight: number; reps: number; isMax: boolean } {
   const step = metric ? 2.5 : 5;
   const bump = metric ? 3.75 : 7.5;
   const { reps, isMax } = waveSlot(weekIndex);
@@ -115,8 +125,9 @@ export function wavePrescription(best: number, weekIndex: number, metric = false
   const loadFor = (count: number) => Math.max(step, Math.ceil(best / (1 + count / 30) / step) * step);
   if (isMax) {
     if (tests) return { weight: attemptWeight(), reps: 1, isMax: true };
-    /* Not a goal lift: hold week 4's double, offer the single. */
-    return { weight: loadFor(2), reps: 2, isMax: false, optionalMax: attemptWeight() };
+    /* No goal on this lift: it holds the double it earned. It is not offered
+       a single — a max that serves no goal is a max the plan did not ask for. */
+    return { weight: loadFor(2), reps: 2, isMax: false };
   }
   return { weight: loadFor(reps), reps, isMax };
 }

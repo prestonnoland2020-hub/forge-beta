@@ -71,10 +71,11 @@ TWO DIFFERENT NUMBERS — NEVER CONFLATE THEM
 
 STRENGTH RULES — THE 8/6/4/2/1 WAVE (Forge's fixed progression system)
 - Every strength or mixed split day that has mapped exercises gets exactly one top-set prescription per week, using ONLY exercises from that day's mapped list. Use the day's exact name in splitDay.
+- THE GOAL LIFT OWNS ITS DAY. If a day's mapped list contains a lift named in context.goalLifts, THAT lift is the day's prescription every single week — not an accessory or machine variation of it. A Squat goal is trained and tested with squats; prescribing hack squat or smith machine squat on that day means the goal lift never gets waved and never gets tested on max week, which defeats the block. Only a day with NO goal lift mapped picks freely from its list.
 - Reps cycle in 5-WEEK waves: week 1 = 8 reps, week 2 = 6, week 3 = 4, week 4 = 2, week 5 = MAX WEEK.
 - Weeks 1-4: weight = the athlete's current CALCULATED max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded — the same calculated max expressed across 8s, 6s, 4s, and 2s.
-- MAX WEEK IS TIED TO GOALS. Only a lift named in context.goalLifts — a lift the athlete holds a Real 1RM goal on — takes a tested single, because a logged single is the only set that goal can register. It gets a 1-rep attempt 5-10 lb above its real 1RM (context.realOneRepMaxes when present); with no real single on record the attempt sits just under the calculated max, the best evidence of what they can hold once.
-- Every OTHER lift on max week stays at 2 reps — a heavy double it already earned — rather than spending a testing session it does not owe. Six tested singles in one week is not a max week. If context.goalLifts is empty, every lift tests, or a calculated max would never convert into a real one.
+- MAX WEEK IS TIED TO GOALS, WITH NO EXCEPTIONS. A tested single exists for exactly one reason: to move a Real 1RM goal forward. ONLY a lift named in context.goalLifts takes one. It gets a 1-rep attempt 5-10 lb above its real 1RM (context.realOneRepMaxes when present); with no real single on record the attempt sits just under the calculated max.
+- Every OTHER lift on max week stays at 2 reps — the heavy double it already earned. Do not offer it an optional single, a "if you're fresh" max, or any other 1-rep work. A day with no goal lift mapped to it simply prescribes one of that day's mapped exercises at the week's rep count. If context.goalLifts is empty, NOTHING is tested that block.
 - Every wave anchors to the athlete's CURRENT calculated max — a new wave only rises once a heavier set is actually logged. Never prescribe a set implying a max below the calculated max.\n- Use the athlete's unit system (context.units): pounds in 5 lb steps, or kilograms in 2.5 kg steps; running in miles and /mi pace, or kilometers and /km pace.
 
 RUNNING RULES
@@ -159,7 +160,11 @@ Deno.serve(async request => {
     LIFT_ALIASES.forEach(group => group.forEach(name => aliasKey.set(name, group[0])));
     const liftKey = (name: string) => { const plain = String(name || '').trim().toLowerCase().replace(/\s+/g, ' '); return aliasKey.get(plain) || plain; };
     const goalLifts = new Set((Array.isArray(context_.goalLifts) ? context_.goalLifts : []).map(name => liftKey(String(name))));
-    const tests = (exercise: string) => goalLifts.size === 0 || goalLifts.has(liftKey(exercise));
+    /* NO EXCEPTIONS. A tested single exists only to move a Real 1RM goal.
+       No goal on the lift means no attempt — including when the athlete holds
+       no strength goals at all, in which case nothing tests and every day
+       simply runs its mapped work through the wave. */
+    const tests = (exercise: string) => goalLifts.has(liftKey(exercise));
     const metric = String(context_.units || '').toLowerCase() === 'metric';
     const step = metric ? 2.5 : 5;
     const bump = metric ? 3.75 : 7.5;
@@ -209,6 +214,23 @@ Deno.serve(async request => {
        ramp that assumes success. The client recomputes these same numbers
        live as new bests are logged, so a PR raises the wave and a miss holds
        it, and the block regenerates when the baseline is outgrown. */
+    /* THE GOAL LIFT OWNS ITS DAY — enforced, not requested. The model was
+       picking Hack Squat and Smith Machine Squat for the two leg days of an
+       athlete whose goal is Squat: the goal gate below then correctly held
+       both at a double, and his actual goal lift went untested all block.
+       Whenever a day maps a goal lift, that lift IS the day's prescription. */
+    const dayGoalLift = new Map<string, string>();
+    (Array.isArray(context_.splitDays) ? context_.splitDays : []).forEach(day => {
+      const entry = day as { name?: string; exercises?: string[] };
+      const match = (entry.exercises || []).find(name => goalLifts.has(liftKey(String(name))));
+      if (entry.name && match) dayGoalLift.set(String(entry.name), String(match));
+    });
+    if (dayGoalLift.size) plan.weeks.forEach((week: { topSets?: Array<{ splitDay: string; exercise: string }> }) => {
+      for (const set of (week.topSets || [])) {
+        const owner = dayGoalLift.get(set.splitDay);
+        if (owner && liftKey(set.exercise) !== liftKey(owner)) set.exercise = owner;
+      }
+    });
     plan.weeks.forEach((week: { topSets?: Array<{ exercise: string; weight: number; reps: number }> }, index: number) => {
       const slot = index % 5;
       for (const set of (week.topSets || [])) {

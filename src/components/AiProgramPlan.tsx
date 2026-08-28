@@ -7,12 +7,12 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { isDemoMode } from '../lib/env';
-import { canonicalLiftKey } from '../lib/liftAliases';
+import { canonicalLiftKey, splitDayKey } from '../lib/liftAliases';
 import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, type AiPlanWeek, type StoredAiPlan,
+  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, type AiPlanWeek, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -50,7 +50,8 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
       : anchorIndex >= 0 ? (((anchorIndex + (absoluteDay - todayAbsolute)) % cycle.length) + cycle.length) % cycle.length
       : ((absoluteDay % cycle.length) + cycle.length) % cycle.length;
     const day = cycle[cycleIndex];
-    const topSet = (week.topSets || []).find(set => set.splitDay === day.name);
+    const topSet = (week.topSets || []).find(set => set.splitDay === day.name)
+      || (week.topSets || []).find(set => splitDayKey(set.splitDay) === splitDayKey(day.name));
     return { date, day, topSet, lower: isLowerBodyDay(day, topSet) };
   });
   /* Pass 1 — decide placements. */
@@ -94,7 +95,6 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     else if (easySet.has(index)) { runKind = 'Easy run'; runText = `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`; runStress = 'Low'; }
     const strengthText = topSet
       ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${topSet.exercise}: ${topSet.weight} × ${topSet.reps}`
-        + (topSet.optionalMax ? ` · optional max ${topSet.optionalMax} × 1 if you're fresh` : '')
       : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
     if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const };
     if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const };
@@ -139,7 +139,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      else holds the double and offers the attempt. No strength goal at all and
      every lift tests, or a calc max would never convert into a real one. */
   const goalLifts = useMemo(() => goalLiftNames(goals), [goals]);
-  const testsThisBlock = (exercise: string) => goalLifts.size === 0 || goalLifts.has(canonicalLiftKey(exercise));
+  const testsThisBlock = (exercise: string) => testsOneRepMax(exercise, goalLifts);
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */
@@ -287,12 +287,29 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      athlete's CURRENT logged best through the 8/6/4/2 wave. Beat a set and
      tomorrow's numbers rise; miss one and the wave holds — the plan reacts
      to the log without waiting for the next block. */
+  /* THE GOAL LIFT OWNS ITS DAY. A stored plan can name Hack Squat or Smith
+     Machine Squat on a leg day whose mapped list also carries Squat — the
+     athlete's actual goal lift. The goal gate then holds that day at a double
+     and the goal lift is never waved or tested. Wherever a day maps a lift the
+     athlete holds a Real 1RM goal on, that lift is the day's prescription,
+     repaired here so an already-generated block heals without regenerating. */
+  const dayGoalLift = (() => {
+    const map = new Map<string, string>();
+    splitDays.forEach(day => {
+      const owner = (day.exercises || []).find(name => goalLifts.has(canonicalLiftKey(name)));
+      if (owner) { map.set(day.name, owner); if (!map.has(splitDayKey(day.name))) map.set(splitDayKey(day.name), owner); }
+    });
+    return map;
+  })();
   let liveAdjusted = false;
   const plan = {
     ...storedPlanData,
     weeks: storedPlanData.weeks.map((item, index) => ({
       ...item,
-      topSets: (item.topSets || []).map(set => {
+      topSets: (item.topSets || []).map(raw => {
+        const owner = dayGoalLift.get(raw.splitDay) || dayGoalLift.get(splitDayKey(raw.splitDay));
+        const set = owner && canonicalLiftKey(owner) !== canonicalLiftKey(raw.exercise) ? { ...raw, exercise: owner } : raw;
+        if (set !== raw) liveAdjusted = true;
         const best = bests.get(set.exercise) ?? [...bests.entries()].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(set.exercise))?.[1];
         if (!best) return set;
         const live = wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, testsThisBlock(set.exercise));
@@ -300,7 +317,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         /* On a max week a tested lift also carries the double it falls back to
            when the split hits that day more than once in the same week. */
         const hold = live.reps === 1 ? wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, false) : undefined;
-        return { ...set, weight: live.weight, reps: live.reps, optionalMax: live.optionalMax, hold: hold && { weight: hold.weight, reps: hold.reps, optionalMax: hold.optionalMax } };
+        return { ...set, weight: live.weight, reps: live.reps, hold: hold && { weight: hold.weight, reps: hold.reps } };
       }),
     })),
   };

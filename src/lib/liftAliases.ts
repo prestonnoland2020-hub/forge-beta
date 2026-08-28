@@ -84,3 +84,10 @@ const PRIMARY_MUSCLES: Record<string, string[]> = {
    movement is known, otherwise the fallback (its library entry's list). */
 export const primaryMusclesFor = (name: string, fallback: string[] = []): string[] =>
   PRIMARY_MUSCLES[canonicalLiftKey(name)] || fallback;
+
+/* Split days repeat inside one cycle as "Legs" and "Legs 2". A plan that
+   prescribes a top set for "Legs" is prescribing for BOTH instances — the
+   second exposure must never fall back to "map an exercise". Strip a trailing
+   instance number to compare day names. */
+export const splitDayKey = (name: string): string =>
+  String(name || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/\s*(?:#\s*)?\d+$/, '');
