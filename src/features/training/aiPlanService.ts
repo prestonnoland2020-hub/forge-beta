@@ -19,7 +19,11 @@ export type AiPlanWeek = {
   topSets: AiPlanTopSet[]; note: string;
 };
 export type AiPlan = { summary: string; easyPace: string; weeks: AiPlanWeek[] };
-export type StoredAiPlan = { plan: AiPlan; generatedAt: string; startDate: string; fingerprint: string; blockWeeks: number };
+/* saved: the athlete has approved this block. Forge rebuilds a plan on its own
+   when the inputs move — new goal, changed split, a PR past the baseline — and
+   that is right until someone is happy with the block they have. A saved plan
+   is pinned: nothing replaces it except an explicit, confirmed refresh. */
+export type StoredAiPlan = { plan: AiPlan; generatedAt: string; startDate: string; fingerprint: string; blockWeeks: number; saved?: boolean; savedAt?: string };
 
 const localKey = 'forge-ai-plan-v1';
 

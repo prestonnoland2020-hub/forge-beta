@@ -1421,3 +1421,22 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .simple-week-schedule article.is-done .session-done-tick{color:var(--accent);font-weight:900}
 .simple-week-schedule article.is-missed{opacity:.55}
 .simple-week-schedule article.is-missed small{font-style:italic}
+
+/* Every goal lift gets its own block ledger — the plan trains them together,
+   so the framing names them together instead of promoting whichever goal was
+   created first. */
+.goal-ledger-stack { display: flex; flex-direction: column; gap: 10px; }
+.goal-ledger-caption { display: flex; flex-direction: column; gap: 2px; padding: 0 4px; }
+.goal-ledger-caption small { color: var(--text-muted, #8b8f8a); font-size: 12px; line-height: 1.4; }
+.goal-ledger-stack .max-ledger { margin: 0; }
+.wave-explainer summary small { display: block; color: var(--text-muted, #8b8f8a); font-size: 12px; margin-top: 2px; }
+
+/* Save plan pins a block the athlete approved; refreshing discards one, so it
+   asks first. */
+.plan-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.plan-saved-badge { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent, #d4ff3f); background: color-mix(in srgb, var(--accent, #d4ff3f) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent, #d4ff3f) 34%, transparent); white-space: nowrap; }
+.plan-refresh-confirm { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--accent, #d4ff3f) 30%, transparent); background: color-mix(in srgb, var(--accent, #d4ff3f) 7%, transparent); }
+.plan-refresh-confirm strong { font-size: 15px; line-height: 1.3; }
+.plan-refresh-confirm small { color: var(--text-muted, #8b8f8a); font-size: 12.5px; line-height: 1.45; }
+.plan-refresh-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.plan-refresh-actions .button { flex: 1 1 auto; min-width: 140px; }

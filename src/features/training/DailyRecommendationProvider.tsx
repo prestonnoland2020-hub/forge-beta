@@ -38,6 +38,10 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const date=isoToday();
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   const aiPlanStamp=useMemo(()=>readLocalAiPlan()?.generatedAt||'',[refreshKey]);
+  /* The goal gate decides whether max week tests a lift, so the overlay MUST
+     recompute when goals arrive. Without this the memo ran once against an
+     empty goals list and the athlete's goal lift held a double on max week. */
+  const goalStamp=useMemo(()=>goals.filter(goal=>goal.type==='Strength').map(goal=>`${goal.exercise}`).sort().join('|'),[goals]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp}),[date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   const generatedBase=useMemo(()=>buildDailyRecommendation({date,splitDay,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,inputFingerprint}),[date,splitDay,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,inputFingerprint]);
   /* The stored AI program is authoritative for today's numbers: when its
@@ -83,28 +87,53 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        athlete's actual goal lift. */
     const dayOwner=(generatedBase.splitDay.exercises||[]).find(name=>goalLiftNames(goals).has(canonicalLiftKey(name)));
     const match=dayOwner&&canonicalLiftKey(dayOwner)!==canonicalLiftKey(rawMatch.exercise)?{...rawMatch,exercise:dayOwner}:rawMatch;
-    /* Live wave numbers: the program stores the block, but today's weight
-       always derives from the CURRENT logged best — a PR yesterday raises
-       today; a miss holds the wave in place. */
+    /* EVERY recommended top set runs the same 8/6/4/2/1 wave — not just the
+       day's goal lift. An accessory used to come from a separate progression,
+       so one card on the day said "8-rep week" while the next said something
+       else. Each lift now waves off ITS OWN calculated max through inverse
+       Epley, from the athlete's current logged best: a PR yesterday raises
+       today, a miss holds the wave. Only the goal-lift rule differs at the
+       top of the wave — a tested single belongs to goal lifts alone; every
+       other lift takes the heavy double instead. A lift with no logged
+       history keeps the engine's baseline suggestion, since there is no max
+       to wave off yet. */
     const weekIdx=currentWeekIndex(storedPlan);
-    let liveBest=0;let liveSingle=0;records.forEach(record=>(record.topSets||[]).forEach(set=>{if(set.completed===false||!set.weight||canonicalLiftKey(set.lift)!==canonicalLiftKey(match.exercise))return;const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));if(max>liveBest)liveBest=max;if(set.reps===1&&set.weight>liveSingle)liveSingle=set.weight}));
     const metric=Boolean(setup?.units==='Metric');
-    /* Max week belongs to lifts with a Real 1RM goal — the only set that goal
-       can register. Others hold the double and are offered the single. */
     const goalLifts=goalLiftNames(goals);
-    const tests=testsOneRepMax(match.exercise,goalLifts);
-    const live=liveBest?wavePrescription(liveBest,weekIdx,metric,liveSingle,tests):{weight:match.weight,reps:match.reps,isMax:waveSlot(weekIdx).isMax&&tests};
-    const slotLabel=live.isMax?'MAX WEEK — 1RM attempt':waveSlot(weekIdx).isMax?'MAX WEEK — heavy double, no goal on this lift':`${live.reps}-rep week`;
+    const liveByLift=new Map<string,{best:number;single:number}>();
+    records.forEach(record=>(record.topSets||[]).forEach(set=>{
+      if(set.completed===false||!set.lift||!set.weight)return;
+      const key=canonicalLiftKey(set.lift);
+      const held=liveByLift.get(key)||{best:0,single:0};
+      const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));
+      liveByLift.set(key,{best:Math.max(held.best,max),single:set.reps===1?Math.max(held.single,set.weight):held.single});
+    }));
+    const isMaxWeek=waveSlot(weekIdx).isMax;
+    const waveFor=(exercise:string,fallback:{weight:number;reps:number})=>{
+      const live=liveByLift.get(canonicalLiftKey(exercise));
+      const tests=testsOneRepMax(exercise,goalLifts);
+      /* No logged history for this lift yet: nothing to wave off, so the
+         engine's baseline stands and the card still asks for a first set. */
+      if(!live?.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
+      const prescription=wavePrescription(live.best,weekIdx,metric,live.single,tests);
+      const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':isMaxWeek?'MAX WEEK — heavy double, no goal on this lift':`${prescription.reps}-rep week`;
+      /* A waved number IS derived from logged history — Today only prints a
+         weight when the set says so, and an unwaved 'baseline' flag was
+         hiding real prescriptions behind "Log a baseline set". */
+      return{...prescription,source:'history' as const,rationale:`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`};
+    };
+    /* The day's plan prescription leads with the goal lift; every other set
+       keeps its own exercise and simply joins the wave. */
     let applied=false;
     const topSets=cardioBase.topSets.map(set=>{
-      if(applied)return set;
-      const isMatch=set.exercise===match.exercise||!generatedBase.topSets.some(other=>other.exercise===match.exercise)&&set===generatedBase.topSets[0];
-      if(!isMatch)return set;
-      applied=true;
-      return{...set,exercise:match.exercise,weight:live.weight,reps:live.reps,calculatedMax:Math.round(live.weight*(1+live.reps/30)),rationale:liveBest?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${liveBest}.`:`Week ${week.week} of your program (${week.phase}).`};
+      const leads=!applied&&(set.exercise===match.exercise||!generatedBase.topSets.some(other=>other.exercise===match.exercise)&&set===generatedBase.topSets[0]);
+      if(leads)applied=true;
+      const exercise=leads?match.exercise:set.exercise;
+      const wave=waveFor(exercise,set);
+      return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:Math.round(wave.weight*(1+wave.reps/30)),rationale:wave.rationale};
     });
     return{...cardioBase,topSets};
-  },[generatedBase,aiPlanStamp]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[generatedBase,aiPlanStamp,goalStamp]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{if(isDemoMode||!user){setStored(current=>current?.status==='completed'||current?.inputFingerprint===inputFingerprint?current:generated);return}let active=true;setLoading(true);void loadDailyRecommendation(user.id,date).then(async existing=>{if(!active)return;if(forceRegenerate.current&&existing?.status!=='completed'){forceRegenerate.current=false;const saved=await saveDailyRecommendation(user.id,generated);if(active)setStored(saved);return}forceRegenerate.current=false;if(existing?.status==='completed'||(existing?.algorithmVersion===DAILY_RECOMMENDATION_VERSION&&existing?.inputFingerprint===inputFingerprint)){setStored(existing);return}const saved=await saveDailyRecommendation(user.id,generated);if(active)setStored(saved)}).then(()=>{if(active)setSyncError(null)}).catch(error=>{if(active){setStored(generated);setSyncError(error instanceof Error?error.message:'Could not save today’s recommendation.')}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user,date,inputFingerprint,generated]);
   const persist=useCallback((next:DailyRecommendation)=>{setStored(next);if(!isDemoMode&&user)void saveDailyRecommendation(user.id,next).then(setStored).catch(error=>setSyncError(error instanceof Error?error.message:'Could not save recommendation choices.'))},[user]);
   const recommendation=stored||generated;
