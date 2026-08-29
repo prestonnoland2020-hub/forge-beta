@@ -73,5 +73,14 @@ check('the tolerance is stated once in the source', /COVERAGE_TOLERANCE_MILES = 
 check('coverage is compared per class per day', /watchMiles\.get\(mapped\.date\)\?\.get\(group\)/.test(src));
 check('a combined entry credits its distance to each part', /classes\.forEach\(name => day\.miles\.set/.test(src));
 
+/* A LIFT IS NOT CARDIO. Strava calls a gym session WeightTraining, and
+   importing every activity as a cardio session made "Weight Training" the
+   most-logged cardio type in the athlete's insights. */
+check('a strength activity is not logged as a cardio session', /if \(group !== 'strength'\) entry\.sessions\.push/.test(src));
+check('a lifting-only day does not become a cardio day', /muscles: hasCardio \? \['Cardio'\] : \[\]/.test(src) && /hasCardio = entry\.sessions\.length > 0/.test(src));
+check('the day is still recorded as trained', /entry\.rowIds\.push\(row\.id\); entry\.titles\.push/.test(src));
+check('Strava WeightTraining classifies as strength', classOfPart('Weight Training') === 'strength');
+check('a run on the same day still imports', classOfPart('Run') === 'run');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

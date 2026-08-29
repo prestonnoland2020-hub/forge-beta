@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import type { CardioLogDraft } from '../../lib/cardioSession';
+import { cardioMiles, type CardioLogDraft } from '../../lib/cardioSession';
 import type { WorkoutRecord } from './WorkoutHistoryProvider';
 
 /* Bridge: synced Strava activities (external_activities) become real training
@@ -200,18 +200,27 @@ export async function importStravaActivities(
       if (covered) { skipped++; supersededRowIds.push(row.id); continue; }
     }
     const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [] };
-    entry.sessions.push(mapped.session); entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
+    /* A LIFT IS NOT CARDIO. Strava reports a gym session as WeightTraining,
+       and importing every activity as a cardio session made "Weight Training"
+       the athlete's most-logged cardio type — 139 barbell sessions filed under
+       running and rowing, skewing every cardio insight. A strength activity
+       still marks the day as trained, but it is not a cardio session and the
+       day does not become a cardio day because of it. */
+    if (group !== 'strength') entry.sessions.push(mapped.session);
+    entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
     byDate.set(mapped.date, entry);
   }
   let imported = 0; const importedRowIds: string[] = []; const reviewIds: string[] = [];
   const reviewCutoff = new Date(); reviewCutoff.setDate(reviewCutoff.getDate() - 3);
   const reviewCutoffIso = reviewCutoff.toISOString().slice(0, 10);
   for (const [date, entry] of byDate) {
+    const hasCardio = entry.sessions.length > 0;
     const result = addRecord({
       date,
       title: entry.titles[0] || 'Imported activity',
-      muscles: ['Cardio'],
-      hasCardio: true,
+      /* Only a real cardio session earns the Cardio marker. */
+      muscles: hasCardio ? ['Cardio'] : [],
+      hasCardio,
       cardioSessions: entry.sessions,
     } as Omit<WorkoutRecord, 'id'>);
     if (result.ok) {
