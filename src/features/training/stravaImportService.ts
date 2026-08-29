@@ -26,6 +26,39 @@ export const pendingStravaReviews = (): string[] => { try { const list = JSON.pa
 export const markStravaReviewed = (sessionId: string) => { try { localStorage.setItem(reviewKey, JSON.stringify(pendingStravaReviews().filter(id => id !== sessionId))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
 const queueStravaReviews = (sessionIds: string[]) => { if (!sessionIds.length) return; try { localStorage.setItem(reviewKey, JSON.stringify(Array.from(new Set([...pendingStravaReviews(), ...sessionIds])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
 export const runShapedActivity = (activity: string) => !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(activity);
+
+/* THE HAND LOG WINS. A run recorded in the app and the same run recorded by
+   the watch are one session, not two — but they never look alike: Forge names
+   a run by its role ("Easy", "Base", "Speed Run", "Long Run") and Strava names
+   it by its sport ("Run", "Trail Run"), so nothing matches on the name and the
+   day ended up with the run counted twice in every mileage total. Compare by
+   what kind of training it is instead: one hand-logged run on a date means
+   every Strava run on that date is the same work, already logged. Nothing else
+   is touched — a Strava ride on the day of a hand-logged run is a real second
+   session and stays. */
+export const cardioClass = (activity: string): string => {
+  const name = String(activity || '').toLowerCase();
+  if (/run|easy|base|tempo|threshold|speed|jog|interval|fartlek/.test(name)) return 'run';
+  if (/walk|hike/.test(name)) return 'walk';
+  if (/bike|ride|cycl/.test(name)) return 'bike';
+  if (/row/.test(name)) return 'row';
+  if (/swim/.test(name)) return 'swim';
+  if (/weight|strength|lift/.test(name)) return 'strength';
+  return 'other';
+};
+const handLoggedClasses = (records: WorkoutRecord[]): Map<string, Set<string>> => {
+  const byDate = new Map<string, Set<string>>();
+  for (const record of records) {
+    for (const session of record.cardioSessions || []) {
+      /* Imported sessions carry a strava- id; anything else the athlete typed. */
+      if (String(session.id || '').startsWith('strava-')) continue;
+      const classes = byDate.get(record.date) || new Set<string>();
+      classes.add(cardioClass(session.activity || ''));
+      byDate.set(record.date, classes);
+    }
+  }
+  return byDate;
+};
 /* Strava sport types → Forge activity names. Unknown types pass through with
    spaces ("TrailRun" → "Trail Run") so nothing is dropped. */
 const typeMap: Record<string, string> = {
@@ -88,11 +121,16 @@ export async function importStravaActivities(
   }
   if (!rows.length) return { imported: 0, skipped: 0 };
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
+  const alreadyLogged = handLoggedClasses(records);
   const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[] }>();
   let skipped = 0;
+  /* Superseded rows are marked imported like any other, so a day the athlete
+     logged by hand is settled once and never re-offered on the next sync. */
+  const supersededRowIds: string[] = [];
   for (const row of rows) {
     const mapped = externalToSession(row);
     if (existingIds.has(mapped.session.id as string) || row.imported_to_workout) { skipped++; continue; }
+    if (alreadyLogged.get(mapped.date)?.has(cardioClass(mapped.session.activity || ''))) { skipped++; supersededRowIds.push(row.id); continue; }
     const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [] };
     entry.sessions.push(mapped.session); entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
     byDate.set(mapped.date, entry);
@@ -117,8 +155,9 @@ export async function importStravaActivities(
   /* .in() takes a URL-length-bounded list, so a full history's worth of ids
      has to be marked in batches — one oversized request would fail and leave
      every row looking un-imported. */
-  for (let start = 0; start < importedRowIds.length; start += 200) {
-    try { await supabase.from('external_activities').update({ imported_to_workout: true }).in('id', importedRowIds.slice(start, start + 200)); } catch { /* dedupe covers it */ }
+  const settledRowIds = [...importedRowIds, ...supersededRowIds];
+  for (let start = 0; start < settledRowIds.length; start += 200) {
+    try { await supabase.from('external_activities').update({ imported_to_workout: true }).in('id', settledRowIds.slice(start, start + 200)); } catch { /* dedupe covers it */ }
   }
   return { imported, skipped };
 }
