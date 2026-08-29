@@ -10,7 +10,11 @@ type ExternalRow = {
   id: string; external_id: string; activity_type: string; activity_name: string;
   started_at: string; distance_meters: number | null; moving_seconds: number | null;
   elapsed_seconds: number | null; average_heartrate: number | null;
-  raw_summary: { start_date_local?: string } | null; imported_to_workout: boolean | null;
+  /* The athlete's local clock, pulled out of the payload by the query instead
+     of dragging every raw Strava blob across the wire — a full history is
+     thousands of rows and the blobs alone would be tens of megabytes. */
+  local_start: string | null; raw_summary?: { start_date_local?: string } | null;
+  imported_to_workout: boolean | null;
 };
 
 const METERS_PER_MILE = 1609.344;
@@ -38,7 +42,7 @@ const paceText = (minutes: number, miles: number) => { const pace = minutes / mi
 const clock = (minutes: number) => { const whole = Math.round(minutes * 60); const m = Math.floor(whole / 60); const s = whole % 60; return `${m}:${String(s).padStart(2, '0')}`; };
 
 export function externalToSession(row: ExternalRow): { date: string; session: CardioLogDraft } {
-  const localStart = row.raw_summary?.start_date_local || row.started_at;
+  const localStart = row.local_start || row.raw_summary?.start_date_local || row.started_at;
   const date = String(localStart).slice(0, 10);
   const activity = activityName(row.activity_type);
   const miles = distanceSport(activity) && row.distance_meters ? Math.round((row.distance_meters / METERS_PER_MILE) * 100) / 100 : 0;
@@ -62,17 +66,31 @@ export async function importStravaActivities(
   records: WorkoutRecord[],
   addRecord: (record: Omit<WorkoutRecord, 'id'>) => { ok: boolean },
 ): Promise<{ imported: number; skipped: number }> {
-  const { data, error } = await supabase
-    .from('external_activities')
-    .select('id,external_id,activity_type,activity_name,started_at,distance_meters,moving_seconds,elapsed_seconds,average_heartrate,raw_summary,imported_to_workout')
-    .eq('provider', 'strava')
-    .order('started_at', { ascending: false })
-    .limit(400);
-  if (error || !data) return { imported: 0, skipped: 0 };
+  /* A CEILING IS NOT A SYNC EITHER. This read used to stop at the newest 400
+     rows, and because it always asked for the SAME newest 400, an athlete with
+     a full Strava history could never reach anything older: every pass
+     re-fetched rows already imported, skipped them, and finished. Page the
+     whole table oldest-to-newest so a complete history lands in the log. */
+  const columns = 'id,external_id,activity_type,activity_name,started_at,distance_meters,moving_seconds,elapsed_seconds,average_heartrate,imported_to_workout,local_start:raw_summary->>start_date_local';
+  const rows: ExternalRow[] = [];
+  const pageSize = 500;
+  for (let page = 0; page < 40; page++) {
+    const { data, error } = await supabase
+      .from('external_activities')
+      .select(columns)
+      .eq('provider', 'strava')
+      .order('started_at', { ascending: true })
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (error) return { imported: 0, skipped: 0 };
+    if (!data || !data.length) break;
+    rows.push(...(data as unknown as ExternalRow[]));
+    if (data.length < pageSize) break;
+  }
+  if (!rows.length) return { imported: 0, skipped: 0 };
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
   const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[] }>();
   let skipped = 0;
-  for (const row of data as ExternalRow[]) {
+  for (const row of rows) {
     const mapped = externalToSession(row);
     if (existingIds.has(mapped.session.id as string) || row.imported_to_workout) { skipped++; continue; }
     const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [] };
@@ -96,8 +114,11 @@ export async function importStravaActivities(
     }
   }
   queueStravaReviews(reviewIds);
-  if (importedRowIds.length) {
-    try { await supabase.from('external_activities').update({ imported_to_workout: true }).in('id', importedRowIds); } catch { /* dedupe covers it */ }
+  /* .in() takes a URL-length-bounded list, so a full history's worth of ids
+     has to be marked in batches — one oversized request would fail and leave
+     every row looking un-imported. */
+  for (let start = 0; start < importedRowIds.length; start += 200) {
+    try { await supabase.from('external_activities').update({ imported_to_workout: true }).in('id', importedRowIds.slice(start, start + 200)); } catch { /* dedupe covers it */ }
   }
   return { imported, skipped };
 }

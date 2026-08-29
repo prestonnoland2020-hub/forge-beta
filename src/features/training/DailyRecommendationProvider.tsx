@@ -31,8 +31,51 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const fallbackDays=useMemo(()=>{const local=localSplitDays();if(local.length)return local;return(setup?.splitDays||[]).map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,type:day.type.toLowerCase() as RecommendationSplitDay['type'],muscles:day.muscles||[],exercises:[],cardioTypes:day.type==='Cardio'||day.type==='Mixed'?['Forge']:[]}))},[setup,refreshKey]);
   useEffect(()=>{if(isDemoMode||!user){setCycle(current=>({...current,days:fallbackDays}));setLoading(false);return}let active=true;setLoading(true);void loadCycleSnapshot(user.id).then(next=>{if(active){setCycle(next);setSyncError(null)}}).catch(error=>{if(active){setCycle(current=>({...current,days:fallbackDays}));setSyncError(error instanceof Error?error.message:'Could not load your split position.')}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user,fallbackDays,refreshKey]);
   const days=cycle.days.length?cycle.days:fallbackDays;const trainingDays=days.filter(day=>day.type!=='rest');
-  const inferredPosition=useMemo(()=>{if(!trainingDays.length)return days[0]?.position||1;const latest=[...records].filter(record=>(record.topSets||[]).length||(record.cardioSessions||[]).length||record.muscles.some(muscle=>muscle!=='Cardio')).sort((a,b)=>b.date.localeCompare(a.date))[0];if(!latest)return trainingDays[0].position;let completedIndex=latest.splitPosition?trainingDays.findIndex(day=>day.position===latest.splitPosition):-1;if(completedIndex<0){const recordMuscles=new Set(latest.muscles.map(muscle=>muscle.toLowerCase()));const scored=trainingDays.map((day,index)=>({index,score:day.muscles.filter(muscle=>recordMuscles.has(muscle.toLowerCase())).length+(day.type==='cardio'&&latest.hasCardio?1:0)})).sort((a,b)=>b.score-a.score);if(scored[0]?.score)completedIndex=scored[0].index}return trainingDays[(Math.max(-1,completedIndex)+1)%trainingDays.length].position},[records,days,trainingDays]);
-  const statePosition=trainingDays.find(day=>day.position===cycle.nextPosition)?.position||trainingDays.find(day=>day.position>cycle.nextPosition)?.position||trainingDays[0]?.position;
+  /* Inference walks the WHOLE split, rest included. Matching the last logged
+     day against trainingDays only meant the day after a rest day's neighbour
+     was the next TRAINING day — the rest day was never a candidate, so the
+     cycle silently shortened by one every lap. */
+  const inferredPosition=useMemo(()=>{
+    if(!days.length)return 1;
+    const latest=[...records].filter(record=>(record.topSets||[]).length||(record.cardioSessions||[]).length||record.muscles.some(muscle=>muscle!=='Cardio')).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    if(!latest)return (trainingDays[0]||days[0]).position;
+    let completedIndex=latest.splitPosition?days.findIndex(day=>day.position===latest.splitPosition):-1;
+    if(completedIndex<0){
+      const recordMuscles=new Set(latest.muscles.map(muscle=>muscle.toLowerCase()));
+      const scored=days.map((day,index)=>({index,score:day.muscles.filter(muscle=>recordMuscles.has(muscle.toLowerCase())).length+(day.type==='cardio'&&latest.hasCardio?1:0)})).sort((a,b)=>b.score-a.score);
+      if(scored[0]?.score)completedIndex=scored[0].index;
+    }
+    const next=days[(Math.max(-1,completedIndex)+1)%days.length];
+    /* Same calendar rule as the stored cursor: rest is owed the day after
+       training and no longer. */
+    const gap=Math.round((new Date(`${isoToday()}T12:00:00`).getTime()-new Date(`${latest.date}T12:00:00`).getTime())/86400000);
+    if(next.type==='rest'&&gap>=2){const nextIndex=days.findIndex(day=>day.position===next.position);return (days[(nextIndex+1)%days.length]||next).position}
+    return next.position;
+  },[records,days,trainingDays]);
+  /* A REST DAY IS A DAY IN THE SPLIT. Every cursor path resolved against
+     trainingDays — the split with rest filtered OUT — so a cursor landing on a
+     rest day found nothing at or after it and wrapped to the first training
+     day. Rest could never be shown: the cycle jumped from Sharms 2 straight to
+     Chest & Back while the Plan tab was still scheduling the rest day. The
+     cursor now walks the whole split.
+
+     Rest is satisfied by the calendar, not by logging: it is due only until
+     the day it fell on has passed, so the athlete rests today and the next
+     training day is up tomorrow without tapping anything. Logging a workout
+     anyway advances the cycle exactly as before. */
+  const lastLoggedDate=useMemo(()=>[...records].filter(record=>(record.topSets||[]).length||(record.cardioSessions||[]).length).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||'',[records]);
+  const nextAfter=(position:number)=>days.find(day=>day.position>position)||days[0];
+  const statePosition=(()=>{
+    const atCursor=days.find(day=>day.position===cycle.nextPosition)||days.find(day=>day.position>cycle.nextPosition)||days[0];
+    if(!atCursor)return trainingDays[0]?.position;
+    /* Rest falls on the day AFTER the last logged session, so it is due while
+       that gap is a single day. Once two days have passed the rest has been
+       had and the next training day is up — an athlete away for a week is not
+       owed a week of rest days. */
+    const daysSinceLogged=lastLoggedDate?Math.round((new Date(`${isoToday()}T12:00:00`).getTime()-new Date(`${lastLoggedDate}T12:00:00`).getTime())/86400000):0;
+    if(atCursor.type==='rest'&&daysSinceLogged>=2)return nextAfter(atCursor.position)?.position??atCursor.position;
+    return atCursor.position;
+  })();
   const duePosition=cycle.revision>0?(statePosition||cycle.nextPosition):inferredPosition;
   const splitDay=days.find(day=>day.position===duePosition)||trainingDays[0]||days[0]||{position:1,name:'Start training',type:'strength' as const,muscles:[],exercises:[],cardioTypes:[]};
   const date=isoToday();
