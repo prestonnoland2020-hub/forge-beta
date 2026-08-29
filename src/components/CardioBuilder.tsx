@@ -17,6 +17,12 @@ const OTHER_UNITS = ['minutes', 'calories', 'reps', 'floors'];
 const ALL_UNITS = [...DISTANCE_UNITS, ...OTHER_UNITS];
 const STAPLE_TYPES = ['Run', 'Walk', 'Bike', 'Rowing', 'Swimming', 'Elliptical', 'Stair Climber', 'Jump Rope'];
 
+const isDistanceUnit = (unit: string) => DISTANCE_UNITS.includes(String(unit || '').trim().toLowerCase());
+/* A distance measured in "minutes" converts to ZERO miles — it counts for
+   nothing in weekly mileage, pace, or an endurance goal, while still looking
+   logged. The pairing is impossible, so it is never stored: entering a
+   distance against a time or count unit moves the unit to that activity's
+   distance unit. */
 const unitFor = (type: string) => {
   const value = type.trim().toLowerCase();
   if (/row|ski/.test(value)) return 'meters';
@@ -68,7 +74,7 @@ const linesFromDraft = (draft: CardioLogDraft): CardioLine[] => {
   return rows.map((row, index) => ({
     id: index + 1,
     cardioType: String(row.cardioType || row.activity || draft.activity || 'Run'),
-    unit: String(row.unit || row.distanceUnit || 'miles'),
+    unit: (() => { const stored = String(row.unit || row.distanceUnit || 'miles'); return Number(row.distance) > 0 && !isDistanceUnit(stored) ? unitFor(String(row.cardioType || row.activity || draft.activity || 'Run')) : stored; })(),
     distance: row.distance ? String(row.distance) : '',
     time: minutesToClock(Number(row.time) || 0),
   }));
@@ -158,16 +164,31 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
     const local = parseCardioDescription(description);
     const parsed = await requestCardioParse(description, { savedCardioTypes: typeOptions, plannedToday: plannedSummary || null }, local);
     if (!parsed.rows.length) { setAiReflection(parsed.reflection || 'Could not read a workout from that.'); setAiSource(parsed.source); setAiBusy(false); return; }
-    const rows = parsed.rows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
+    /* THE MODEL MAY NOT DELETE A DISTANCE THE ATHLETE TYPED. It returned
+       "Run · 20:00" with distance 0 for a run that was 2.1 miles — a run worth
+       zero miles to mileage, pace and every race goal. The local regex parser
+       reads the same sentence deterministically, so when it finds distance and
+       the model returned none, the model is overruled rather than trusted. */
+    const aiDistance = parsed.rows.reduce((total, row) => total + (Number(row.distance) || 0), 0);
+    const localDistance = local.rows.reduce((total, row) => total + (Number(row.distance) || 0), 0);
+    const recoveredDistance = aiDistance === 0 && localDistance > 0;
+    const sourceRows = recoveredDistance && local.rows.length === parsed.rows.length
+      ? parsed.rows.map((row, index) => ({ ...row, distance: local.rows[index].distance, unit: local.rows[index].unit }))
+      : recoveredDistance ? local.rows : parsed.rows;
+    /* The AI logger may return a distance against a time unit ("2.1 minutes").
+       Its unit is a suggestion, not a fact — a stated distance always lands on
+       a distance unit so the miles are real. */
+    const rows = sourceRows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: Number(row.distance) > 0 && !isDistanceUnit(row.unit) ? unitFor(row.cardioType) : row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
     const noteText = parsed.note && !note ? parsed.note : note;
     /* "Log it" logs it. The rows used to land in the composer for a second
        confirming tap, and a session that never got that tap was thrown away
        on save. It commits straight to the day now and stays editable in the
        list above. */
-    if (commit(rows, noteText)) { reset(); setAiReflection(parsed.reflection); setAiSource(parsed.source); setAiBusy(false); return; }
+    const reflection = recoveredDistance ? `${parsed.reflection} (Distance read from your words — the logger had left it blank.)`.trim() : parsed.reflection;
+    if (commit(rows, noteText)) { reset(); setAiReflection(reflection); setAiSource(parsed.source); setAiBusy(false); return; }
     setLines(rows);
     if (parsed.note && !note) setNote(parsed.note);
-    setAiReflection(parsed.reflection);
+    setAiReflection(reflection);
     setAiSource(parsed.source);
     setAiBusy(false);
   };
@@ -180,6 +201,11 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
   };
 
   const summary = summarize(lines);
+  /* A run with a time but no distance is worth zero miles to weekly mileage,
+     pace, and every endurance goal — and it looks logged. The AI logger did
+     exactly this ("Run · 20:00"), so the gap is named rather than left to be
+     discovered in a mileage total that quietly stops moving. */
+  const milelessRuns = lines.filter(line => /run|jog|walk/i.test(line.cardioType) && clockToMinutes(line.time) > 0 && !(Number(line.distance) > 0)).length;
 
   /* One commit path for every way a session gets logged — typed rows, the AI
      box, a library template. Logging IS saving: the entry lands in the day
@@ -243,11 +269,11 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
             <input list="cardio-type-options" value={line.cardioType} onChange={event => changeType(line.id, event.target.value)} placeholder="Run" />
           </label>
           <label className="cardio-log-distance"><span className="cardio-log-label">Distance</span>
-            <input type="number" inputMode="decimal" min="0" step="0.01" value={line.distance} onChange={event => updateLine(line.id, { distance: event.target.value })} placeholder="0" />
+            <input type="number" inputMode="decimal" min="0" step="0.01" value={line.distance} onChange={event => updateLine(line.id, Number(event.target.value) > 0 && !isDistanceUnit(line.unit) ? { distance: event.target.value, unit: unitFor(line.cardioType) } : { distance: event.target.value })} placeholder="0" />
           </label>
           <label className="cardio-log-unit"><span className="cardio-log-label">Unit</span>
             <select value={line.unit} onChange={event => updateLine(line.id, { unit: event.target.value })}>
-              {ALL_UNITS.map(unit => <option value={unit} key={unit}>{unit}</option>)}
+              {(Number(line.distance) > 0 ? DISTANCE_UNITS : ALL_UNITS).map(unit => <option value={unit} key={unit}>{unit}</option>)}
             </select>
           </label>
           <label className="cardio-log-time"><span className="cardio-log-label">Time</span>
@@ -267,6 +293,7 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
       </label>
 
       {summary && <p className="cardio-log-summary">{summary}</p>}
+      {milelessRuns > 0 && <p className="cardio-log-warning" role="status">Add a distance — without one {milelessRuns > 1 ? 'these runs count' : 'this run counts'} as 0 miles toward your weekly mileage, pace, and race goals.</p>}
 
       <div className="cardio-log-actions">
         <button type="button" className="button" disabled={!summary} onClick={save}>{editingId ? 'Save changes' : 'Save cardio'}</button>

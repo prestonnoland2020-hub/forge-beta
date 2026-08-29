@@ -12,7 +12,7 @@ import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolveWeekRunning, type AiPlanWeek, type StoredAiPlan,
+  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays, type AiPlanWeek, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -33,25 +33,6 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    split-day name), but two hard guards run regardless of what the AI said:
    the quality session never lands on a lower-body day, and if the AI chose
    one anyway it is relocated to the best non-lower day of the week. */
-/* Which split days land inside a given plan week. A rolling cycle that is not
-   7 days long rotates, so an 8-day split shows only 7 of its days in any one
-   week — the volume math has to agree with the schedule about which. */
-function weekCycleDays(startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }): SplitDay[] {
-  const cycle = splitDays.length ? splitDays : [{ name: 'Training', dayType: 'strength' } as SplitDay];
-  const start = new Date(`${startIso}T12:00:00`); start.setDate(start.getDate() + weekIndex * 7);
-  const today = new Date(); today.setHours(12, 0, 0, 0);
-  const todayAbsolute = Math.floor(today.getTime() / 86400000);
-  const anchorIndex = anchor ? cycle.findIndex((_, index) => index + 1 === anchor.position) : -1;
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(start); date.setDate(start.getDate() + index);
-    const absoluteDay = Math.floor(date.getTime() / 86400000);
-    const cycleIndex = rhythm !== 'rolling' ? index % cycle.length
-      : anchorIndex >= 0 ? (((anchorIndex + (absoluteDay - todayAbsolute)) % cycle.length) + cycle.length) % cycle.length
-      : ((absoluteDay % cycle.length) + cycle.length) % cycle.length;
-    return cycle[cycleIndex];
-  });
-}
-
 function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi'): Session[] {
   const cycle = splitDays.length ? splitDays : [{ name: 'Training', dayType: 'strength' }];
   const start = new Date(`${startIso}T12:00:00`); start.setDate(start.getDate() + weekIndex * 7);
@@ -334,37 +315,16 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      and the goal lift is never waved or tested. Wherever a day maps a lift the
      athlete holds a Real 1RM goal on, that lift is the day's prescription,
      repaired here so an already-generated block heals without regenerating. */
-  const dayGoalLift = (() => {
-    const map = new Map<string, string>();
-    splitDays.forEach(day => {
-      const owner = (day.exercises || []).find(name => goalLifts.has(canonicalLiftKey(name)));
-      if (owner) { map.set(day.name, owner); if (!map.has(splitDayKey(day.name))) map.set(splitDayKey(day.name), owner); }
-    });
-    return map;
-  })();
   let liveAdjusted = false;
   const plan = {
     ...storedPlanData,
     weeks: storedPlanData.weeks.map((rawItem, index) => {
-      /* The athlete's stated run days and mileage floor are enforced here too,
-         so a block generated before the rule existed still shows every run. */
-      const item = resolveWeekRunning(rawItem, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor), { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length });
-      return {
-      ...item,
-      topSets: (item.topSets || []).map(raw => {
-        const owner = dayGoalLift.get(raw.splitDay) || dayGoalLift.get(splitDayKey(raw.splitDay));
-        const set = owner && canonicalLiftKey(owner) !== canonicalLiftKey(raw.exercise) ? { ...raw, exercise: owner } : raw;
-        if (set !== raw) liveAdjusted = true;
-        const best = bests.get(set.exercise) ?? [...bests.entries()].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(set.exercise))?.[1];
-        if (!best) return set;
-        const live = wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, testsThisBlock(set.exercise));
-        if (live.weight !== set.weight || live.reps !== set.reps) liveAdjusted = true;
-        /* On a max week a tested lift also carries the double it falls back to
-           when the split hits that day more than once in the same week. */
-        const hold = live.reps === 1 ? wavePrescription(best, index, metric, bestSingles.get(set.exercise) || 0, false) : undefined;
-        return { ...set, weight: live.weight, reps: live.reps, hold: hold && { weight: hold.weight, reps: hold.reps } };
-      }),
-    }; }),
+      /* One shared resolver — the Coach reads the identical week, so no
+         surface can quote a number another surface does not show. */
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length }, { bests, singles: bestSingles, goalLifts, metric }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      if (item.adjusted) liveAdjusted = true;
+      return item;
+    }),
   };
   const weekIndex = currentWeekIndex(stored);
   const week = plan.weeks[weekIndex];

@@ -9,7 +9,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning } from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays } from './aiPlanService';
 import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void};
@@ -65,10 +65,13 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Same correction the Plan page applies: the athlete's stated running days
        and mileage floor decide the week, so Today never comes up empty on a
        day the plan simply forgot to schedule. */
-    /* The same seven-day window the Plan page measures, rotated to start on the
-       day being shown, so both surfaces quote the identical distance. */
-    const windowStart=Math.max(0,days.findIndex(day=>day.name===generatedBase.splitDay.name));
-    const windowDays=days.length?Array.from({length:Math.min(7,days.length)},(_,offset)=>days[(windowStart+offset)%days.length]):days;
+    /* THE SAME WINDOW THE PLAN PAGE MEASURES — computed by the same helper,
+       from the plan's own start date. Rotating the cycle to start on today
+       instead produced a different set of easy days and therefore a different
+       split of the week's miles: Today said 6.5 mi for the run the Plan tab
+       called 3.5. One window, one answer. */
+    const planRhythm=(()=>{try{return (JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null')?.rhythm==='weekly'?'weekly':'rolling') as 'weekly'|'rolling'}catch{return 'rolling' as const}})();
+    const windowDays=weekCycleDays(storedPlan.startDate,currentWeekIndex(storedPlan),days,planRhythm,{position:generatedBase.splitDay.position});
     const week=resolveWeekRunning(rawWeek,windowDays,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage},{weekIndex:currentWeekIndex(storedPlan),blockWeeks:storedPlan.plan.weeks.length});
     /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
        second opinion that could contradict the block — 4 × 200 m on a leg

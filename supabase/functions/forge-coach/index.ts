@@ -39,6 +39,8 @@ const cardioLogInstructions = `You convert an athlete's plain-language descripti
 OUTPUT
 - rows: one row per distinct effort. A steady workout is one row. Interval work becomes one row per repeat, or one row per distinct segment (warmup, repeats, cooldown) — identical repeats are separate rows so the log matches what was performed.
 - Each row: cardioType (Run, Walk, Bike, Rowing, Swimming, Elliptical, Stair Climber, Jump Rope — reuse the athlete's own activity name when it is clearly an activity), distance (0 when only time is known), unit, timeMinutes (decimal minutes; 0 when only distance is known).
+- UNIT AND DISTANCE MUST AGREE. 'minutes', 'calories', 'reps' and 'floors' are for rows with NO distance. The moment distance is greater than 0 the unit MUST be miles, km, meters or yards — a distance measured in minutes is worth zero miles to the athlete's mileage, pace and race goals.
+- NEVER DROP A STATED DISTANCE. If the athlete says how far they went ("2.1 miles in 20 minutes", "ran 3 in 24"), that number belongs in distance with a distance unit, and the duration belongs in timeMinutes. Only leave distance at 0 when they genuinely gave no distance at all.
 - Prefer the athlete's interval detail over a synced device summary when both are given, but keep totals consistent with what they stated. If their stated total conflicts with the sum of described segments, trust the segments and flag the difference in the note.
 - Rest between intervals is NOT a row; describe a notable rest scheme in the note.
 - note: one short line of useful context from their words (surface, feel, rest scheme, weather). Empty string when there is nothing beyond the numbers.
@@ -166,7 +168,18 @@ Return one editable cardio/circuit using only exact movement names and units in 
     if (!answer) throw new Error('Coach returned no answer.');
     if (cardioScope) {
       const parsed = JSON.parse(answer);
-      return Response.json({ answer: String(parsed.reflection), cardio: { reflection: String(parsed.reflection), note: String(parsed.note || ''), rows: parsed.rows } }, { headers: corsHeaders });
+      /* UNIT AND DISTANCE MUST AGREE — enforced, not requested. A distance
+         returned against 'minutes' converts to ZERO miles downstream: the run
+         still looks logged while counting for nothing in weekly mileage, pace
+         or an endurance goal. A stated distance always lands on a distance
+         unit. */
+      const DISTANCE_UNITS = ['miles', 'km', 'meters', 'yards'];
+      const rows = (Array.isArray(parsed.rows) ? parsed.rows : []).map((row: Record<string, unknown>) => {
+        if (!(Number(row.distance) > 0) || DISTANCE_UNITS.includes(String(row.unit))) return row;
+        const type = String(row.cardioType || '');
+        return { ...row, unit: /row|ski|erg/i.test(type) ? 'meters' : /swim/i.test(type) ? 'yards' : 'miles' };
+      });
+      return Response.json({ answer: String(parsed.reflection), cardio: { reflection: String(parsed.reflection), note: String(parsed.note || ''), rows } }, { headers: corsHeaders });
     }
     if (workoutScope) {
       const workout = JSON.parse(answer);

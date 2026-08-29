@@ -1455,3 +1455,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .classic-calendar .calendar-grid button.is-today.trained::after { display: none; }
 .classic-calendar .calendar-grid button.is-today { background: color-mix(in srgb, var(--accent, #d4ff3f) 9%, transparent); }
 .classic-calendar .calendar-grid button.is-today.selected { background: color-mix(in srgb, var(--accent, #d4ff3f) 16%, transparent); }
+
+/* A run logged without a distance is worth nothing to mileage or pace — say so
+   at the moment of logging rather than letting the totals quietly stall. */
+.cardio-log-warning { margin: 6px 0 0; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: #f6c66b; background: rgba(246, 198, 107, .1); border: 1px solid rgba(246, 198, 107, .28); }
