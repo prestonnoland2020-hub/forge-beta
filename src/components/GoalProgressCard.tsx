@@ -5,6 +5,7 @@ import { useWorkoutHistory, type WorkoutRecord } from '../features/training/Work
 import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
 import { clockToSeconds, formatGoalTarget } from '../lib/time';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { sameLift } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { requestForgeCoach } from '../features/training/coachService';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
@@ -117,7 +118,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const demonstratedTrajectory: GoalEvidence[] = [];
 
   if (goal.type === 'Strength') {
-    const matchingSets=records.flatMap(record=>{const topSets=(record.topSets||[]).filter(set=>set.completed!==false&&set.lift===(goal.exercise||'')&&set.weight>0&&set.reps>0);if(topSets.length)return topSets.map(set=>({date:record.date,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax}));return record.lift===(goal.exercise||'')&&record.weight&&record.reps?[{date:record.date,weight:record.weight,reps:record.reps,calculatedMax:record.calculatedMax}]:[]});
+    const matchingSets=records.flatMap(record=>{const topSets=(record.topSets||[]).filter(set=>set.completed!==false&&sameLift(set.lift,goal.exercise||'')&&set.weight>0&&set.reps>0);if(topSets.length)return topSets.map(set=>({date:record.date,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax}));return sameLift(record.lift||'',goal.exercise||'')&&record.weight&&record.reps?[{date:record.date,weight:record.weight,reps:record.reps,calculatedMax:record.calculatedMax}]:[]});
     matchingSets.forEach(set=>{trajectoryEvidence.push({date:set.date,value:set.calculatedMax||calculateEstimatedOneRepMax(set.weight,set.reps)||set.weight,label:`Calculated from ${set.weight} ${weightUnit} × ${set.reps}`});if(set.reps===1)demonstratedTrajectory.push({date:set.date,value:set.weight,label:`Real 1RM · ${set.weight} ${weightUnit}`})});
     const loadRecord=matchingSets.filter(set=>set.reps===1).reduce<(typeof matchingSets)[number]|undefined>((winner,set)=>!winner||set.weight>winner.weight?set:winner,undefined);
     const calculatedRecord=matchingSets.reduce<(typeof matchingSets)[number]|undefined>((winner,set)=>{const value=set.calculatedMax||calculateEstimatedOneRepMax(set.weight,set.reps)||set.weight;const winnerValue=winner&&(winner.calculatedMax||calculateEstimatedOneRepMax(winner.weight,winner.reps)||winner.weight);return!winner||value>(winnerValue||0)?set:winner},undefined);

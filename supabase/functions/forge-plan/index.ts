@@ -217,8 +217,11 @@ Deno.serve(async request => {
        block stored before this existed heals without regeneration. */
     const runningDays = Math.max(0, Math.min(7, Math.round(Number(profile.runningDays) || 0)));
     if (runningDays) {
-      const dayList = (Array.isArray(context_.splitDays) ? context_.splitDays : []) as Array<{ name?: string; type?: string }>;
-      const isRest = (day: { name?: string; type?: string }) => /rest/i.test(String(day.type || '')) || /^\s*rest\b/i.test(String(day.name || ''));
+      const dayList = (Array.isArray(context_.splitDays) ? context_.splitDays : []) as Array<{ name?: string; type?: string; dayType?: string }>;
+      /* Both keys, like the client. This read `type` alone and was safe only
+         because one caller happened to send that key; the next caller to send
+         its native `dayType` would have had easy runs filled onto rest days. */
+      const isRest = (day: { name?: string; type?: string; dayType?: string }) => /rest/i.test(String(day.type ?? day.dayType ?? '')) || /^\s*rest\b/i.test(String(day.name || ''));
       const paceMinutes = (pace: string) => { const match = String(pace || '').match(/(\d+):(\d{2})/); return match ? Number(match[1]) + Number(match[2]) / 60 : 0; };
       plan.weeks.forEach((week: Record<string, unknown>) => {
         let mileage = Number(week.mileage) || 0;
@@ -253,15 +256,25 @@ Deno.serve(async request => {
        athlete whose goal is Squat: the goal gate below then correctly held
        both at a double, and his actual goal lift went untested all block.
        Whenever a day maps a goal lift, that lift IS the day's prescription. */
+    /* Split days repeat inside one cycle as "Legs" and "Legs 2", and the model
+       writes whichever it likes. Matching on the exact name only, the second
+       instance found no owner and kept whatever accessory the model chose —
+       the client's resolver then rewrote it at render, so the stored block and
+       the screen disagreed about the same day. Same fold as the client's
+       `splitDayKey`. */
+    const dayKey = (name: string) => String(name || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/\s*(?:#\s*)?\d+$/, '');
     const dayGoalLift = new Map<string, string>();
     (Array.isArray(context_.splitDays) ? context_.splitDays : []).forEach(day => {
       const entry = day as { name?: string; exercises?: string[] };
       const match = (entry.exercises || []).find(name => goalLifts.has(liftKey(String(name))));
-      if (entry.name && match) dayGoalLift.set(String(entry.name), String(match));
+      if (entry.name && match) {
+        dayGoalLift.set(String(entry.name), String(match));
+        if (!dayGoalLift.has(dayKey(String(entry.name)))) dayGoalLift.set(dayKey(String(entry.name)), String(match));
+      }
     });
     if (dayGoalLift.size) plan.weeks.forEach((week: { topSets?: Array<{ splitDay: string; exercise: string }> }) => {
       for (const set of (week.topSets || [])) {
-        const owner = dayGoalLift.get(set.splitDay);
+        const owner = dayGoalLift.get(set.splitDay) || dayGoalLift.get(dayKey(set.splitDay));
         if (owner && liftKey(set.exercise) !== liftKey(owner)) set.exercise = owner;
       }
     });

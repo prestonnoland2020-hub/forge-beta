@@ -4,6 +4,8 @@ import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvi
 import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
+import { canonicalLiftKey } from '../lib/liftAliases';
+import { bestsFromHistory,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,type SplitDayRef } from '../features/training/aiPlanService';
 
 type SplitDay={name:string;dayType:string;muscles?:string[];exercises?:string[];cardioPolicy?:'none'|'forge'|'planned';cardio?:PlannedCardio[]};
 type CalendarSession={date:Date;kind:string;title:string;detail:string;metric?:string;goal:string;stress:'High'|'Moderate'|'Low'|'Rest';scaled?:boolean};
@@ -18,9 +20,13 @@ function scaleCardio(plan:PlannedCardio,week:PlanWeek,profile:AdaptiveProfile){
   return{summary:cardioPlanSummary(next),reason:`Scaled for ${week.phase.toLowerCase()} phase${profile.readiness<75?' and current recovery':''}.`};
 }
 
-function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map()):CalendarSession[]{
+function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number}):CalendarSession[]{
   const strengthGoal=goals.find(goal=>goal.type==='Strength');const enduranceGoal=goals.find(goal=>goal.type==='Endurance');const start=new Date(`${week.startDate}T12:00:00`);const cycle=splitDays.length?splitDays:[{name:'Strength',dayType:'strength'},{name:'Easy cardio',dayType:'cardio'},{name:'Rest',dayType:'rest'}];let strengthIndex=0;
-  const weekDays=Array.from({length:7},(_,index)=>{const date=new Date(start);date.setDate(start.getDate()+index);const absoluteDay=Math.floor(date.getTime()/86400000);const cycleIndex=rhythm==='rolling'?((absoluteDay%cycle.length)+cycle.length)%cycle.length:index%cycle.length;return{date,day:cycle[cycleIndex]};});
+  /* The same rotation the program uses, anchored to the live split cursor.
+     Without the anchor this calendar drifted from the program on the same
+     screen the moment the athlete missed a day: "Legs" on Thursday in one
+     panel, "Push" on Thursday in the other. */
+  const weekDays=weekCycleDays(week.startDate,0,cycle as SplitDayRef[],rhythm,anchor).map((day,index)=>{const date=new Date(start);date.setDate(start.getDate()+index);return{date,day:day as unknown as SplitDay};});
   const compatible=weekDays.map((entry,index)=>({entry,index})).filter(({entry})=>entry.day.dayType.toLowerCase()!=='rest'||entry.day.cardioPolicy!=='none');
   const requestedRuns=enduranceGoal?Math.max(1,Math.min(profile.runningDays,compatible.length)):0;
   const cardioByDay=new Map<number,'quality'|'easy'|'long'>();
@@ -59,12 +65,15 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     if(type==='strength'||type==='mixed'){const isPrimary=strengthIndex++===0;
     /* The goal lift appears ONCE a week, on the primary strength day. Other
        days train their own muscles — no squat-stage stamp on every row. */
-    const dayLifts=(day.exercises||[]).filter(name=>bests.has(name)).sort((a,b)=>(bests.get(b)||0)-(bests.get(a)||0));
-    const reps=week.strengthReps||6;
-    /* Loads trend UP: ~0.6%/week on top of the logged best, eased on deload
-       weeks — the athlete gets stronger, never re-anchored to an old number. */
-    const progressFactor=(week.phase==='Deload'?0.94:1)*(1+Math.min(.12,(week.week-1)*0.006));
-    const dayTopSet=dayLifts.length?`${dayLifts[0]}: ${Math.max(5,Math.round((bests.get(dayLifts[0])!/(1+reps/30))*.97*progressFactor/5)*5)} × ${reps}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
+    /* Bests are keyed canonically, so the lookup has to be too. */
+    const dayLifts=(day.exercises||[]).filter(name=>bests.has(canonicalLiftKey(name))).sort((a,b)=>(bests.get(canonicalLiftKey(b))||0)-(bests.get(canonicalLiftKey(a))||0));
+    /* THE WAVE, not a fourth formula. This line used to run inverse Epley
+       times a 0.97 fudge times a 0.6%/week creep — arithmetic that existed
+       nowhere else in Forge and disagreed with the program printed directly
+       above it. */
+    const lead=dayLifts[0];
+    const wave=lead?wavePrescription(bests.get(canonicalLiftKey(lead))||0,week.week-1,false,0,testsOneRepMax(lead,goalLifts)):null;
+    const dayTopSet=lead&&wave?`${lead}: ${wave.weight} × ${wave.reps}${wave.isMax?' tested MAX':''}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
     /* Every strength day carries a recommended top set from ITS mapped
        exercises and logged bests — the goal lift still leads its own day. */
     const strength=isPrimary?`${week.topSet}${week.strengthLoad?` · ${week.strengthFocus}`:''}`:dayTopSet?`Top set · ${dayTopSet}`:`${day.muscles?.filter(muscle=>muscle!=='Cardio').join(' + ')||'Accessory'} strength · map an exercise for a prescription`;return{date,kind:cardioKind?`${type==='mixed'?'Mixed':'Strength'} + ${cardioKind}`:(type==='mixed'?'Mixed':'Strength'),title:day.name,detail:cardioText?`${strength} · Cardio: ${cardioText}`:strength,goal:strengthGoal?.title||'Strength development',stress:cardioStress==='High'?'High':isPrimary?'High':'Moderate',scaled:Boolean(cardioText)};}
@@ -78,8 +87,9 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const [horizon,setHorizon]=useState<12|26|52>(12);
   const [openWeek,setOpenWeek]=useState<number|null>(null);
   const roadmap=useMemo(()=>buildLongRangePlan(goals,profile,horizon,records),[goals,profile,records,horizon]);
-  const bests=useMemo(()=>{const map=new Map<string,number>();records.forEach(record=>(record.topSets||[]).forEach(set=>{if(set.completed===false||!set.lift||!set.weight)return;const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));if(max>(map.get(set.lift)||0))map.set(set.lift,max)}));return map},[records]);
-  const active=roadmap[0];const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests):[],[active,splitDays,goals,profile,rhythm,bests]);
+  const bests=useMemo(()=>bestsFromHistory(records).bests,[records]);
+  const goalLifts=useMemo(()=>goalLiftNames(goals),[goals]);
+  const active=roadmap[0];const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts]);
   const exportRoadmap=()=>{
     const lines=['FORGE ROADMAP TO GOAL',`${roadmap.length} weeks · ${goals.map(goal=>goal.title).join(' · ')||'Baseline development'}`,'',...roadmap.flatMap(week=>[`WEEK ${week.week} · ${week.start} · ${week.phase.toUpperCase()}`,`  Volume: ${week.mileage?`${week.mileage} mi`:'no scheduled running'}${week.change?` (${week.change>0?'+':''}${week.change}%)`:''}`,`  Long run: ${week.longRun}`,`  Hard run: ${week.quality}`,`  Top set: ${week.strengthLoad?`${week.strengthExercise} ${week.strengthLoad} × ${week.strengthReps} · projected max ${week.calculatedMax}${week.strengthGoal?` / goal ${week.strengthGoal}`:''}`:week.topSet}`,''])];
     const blob=new Blob([lines.join('\n')],{type:'text/plain'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`forge-roadmap-${roadmap.length}-weeks.txt`;link.click();URL.revokeObjectURL(url);

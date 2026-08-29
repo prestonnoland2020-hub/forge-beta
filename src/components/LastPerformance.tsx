@@ -1,8 +1,9 @@
+import { sameLift } from '../lib/liftAliases';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 
 export function lastCompletedSet(records:WorkoutRecord[],exercise:string){
-  return records.flatMap(record=>record.topSets?.length?record.topSets.filter(set=>set.completed!==false&&set.lift===exercise).map(set=>({date:record.date,weight:set.weight,reps:set.reps})):(record.lift===exercise&&record.weight&&record.reps?[{date:record.date,weight:record.weight,reps:record.reps}]:[])).sort((a,b)=>b.date.localeCompare(a.date))[0];
+  return records.flatMap(record=>record.topSets?.length?record.topSets.filter(set=>set.completed!==false&&sameLift(set.lift,exercise)).map(set=>({date:record.date,weight:set.weight,reps:set.reps})):(sameLift(record.lift||'',exercise)&&record.weight&&record.reps?[{date:record.date,weight:record.weight,reps:record.reps}]:[])).sort((a,b)=>b.date.localeCompare(a.date))[0];
 }
 
 export function LastPerformanceBanner({exercise,records,unit,onClose,onUse}:{exercise:string;records:WorkoutRecord[];unit:string;onClose:()=>void;onUse?:(weight:number,reps:number)=>void}){

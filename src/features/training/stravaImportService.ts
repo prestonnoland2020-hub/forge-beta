@@ -27,35 +27,92 @@ export const markStravaReviewed = (sessionId: string) => { try { localStorage.se
 const queueStravaReviews = (sessionIds: string[]) => { if (!sessionIds.length) return; try { localStorage.setItem(reviewKey, JSON.stringify(Array.from(new Set([...pendingStravaReviews(), ...sessionIds])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
 export const runShapedActivity = (activity: string) => !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(activity);
 
-/* THE HAND LOG WINS. A run recorded in the app and the same run recorded by
-   the watch are one session, not two — but they never look alike: Forge names
-   a run by its role ("Easy", "Base", "Speed Run", "Long Run") and Strava names
-   it by its sport ("Run", "Trail Run"), so nothing matches on the name and the
-   day ended up with the run counted twice in every mileage total. Compare by
-   what kind of training it is instead: one hand-logged run on a date means
-   every Strava run on that date is the same work, already logged. Nothing else
-   is touched — a Strava ride on the day of a hand-logged run is a real second
-   session and stays. */
-export const cardioClass = (activity: string): string => {
-  const name = String(activity || '').toLowerCase();
-  if (/run|easy|base|tempo|threshold|speed|jog|interval|fartlek/.test(name)) return 'run';
-  if (/walk|hike/.test(name)) return 'walk';
-  if (/bike|ride|cycl/.test(name)) return 'bike';
-  if (/row/.test(name)) return 'row';
+/* THE HAND LOG WINS THE DISTANCE IT COVERS. A run typed into Forge and the
+   same run recorded by the watch are one session, not two — but they never
+   look alike: Forge names a run by its role ("Easy", "Base", "Speed Run") and
+   Strava names it by its sport ("Run", "Trail Run"), so nothing matched and
+   the day counted the run twice in every mileage total.
+
+   Presence alone was too blunt a test. On a day with four separate Strava
+   runs and one combined "Easy + Speed Run · 3 mi" entry, that single entry
+   suppressed all four — and across one athlete's history it hid 28.5 miles
+   the watch was the only witness to. So the hand log supersedes the watch for
+   the distance it actually accounts for: if the day's typed running covers
+   what Strava recorded, the watch copy is a duplicate and goes; if the watch
+   recorded materially more, the typed entry is an incomplete record of that
+   day and the Strava runs stay.
+
+   A class with no distance to compare (a lifting session) still goes on
+   presence, and a Strava ride on the day of a hand-logged run was never
+   touched — it is a real second session. */
+const COVERAGE_TOLERANCE_MILES = 0.5;
+const classOfPart = (part: string): string => {
+  const name = part.toLowerCase();
+  /* THE SPORT IS DECIDED BEFORE THE INTENSITY. Forge's run names are mostly
+     intensity words — "Easy", "Base", "Tempo" — but those words attach to any
+     sport, and checking them first classified "Easy Bike" as a run. The
+     consequence was not cosmetic: the dedupe then treated a genuine Strava
+     RUN that day as already logged, marked it settled, and the miles were
+     gone for good. A named sport always wins; intensity only decides when no
+     sport is named, where an unqualified "Easy" means an easy run. */
+  if (/bike|ride|cycl|spin/.test(name)) return 'bike';
+  if (/row|erg/.test(name)) return 'row';
   if (/swim/.test(name)) return 'swim';
+  if (/walk|hike/.test(name)) return 'walk';
   if (/weight|strength|lift/.test(name)) return 'strength';
+  if (/elliptical/.test(name)) return 'elliptical';
+  if (/stair|step/.test(name)) return 'stairs';
+  if (/ski/.test(name)) return 'ski';
+  if (/run|jog|tempo|threshold|fartlek|interval|speed|easy|base|long/.test(name)) return 'run';
   return 'other';
 };
-const handLoggedClasses = (records: WorkoutRecord[]): Map<string, Set<string>> => {
-  const byDate = new Map<string, Set<string>>();
+
+/* ONE ENTRY CAN HOLD MORE THAN ONE SESSION. Athletes write "Walk + Easy" for
+   a walk and an easy run, and "Row + Wall Balls + Assault Bike" for a
+   circuit. Forcing a single class onto those names decides wrongly whichever
+   way it is ordered — as a run it swallowed a real Strava walk, as a walk it
+   swallowed a real Strava run. The plus sign separates sessions, so each part
+   is classified on its own and the entry covers all of them. An adjective and
+   a noun with no plus ("Easy Bike") is still one session. */
+export const cardioClasses = (activity: string): Set<string> =>
+  new Set(String(activity || '').split('+').map(part => part.trim()).filter(Boolean).map(classOfPart));
+
+/* The entry's leading class, for callers that need exactly one. */
+export const cardioClass = (activity: string): string =>
+  classOfPart(String(activity || '').split('+')[0] || '');
+type DayCoverage = { classes: Set<string>; miles: Map<string, number> };
+const handLoggedCoverage = (records: WorkoutRecord[]): Map<string, DayCoverage> => {
+  const byDate = new Map<string, DayCoverage>();
   for (const record of records) {
     for (const session of record.cardioSessions || []) {
       /* Imported sessions carry a strava- id; anything else the athlete typed. */
       if (String(session.id || '').startsWith('strava-')) continue;
-      const classes = byDate.get(record.date) || new Set<string>();
-      classes.add(cardioClass(session.activity || ''));
-      byDate.set(record.date, classes);
+      const day = byDate.get(record.date) || { classes: new Set<string>(), miles: new Map<string, number>() };
+      const classes = [...cardioClasses(session.activity || '')];
+      const miles = cardioMiles(session);
+      classes.forEach(name => day.classes.add(name));
+      /* A combined entry's distance is not split between its parts — Forge
+         does not know how much of "Walk + Easy" was the run. Crediting the
+         whole distance to each part is the generous reading, and generous is
+         the right direction here: it errs toward trusting what the athlete
+         typed, which is the rule they asked for. */
+      if (miles > 0) classes.forEach(name => day.miles.set(name, (day.miles.get(name) || 0) + miles));
+      byDate.set(record.date, day);
     }
+  }
+  return byDate;
+};
+/* What the watch recorded per class per day, so coverage can be compared. */
+const stravaMilesByDay = (rows: ExternalRow[]): Map<string, Map<string, number>> => {
+  const byDate = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    const mapped = externalToSession(row);
+    const miles = cardioMiles(mapped.session);
+    if (!(miles > 0)) continue;
+    const day = byDate.get(mapped.date) || new Map<string, number>();
+    const name = cardioClass(mapped.session.activity || '');
+    day.set(name, (day.get(name) || 0) + miles);
+    byDate.set(mapped.date, day);
   }
   return byDate;
 };
@@ -121,7 +178,8 @@ export async function importStravaActivities(
   }
   if (!rows.length) return { imported: 0, skipped: 0 };
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
-  const alreadyLogged = handLoggedClasses(records);
+  const handLogged = handLoggedCoverage(records);
+  const watchMiles = stravaMilesByDay(rows);
   const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[] }>();
   let skipped = 0;
   /* Superseded rows are marked imported like any other, so a day the athlete
@@ -130,7 +188,17 @@ export async function importStravaActivities(
   for (const row of rows) {
     const mapped = externalToSession(row);
     if (existingIds.has(mapped.session.id as string) || row.imported_to_workout) { skipped++; continue; }
-    if (alreadyLogged.get(mapped.date)?.has(cardioClass(mapped.session.activity || ''))) { skipped++; supersededRowIds.push(row.id); continue; }
+    /* Superseded only when the athlete's own entry covers this class for the
+       day. A lifting session has no distance to compare, so presence decides;
+       running is judged on miles. */
+    const group = cardioClass(mapped.session.activity || '');
+    const day = handLogged.get(mapped.date);
+    if (day?.classes.has(group)) {
+      const watched = watchMiles.get(mapped.date)?.get(group) || 0;
+      const typed = day.miles.get(group) || 0;
+      const covered = watched === 0 || typed + COVERAGE_TOLERANCE_MILES >= watched;
+      if (covered) { skipped++; supersededRowIds.push(row.id); continue; }
+    }
     const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [] };
     entry.sessions.push(mapped.session); entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
     byDate.set(mapped.date, entry);

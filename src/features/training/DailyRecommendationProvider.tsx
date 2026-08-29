@@ -9,8 +9,9 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays } from './aiPlanService';
-import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay } from './aiPlanService';
+import { calculateEstimatedOneRepMax } from '../../lib/strength';
+import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void};
 const Context=createContext<Value|null>(null);
@@ -169,23 +170,41 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const weekIdx=currentWeekIndex(storedPlan);
     const metric=Boolean(setup?.units==='Metric');
     const goalLifts=goalLiftNames(goals);
-    const liveByLift=new Map<string,{best:number;single:number}>();
-    records.forEach(record=>(record.topSets||[]).forEach(set=>{
-      if(set.completed===false||!set.lift||!set.weight)return;
-      const key=canonicalLiftKey(set.lift);
-      const held=liveByLift.get(key)||{best:0,single:0};
-      const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));
-      liveByLift.set(key,{best:Math.max(held.best,max),single:set.reps===1?Math.max(held.single,set.weight):held.single});
+    /* Shared builder. This was a fourth copy, and its bare Epley read a logged
+       405x1 as a 419 max — inflating a true single by 3.3% and prescribing off
+       the inflated number. */
+    const {bests:liveBests,singles:liveSingles}=bestsFromHistory(records);
+    /* ONE ATTEMPT PER LIFT PER WEEK, THE SAME ONE THE PLAN TAB PICKS. A
+       rolling split shorter than seven days hits the same day twice inside a
+       week; the Plan tab demoted the second exposure to the heavy double and
+       Today did not, so the athlete was told to attempt a true single on both.
+       `windowDays[0]` is today — the same window the running math uses — so
+       both screens choose the same day. */
+    const attemptDays=chooseMaxAttemptDays(windowDays.map((day,index)=>{
+      const set=(week.topSets||[]).find(entry=>entry.splitDay===day.name);
+      const key=set?canonicalLiftKey(set.exercise):'';
+      const best=key?liveBests.get(key)||0:0;
+      const live=best?wavePrescription(best,weekIdx,metric,liveSingles.get(key)||0,testsOneRepMax(set!.exercise,goalLifts)):null;
+      return{
+        exercise:set?.exercise,
+        reps:live?.reps,
+        hasHold:Boolean(live?.isMax),
+        cost:(day.name===week.longRunDay?2:0)+(day.name===week.qualityDay?3:0)+((week.easyDays||[]).includes(day.name)?1:0)+index*0.01,
+      };
     }));
+    const todayHoldsTheAttempt=attemptDays.has(0);
     const isMaxWeek=waveSlot(weekIdx).isMax;
     const waveFor=(exercise:string,fallback:{weight:number;reps:number})=>{
-      const live=liveByLift.get(canonicalLiftKey(exercise));
+      const key=canonicalLiftKey(exercise);
+      const live={best:liveBests.get(key)||0,single:liveSingles.get(key)||0};
       const tests=testsOneRepMax(exercise,goalLifts);
       /* No logged history for this lift yet: nothing to wave off, so the
          engine's baseline stands and the card still asks for a first set. */
-      if(!live?.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
-      const prescription=wavePrescription(live.best,weekIdx,metric,live.single,tests);
-      const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':isMaxWeek?'MAX WEEK — heavy double, no goal on this lift':`${prescription.reps}-rep week`;
+      if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
+      /* A tested single the athlete is not taking today falls back to the
+         double the lift already earned, rather than being offered twice. */
+      const prescription=wavePrescription(live.best,weekIdx,metric,live.single,tests&&todayHoldsTheAttempt);
+      const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':isMaxWeek?(tests?'MAX WEEK — the attempt is scheduled on another day this week':'MAX WEEK — heavy double, no goal on this lift'):`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
          weight when the set says so, and an unwaved 'baseline' flag was
          hiding real prescriptions behind "Log a baseline set". */
@@ -195,11 +214,11 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        keeps its own exercise and simply joins the wave. */
     let applied=false;
     const topSets=cardioBase.topSets.map(set=>{
-      const leads=!applied&&(set.exercise===match.exercise||!generatedBase.topSets.some(other=>other.exercise===match.exercise)&&set===generatedBase.topSets[0]);
+      const leads=!applied&&(sameLift(set.exercise,match.exercise)||!generatedBase.topSets.some(other=>sameLift(other.exercise,match.exercise))&&set===generatedBase.topSets[0]);
       if(leads)applied=true;
       const exercise=leads?match.exercise:set.exercise;
       const wave=waveFor(exercise,set);
-      return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:Math.round(wave.weight*(1+wave.reps/30)),rationale:wave.rationale};
+      return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:calculateEstimatedOneRepMax(wave.weight,wave.reps)||0,rationale:wave.rationale};
     });
     return{...cardioBase,topSets};
   },[generatedBase,aiPlanStamp,goalStamp,planInputsStamp]); // eslint-disable-line react-hooks/exhaustive-deps

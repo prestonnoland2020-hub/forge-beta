@@ -100,7 +100,10 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const strengthLibrary=input.exercises.filter(exercise=>exercise.enabled&&exercise.kind==='Strength'&&!/HYROX|CrossFit/i.test(exercise.detail));
   const strengthGoals=input.goals.filter(goal=>goal.type==='Strength'&&goal.exercise);
   const goalByLift=new Map(strengthGoals.map(goal=>[normalized(goal.exercise||''),goal]));
-  const goalMaxByLift=strengthGoals.reduce<Record<string,number>>((map,goal)=>{const target=goalTarget(goal);if(goal.exercise&&target)map[goal.exercise]=target;return map},{});
+  /* Keyed canonically: written raw, a "Squat" goal was invisible to a "Back
+     Squat" template and the day fell back to "establish a baseline" on a lift
+     with years of history behind it. */
+  const goalMaxByLift=strengthGoals.reduce<Record<string,number>>((map,goal)=>{const target=goalTarget(goal);if(goal.exercise&&target)map[canonicalLiftKey(goal.exercise)]=target;return map},{});
   const dueMuscles=normalizeMuscleGroups(input.splitDay.muscles).filter(muscle=>muscle!=='Cardio');
   const explicitNames=new Set(input.splitDay.exercises.map(normalized));
   const compareExercise=(a:LibraryExercise,b:LibraryExercise)=>{

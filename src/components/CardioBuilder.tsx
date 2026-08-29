@@ -23,12 +23,24 @@ const isDistanceUnit = (unit: string) => DISTANCE_UNITS.includes(String(unit || 
    logged. The pairing is impossible, so it is never stored: entering a
    distance against a time or count unit moves the unit to that activity's
    distance unit. */
+/* A DEFAULT UNIT IS NOT A REPAIR UNIT. This returned 'minutes' for an
+   elliptical or a stair climber, and it is also the function called to FIX a
+   distance sitting on a time unit — so "3" on an elliptical was "repaired"
+   from minutes to minutes, the distance silently became zero miles, and the
+   select still displayed "miles" because the options list filters to distance
+   units once a distance is typed. The athlete read three miles and the app
+   stored none. `distanceUnitFor` never returns a time unit; `unitFor` keeps
+   the sensible empty-line default. */
+const distanceUnitFor = (type: string) => {
+  const value = type.trim().toLowerCase();
+  if (/row|ski|erg/.test(value)) return 'meters';
+  if (/swim/.test(value)) return 'yards';
+  return 'miles';
+};
 const unitFor = (type: string) => {
   const value = type.trim().toLowerCase();
-  if (/row|ski/.test(value)) return 'meters';
-  if (/swim/.test(value)) return 'yards';
   if (/elliptical|jump rope|stair/.test(value)) return 'minutes';
-  return 'miles';
+  return distanceUnitFor(type);
 };
 
 const toMiles = (distance: number, unit: string) => {
@@ -74,7 +86,7 @@ const linesFromDraft = (draft: CardioLogDraft): CardioLine[] => {
   return rows.map((row, index) => ({
     id: index + 1,
     cardioType: String(row.cardioType || row.activity || draft.activity || 'Run'),
-    unit: (() => { const stored = String(row.unit || row.distanceUnit || 'miles'); return Number(row.distance) > 0 && !isDistanceUnit(stored) ? unitFor(String(row.cardioType || row.activity || draft.activity || 'Run')) : stored; })(),
+    unit: (() => { const stored = String(row.unit || row.distanceUnit || 'miles'); return Number(row.distance) > 0 && !isDistanceUnit(stored) ? distanceUnitFor(String(row.cardioType || row.activity || draft.activity || 'Run')) : stored; })(),
     distance: row.distance ? String(row.distance) : '',
     time: minutesToClock(Number(row.time) || 0),
   }));
@@ -146,7 +158,13 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
   }, [exercises]);
 
   const updateLine = (id: number, change: Partial<CardioLine>) => setLines(current => current.map(line => line.id === id ? { ...line, ...change } : line));
-  const changeType = (id: number, cardioType: string) => setLines(current => current.map(line => line.id === id ? { ...line, cardioType, unit: unitFor(cardioType) } : line));
+  /* Correcting the activity on a line that already has a distance keeps that
+     distance measurable: it moves to the new activity's DISTANCE unit, never
+     to a time unit. Retyping "Run" as "Stair Climber" used to turn 3 miles
+     into nothing, with no warning. */
+  const changeType = (id: number, cardioType: string) => setLines(current => current.map(line => line.id === id
+    ? { ...line, cardioType, unit: Number(line.distance) > 0 ? distanceUnitFor(cardioType) : unitFor(cardioType) }
+    : line));
   const addLine = () => setLines(current => {
     const last = current[current.length - 1];
     return [...current, { id: Date.now(), cardioType: last?.cardioType || 'Run', unit: last?.unit || 'miles', distance: last?.distance || '', time: '' }];
@@ -178,7 +196,7 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
     /* The AI logger may return a distance against a time unit ("2.1 minutes").
        Its unit is a suggestion, not a fact — a stated distance always lands on
        a distance unit so the miles are real. */
-    const rows = sourceRows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: Number(row.distance) > 0 && !isDistanceUnit(row.unit) ? unitFor(row.cardioType) : row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
+    const rows = sourceRows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: Number(row.distance) > 0 && !isDistanceUnit(row.unit) ? distanceUnitFor(row.cardioType) : row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
     const noteText = parsed.note && !note ? parsed.note : note;
     /* "Log it" logs it. The rows used to land in the composer for a second
        confirming tap, and a session that never got that tap was thrown away
@@ -269,7 +287,7 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
             <input list="cardio-type-options" value={line.cardioType} onChange={event => changeType(line.id, event.target.value)} placeholder="Run" />
           </label>
           <label className="cardio-log-distance"><span className="cardio-log-label">Distance</span>
-            <input type="number" inputMode="decimal" min="0" step="0.01" value={line.distance} onChange={event => updateLine(line.id, Number(event.target.value) > 0 && !isDistanceUnit(line.unit) ? { distance: event.target.value, unit: unitFor(line.cardioType) } : { distance: event.target.value })} placeholder="0" />
+            <input type="number" inputMode="decimal" min="0" step="0.01" value={line.distance} onChange={event => updateLine(line.id, Number(event.target.value) > 0 && !isDistanceUnit(line.unit) ? { distance: event.target.value, unit: distanceUnitFor(line.cardioType) } : { distance: event.target.value })} placeholder="0" />
           </label>
           <label className="cardio-log-unit"><span className="cardio-log-label">Unit</span>
             <select value={line.unit} onChange={event => updateLine(line.id, { unit: event.target.value })}>

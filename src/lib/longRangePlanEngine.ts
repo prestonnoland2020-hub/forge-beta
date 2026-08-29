@@ -1,6 +1,8 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { prescribeTopSet } from './strengthPrescription';
+import { canonicalLiftKey } from './liftAliases';
+import { bestsFromHistory, waveSlot, WAVE_LENGTH, LONG_RUN_MIN_SHARE, LONG_RUN_MAX_SHARE } from '../features/training/aiPlanService';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import type { CardioLogDraft } from './cardioSession';
 
@@ -18,20 +20,25 @@ export type PlanHistoryRecord={topSets?:Array<{lift:string;weight:number;reps:nu
    a variant match ("Smith Machine Squat" for a Squat goal) fills in when the
    exact lift has never been logged. */
 const historyMax=(records:PlanHistoryRecord[],exercise?:string)=>{
-  if(!exercise)return 0;const target=exercise.trim().toLowerCase();let exact=0;let variant=0;
-  records.forEach(record=>(record.topSets||[]).forEach(set=>{
-    if(set.completed===false||!set.lift||!set.weight)return;
-    const name=set.lift.trim().toLowerCase();
-    const max=set.calculatedMax||Math.round(set.weight*(1+set.reps/30));
-    if(name===target){if(max>exact)exact=max}
-    else if(name.includes(target)||target.includes(name)){if(max>variant)variant=max}
-  }));
-  return exact||variant;
+  if(!exercise)return 0;
+  /* Substring matching used to stand in for aliasing here, and it is not the
+     same thing: "hack squat".includes("squat") is true, so a Squat goal with
+     no logged Squat silently took its baseline from a HACK SQUAT — a lift the
+     alias table deliberately refuses to fold — and the whole roadmap
+     prescribed squat loads off a machine number. Only real aliases count. */
+  return bestsFromHistory(records).bests.get(canonicalLiftKey(exercise))||0;
 };
 export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,weeksRequested=16,records:PlanHistoryRecord[]=[]):PlanWeek[]{
   const endurance=goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];const available=deadline?Math.max(4,Math.ceil((deadline-Date.now())/604800000)):weeksRequested;const total=Math.min(52,Math.max(8,Math.min(available,weeksRequested)));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return miles>=0.5&&minutes?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
   return Array.from({length:total},(_,index)=>{
-    const week=index+1;const weekDate=new Date();weekDate.setHours(12,0,0,0);weekDate.setDate(weekDate.getDate()+index*7);const taper=Boolean(endurance)&&week>total-2;const test=week===total;const deload=!taper&&!test&&week%4===0;const progress=index/Math.max(1,total-1);const phase:PlanWeek['phase']=test?'Test':taper?'Taper':deload?'Deload':progress<.25?'Foundation':progress<.65?'Build':'Specific';const priorBuild=startMileage+(peak-startMileage)*Math.min(1,progress/.86);const mileage=Number((hasRunBaseline?(taper?priorBuild*(test?.55:.72):deload?priorBuild*.78:priorBuild):0).toFixed(1));const previous=index===0?startMileage:startMileage+(peak-startMileage)*Math.min(1,(index-1)/Math.max(1,total-1)/.86);const change=hasRunBaseline&&previous?Math.round((mileage-previous)/previous*100):0;const repDistance=intervalMenu[Math.min(intervalMenu.length-1,Math.floor(progress*intervalMenu.length))];
+    const week=index+1;const weekDate=new Date();weekDate.setHours(12,0,0,0);weekDate.setDate(weekDate.getDate()+index*7);const taper=Boolean(endurance)&&week>total-2;
+    /* The roadmap and the program render on the SAME screen, so they cannot
+       run different calendars. Max week and the deload are the wave's — the
+       5-week 8/6/4/2/1 cycle, deloading on the 2-rep week so the attempt
+       always follows a lighter week — not "the last week of the horizon" and
+       "every fourth week", which put DELOAD on the roadmap in a week the
+       program called BUILD. */
+    const test=waveSlot(index).isMax;const deload=!taper&&!test&&index%WAVE_LENGTH===WAVE_LENGTH-2;const progress=index/Math.max(1,total-1);const phase:PlanWeek['phase']=test?'Test':taper?'Taper':deload?'Deload':progress<.25?'Foundation':progress<.65?'Build':'Specific';const priorBuild=startMileage+(peak-startMileage)*Math.min(1,progress/.86);const mileage=Number((hasRunBaseline?(taper?priorBuild*(test?.55:.72):deload?priorBuild*.78:priorBuild):0).toFixed(1));const previous=index===0?startMileage:startMileage+(peak-startMileage)*Math.min(1,(index-1)/Math.max(1,total-1)/.86);const change=hasRunBaseline&&previous?Math.round((mileage-previous)/previous*100):0;const repDistance=intervalMenu[Math.min(intervalMenu.length-1,Math.floor(progress*intervalMenu.length))];
     const goalSeconds=clockSeconds(endurance?.target);const goalMilesTotal=eventMiles(endurance);const goalPacePerMile=goalSeconds&&goalMilesTotal?goalSeconds/goalMilesTotal:0;
     /* Interval targets come from the GOAL pace, eased by phase — Foundation
        runs reps ~4% slower than goal pace, Specific runs them at goal pace. */
@@ -48,7 +55,9 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
        lifetime longest, which put a 13.2 mi long run inside a 14 mi week and
        froze it there for a year. */
     const durabilityCap=profile.longestRunMiles+index*0.3;
-    const longMiles=hasRunBaseline?(Math.min(Math.max(3,mileage*.35),durabilityCap)*(taper?.72:test?.55:deload?.85:1)).toFixed(1):'0';const longMinutes=Number(longMiles)*(easyAnchor?easyAnchor/60:10);const easyMinutes=hasRunBaseline?Math.round(Math.max(20,Math.min(45,Math.min(longMinutes*.8,mileage/Math.max(1,profile.runningDays)*10)))):0;
+    /* The same 25–35% band the resolver uses; .35 flat here put a different
+       long run on the roadmap than the program showed for the same week. */
+    const longMiles=hasRunBaseline?(Math.min(Math.max(mileage*LONG_RUN_MIN_SHARE,Math.min(3,mileage)),Math.min(mileage*LONG_RUN_MAX_SHARE,durabilityCap))*(taper?.72:test?.55:deload?.85:1)).toFixed(1):'0';const longMinutes=Number(longMiles)*(easyAnchor?easyAnchor/60:10);const easyMinutes=hasRunBaseline?Math.round(Math.max(20,Math.min(45,Math.min(longMinutes*.8,mileage/Math.max(1,profile.runningDays)*10)))):0;
     const prescription=prescribeTopSet({baselineMax:currentStrength,goalMax:targetStrength||undefined,weekIndex:index,progress,readiness:profile.readiness,highFatigue:profile.strengthFatigue==='High',allowTest:test});const hasStrengthBaseline=Boolean(strength&&currentStrength);const topSet=!strength?'No strength goal':hasStrengthBaseline?`${strength.exercise}: ${prescription.weight} × ${prescription.reps}${prescription.isTest?' tested MAX':''}`:`${strength.exercise}: baseline needed`;const strengthFocus=!strength?'No strength progression':hasStrengthBaseline?`${prescription.label}-rep stage · ${phase==='Foundation'?'volume & technique':phase==='Build'?'progressive overload':phase==='Specific'?'goal-specific strength':deload?'fatigue control':taper?'maintain & freshen':'assessment'}`:'Log a comparable set first';
     return{week,start:dateLabel(weekDate),startDate:weekDate.toISOString().slice(0,10),phase,mileage,change,strengthFocus,topSet,strengthExercise:strength?.exercise||'Primary lift',strengthLoad:hasStrengthBaseline?prescription.weight:0,strengthReps:hasStrengthBaseline?prescription.reps:0,calculatedMax:hasStrengthBaseline?prescription.calculatedMax:0,strengthGoal:targetStrength,goalPercent:hasStrengthBaseline?prescription.percentOfGoal:0,quality,longRun:endurance?(hasRunBaseline?`${longMiles} mi easy${easyPaceText||' · conversational effort'}`:'Baseline needed'):'Not scheduled',easy:endurance?(hasRunBaseline?`${easyMinutes} min easy${easyPaceText||(profile.watchConnected?` · ${profile.easyHrMin}–${profile.easyHrMax} bpm`:' · conversational effort')}`:'Log an easy run first'):'Optional easy movement',why:!hasRunBaseline&&endurance?'Forge needs a real running baseline before progressing volume.':!hasStrengthBaseline&&strength?'Forge needs a comparable strength set before prescribing load.':`Progress toward ${endurance?.title||strength?.title||'the active goals'} without stacking hard stress.`,adjustment:hasStrengthBaseline?`${prescription.rationale} Regenerated after completed, missed, or failed work.`:'No strength load is inferred from the goal target.'};
   });

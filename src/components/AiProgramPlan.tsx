@@ -8,17 +8,19 @@ import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { isDemoMode } from '../lib/env';
 import { canonicalLiftKey, splitDayKey } from '../lib/liftAliases';
-import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
+import { cardioMiles, summarizeCardioDraft, formatCardioMinutes } from '../lib/cardioSession';
+import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { runShapedActivity } from '../features/training/stravaImportService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays, type AiPlanWeek, type StoredAiPlan,
+  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
+  bestsFromHistory, chooseMaxAttemptDays, type AiPlanWeek, type SplitDayRef, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
 type Session = { date: Date; kind: string; title: string; detail: string; stress: 'High' | 'Moderate' | 'Low' | 'Rest' };
 const dateText = (date: Date) => date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const epley = (weight: number, reps: number) => Math.round(weight * (1 + reps / 30));
 
 /* Lower-body is a property of the MUSCLES a day trains (or a squat-pattern
    top set), never of the day's name — users name days anything. */
@@ -34,22 +36,15 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    the quality session never lands on a lower-body day, and if the AI chose
    one anyway it is relocated to the best non-lower day of the week. */
 function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi'): Session[] {
-  const cycle = splitDays.length ? splitDays : [{ name: 'Training', dayType: 'strength' }];
+  /* The window comes from `weekCycleDays` — the same function the volume math
+     uses. This was a byte-identical second copy of that rotation, which meant
+     the schedule and the mileage that must agree were computed twice and free
+     to drift apart on the next edit. */
   const start = new Date(`${startIso}T12:00:00`); start.setDate(start.getDate() + weekIndex * 7);
-  /* The rotation is anchored to the LIVE split cursor: today shows the day
-     that is actually due (completion-driven — missed days hold it in place),
-     and every other date extends from there. Date arithmetic is only the
-     fallback when no cursor is available. */
-  const today = new Date(); today.setHours(12, 0, 0, 0);
-  const todayAbsolute = Math.floor(today.getTime() / 86400000);
-  const anchorIndex = anchor ? cycle.findIndex((_, index) => index + 1 === anchor.position) : -1;
-  const dayInfos = Array.from({ length: 7 }, (_, index) => {
+  const window = weekCycleDays(startIso, weekIndex, splitDays as SplitDayRef[], rhythm, anchor);
+  const dayInfos = window.map((entry, index) => {
     const date = new Date(start); date.setDate(start.getDate() + index);
-    const absoluteDay = Math.floor(date.getTime() / 86400000);
-    const cycleIndex = rhythm !== 'rolling' ? index % cycle.length
-      : anchorIndex >= 0 ? (((anchorIndex + (absoluteDay - todayAbsolute)) % cycle.length) + cycle.length) % cycle.length
-      : ((absoluteDay % cycle.length) + cycle.length) % cycle.length;
-    const day = cycle[cycleIndex];
+    const day = (entry as unknown as SplitDay);
     const topSet = (week.topSets || []).find(set => set.splitDay === day.name)
       || (week.topSets || []).find(set => splitDayKey(set.splitDay) === splitDayKey(day.name));
     return { date, day, topSet, lower: isLowerBodyDay(day, topSet) };
@@ -77,16 +72,15 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
      three times over. The attempt goes to that lift's cleanest session — no
      long run, no quality work — and the day's other appearances drop back to
      the heavy double the lift already earned. */
-  const attemptIndex = new Map<string, { index: number; cost: number }>();
-  dayInfos.forEach((info, index) => {
-    if (!info.topSet || info.topSet.reps !== 1 || !info.topSet.hold) return;
-    const cost = (index === longIndex ? 2 : 0) + (index === qualityIndex ? 3 : 0) + (easySet.has(index) ? 1 : 0);
-    const held = attemptIndex.get(info.topSet.exercise);
-    if (!held || cost < held.cost) attemptIndex.set(info.topSet.exercise, { index, cost });
-  });
+  const attemptDays = chooseMaxAttemptDays(dayInfos.map((info, index) => ({
+    exercise: info.topSet?.exercise,
+    reps: info.topSet?.reps,
+    hasHold: Boolean(info.topSet?.hold),
+    cost: (index === longIndex ? 2 : 0) + (index === qualityIndex ? 3 : 0) + (easySet.has(index) ? 1 : 0),
+  })));
   /* Pass 2 — render sessions. */
   return dayInfos.map(({ date, day, topSet: rawTopSet }, index) => {
-    const demoted = rawTopSet?.reps === 1 && rawTopSet.hold && attemptIndex.get(rawTopSet.exercise)?.index !== index;
+    const demoted = rawTopSet?.reps === 1 && rawTopSet.hold && !attemptDays.has(index);
     const topSet = demoted && rawTopSet?.hold ? { ...rawTopSet, ...rawTopSet.hold } : rawTopSet;
     const type = day.dayType.toLowerCase();
     let runText = ''; let runKind = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
@@ -140,13 +134,16 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   }, [generating]); // eslint-disable-line react-hooks/exhaustive-deps
   const generatingStage = GEN_STAGES[stageIndex];
 
-  const bests = useMemo(() => { const map = new Map<string, number>(); records.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false || !set.lift || !set.weight) return; const max = set.calculatedMax || epley(set.weight, set.reps); if (max > (map.get(set.lift) || 0)) map.set(set.lift, max); })); return map; }, [records]);
-  /* True logged singles — Real 1RMs — anchor max-week attempts directly. */
-  const bestSingles = useMemo(() => { const map = new Map<string, number>(); records.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false || !set.lift || !set.weight || set.reps !== 1) return; if (set.weight > (map.get(set.lift) || 0)) map.set(set.lift, set.weight); })); return map; }, [records]);
+  /* Both maps come from the shared builder, keyed canonically. Keyed raw, this
+     screen read "Back Squat 275x5" as a 321 max while Today folded the same
+     history to 380 and prescribed forty-five pounds more. */
+  const history = useMemo(() => bestsFromHistory(records), [records]);
+  const bests = history.bests;
+  const bestSingles = history.singles;
   /* Max week is tied to GOALS: only a lift with a Real 1RM goal owes a tested
-     single, because that is the only set the goal can register. Everything
-     else holds the double and offers the attempt. No strength goal at all and
-     every lift tests, or a calc max would never convert into a real one. */
+     single, because that is the only set the goal can register. Every other
+     lift holds the double, and no single is offered — not as an option, and
+     not when there are no strength goals at all. */
   const goalLifts = useMemo(() => goalLiftNames(goals), [goals]);
   const testsThisBlock = (exercise: string) => testsOneRepMax(exercise, goalLifts);
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
@@ -157,8 +154,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     const map = new Map<string, MaxSource>();
     records.forEach(record => (record.topSets || []).forEach(set => {
       if (set.completed === false || !set.lift || !set.weight) return;
-      const max = set.calculatedMax || epley(set.weight, set.reps);
-      if (max > (map.get(set.lift)?.max || 0)) map.set(set.lift, { max, weight: set.weight, reps: set.reps, date: record.date });
+      const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
+      const key = canonicalLiftKey(set.lift);
+      if (max > (map.get(key)?.max || 0)) map.set(key, { max, weight: set.weight, reps: set.reps, date: record.date });
     }));
     return map;
   }, [records]);
@@ -166,7 +164,8 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     const map = new Map<string, { weight: number; date: string }>();
     records.forEach(record => (record.topSets || []).forEach(set => {
       if (set.completed === false || !set.lift || !set.weight || set.reps !== 1) return;
-      if (set.weight > (map.get(set.lift)?.weight || 0)) map.set(set.lift, { weight: set.weight, date: record.date });
+      const key = canonicalLiftKey(set.lift);
+      if (set.weight > (map.get(key)?.weight || 0)) map.set(key, { weight: set.weight, date: record.date });
     }));
     return map;
   }, [records]);
@@ -175,7 +174,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     records.slice(0, 60).forEach(record => (record.cardioSessions || []).forEach(session => {
       /* Pace anchoring uses RUN-shaped work only — a synced ride or swim at
          3:00/mi must never become the athlete's "logged easy pace". */
-      if (/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(session.activity || '')) return;
+      if (!runShapedActivity(session.activity || '')) return;
       const miles = cardioMiles(session); const minutes = summarizeCardioDraft(session).minutes;
       if (!miles || !minutes) return;
       const paceCheck = minutes / miles;
@@ -183,7 +182,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       const paceMinutes = minutes / miles;
       const shownDistance = metric ? Math.round(miles * 1.609344 * 100) / 100 : Math.round(miles * 100) / 100;
       const shownPace = metric ? paceMinutes / 1.609344 : paceMinutes;
-      runs.push({ date: record.date, activity: session.activity || 'Run', distance: shownDistance, unit: metric ? 'km' : 'miles', minutes: Math.round(minutes * 10) / 10, pace: `${Math.floor(shownPace)}:${String(Math.round((shownPace % 1) * 60)).padStart(2, '0')}/${metric ? 'km' : 'mi'}` });
+      runs.push({ date: record.date, activity: session.activity || 'Run', distance: shownDistance, unit: metric ? 'km' : 'miles', minutes: Math.round(minutes * 10) / 10, pace: `${formatCardioMinutes(shownPace)}/${metric ? 'km' : 'mi'}` });
     }));
     return runs.slice(0, 14);
   }, [records, metric]);
@@ -269,8 +268,8 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
        its baseline — a mid-block PR more than ~5% past what the block was
        built on deserves a fresh program, not just a scaled overlay. */
     const outgrown = Boolean(stored?.plan.weeks[0]?.topSets?.some(set => {
-      const best = bests.get(set.exercise);
-      return best && best > set.weight * (1 + set.reps / 30) * 1.05;
+      const best = bests.get(canonicalLiftKey(set.exercise));
+      return best && best > (calculateEstimatedOneRepMax(set.weight, set.reps) || 0) * 1.05;
     }));
     /* A SAVED PLAN IS PINNED. Forge may notice the block is stale, but it
        does not get to replace a block the athlete approved — only an explicit
@@ -347,8 +346,8 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      of them, not whichever goal happened to be created first — falling back to
      the heaviest set of the week when no goal lift is on the calendar. */
   const headline = (item: AiPlanWeek) => {
-    const sets = [...(item.topSets || [])].sort((a, b) => epley(b.weight, b.reps) - epley(a.weight, a.reps));
-    return sets.find(set => goalLifts.has(canonicalLiftKey(set.exercise))) || sets[0];
+    const sets = [...(item.topSets || [])].sort((a, b) => (calculateEstimatedOneRepMax(b.weight, b.reps) || 0) - (calculateEstimatedOneRepMax(a.weight, a.reps) || 0));
+    return sets.find(set => testsOneRepMax(set.exercise, goalLifts)) || sets[0];
   };
 
   return <div className="simple-program ai-program">
@@ -447,7 +446,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
             <span className="roadmap-miles">{item.mileage || '—'}</span>
             <span className="roadmap-long">{item.longRunMiles ? `${item.longRunMiles} ${metric ? 'km' : 'mi'}` : '—'}</span>
             <span className="roadmap-run">{item.quality}</span>
-            <span className="roadmap-set">{lead ? <><b>{epley(lead.weight, lead.reps)} max</b><small>{lead.exercise} {lead.weight}×{lead.reps}</small></> : '—'}</span>
+            <span className="roadmap-set">{lead ? <><b>{calculateEstimatedOneRepMax(lead.weight, lead.reps)} max</b><small>{lead.exercise} {lead.weight}×{lead.reps}</small></> : '—'}</span>
           </button>
           {openWeek === item.week && <div className="roadmap-days">{aiWeekSessions(item, stored.startDate, index, splitDays, rhythm, anchor, metric ? 'km' : 'mi').map(session => <div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US', { weekday: 'short' })}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
         </div>; })}</div>

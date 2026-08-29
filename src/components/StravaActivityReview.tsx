@@ -47,7 +47,14 @@ export function StravaActivityReview() {
       savedCardioTypes: ['Run', 'Speed Run', 'Long Run', 'Easy', 'Base', 'Tempo', 'Walk', 'Bike', 'Rowing', 'Swimming'],
     }, local);
     if (!parsed.rows.length) { setReflection(parsed.reflection || 'Could not read a workout from that — try describing the reps and rest.'); setBusy(false); return; }
-    const refined: CardioLogDraft = {
+    /* A distance never sits on a time unit. Named here rather than imported so
+     this file states the rule it is keeping. */
+  const distanceSafeUnit = (row: { cardioType?: string; unit?: string; distance?: number }) => {
+    const unit = String(row.unit || 'miles');
+    if (!(Number(row.distance) > 0) || /mile|km|kilo|meter|yard/i.test(unit)) return unit;
+    return /row|ski|erg/i.test(String(row.cardioType || '')) ? 'meters' : /swim/i.test(String(row.cardioType || '')) ? 'yards' : 'miles';
+  };
+  const refined: CardioLogDraft = {
       ...session,
       structure: parsed.rows.length > 1 ? 'intervals' : 'steady',
       /* Only the AI reads intent well enough to rename the session — the
@@ -55,8 +62,12 @@ export function StravaActivityReview() {
          workout a Walk. Offline, the activity keeps its synced name. */
       activity: parsed.source === 'ai' ? (parsed.rows[0].cardioType || session.activity) : session.activity,
       prescription: {
-        legacyIntervals: parsed.rows.map(row => ({ cardioType: row.cardioType, unit: row.unit, distance: row.distance, time: row.timeMinutes })),
-        distanceUnit: parsed.rows[0].unit || 'miles',
+        /* THE SAME UNIT GUARANTEE THE COMPOSER GIVES. This was the third
+           path into cardio storage and the only one with no coercion at all,
+           so the exact sentence the composer rescues — a distance the model
+           attached to a time unit — was stored here as zero miles. */
+        legacyIntervals: parsed.rows.map(row => ({ cardioType: row.cardioType, unit: distanceSafeUnit(row), distance: row.distance, time: row.timeMinutes })),
+        distanceUnit: distanceSafeUnit(parsed.rows[0]),
         note: parsed.note || 'Refined from Strava sync',
       },
       summary: '',

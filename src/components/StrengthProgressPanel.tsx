@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { sameLift } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -18,7 +19,7 @@ export function StrengthProgressPanel({ range, rangeLabel, onLiftChange }: { ran
   const [activePoint, setActivePoint] = useState<number | null>(null);
   const entries = useMemo(() => {
     const cutoff = rangeDays[range] === Infinity ? -Infinity : Date.now() - rangeDays[range] * 86400000;
-    return records.filter(record=>record.lift===effectiveLift&&record.weight&&record.reps).map(record=>({date:record.date,label:new Date(`${record.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),weight:record.weight!,reps:record.reps!} as StrengthEntry))
+    return records.filter(record=>sameLift(record.lift||'',effectiveLift)&&record.weight&&record.reps).map(record=>({date:record.date,label:new Date(`${record.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),weight:record.weight!,reps:record.reps!} as StrengthEntry))
       .filter(entry => new Date(`${entry.date}T12:00:00`).getTime() >= cutoff)
       .filter(entry => mode === 'calculated' || entry.reps === 1)
       .sort((a,b)=>a.date.localeCompare(b.date))

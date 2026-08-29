@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { isRestDay } from './aiPlanService';
 import type { DailyRecommendation, RecommendationSplitDay } from '../../lib/dailyRecommendationEngine';
 
 export type CycleSnapshot={splitId?:string;nextPosition:number;revision:number;days:RecommendationSplitDay[]};
@@ -11,7 +12,14 @@ export async function loadCycleSnapshot(ownerId:string):Promise<CycleSnapshot>{
   if(stateError)throw stateError;
   const days=[...((split as {training_split_days?:Array<{id:string;position:number;name:string;muscle_groups:string[];goal_lifts:string[];cardio_types:string[]}>}).training_split_days||[])].sort((a,b)=>a.position-b.position).map(day=>{
     const muscles=day.muscle_groups||[];const exercises=day.goal_lifts||[];const cardioTypes=day.cardio_types||[];const hasStrength=muscles.length>0||exercises.length>0;const hasCardio=cardioTypes.length>0;
-    return{id:day.id,splitId:String(split.id),position:day.position,name:day.name||`Day ${day.position}`,type:hasStrength&&hasCardio?'mixed':hasStrength?'strength':hasCardio?'cardio':'rest',muscles,exercises,cardioTypes} as RecommendationSplitDay;
+        /* WHAT THE ATHLETE CALLED IT WINS. Derived purely from content, a day
+       named "Rest" that also permitted cardio came back as a CARDIO day here
+       while the Plan tab read it as rest — so the week's miles were divided
+       across a different number of days on each screen. `isRestDay` is the
+       one definition. */
+    const name=day.name||`Day ${day.position}`;
+    const type=isRestDay({name})?'rest':hasStrength&&hasCardio?'mixed':hasStrength?'strength':hasCardio?'cardio':'rest';
+    return{id:day.id,splitId:String(split.id),position:day.position,name,type,muscles,exercises,cardioTypes} as RecommendationSplitDay;
   });
   const matchesSplit=state?.split_id===split.id;
   return{splitId:String(split.id),nextPosition:matchesSplit?Number(state?.next_position||days[0]?.position||1):(days[0]?.position||1),revision:matchesSplit?Number(state?.revision||0):0,days};

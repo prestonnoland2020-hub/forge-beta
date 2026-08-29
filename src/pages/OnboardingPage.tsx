@@ -5,11 +5,20 @@ import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvid
 import { useProfileSetup, type AthleteSetup } from '../features/profile/ProfileSetupProvider';
 import { saveProfile } from '../features/profile/profileService';
 import { saveTrainingSplit } from '../features/splits/splitService';
+import { useGoals } from '../features/goals/GoalsProvider';
+import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 
+/* THREE STEPS, AND THE GOAL IS ONE OF THEM. Forge programs toward a goal —
+   the wave, the mileage ramp and max week all exist to move one. An athlete
+   who finished setup without one landed on a home screen of empty states and
+   never met the thing that makes the app different; four of the first seven
+   accounts sat there. So setup does not complete until a goal exists. */
 const steps = [
   ['The essentials', 'Tell Forge what your training should serve.'],
   ['Train safely', 'Add only the limits that can change a workout.'],
+  ['Your first goal', 'Name what the training is for.'],
 ] as const;
+const LAST_STEP = steps.length - 1;
 
 const blank: AthleteSetup = {
   displayName: '', username: '', birthDate: '', units: 'Imperial', height: '', startingWeight: '', currentWeight: '',
@@ -38,11 +47,16 @@ function starterSplit(focus: AthleteSetup['primaryFocus'], count: number): Athle
 export function OnboardingPage() {
   const { user } = useAuth();
   const { setup, saveSetup } = useProfileSetup();
+  const { goals, saveGoal } = useGoals();
   const { updateProfile } = useAdaptiveTraining();
   const navigate = useNavigate();
   const location = useLocation();
   const suggestedName = String(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '');
-  const [step, setStep] = useState(0);
+  /* An athlete sent back by the gate has a finished profile and no goal —
+     open straight on the goal step rather than making them re-walk setup. */
+  const needsGoal = Boolean((location.state as { needsGoal?: boolean } | null)?.needsGoal);
+  const [step, setStep] = useState(needsGoal ? LAST_STEP : 0);
+  const [goalOpen, setGoalOpen] = useState(false);
   const [disclaimerChecked, setDisclaimerChecked] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [data, setData] = useState<AthleteSetup>(() => ({ ...blank, ...(setup || {}), displayName: setup?.displayName || suggestedName }));
@@ -52,13 +66,19 @@ export function OnboardingPage() {
   const isEditing = Boolean(setup?.completedAt);
 
   const next = () => {
-    if (!data.displayName.trim()) return setError('Enter your name.');
-    if (data.trainingDays < 1 || data.trainingDays > 7) return setError('Choose 1–7 training days.');
-    setError(''); setStep(1); window.scrollTo(0, 0);
+    if (step === 0) {
+      if (!data.displayName.trim()) return setError('Enter your name.');
+      if (data.trainingDays < 1 || data.trainingDays > 7) return setError('Choose 1–7 training days.');
+    }
+    if (step === 1 && !data.acceptedSafety) return setError('Confirm the safety note to continue.');
+    setError(''); setStep(current => Math.min(LAST_STEP, current + 1)); window.scrollTo(0, 0);
   };
 
   const finish = async () => {
     if (!data.acceptedSafety) return setError('Confirm the safety note to finish.');
+    /* THE GATE. Nothing below this line runs without a goal — not the profile
+       write that sets onboarding_completed, and not saveSetup. */
+    if (!goals.length) return setError('Add one goal to finish. Forge builds the plan around it.');
     setSaving(true); setError('');
     let username = (data.username || data.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '')).slice(0, 18);
     if (username.length < 3) username = `athlete${user?.id.slice(0, 6) || 'fit'}`;
@@ -104,9 +124,9 @@ export function OnboardingPage() {
   </main>;
 
   return <main className="onboarding-shell onboarding-simple">
-    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing ? 'EDIT PROFILE' : `SETUP ${step + 1} OF 2`}</span></header>
+    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing && !needsGoal ? 'EDIT PROFILE' : `SETUP ${step + 1} OF ${steps.length}`}</span></header>
     <div className="onboarding-grid">
-      <aside><span className="eyebrow">START SIMPLE</span><h1>Ready in two steps.</h1><p>Forge learns performance from completed workouts. You do not need to estimate maxes, pace, equipment, or recovery during setup.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
+      <aside><span className="eyebrow">START SIMPLE</span><h1>Ready in three steps.</h1><p>Forge learns performance from completed workouts. You do not need to estimate maxes, pace, equipment, or recovery during setup.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
       <section className="onboarding-card">
         <div className="setup-heading"><span className="eyebrow">{steps[step][0]}</span><h2>{steps[step][1]}</h2></div>
         {step === 0 && <div className="setup-fields">
@@ -123,8 +143,24 @@ export function OnboardingPage() {
           <div className="setup-note full"><strong>Your first workouts establish the baseline.</strong><span>Strength comes from completed weight and reps. Endurance comes from recorded distance, time, and pace. A connected activity service can be added after setup.</span></div>
           <label className="setup-check safety full"><input type="checkbox" checked={data.acceptedSafety} onChange={event => set('acceptedSafety', event.target.checked)} /><span><strong>I’ll report pain, injury, or unusual fatigue.</strong><small>Forge provides training guidance, not medical diagnosis.</small></span></label>
         </div>}
+        {step === LAST_STEP && <div className="setup-fields">
+          {goals.length
+            ? <div className="setup-goal-list full">
+                {goals.map(goal => <div className="setup-goal-row" key={`${goal.type}-${goal.title}`}>
+                  <span><strong>{goal.title}</strong><small>{goal.type}{goal.date ? ` · by ${goal.date}` : ''}</small></span>
+                  <b>✓</b>
+                </div>)}
+                <button type="button" className="button ghost" onClick={() => setGoalOpen(true)}>Add another goal</button>
+              </div>
+            : <div className="setup-note full setup-goal-empty">
+                <strong>One goal is all Forge needs.</strong>
+                <span>A lift you want to hit, or a race you want to run. The 8/6/4/2/1 wave, your weekly mileage and max week all exist to move it — without one, Forge has nothing to program toward.</span>
+                <button type="button" className="button" onClick={() => setGoalOpen(true)}>Set your first goal</button>
+              </div>}
+          {goalOpen && <GoalBuilder onClose={() => setGoalOpen(false)} onSave={(goal: CreatedGoal) => { saveGoal(goal, null); setGoalOpen(false); setError(''); }} />}
+        </div>}
         {error && <div className="setup-error">{error}</div>}
-        <footer className="setup-actions">{step ? <button className="button ghost" disabled={saving} onClick={() => { setError(''); setStep(0); }}>← Back</button> : <span />}<button className="button" disabled={saving} onClick={step ? finish : next}>{step ? saving ? 'Saving…' : isEditing ? 'Save profile' : 'Enter Forge' : 'Continue'} →</button></footer>
+        <footer className="setup-actions">{step ? <button className="button ghost" disabled={saving} onClick={() => { setError(''); setStep(current => Math.max(0, current - 1)); }}>← Back</button> : <span />}<button className="button" disabled={saving} onClick={step === LAST_STEP ? finish : next}>{step === LAST_STEP ? saving ? 'Saving…' : isEditing ? 'Save profile' : 'Enter Forge' : 'Continue'} →</button></footer>
       </section>
     </div>
   </main>;
