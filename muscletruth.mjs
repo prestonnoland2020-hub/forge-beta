@@ -1,6 +1,7 @@
 /* Split is the sole source of truth for muscles on plan days; exercises'
    PRIMARY movers drive custom days; Session Details has no muscle picker. */
 import { chromium } from 'playwright';
+import { setDial, setWeightDial } from './dialdriver.mjs';
 import { days, setup, goals } from './seed.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const seedPlan = ([d, s, g]) => {
@@ -14,16 +15,14 @@ const seedPlan = ([d, s, g]) => {
 };
 const todayIso = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; };
 const fillLift = async (p, lift, w, r) => {
-  await p.evaluate(([name, weight, reps]) => {
-    const setV = (el, v) => { const d = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set; d.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+  /* Numbers are picked from a wheel now, not typed. */
+  await p.evaluate(name => {
     const sel = [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.text === name));
     if (sel) { const d = Object.getOwnPropertyDescriptor(sel.constructor.prototype, 'value').set; d.call(sel, name); sel.dispatchEvent(new Event('change', { bubbles: true })); }
-    setTimeout(() => {}, 0);
-    const labels = [...document.querySelectorAll('label')];
-    const wEl = labels.find(l => /weight/i.test(l.textContent) && !/body/i.test(l.textContent))?.querySelector('input');
-    const rEl = labels.find(l => /^reps/i.test(l.textContent.trim()))?.querySelector('input');
-    setV(wEl, weight); setV(rEl, reps);
-  }, [lift, w, r]);
+  }, lift);
+  await p.waitForTimeout(400);
+  await setWeightDial(p, 'Weight', w);
+  await setDial(p, 'Reps', r);
 };
 let fails = 0;
 const check = (label, cond, detail) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${label}${cond ? '' : '  ' + detail}`); if (!cond) fails++; };

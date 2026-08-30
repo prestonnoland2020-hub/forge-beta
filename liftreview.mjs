@@ -3,6 +3,7 @@
    the two facts Forge's program runs on. The card asks for exactly those and
    derives the rest. */
 import { chromium } from 'playwright';
+import { setDial, setWeightDial } from './dialdriver.mjs';
 import { setup, goals } from './seed.mjs';
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
@@ -21,7 +22,7 @@ await p.addInitScript(([s, g, day]) => {
   localStorage.setItem('forge-workout-history-v1', JSON.stringify([
     { id: 'strava-day', date: day, title: 'Morning Weight Training', muscles: [], hasCardio: false, topSets: [] },
   ]));
-  localStorage.setItem('forge-strava-strength-review-v1', JSON.stringify([day]));
+  localStorage.setItem('forge-strava-review-v1', JSON.stringify([day]));
 }, [setup, goals, iso]);
 
 await p.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded' });
@@ -29,49 +30,46 @@ await p.waitForTimeout(2200);
 
 let pass = 0, fail = 0;
 const check = (n, ok, d = '') => { if (ok) { pass++; console.log(`PASS  ${n}`); } else { fail++; console.log(`FAIL  ${n} ${d}`); } };
-const card = () => p.$('.strava-strength-review');
+const card = () => p.$('.strava-review-sheet');
 
-check('a synced lift raises the card', Boolean(await card()));
-const heading = await p.evaluate(() => document.querySelector('.strava-strength-review')?.innerText.replace(/\n/g, ' ') || '');
-check('the card names the synced activity', /MORNING WEIGHT TRAINING/i.test(heading), heading.slice(0, 80));
-check('it asks the two questions', /Which day was this/i.test(heading) && /top set/i.test(heading), heading.slice(0, 140));
+check('a synced day takes over the screen', Boolean(await p.$('.strava-review-backdrop')) && Boolean(await card()));
+const heading = await p.evaluate(() => document.querySelector('.strava-review-sheet')?.innerText.replace(/\n/g, ' ') || '');
+check('the takeover names the synced activity', /MORNING WEIGHT TRAINING/i.test(heading), heading.slice(0, 80));
+check('it asks for the split day, the top set and a description', /SPLIT DAY/i.test(heading) && /TOP SET/i.test(heading) && /DESCRIBE IT/i.test(heading), heading.slice(0, 160));
+check('an AI box is offered like the log has', Boolean(await p.$('.strava-review-sheet textarea')));
 
 /* Nothing can be saved until both answers exist. */
-const saveDisabled = () => p.evaluate(() => document.querySelector('.strava-strength-review button.button')?.disabled);
-check('save is refused with no answers', await saveDisabled() === true);
+const saveDisabled = () => p.evaluate(() => [...document.querySelectorAll('.strava-review-sheet button.button')].find(b => /Save this day/.test(b.textContent))?.disabled);
+check('save is refused with no answers at all', await saveDisabled() === true);
 
-const days = await p.evaluate(() => [...(document.querySelector('.strava-strength-review select')?.options || [])].map(o => o.text));
+const days = await p.evaluate(() => [...(document.querySelector('.strava-review-sheet select')?.options || [])].map(o => o.text));
 check('every split day is offered', days.includes('Chest & Back') && days.includes('Lower Body'), JSON.stringify(days));
 
 const setSelect = (index, value) => p.evaluate(([i, v]) => {
-  const el = document.querySelectorAll('.strava-strength-review select')[i];
+  const el = document.querySelectorAll('.strava-review-sheet select')[i];
   const setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set;
   setter.call(el, v); el.dispatchEvent(new Event('change', { bubbles: true }));
 }, [index, value]);
 
 await setSelect(0, '1'); // Lower Body
 await p.waitForTimeout(600);
-check('choosing a day reveals the top set row', Boolean(await p.$('.strength-review-set')));
-const lifts = await p.evaluate(() => [...(document.querySelectorAll('.strava-strength-review select')[1]?.options || [])].map(o => o.text));
+check('the top set row is always available', Boolean(await p.$('.strava-review-set')));
+const lifts = await p.evaluate(() => [...(document.querySelectorAll('.strava-review-sheet select')[1]?.options || [])].map(o => o.text));
 check("the day's own lift is offered first", lifts[1] === 'Squat', JSON.stringify(lifts.slice(0, 4)));
 check('the rest of the library is still reachable', lifts.length > 3, String(lifts.length));
 
 await setSelect(1, 'Squat');
 await p.waitForTimeout(400);
-check('save is still refused without numbers', await saveDisabled() === true);
+check('choosing a day alone is already an answer', await saveDisabled() === false);
 
-const fill = (index, value) => p.evaluate(([i, v]) => {
-  const el = document.querySelectorAll('.strava-strength-review input')[i];
-  const setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set;
-  setter.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true }));
-}, [index, value]);
-await fill(0, '315'); await fill(1, '5');
-await p.waitForTimeout(500);
-const maxShown = await p.evaluate(() => document.querySelector('.strength-review-max')?.textContent || '');
+await setWeightDial(p, 'Weight', '315');
+await setDial(p, 'Reps', '5');
+await p.waitForTimeout(400);
+const maxShown = await p.evaluate(() => document.querySelector('.strava-review-max')?.textContent || '');
 check('the calculated max is shown before saving', /368/.test(maxShown), maxShown);
 check('save is now offered', await saveDisabled() === false);
 
-await p.evaluate(() => document.querySelector('.strava-strength-review button.button').click());
+await p.evaluate(() => [...document.querySelectorAll('.strava-review-sheet button.button')].find(b => /Save this day/.test(b.textContent)).click());
 await p.waitForTimeout(1200);
 const day = await p.evaluate(d => JSON.parse(localStorage.getItem('forge-workout-history-v1') || '[]').find(x => x.date === d), iso);
 check('the day takes the split day it was assigned', day?.title === 'Lower Body', day?.title);
@@ -79,7 +77,7 @@ check('it lands on that split position', day?.splitPosition === 2, String(day?.s
 check('the top set is recorded', day?.topSets?.[0]?.lift === 'Squat' && day.topSets[0].weight === 315 && day.topSets[0].reps === 5, JSON.stringify(day?.topSets));
 check('the calculated max is stored', day?.topSets?.[0]?.calculatedMax === 368, String(day?.topSets?.[0]?.calculatedMax));
 check('muscles come from the day and the lift', ['Quads', 'Hamstrings', 'Glutes'].every(m => day?.muscles?.includes(m)), JSON.stringify(day?.muscles));
-check('the card clears once answered', !(await card()));
+check('the takeover closes once answered', !(await p.$('.strava-review-backdrop')));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 await b.close();

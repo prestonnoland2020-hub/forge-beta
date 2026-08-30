@@ -119,3 +119,68 @@
 .strength-review-numbers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .strength-review-max{color:var(--accent);font-weight:800}
 .strength-review-saved{color:var(--accent);font-weight:700}
+
+/* A synced day takes over the screen. It was a strip at the top of Today —
+   easy to scroll past, too small to answer in. */
+.strava-review-backdrop{position:fixed;inset:0;z-index:60;background:#000c;backdrop-filter:blur(6px);display:grid;place-items:center;padding:18px;overflow-y:auto}
+.strava-review-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);overflow-y:auto;display:grid;gap:16px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,white 4%),var(--card));border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 30px 80px #000b}
+.strava-review-sheet header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.strava-review-sheet header>div{display:grid;gap:5px;min-width:0}
+.strava-review-sheet header strong{font:800 22px var(--display-font);text-transform:uppercase;line-height:1.05}
+.strava-review-sheet header small{color:var(--muted);line-height:1.4}
+.strava-review-close{background:none;border:0;color:var(--muted);font-size:30px;line-height:1;padding:0 4px;flex:none}
+.strava-review-lede{margin:0;color:var(--muted);line-height:1.45}
+.strava-review-sheet label{display:grid;gap:7px;font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.strava-review-sheet select,.strava-review-sheet input,.strava-review-sheet textarea{width:100%;box-sizing:border-box;background:var(--surface-sunken);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:13px 14px;font:700 16px inherit;text-transform:none;letter-spacing:0}
+.strava-review-sheet textarea{font-weight:500;line-height:1.5;resize:vertical}
+.strava-review-set{display:grid;gap:12px}
+.strava-review-numbers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.strava-review-max,.strava-review-reflection{color:var(--accent);font-weight:700}
+.strava-review-hint{color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0}
+.strava-review-sheet footer{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:420px){.strava-review-sheet{padding:18px;border-radius:18px}.strava-review-sheet header strong{font-size:19px}}
+
+/* NUMBERS ARE PICKED, NOT TYPED. A wheel offers only real values — a barbell
+   moves in fives, reps are whole, a run is read to a hundredth — so the typo
+   that turns 225 into 2250 cannot be made. */
+.dial-backdrop{position:fixed;inset:0;z-index:80;background:#000d;backdrop-filter:blur(8px);display:grid;place-items:end center;padding:0}
+.dial-sheet{width:min(520px,100%);background:linear-gradient(180deg,color-mix(in srgb,var(--card) 94%,white 6%),var(--card));border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:20px 20px calc(16px + env(safe-area-inset-bottom));display:grid;gap:14px;box-shadow:0 -24px 70px #000b;animation:dial-rise .18s ease-out}
+@keyframes dial-rise{from{transform:translateY(18px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.dial-sheet header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.dial-sheet header strong{font:800 13px var(--display-font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.dial-preview{font:800 26px var(--display-font);color:var(--accent);font-variant-numeric:tabular-nums}
+.dial-columns{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;height:220px}
+.dial-band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:44px;border-radius:12px;background:color-mix(in srgb,var(--accent) 11%,transparent);border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);pointer-events:none}
+.dial-wheel{height:220px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;-ms-overflow-style:none;display:grid;min-width:88px;text-align:center;overscroll-behavior:contain}
+.dial-wheel::-webkit-scrollbar{display:none}
+.dial-wheel:focus-visible{outline:2px solid var(--accent);border-radius:12px}
+.dial-pad{height:88px;flex:none}
+.dial-value{height:44px;line-height:44px;scroll-snap-align:center;background:none;border:0;color:var(--muted);font:700 21px var(--display-font);font-variant-numeric:tabular-nums;opacity:.5;transition:opacity .12s,color .12s,transform .12s;padding:0}
+.dial-value.active{color:var(--text);opacity:1;font-weight:800;transform:scale(1.06)}
+.dial-point{font:800 22px var(--display-font);color:var(--muted);align-self:center;margin-top:-2px}
+.dial-suffix{font:800 13px var(--display-font);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);align-self:center;min-width:34px;text-align:left}
+.dial-sheet footer{display:grid;grid-template-columns:1fr 1fr;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.dial-cancel,.dial-ok{padding:14px;border-radius:12px;font:800 15px inherit;border:1px solid var(--line);background:transparent;color:var(--muted)}
+.dial-ok{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast)}
+
+/* The field that opens it. */
+.dial-field{display:grid;gap:7px;min-width:0}
+.dial-field-label{font:800 11px var(--display-font);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.dial-field-button{display:flex;align-items:baseline;justify-content:space-between;gap:8px;width:100%;background:var(--surface-sunken);border:1px solid var(--line);border-radius:12px;padding:13px 15px;text-align:left}
+.dial-field-button b{font:800 21px var(--display-font);color:var(--muted);font-variant-numeric:tabular-nums}
+.dial-field-button.set b{color:var(--text)}
+.dial-field-button small{font:800 11px var(--display-font);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dial-field-button:active{border-color:var(--accent)}
+.dial-field-hint{color:var(--muted);font-size:11px}
+
+/* Logging is a header action, not a destination. */
+.top-log{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:var(--accent-contrast);border:0}
+.top-log svg{width:20px;height:20px}
+.top-log:active{transform:scale(.94)}
+.bottom-nav{grid-template-columns:repeat(5,1fr)}
+
+/* Dialled number pairs sit side by side and share a baseline. */
+.dial-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
+.cardio-log-distance .dial-field-button,.cardio-log-time .dial-field-button{padding:11px 12px}
+.cardio-log-distance .dial-field-button b,.cardio-log-time .dial-field-button b{font-size:18px}
+.dial-plus{font:800 18px var(--display-font);color:var(--muted);align-self:center;opacity:.7}

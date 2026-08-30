@@ -10,6 +10,7 @@
    day now arrives with a real bench prescription, and the athlete has to
    actually decline it. */
 import { chromium } from 'playwright';
+import { setDial, setWeightDial } from './dialdriver.mjs';
 import { days, setup, goals } from './seed.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const p = await b.newPage({ viewport: { width: 390, height: 950 } });
@@ -48,13 +49,8 @@ await p.evaluate(() => {
   if (sel) set(sel, 'Back Squat');
 });
 await p.waitForTimeout(500);
-await p.evaluate(() => {
-  const set = window.__set;
-  const labels = [...document.querySelectorAll('label')];
-  const w = labels.find(l => /weight/i.test(l.textContent) && !/body/i.test(l.textContent))?.querySelector('input');
-  const r = labels.find(l => /reps/i.test(l.textContent))?.querySelector('input');
-  if (w) set(w, '225'); if (r) set(r, '3');
-});
+await setWeightDial(p, 'Weight', '225');
+await setDial(p, 'Reps', '3');
 await p.waitForTimeout(400);
 await p.evaluate(() => {
   const add = [...document.querySelectorAll('button')].find(b => /add completed top set|save top set/i.test(b.textContent));

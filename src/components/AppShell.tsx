@@ -162,6 +162,12 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
           {hasRecoveryData && <NavLink className="top-readiness" to="/profile"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
+          {/* LOGGING IS A HEADER ACTION, NOT A DESTINATION. It sat in the
+              middle of the bottom bar as though it were a place to browse to,
+              which is where an app puts a feed, not a verb. Top right, beside
+              the athlete's own avatar, is where every app that expects you to
+              ADD something puts it. */}
+          <NavLink className="top-log" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></NavLink>
           <NavLink className="avatar" to="/profile">{initials}</NavLink>
         </div>
       </header>
@@ -171,7 +177,6 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     <nav className="bottom-nav" aria-label="Mobile navigation">
       <NavLink to="/" end aria-label="Today"><NavGlyph name="home"/><small>Today</small></NavLink>
       <NavLink to="/plan" aria-label="Plan"><NavGlyph name="calendar"/><small>Plan</small></NavLink>
-      <NavLink to="/workout" aria-label="Log a workout"><span className="nav-icon nav-create" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5.5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></svg></span><small>Log</small></NavLink>
       <NavLink to="/coach" aria-label="Coach"><NavGlyph name="coach"/><small>Coach</small></NavLink>
       <NavLink to="/history" aria-label="Activities"><NavGlyph name="history"/><small>Activities</small></NavLink>
       <NavLink to="/insights" className={youTabRoutes.some(route => location.pathname.startsWith(route)) ? 'active' : ''} aria-label="You"><NavGlyph name="you"/><small>You</small></NavLink>

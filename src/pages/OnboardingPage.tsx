@@ -6,6 +6,7 @@ import { useProfileSetup, type AthleteSetup } from '../features/profile/ProfileS
 import { saveProfile } from '../features/profile/profileService';
 import { saveTrainingSplit } from '../features/splits/splitService';
 import { useGoals } from '../features/goals/GoalsProvider';
+import { DialField } from '../components/NumberDial';
 import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 
 /* THREE STEPS, AND THE GOAL IS ONE OF THEM. Forge programs toward a goal —
@@ -132,9 +133,9 @@ export function OnboardingPage() {
         {step === 0 && <div className="setup-fields">
           <label className="full">Your name <em>Required</em><input autoFocus value={data.displayName} onChange={event => set('displayName', event.target.value)} placeholder="Preston" /></label>
           <fieldset className="full"><legend>Main training focus</legend><div className="setup-choices">{(['Hybrid', 'Strength', 'Endurance', 'Body composition'] as const).map(item => <button type="button" className={data.primaryFocus === item ? 'active' : ''} onClick={() => set('primaryFocus', item)} key={item}>{item}</button>)}</div></fieldset>
-          <label>Training days per cycle <input type="number" inputMode="numeric" min="1" max="7" value={data.trainingDays} onChange={event => set('trainingDays', Number(event.target.value))} /></label>
+          <DialField label="Training days per cycle" kind="days" value={String(data.trainingDays || '')} onChange={next => set('trainingDays', Number(next))} />
           <label>Units <select value={data.units} onChange={event => set('units', event.target.value as AthleteSetup['units'])}><option>Imperial</option><option>Metric</option></select></label>
-          <label className="full">Current weight <span>Optional</span><input type="number" inputMode="decimal" min="1" value={data.currentWeight} onChange={event => set('currentWeight', event.target.value)} placeholder={data.units === 'Metric' ? 'kg' : 'lb'} /></label>
+          <div className="full"><DialField label="Current weight" kind="weight" unit={data.units === 'Metric' ? 'kg' : 'lb'} value={data.currentWeight} onChange={next => set('currentWeight', next)} hint="Optional" /></div>
           <div className="setup-note full"><strong>That is enough to begin.</strong><span>Forge creates a starter split. You can adjust its days and exercises later from Plan.</span></div>
         </div>}
         {step === 1 && <div className="setup-fields">

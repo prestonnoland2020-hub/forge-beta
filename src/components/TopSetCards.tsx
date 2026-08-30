@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DialField } from './NumberDial';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import type { LoggedTopSet, WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -116,7 +117,10 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
         {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} ×{set.reps}</strong><small>Calculated max {max ?? '—'} {unit}</small></div> : <>
           <label className="top-set-exercise-field">Exercise<select value={displayedSet.lift} onChange={event => { if (event.target.value === '__new__') { setCreatingExercise(true); setCreateError(''); return; } chooseExercise(event.target.value); }}><option value="">Choose exercise</option>{options.map(exercise => <option key={exercise.id}>{exercise.name}</option>)}<option value="__new__">＋ Add a new exercise…</option></select></label>
           {displayedSet.lift && <div className="inline-last-set"><span>LAST COMPLETED</span>{previous ? <><strong>{previous.weight} {unit} ×{previous.reps}</strong><small>Calculated max {calculateEstimatedOneRepMax(previous.weight, previous.reps) ?? previous.weight} {unit} · {new Date(`${previous.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small></> : <small>No earlier completed top set—this result establishes the baseline.</small>}</div>}
-          <div className="field-grid"><label>Weight ({unit})<input value={displayedSet.weight || ''} onChange={event => changeDisplayedSet({ weight: Number(event.target.value) })} inputMode="decimal" placeholder="0" /></label><label>Reps<input value={displayedSet.reps || ''} onChange={event => changeDisplayedSet({ reps: Number(event.target.value) })} inputMode="numeric" placeholder="0" /></label></div>
+          <div className="field-grid dial-grid">
+            <DialField label="Weight" kind="weight" unit={unit} value={displayedSet.weight ? String(displayedSet.weight) : ''} onChange={next => changeDisplayedSet({ weight: Number(next) })} />
+            <DialField label="Reps" kind="reps" value={displayedSet.reps ? String(displayedSet.reps) : ''} onChange={next => changeDisplayedSet({ reps: Number(next) })} />
+          </div>
           {max && <div className="top-set-card-result"><span>CALCULATED MAX</span><strong>{max} {unit}</strong></div>}
           <footer><span>{isCorrecting ? 'This replaces the completed result everywhere it is used.' : 'This exercise supplies its muscle mapping automatically.'}</span><button type="button" className="button" disabled={!displayedSet.lift || !displayedSet.weight || !displayedSet.reps} onClick={isCorrecting ? saveCorrection : () => onQuickLog(set)}>{isCorrecting ? 'Save correction' : 'Save top set'}</button></footer>
         </>}

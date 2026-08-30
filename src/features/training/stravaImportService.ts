@@ -18,23 +18,17 @@ type ExternalRow = {
 };
 
 const METERS_PER_MILE = 1609.344;
-/* Review queue: freshly imported activities surface on Today with an AI box
-   so the athlete can turn a flat device summary ("3 mi @ 9:00") into what
-   actually happened ("6×300 at :37 with walking rests"). */
+/* REVIEW QUEUE, KEYED BY DAY. A freshly synced activity raises one takeover
+   card so the athlete can say what the watch could not: which split day it
+   was, what the top set was, and — in their own words — what the session
+   actually contained ("6×300 at :37 with walking rests" rather than
+   "3 mi @ 9:00"). Keyed by date rather than session id because a synced lift
+   creates no cardio session to hang an id on, and because one card per day
+   beats three cards for one morning. */
 const reviewKey = 'forge-strava-review-v1';
 export const pendingStravaReviews = (): string[] => { try { const list = JSON.parse(localStorage.getItem(reviewKey) || '[]'); return Array.isArray(list) ? list : []; } catch { return []; } };
-export const markStravaReviewed = (sessionId: string) => { try { localStorage.setItem(reviewKey, JSON.stringify(pendingStravaReviews().filter(id => id !== sessionId))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
-/* A SYNCED LIFT IS HALF A RECORD. Strava knows the athlete was in the gym for
-   54 minutes; it does not know which split day that was or what they lifted —
-   and those are the two facts Forge's whole program runs on. So a strength
-   activity queues its DATE for a one-tap follow-up: pick the day, add the top
-   set, done. Keyed by date rather than session id because a strength import
-   creates no cardio session to hang an id on. */
-const strengthKey = 'forge-strava-strength-review-v1';
-export const pendingStrengthReviews = (): string[] => { try { const list = JSON.parse(localStorage.getItem(strengthKey) || '[]'); return Array.isArray(list) ? list : []; } catch { return []; } };
-export const markStrengthReviewed = (date: string) => { try { localStorage.setItem(strengthKey, JSON.stringify(pendingStrengthReviews().filter(item => item !== date))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
-const queueStrengthReviews = (dates: string[]) => { if (!dates.length) return; try { localStorage.setItem(strengthKey, JSON.stringify(Array.from(new Set([...pendingStrengthReviews(), ...dates])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
-const queueStravaReviews = (sessionIds: string[]) => { if (!sessionIds.length) return; try { localStorage.setItem(reviewKey, JSON.stringify(Array.from(new Set([...pendingStravaReviews(), ...sessionIds])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
+export const markStravaReviewed = (date: string) => { try { localStorage.setItem(reviewKey, JSON.stringify(pendingStravaReviews().filter(item => item !== date))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
+const queueStravaReviews = (dates: string[]) => { if (!dates.length) return; try { localStorage.setItem(reviewKey, JSON.stringify(Array.from(new Set([...pendingStravaReviews(), ...dates])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
 export const runShapedActivity = (activity: string) => !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(activity);
 
 /* THE HAND LOG WINS THE DISTANCE IT COVERS. A run typed into Forge and the
@@ -220,7 +214,7 @@ export async function importStravaActivities(
     entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
     byDate.set(mapped.date, entry);
   }
-  let imported = 0; const importedRowIds: string[] = []; const reviewIds: string[] = []; const strengthDates: string[] = [];
+  let imported = 0; const importedRowIds: string[] = []; const reviewIds: string[] = [];
   const reviewCutoff = new Date(); reviewCutoff.setDate(reviewCutoff.getDate() - 3);
   const reviewCutoffIso = reviewCutoff.toISOString().slice(0, 10);
   for (const [date, entry] of byDate) {
@@ -235,15 +229,11 @@ export async function importStravaActivities(
     } as Omit<WorkoutRecord, 'id'>);
     if (result.ok) {
       imported += entry.sessions.length; importedRowIds.push(...entry.rowIds);
-      if (date >= reviewCutoffIso) {
-        reviewIds.push(...entry.sessions.filter(session => runShapedActivity(session.activity || '')).map(session => String(session.id)));
-        /* Ask about a gym session only while it is fresh enough to remember. */
-        if (entry.strength) strengthDates.push(date);
-      }
+      /* Ask only while the session is fresh enough to remember. */
+      if (date >= reviewCutoffIso) reviewIds.push(date);
     }
   }
   queueStravaReviews(reviewIds);
-  queueStrengthReviews(strengthDates);
   /* .in() takes a URL-length-bounded list, so a full history's worth of ids
      has to be marked in batches — one oversized request would fail and leave
      every row looking un-imported. */

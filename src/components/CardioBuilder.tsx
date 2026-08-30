@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { DialField } from './NumberDial';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import type { CardioLogDraft } from '../lib/cardioSession';
 import { parseCardioDescription } from '../lib/cardioParse';
@@ -286,17 +287,18 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
           <label className="cardio-log-type"><span className="cardio-log-label">Type</span>
             <input list="cardio-type-options" value={line.cardioType} onChange={event => changeType(line.id, event.target.value)} placeholder="Run" />
           </label>
-          <label className="cardio-log-distance"><span className="cardio-log-label">Distance</span>
-            <input type="number" inputMode="decimal" min="0" step="0.01" value={line.distance} onChange={event => updateLine(line.id, Number(event.target.value) > 0 && !isDistanceUnit(line.unit) ? { distance: event.target.value, unit: distanceUnitFor(line.cardioType) } : { distance: event.target.value })} placeholder="0" />
-          </label>
+          <div className="cardio-log-distance">
+            <DialField label="Distance" kind="distance" unit={line.unit} value={line.distance}
+              onChange={next => updateLine(line.id, Number(next) > 0 && !isDistanceUnit(line.unit) ? { distance: next, unit: distanceUnitFor(line.cardioType) } : { distance: next })} />
+          </div>
           <label className="cardio-log-unit"><span className="cardio-log-label">Unit</span>
             <select value={line.unit} onChange={event => updateLine(line.id, { unit: event.target.value })}>
               {(Number(line.distance) > 0 ? DISTANCE_UNITS : ALL_UNITS).map(unit => <option value={unit} key={unit}>{unit}</option>)}
             </select>
           </label>
-          <label className="cardio-log-time"><span className="cardio-log-label">Time</span>
-            <input inputMode="numeric" value={line.time} onChange={event => updateLine(line.id, { time: event.target.value })} placeholder="mm:ss" />
-          </label>
+          <div className="cardio-log-time">
+            <DialField label="Time" kind="clock" value={line.time} onChange={next => updateLine(line.id, { time: next })} placeholder="0:00" />
+          </div>
           {(linePace(line) || lines.length > 1) && <div className="cardio-log-line-end">
             {linePace(line) && <em>{linePace(line)}</em>}
             {lines.length > 1 && <button type="button" onClick={() => removeLine(line.id)} aria-label={`Remove line ${index + 1}`}>×</button>}
