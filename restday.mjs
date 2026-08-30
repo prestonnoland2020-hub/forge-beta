@@ -48,6 +48,45 @@ const dueDay = async (records, cursor) => {
   console.log('   trained two days ago, cursor on Rest →', day);
   check('rest advances on its own the next day', /Chest & Back/i.test(day), day);
 }
+/* ONLY A SPLIT DAY MOVES THE PLAN. A walk is not training the split, so it
+   cannot decide anything about where the cursor sits — neither ageing a rest
+   day out nor reviving one that has already been had. The old rule counted
+   ANY logged row, so a Saturday walk reset the clock and the plan answered
+   differently for it. */
+const strayCardio = (date, activity) => ({ id: `w-${date}`, date, title: activity, muscles: ['Cardio'],
+  hasCardio: true, cardioSessions: [{ id: `s-${date}`, structure: 'steady', activity, summary: `${activity} \u00b7 1 mi \u00b7 20:00`,
+    prescription: { legacyIntervals: [{ cardioType: activity, unit: 'miles', distance: 1, time: 20 }], distanceUnit: 'miles' } }],
+  topSets: [] });
+{
+  /* The rest day was had days ago. A walk yesterday cannot revive it — under
+     the old any-row rule it did, and the plan sat on Rest indefinitely for an
+     athlete who only ever walked. */
+  const { day } = await dueDay([
+    logged(dayIso(3), 3, 'Sharms 2', 'Shoulders', 'Smith Machine Shoulder Press'),
+    strayCardio(dayIso(1), 'Walk'),
+  ], 4);
+  console.log('   split day 3 days ago, walk yesterday, cursor on Rest \u2192', day);
+  check('a walk cannot revive a rest day already had', /Chest & Back/i.test(day), day);
+}
+{
+  /* The invariant itself: the same split history answers the same way whether
+     or not a walk sits beside it. */
+  const withoutWalk = await dueDay([logged(dayIso(2), 3, 'Sharms 2', 'Shoulders', 'Smith Machine Shoulder Press')], 4);
+  const withWalk = await dueDay([
+    logged(dayIso(2), 3, 'Sharms 2', 'Shoulders', 'Smith Machine Shoulder Press'),
+    strayCardio(dayIso(1), 'Walk'),
+  ], 4);
+  console.log(`   same history with and without a walk \u2192 ${withoutWalk.day} / ${withWalk.day}`);
+  check('a walk changes nothing about what is due', withoutWalk.day === withWalk.day, `${withoutWalk.day} / ${withWalk.day}`);
+}
+{
+  /* Two days with no SPLIT day at all \u2014 the rest day has genuinely passed. */
+  const { day } = await dueDay([
+    logged(dayIso(3), 3, 'Sharms 2', 'Shoulders', 'Smith Machine Shoulder Press'),
+  ], 4);
+  console.log('   no split day for 3 days, cursor on Rest \u2192', day);
+  check('rest still steps aside when no split day has happened', /Chest & Back/i.test(day), day);
+}
 // a normal training cursor is untouched
 {
   const { day } = await dueDay([logged(dayIso(1), 1, 'Chest & Back', 'Chest', 'Bench')], 2);

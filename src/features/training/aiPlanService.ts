@@ -22,12 +22,21 @@ export type AiPlanWeek = {
   easyRuns?: number[];
   topSets: AiPlanTopSet[]; note: string;
 };
-export type AiPlan = { summary: string; easyPace: string; weeks: AiPlanWeek[] };
+/* adjustmentNote: when the athlete asked for a change in their own words, the
+   builder answers in one sentence saying what it did with the request — so a
+   request that could not be honored says so instead of silently vanishing.
+   Optional: a block generated before this field existed has none. */
+export type AiPlan = { summary: string; easyPace: string; weeks: AiPlanWeek[]; adjustmentNote?: string };
 /* saved: the athlete has approved this block. Forge rebuilds a plan on its own
    when the inputs move — new goal, changed split, a PR past the baseline — and
    that is right until someone is happy with the block they have. A saved plan
    is pinned: nothing replaces it except an explicit, confirmed refresh. */
-export type StoredAiPlan = { plan: AiPlan; generatedAt: string; startDate: string; fingerprint: string; blockWeeks: number; saved?: boolean; savedAt?: string };
+/* adjustments: the athlete's own words for how this block should differ, kept
+   with the block because it is a STANDING instruction. Forge rebuilds on its
+   own when the inputs move, and a rebuild that quietly dropped "no running on
+   Mondays" would be Forge undoing what it was asked to do. It rides along
+   until the athlete edits it or regenerates without it. */
+export type StoredAiPlan = { plan: AiPlan; generatedAt: string; startDate: string; fingerprint: string; blockWeeks: number; saved?: boolean; savedAt?: string; adjustments?: string };
 
 const localKey = 'forge-ai-plan-v1';
 
@@ -356,10 +365,38 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
   runWindow?: SplitDayRef[],
 ): T & { adjusted: boolean } {
   const resolved = resolveWeekRunning(week, runWindow?.length ? runWindow : splitDays, athlete, block);
-  const dayGoalLift = new Map<string, string>();
+  /* WHICH GOAL LIFT OWNS A DAY CANNOT DEPEND ON ARRAY ORDER. "Chest & Back"
+     maps Bench and Pull Ups — both goal lifts — and the day appears twice in
+     the cycle. Taking the FIRST match meant the owner was decided by however
+     the exercises happened to be stored, and the two instances were stored in
+     opposite orders: Chest & Back prescribed Bench, Chest & Back 2 prescribed
+     Pull Ups, for what is one day. Reorder the list in the plan editor and the
+     prescription changed under the athlete.
+
+     Two goal lifts on a day that occurs twice is not a conflict — it is one
+     each. So the instances of a day are folded together, its goal lifts sorted
+     canonically so the answer never moves, and handed out round-robin by
+     instance: the first exposure takes the first lift, the second takes the
+     second. One goal lift on a day still owns every instance of it. */
+  const instancesOfDay = new Map<string, string[]>();
   splitDays.forEach(day => {
-    const owner = (day.exercises || []).find(name => strength.goalLifts.has(canonicalLiftKey(name)));
-    if (owner) { dayGoalLift.set(day.name, owner); if (!dayGoalLift.has(splitDayKey(day.name))) dayGoalLift.set(splitDayKey(day.name), owner); }
+    const key = splitDayKey(day.name);
+    instancesOfDay.set(key, [...(instancesOfDay.get(key) || []), day.name]);
+  });
+  const goalLiftsOfDay = new Map<string, string[]>();
+  splitDays.forEach(day => {
+    const key = splitDayKey(day.name);
+    const owned = (day.exercises || []).filter(name => strength.goalLifts.has(canonicalLiftKey(name)));
+    const merged = new Map<string, string>();
+    [...(goalLiftsOfDay.get(key) || []), ...owned].forEach(name => merged.set(canonicalLiftKey(name), name));
+    goalLiftsOfDay.set(key, [...merged.values()].sort((a, b) => canonicalLiftKey(a).localeCompare(canonicalLiftKey(b))));
+  });
+  const dayGoalLift = new Map<string, string>();
+  instancesOfDay.forEach((names, key) => {
+    const owners = goalLiftsOfDay.get(key) || [];
+    if (!owners.length) return;
+    names.forEach((name, index) => dayGoalLift.set(name, owners[index % owners.length]));
+    dayGoalLift.set(key, owners[0]);
   });
   const lookup = (table: Map<string, number> | undefined, name: string) =>
     table?.get(name) ?? [...(table?.entries() || [])].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(name))?.[1];

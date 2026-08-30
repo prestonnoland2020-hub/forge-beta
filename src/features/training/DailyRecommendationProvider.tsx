@@ -64,7 +64,16 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      the day it fell on has passed, so the athlete rests today and the next
      training day is up tomorrow without tapping anything. Logging a workout
      anyway advances the cycle exactly as before. */
-  const lastLoggedDate=useMemo(()=>[...records].filter(record=>(record.topSets||[]).length||(record.cardioSessions||[]).length).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||'',[records]);
+  /* ONLY A SPLIT DAY MOVES THE PLAN. A rest day that is due sits and waits, and
+     after a couple of days of nothing it steps aside so the cycle is not
+     stranded. But "nothing" has to mean no SPLIT day — an athlete who walks on
+     a Saturday has not trained his split, and that walk should not be what
+     decides his rest day has expired. Anything logged without a split position
+     (a Strava import, a stray walk, a one-off row) leaves the cursor exactly
+     where it was. */
+  const lastSplitDayDate=useMemo(()=>[...records]
+    .filter(record=>record.splitPosition&&((record.topSets||[]).length||(record.cardioSessions||[]).length))
+    .sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||'',[records]);
   const nextAfter=(position:number)=>days.find(day=>day.position>position)||days[0];
   const statePosition=(()=>{
     const atCursor=days.find(day=>day.position===cycle.nextPosition)||days.find(day=>day.position>cycle.nextPosition)||days[0];
@@ -73,7 +82,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        that gap is a single day. Once two days have passed the rest has been
        had and the next training day is up — an athlete away for a week is not
        owed a week of rest days. */
-    const daysSinceLogged=lastLoggedDate?Math.round((new Date(`${isoToday()}T12:00:00`).getTime()-new Date(`${lastLoggedDate}T12:00:00`).getTime())/86400000):0;
+    const daysSinceLogged=lastSplitDayDate?Math.round((new Date(`${isoToday()}T12:00:00`).getTime()-new Date(`${lastSplitDayDate}T12:00:00`).getTime())/86400000):0;
     if(atCursor.type==='rest'&&daysSinceLogged>=2)return nextAfter(atCursor.position)?.position??atCursor.position;
     return atCursor.position;
   })();

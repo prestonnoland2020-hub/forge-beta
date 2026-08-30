@@ -1435,11 +1435,35 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    asks first. */
 .plan-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .plan-saved-badge { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent, #d4ff3f); background: color-mix(in srgb, var(--accent, #d4ff3f) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent, #d4ff3f) 34%, transparent); white-space: nowrap; }
-.plan-refresh-confirm { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--accent, #d4ff3f) 30%, transparent); background: color-mix(in srgb, var(--accent, #d4ff3f) 7%, transparent); }
-.plan-refresh-confirm strong { font-size: 15px; line-height: 1.3; }
-.plan-refresh-confirm small { color: var(--text-muted, #8b8f8a); font-size: 12.5px; line-height: 1.45; }
-.plan-refresh-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.plan-refresh-actions .button { flex: 1 1 auto; min-width: 140px; }
+/* REGENERATING IS A CONVERSATION. The old confirm was a strip inside the card
+   with one question and one answer; this takes over the screen, the same way a
+   synced day does, because the athlete is being asked to say something rather
+   than to agree to something. */
+.plan-rebuild-backdrop { position: fixed; inset: 0; z-index: 70; background: #000c; backdrop-filter: blur(6px); display: grid; place-items: center; padding: 18px; overflow-y: auto; }
+.plan-rebuild-sheet { width: min(560px, 100%); max-height: calc(100vh - 36px); overflow-y: auto; display: grid; gap: 14px; background: linear-gradient(145deg, color-mix(in srgb, var(--card) 96%, white 4%), var(--card)); border: 1px solid var(--line); border-radius: 22px; padding: 22px; box-shadow: 0 30px 80px #000b; }
+.plan-rebuild-sheet header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.plan-rebuild-sheet header > div { display: grid; gap: 6px; min-width: 0; }
+.plan-rebuild-sheet header strong { font: 800 20px var(--display-font); text-transform: uppercase; line-height: 1.08; text-wrap: balance; }
+.plan-rebuild-sheet header small { color: var(--muted); line-height: 1.45; }
+.plan-rebuild-close { background: none; border: 0; color: var(--muted); font-size: 30px; line-height: 1; padding: 0 4px; flex: none; }
+.plan-rebuild-sheet label { display: grid; gap: 8px; font: 800 11px var(--display-font); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.plan-rebuild-sheet textarea { width: 100%; box-sizing: border-box; background: var(--surface-sunken); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; font: 500 16px inherit; line-height: 1.5; letter-spacing: 0; text-transform: none; resize: vertical; }
+.plan-rebuild-sheet textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.plan-rebuild-sheet textarea:disabled { opacity: .55; }
+.plan-rebuild-hint, .plan-rebuild-foot { color: var(--muted); font-size: 12.5px; line-height: 1.45; margin: -6px 0 0; }
+.plan-rebuild-foot { margin: 0; }
+.plan-rebuild-busy { margin: 0; color: var(--accent); font-weight: 700; line-height: 1.45; }
+.plan-rebuild-error { margin: 0; color: #ff8a7a; font-weight: 700; line-height: 1.45; }
+.plan-rebuild-sheet footer { display: grid; gap: 10px; }
+.plan-rebuild-sheet footer .button { width: 100%; }
+/* Three buttons, three weights: build the change, build without one, and walk
+   away. Backing out is not a third choice of equal standing — an outline
+   identical to "Just regenerate" made it read as one. */
+.plan-rebuild-sheet footer .button.ghost { border-color: transparent; background: none; color: var(--muted); font-weight: 700; }
+.plan-rebuild-sheet footer .button.ghost:active { color: var(--text); }
+/* What was asked for, kept beside the block it shaped. */
+.plan-adjustment { display: block; margin-top: 4px; color: var(--text-muted, #8b8f8a); font-size: 12.5px; line-height: 1.45; }
+.plan-adjustment b { color: var(--text); font-weight: 800; }
 
 /* The AI program card carries the block stamp and its two actions — the
    generated summary duplicated the ledgers and schedule below it. */

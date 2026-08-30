@@ -3,6 +3,7 @@ import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
+import { PlanRebuildModal } from './PlanRebuildModal';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -206,8 +207,13 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     runningDays: profile.runningDays, mileage: [minWeeklyMileage, maxWeeklyMileage],
   }), [goals, splitDays, profile.runningDays, minWeeklyMileage, maxWeeklyMileage]);
 
-  const regenerate = async () => {
-    if (generating) return;
+  /* A rebuild carries the athlete's standing instruction. Passing it every
+     time — including the silent rebuilds Forge starts on its own — is what
+     makes it standing rather than a one-off that the next automatic refresh
+     quietly undoes. Returns whether the block was actually built, so the
+     rebuild sheet can stay open (holding what was typed) when it was not. */
+  const regenerate = async (adjustments?: string): Promise<boolean> => {
+    if (generating) return false;
     setGenerating(true); setError(''); generateStartedAt.current = Date.now();
     try {
       const context = {
@@ -227,14 +233,20 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         loggedBests: Object.fromEntries(bests),
         loggedSingles: Object.fromEntries(bestSingles),
         recentRuns,
+        /* The athlete's own words for this rebuild. Absent when they asked for
+           a plain regeneration, so the builder is not handed an empty string
+           to interpret. */
+        ...(adjustments ? { adjustments } : {}),
       };
       const plan = await generateAiPlan(context);
       /* A newly generated block starts unsaved — it has not been approved. */
-      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate: new Date().toISOString().slice(0, 10), fingerprint, blockWeeks: plan.weeks.length, saved: false };
+      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate: new Date().toISOString().slice(0, 10), fingerprint, blockWeeks: plan.weeks.length, saved: false, ...(adjustments ? { adjustments } : {}) };
       await saveStoredAiPlan(next, Boolean(user));
       setStored(next);
+      return true;
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : 'The plan service is unreachable.');
+      return false;
     } finally { setGenerating(false); }
   };
   /* Saving pins the block; refreshing throws one away, so it asks first. */
@@ -244,7 +256,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     setStored(next);
     try { await saveStoredAiPlan(next, Boolean(user)); } catch { setError('Saved on this device — the sync will retry.'); }
   };
-  const confirmRefresh = async () => { setRefreshAsk(false); await regenerate(); };
+  /* null means "just regenerate" — a fresh block with no instructions, which
+     also clears any standing request. A string replaces it. The sheet closes
+     only when the block actually built, so a refusal (the two-minute cooldown,
+     a dropped connection) never costs the athlete what they typed. */
+  const rebuild = async (adjustments: string | null) => {
+    const ok = await regenerate(adjustments || undefined);
+    if (ok) setRefreshAsk(false);
+  };
 
   useEffect(() => { let active = true; loadStoredAiPlan(Boolean(user)).then(loaded => { if (!active) return; setStored(loaded); setStoreLoading(false); }).catch(() => { if (active) setStoreLoading(false); }); return () => { active = false; }; }, [user]);
   useEffect(() => {
@@ -253,7 +272,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       if (generating && generateStartedAt.current && Date.now() - generateStartedAt.current > 100000) {
         backgroundRetried.current = true;
         setGenerating(false);
-        window.setTimeout(() => { void regenerate(); }, 300);
+        window.setTimeout(() => { void regenerate(stored?.adjustments); }, 300);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -276,7 +295,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
        confirmed refresh does. */
     if (stored?.saved) return;
     const stale = !stored || stored.fingerprint !== fingerprint || weeksRemaining(stored) < 4 || outgrown;
-    if (stale && baselineReady) { autoAttempted.current = true; void regenerate(); }
+    if (stale && baselineReady) { autoAttempted.current = true; void regenerate(stored?.adjustments); }
   }, [storeLoading, stored, fingerprint, user, goals.length, splitDays.length, generating, bests, baselineReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* A stored block renders even offline/demo; only GENERATION needs a user. */
@@ -356,22 +375,27 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         this card is the two actions and the stamp that says which block they
         act on. The generated summary was an essay repeating what those cards
         already show. */}
-    <section className="card ai-program-meta compact"><div><span className="eyebrow">AI PROGRAM · GENERATED {generatedLabel.toUpperCase()}</span>{generating ? <small className="ai-program-progress">{generatingStage}</small> : null}</div><div className="plan-actions">
+    <section className="card ai-program-meta compact"><div><span className="eyebrow">AI PROGRAM · GENERATED {generatedLabel.toUpperCase()}</span>{generating ? <small className="ai-program-progress">{generatingStage}</small> : null}{stored.adjustments && !generating ? <small className="plan-adjustment"><b>You asked:</b> “{stored.adjustments}”{plan.adjustmentNote ? ` — ${plan.adjustmentNote}` : ''}</small> : null}</div><div className="plan-actions">
       {/* Saving is a local pin — it needs no backend, so it is offered
           wherever a block exists. Refreshing calls the plan service. */}
       {stored.saved
         ? <span className="plan-saved-badge" title={stored.savedAt ? `Saved ${new Date(stored.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : undefined}>✓ Plan saved</span>
         : <button type="button" className="button" disabled={generating} onClick={() => void savePlan()}>Save plan</button>}
-      {canGenerate ? <button type="button" className="button secondary" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Generating…' : 'Generate plan'}</button> : null}
-    </div>{error ? <small className="ai-program-error">{error} — showing the stored block.</small> : null}
-    {refreshAsk ? <div className="plan-refresh-confirm" role="alertdialog" aria-label="Confirm plan refresh">
-      <strong>Are you sure you want to generate a new plan?</strong>
-      <small>{stored.saved ? 'This replaces the block you saved with a newly built one. It cannot be undone.' : 'This builds a new block from your current goals, split, and logged bests. The plan you are looking at is replaced.'}</small>
-      <div className="plan-refresh-actions">
-        <button type="button" className="button" onClick={() => void confirmRefresh()}>Yes, generate</button>
-        <button type="button" className="button ghost" onClick={() => setRefreshAsk(false)}>No, keep this plan</button>
-      </div>
-    </div> : null}</section>
+      {/* The block already exists, so the honest verb is REGENERATE. "Generate
+          plan" read as though it might build the plan that was missing, when
+          what it does is throw this one away and build another. */}
+      {canGenerate ? <button type="button" className="button secondary" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Regenerating…' : 'Regenerate plan'}</button> : null}
+    </div>{error && !refreshAsk ? <small className="ai-program-error">{error} — showing the stored block.</small> : null}
+    </section>
+    {refreshAsk ? <PlanRebuildModal
+      saved={Boolean(stored.saved)}
+      standing={stored.adjustments}
+      busy={generating}
+      stage={generatingStage}
+      error={error}
+      onCancel={() => { setRefreshAsk(false); setError(''); }}
+      onRebuild={adjustments => void rebuild(adjustments)}
+    /> : null}
     {(() => {
       /* The block's thesis, stated in numbers — ONCE PER GOAL LIFT. The block
          trains every Real 1RM goal at the same time: each goal lift owns its
