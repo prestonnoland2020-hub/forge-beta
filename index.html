@@ -2,8 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#121614" />
+    <!-- maximum-scale + user-scalable=no is the one reliable way to stop iOS
+         Safari zooming the page on an input that some future stylesheet sets
+         below 16px. The CSS 16px rule is still the real fix; this is the net
+         underneath it, and it matters most in the Capacitor WebView where a
+         zoomed page cannot be pinched back out to fit. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b100e" />
+    <meta name="description" content="Forge logs the top set — the one heaviest honest effort — and coaches the progression from there." />
+    <!-- Long-press on a native WebView otherwise offers text selection and a
+         callout menu over buttons, which reads as a bug rather than an app. -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Forge" />
