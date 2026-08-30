@@ -48,6 +48,12 @@ await p.goto('http://localhost:4191/#/workout?source=split', { waitUntil: 'domco
 await p.waitForTimeout(2400);
 check('a deep link with a query survives the launch', /source=split/.test(p.url()), p.url());
 
+/* NEVER THE LOG. It is the one screen holding work that is not saved yet, so a
+   phone reloading a backgrounded tab must not throw a half-typed session away. */
+await p.goto('http://localhost:4191/#/workout', { waitUntil: 'domcontentloaded' });
+await p.waitForTimeout(2400);
+check('a launch on the log stays on the log', p.url().endsWith('#/workout'), p.url());
+
 /* And a launch already on Today changes nothing. */
 await p.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(2200);

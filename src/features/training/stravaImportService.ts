@@ -26,9 +26,39 @@ const METERS_PER_MILE = 1609.344;
    creates no cardio session to hang an id on, and because one card per day
    beats three cards for one morning. */
 const reviewKey = 'forge-strava-review-v1';
-export const pendingStravaReviews = (): string[] => { try { const list = JSON.parse(localStorage.getItem(reviewKey) || '[]'); return Array.isArray(list) ? list : []; } catch { return []; } };
-export const markStravaReviewed = (date: string) => { try { localStorage.setItem(reviewKey, JSON.stringify(pendingStravaReviews().filter(item => item !== date))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
-const queueStravaReviews = (dates: string[]) => { if (!dates.length) return; try { localStorage.setItem(reviewKey, JSON.stringify(Array.from(new Set([...pendingStravaReviews(), ...dates])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
+/* A LIFT LEAVES NO MARK ON THE RECORD, SO THE QUESTION CARRIES IT. Strava says
+   the athlete was in the gym for 49 minutes; it does not say what they lifted,
+   so there is nothing to write onto the day — no sets, no muscles. The record
+   for a morning of lifting plus two runs is indistinguishable from a morning
+   of two runs, and the card would then ask a gym session the questions it asks
+   a run: none.
+
+   The fact rides with the QUESTION rather than the record. The queue already
+   survives a reload, and "was a lift part of this day" is exactly the thing
+   the card needs and nothing else does. Entries were bare date strings; they
+   are {d, s} now, and a stored array of strings still reads correctly. */
+type ReviewEntry = { d: string; s?: boolean };
+const readReviewQueue = (): ReviewEntry[] => {
+  try {
+    const list = JSON.parse(localStorage.getItem(reviewKey) || '[]');
+    if (!Array.isArray(list)) return [];
+    return list.map(item => typeof item === 'string' ? { d: item } : item).filter((item): item is ReviewEntry => Boolean(item && typeof item.d === 'string'));
+  } catch { return []; }
+};
+const writeReviewQueue = (entries: ReviewEntry[]) => {
+  try { localStorage.setItem(reviewKey, JSON.stringify(entries.slice(-12))); } catch { /* fine */ }
+  window.dispatchEvent(new Event('forge-strava-review-changed'));
+};
+export const pendingStravaReviews = (): string[] => readReviewQueue().map(entry => entry.d);
+/* Whether the sync for that date included a strength activity. */
+export const stravaReviewHasStrength = (date: string): boolean => Boolean(readReviewQueue().find(entry => entry.d === date)?.s);
+export const markStravaReviewed = (date: string) => writeReviewQueue(readReviewQueue().filter(entry => entry.d !== date));
+const queueStravaReviews = (entries: ReviewEntry[]) => {
+  if (!entries.length) return;
+  const merged = new Map(readReviewQueue().map(entry => [entry.d, entry]));
+  entries.forEach(entry => merged.set(entry.d, { d: entry.d, s: Boolean(entry.s || merged.get(entry.d)?.s) }));
+  writeReviewQueue([...merged.values()]);
+};
 export const runShapedActivity = (activity: string) => !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(activity);
 
 /* THE HAND LOG WINS THE DISTANCE IT COVERS. A run typed into Forge and the
@@ -214,7 +244,7 @@ export async function importStravaActivities(
     entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
     byDate.set(mapped.date, entry);
   }
-  let imported = 0; const importedRowIds: string[] = []; const reviewIds: string[] = [];
+  let imported = 0; const importedRowIds: string[] = []; const reviewIds: ReviewEntry[] = [];
   const reviewCutoff = new Date(); reviewCutoff.setDate(reviewCutoff.getDate() - 3);
   const reviewCutoffIso = reviewCutoff.toISOString().slice(0, 10);
   for (const [date, entry] of byDate) {
@@ -230,7 +260,7 @@ export async function importStravaActivities(
     if (result.ok) {
       imported += entry.sessions.length; importedRowIds.push(...entry.rowIds);
       /* Ask only while the session is fresh enough to remember. */
-      if (date >= reviewCutoffIso) reviewIds.push(date);
+      if (date >= reviewCutoffIso) reviewIds.push({ d: date, s: entry.strength });
     }
   }
   queueStravaReviews(reviewIds);

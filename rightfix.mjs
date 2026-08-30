@@ -1,8 +1,9 @@
 /* Colton's flow: due day says Chest & Back, athlete does something else — he
-   drops the planned bench and logs a SQUAT. Assert: the saved day is Lower
-   Body (position 2), with no phantom Chest/Back muscles, and the Chest & Back
-   recommendation is NOT marked completed. A day's identity follows what was
-   LOGGED, never what was planned.
+   drops the planned bench and logs a SQUAT. Assert: no phantom Chest/Back
+   muscles, the Chest & Back recommendation is NOT marked completed, and the
+   cycle continues from where he really trained. What he LOGGED decides the
+   muscles and the credit; the NAME stays the one he chose at the top, because
+   Forge cannot tell a leg day from a chest day with a squat on it.
 
    The harness used to skip the "drop the planned set" step and still passed,
    because a "Bench" split-day mapping could not see "Bench Press" history and
@@ -82,14 +83,20 @@ const contentOk = out.day && !out.day.recommendationId
   && !out.day.muscles.includes('Chest') && !out.day.muscles.includes('Back')
   && out.day.muscles.includes('Quads') && out.day.lift === 'Back Squat';
 console.log(contentOk ? 'PASS — muscles and credit follow the logged set' : 'FAIL — the day was saved as the planned one');
-/* KNOWN GAP, asserted separately so it cannot be forgotten: the day should
-   also be RENAMED to the split day it matches (Lower Body, position 2). When
-   the athlete removes the planned set entirely, the content-mismatch remap
-   does not fire and the day keeps the recommended position. */
-const renamedOk = out.day && out.day.title === 'Lower Body' && out.day.splitPosition === 2;
-console.log(renamedOk ? 'PASS — the day is renamed to the split day it matches'
-  : `KNOWN GAP — saved as "${out.day?.title}" at position ${out.day?.splitPosition}; expected Lower Body at 2`);
-const ok = contentOk;
+/* THE DAY'S NAME IS THE ATHLETE'S, NOT AN INFERENCE. This file used to assert
+   the opposite — that logging a squat should RENAME the day to Lower Body —
+   and carried it for months as a KNOWN GAP. It was the wrong thing to want.
+   Forge cannot tell a leg day from a chest day with one squat on it, and every
+   rule that guessed got one of those two cases wrong.
+
+   The three source buttons at the top of the log already answer it, so the
+   answer is the athlete's: the day stays the one they said they were on. What
+   they LOGGED still decides the muscles, the credit and the cycle — asserted
+   above and below — but not the label. daylabel.mjs owns the rule itself. */
+const keptOk = out.day && out.day.title === 'Chest & Back' && out.day.splitPosition === 1;
+console.log(keptOk ? 'PASS — the day keeps the name the athlete gave it'
+  : `FAIL — saved as "${out.day?.title}" at position ${out.day?.splitPosition}; expected Chest & Back at 1`);
+const ok = contentOk && keptOk;
 // Now verify the rec was NOT consumed: reload, due day should STILL be Chest & Back
 await p.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(1900);

@@ -21,6 +21,8 @@ type Props = {
   onRemove: (index: number) => void;
   onCreateExercise: (name: string, muscles: string[]) => void;
   planLabel?: string;
+  /* Set when the day has no label yet: a top set has nothing to attach to. */
+  blockedReason?: string;
 };
 
 const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${set.weight}::${set.reps}`;
@@ -34,7 +36,7 @@ const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${s
    A set that is saved collapses to what it is — the lift, the load, the max —
    and opens on a tap when it needs correcting. A set still being entered is
    open, because it is the question on the screen. */
-export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onCreateExercise, planLabel }: Props) {
+export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onCreateExercise, planLabel, blockedReason = '' }: Props) {
   /* Keyed, not indexed: rows are added and removed under this state. */
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [closedKeys, setClosedKeys] = useState<string[]>([]);
@@ -143,7 +145,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
             <DialField label="Reps" kind="reps" value={displayedSet.reps ? String(displayedSet.reps) : ''} onChange={next => changeDisplayedSet({ reps: Number(next) })} />
           </div>
           {max && <div className="top-set-card-result"><span>CALCULATED MAX</span><strong>{max} {unit}</strong></div>}
-          <footer><span>{isCorrecting ? 'This replaces the completed result everywhere it is used.' : 'This exercise supplies its muscle mapping automatically.'}</span><button type="button" className="button" disabled={!displayedSet.lift || !displayedSet.weight || !displayedSet.reps} onClick={isCorrecting ? saveCorrection : () => onQuickLog(set)}>{isCorrecting ? 'Save correction' : 'Save top set'}</button></footer>
+          <footer><span>{isCorrecting ? 'This replaces the completed result everywhere it is used.' : blockedReason || 'This exercise supplies its muscle mapping automatically.'}</span><button type="button" className="button" disabled={!displayedSet.lift || !displayedSet.weight || !displayedSet.reps || Boolean(blockedReason && !isCorrecting)} onClick={isCorrecting ? saveCorrection : () => onQuickLog(set)}>{isCorrecting ? 'Save correction' : 'Save top set'}</button></footer>
         </>}
       </article>;
     })}

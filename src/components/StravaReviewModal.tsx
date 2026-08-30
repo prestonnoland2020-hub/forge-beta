@@ -4,7 +4,7 @@ import { useTrainingLibrary, exerciseCategory } from '../features/training/Train
 import { requestCardioParse } from '../features/training/coachService';
 import { parseCardioDescription } from '../lib/cardioParse';
 import { formatCardioSummary, type CardioLogDraft } from '../lib/cardioSession';
-import { markStravaReviewed, pendingStravaReviews, cardioClass } from '../features/training/stravaImportService';
+import { markStravaReviewed, pendingStravaReviews, stravaReviewHasStrength, cardioClass } from '../features/training/stravaImportService';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { splitDayKey } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -68,7 +68,11 @@ export function StravaReviewModal() {
   const cardioSessions = pending?.record.cardioSessions || [];
   const loggedTopSets = pending?.record.topSets || [];
   const trainedMuscles = (pending?.record.muscles || []).filter(muscle => muscle !== 'Cardio');
-  const cardioOnly = cardioSessions.length > 0 && !trainedMuscles.length && !loggedTopSets.length
+  /* A lift inside the day's sync leaves nothing on the record to find, so the
+     question itself remembers. Without this, a morning of lifting plus two
+     runs was asked what a run is asked: nothing. */
+  const syncedLift = pending ? stravaReviewHasStrength(pending.date) : false;
+  const cardioOnly = cardioSessions.length > 0 && !trainedMuscles.length && !loggedTopSets.length && !syncedLift
     && cardioSessions.every(session => cardioClass(session.activity || '') !== 'strength');
 
   const todayIso = (() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; })();

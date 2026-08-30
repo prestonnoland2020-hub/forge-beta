@@ -1474,3 +1474,5 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 /* A run logged without a distance is worth nothing to mileage or pace — say so
    at the moment of logging rather than letting the totals quietly stall. */
 .cardio-log-warning { margin: 6px 0 0; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: #f6c66b; background: rgba(246, 198, 107, .1); border: 1px solid rgba(246, 198, 107, .28); }
+/* Why the attempt sits below the calc max, on the row the athlete sees. */
+.max-ledger-why { display: block; margin-top: 3px; color: var(--text-muted, #8b8f8a); font-size: 12px; line-height: 1.4; }

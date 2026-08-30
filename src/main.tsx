@@ -85,14 +85,18 @@ if (callbackQuery.get('strava') === 'callback' && !window.location.hash) {
    Only a LAUNCH is redirected. A reload keeps its place (a developer checking
    a deploy on Plan should stay on Plan), back and forward keep theirs, and any
    route carrying a query string is a deep link someone followed on purpose —
-   an edit link, a source mode, the OAuth return — so it is left alone. */
+   an edit link, a source mode, the OAuth return — so it is left alone.
+
+   And never the LOG. It is the one screen holding work that is not saved yet:
+   a phone that reloads a backgrounded tab would have thrown away a session
+   halfway through being typed. */
 const launch = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type;
 const [launchPath, launchQuery] = window.location.hash.replace(/^#/, '').split('?');
 if ((!launch || launch === 'navigate')
   && !launchQuery
   && callbackQuery.get('strava') !== 'callback'
   && launchPath && launchPath !== '/'
-  && !/^\/(login|auth\/callback)/.test(launchPath)) {
+  && !/^\/(login|auth\/callback|workout)/.test(launchPath)) {
   window.location.hash = '/';
 }
 

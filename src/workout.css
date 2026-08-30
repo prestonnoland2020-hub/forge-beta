@@ -144,15 +144,21 @@
 /* NUMBERS ARE PICKED, NOT TYPED. A wheel offers only real values — a barbell
    moves in fives, reps are whole, a run is read to a hundredth — so the typo
    that turns 225 into 2250 cannot be made. */
-.dial-backdrop{position:fixed;inset:0;z-index:80;background:#000d;backdrop-filter:blur(8px);display:grid;place-items:end center;padding:0}
-.dial-sheet{width:min(520px,100%);background:linear-gradient(180deg,color-mix(in srgb,var(--card) 94%,white 6%),var(--card));border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:20px 20px calc(16px + env(safe-area-inset-bottom));display:grid;gap:14px;box-shadow:0 -24px 70px #000b;animation:dial-rise .18s ease-out}
+/* A WHEEL TURNS ONE WAY. The wheel scrolls vertically, but nothing stopped a
+   finger that drifted sideways from panning the sheet, the backdrop, or the
+   page behind it — so a thumb flick that was a few degrees off its axis slid
+   the whole dial across the screen mid-spin and lost the value being aimed at.
+   The backdrop takes no gestures at all; the sheet and the wheels take pan-y
+   and nothing else; and nothing in the stack may scroll horizontally. */
+.dial-backdrop{position:fixed;inset:0;z-index:80;background:#000d;backdrop-filter:blur(8px);display:grid;place-items:end center;padding:0;overflow:hidden;touch-action:none;overscroll-behavior:contain}
+.dial-sheet{width:min(520px,100%);background:linear-gradient(180deg,color-mix(in srgb,var(--card) 94%,white 6%),var(--card));border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:20px 20px calc(16px + env(safe-area-inset-bottom));display:grid;gap:14px;box-shadow:0 -24px 70px #000b;animation:dial-rise .18s ease-out;overflow-x:hidden;touch-action:pan-y}
 @keyframes dial-rise{from{transform:translateY(18px);opacity:.6}to{transform:translateY(0);opacity:1}}
 .dial-sheet header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .dial-sheet header strong{font:800 13px var(--display-font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .dial-preview{font:800 26px var(--display-font);color:var(--accent);font-variant-numeric:tabular-nums}
-.dial-columns{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;height:220px}
+.dial-columns{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;height:220px;overflow-x:hidden;touch-action:pan-y}
 .dial-band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:44px;border-radius:12px;background:color-mix(in srgb,var(--accent) 11%,transparent);border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);pointer-events:none}
-.dial-wheel{height:220px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;-ms-overflow-style:none;display:grid;min-width:88px;text-align:center;overscroll-behavior:contain}
+.dial-wheel{height:220px;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;scrollbar-width:none;-ms-overflow-style:none;display:grid;min-width:88px;text-align:center;overscroll-behavior:contain;touch-action:pan-y}
 .dial-wheel::-webkit-scrollbar{display:none}
 .dial-wheel:focus-visible{outline:2px solid var(--accent);border-radius:12px}
 .dial-pad{height:88px;flex:none}

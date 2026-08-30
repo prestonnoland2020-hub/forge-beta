@@ -421,7 +421,18 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
              rather than as a duplicated row. */
           const measured = source?.reps === 1;
           return <details className="card max-ledger" key={entry.name}>
-            <summary><div><span className="eyebrow">{entry.name.toUpperCase()}</span><strong>Calc max {best} {unit} → max week {attempt.weight} × 1</strong></div><b>＋</b></summary>
+            {/* THE TWO NUMBERS LOOK LIKE A CONTRADICTION UNTIL ONE SENTENCE
+                EXPLAINS THEM. "Calc max 517 → max week 485 × 1" reads as the
+                plan asking for LESS than the athlete can do. It is not: 517 is
+                Epley's estimate from a rep set, 475 is what he has actually
+                held for a single, and 485 is the next real single. The line
+                that says so belongs on the row he actually sees, not only
+                inside the card he has to open. */}
+            <summary><div><span className="eyebrow">{entry.name.toUpperCase()}</span><strong>Calc max {best} {unit} → max week {attempt.weight} × 1</strong>
+              {single && attempt.weight < best
+                ? <small className="max-ledger-why">{attempt.weight} is {attempt.weight - single.weight} {unit} over your real {single.weight} single — {best} is estimated from reps, not lifted.</small>
+                : !single ? <small className="max-ledger-why">No real single on record yet, so this is your first true attempt at {entry.name}.</small> : null}
+            </div><b>＋</b></summary>
             <div className="max-ledger-body">
               <h3>Turning a calculated max into a real one</h3>
               <div className="ledger-rail">

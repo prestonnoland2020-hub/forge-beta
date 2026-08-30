@@ -30,7 +30,7 @@ export type TopSetDraft = { lift: string; muscles: string[]; isNew: boolean; wei
 
 const norm = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ');
 
-export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, onClose, onSave }: {
+export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, onClose, onSave, blockedReason = '' }: {
   unit: string;
   exercises: LibraryExercise[];
   suggested: string[];
@@ -38,6 +38,8 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
   existing: string[];
   onClose: () => void;
   onSave: (draft: TopSetDraft) => void;
+  /* Set when the day has no label yet: a top set has nothing to attach to. */
+  blockedReason?: string;
 }) {
   const [query, setQuery] = useState('');
   const [chosen, setChosen] = useState<LibraryExercise | null>(null);
@@ -95,7 +97,7 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
   const toggleMuscle = (muscle: string) => setMuscles(current => current.includes(muscle) ? current.filter(item => item !== muscle) : [...current, muscle]);
 
   const max = Number(weight) && Number(reps) ? calculateEstimatedOneRepMax(Number(weight), Number(reps)) : null;
-  const ready = Boolean(lift) && muscles.length > 0 && Number(weight) > 0 && Number(reps) > 0;
+  const ready = Boolean(lift) && muscles.length > 0 && Number(weight) > 0 && Number(reps) > 0 && !blockedReason;
 
   return <div className="top-set-sheet-backdrop" role="dialog" aria-modal="true" aria-label="Add a top set" onClick={onClose}>
     <div className="top-set-sheet" onClick={event => event.stopPropagation()}>
@@ -141,6 +143,7 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
         {alreadyLogged ? <small className="top-set-sheet-warning">{lift} is already on today’s log — saving this adds a second set of it.</small> : null}
       </>}
 
+      {blockedReason ? <p className="top-set-sheet-warning">{blockedReason}</p> : null}
       <footer>
         <button type="button" className="button" disabled={!ready} onClick={() => onSave({ lift, muscles, isNew, weight: Number(weight), reps: Number(reps) })}>Save top set</button>
         <button type="button" className="button ghost" onClick={onClose}>Cancel</button>

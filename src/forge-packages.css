@@ -132,3 +132,27 @@ html[data-package="trail"] .week-pulse-area{fill:rgba(252,82,0,.12)}
 .package-meta em{font-style:normal;font-size:10px;font-weight:900;letter-spacing:.12em;color:var(--accent)}
 .package-note{color:var(--ink-3)}
 @media(max-width:600px){.package-grid{grid-template-columns:1fr}}
+
+/* ─────────────────────────────────────────── a phone must not zoom to type
+   iOS Safari zooms the page whenever a focused form control is smaller than
+   16px, then leaves the athlete panned somewhere in the middle of a field
+   they now have to pinch back out of. It is not a preference — it is a hard
+   platform rule, and every field under 16px triggers it.
+
+   Forge sets its type in the 10-13px range all over, which is right for
+   labels and wrong for anything you type into. This is the one place that
+   decides it, so a new field cannot reintroduce the zoom by inheriting a
+   small size from the card it sits in.
+
+   !important is deliberate. The sizes being overridden are set by more
+   specific selectors (.strava-review-sheet input, .plan-rebuild-sheet
+   textarea, and so on) and by `font:` shorthands, so ordering alone does not
+   win — and there is no design reason to want a zooming field.
+
+   Scoped to widths where the zoom happens; the desktop layout keeps its
+   sizing. Checkboxes and radios have no text to zoom. */
+@media (max-width: 900px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea { font-size: 16px !important; }
+}
