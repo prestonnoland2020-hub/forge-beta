@@ -76,6 +76,26 @@ if (callbackQuery.get('strava') === 'callback' && !window.location.hash) {
   window.location.hash = '/profile';
 }
 
+/* OPENING THE APP MEANS TODAY. The hash survives whatever closed the app — a
+   backgrounded tab, a home-screen shortcut saved from wherever the athlete
+   happened to be — so someone who last looked at Plan opened Forge on Plan
+   days later. The app's answer to "what now" lives on Today; that is where a
+   launch lands.
+
+   Only a LAUNCH is redirected. A reload keeps its place (a developer checking
+   a deploy on Plan should stay on Plan), back and forward keep theirs, and any
+   route carrying a query string is a deep link someone followed on purpose —
+   an edit link, a source mode, the OAuth return — so it is left alone. */
+const launch = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type;
+const [launchPath, launchQuery] = window.location.hash.replace(/^#/, '').split('?');
+if ((!launch || launch === 'navigate')
+  && !launchQuery
+  && callbackQuery.get('strava') !== 'callback'
+  && launchPath && launchPath !== '/'
+  && !/^\/(login|auth\/callback)/.test(launchPath)) {
+  window.location.hash = '/';
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppErrorBoundary><HashRouter>

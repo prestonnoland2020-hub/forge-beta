@@ -38,9 +38,19 @@ check('the takeover names the synced activity', /MORNING WEIGHT TRAINING/i.test(
 check('it asks for the split day, the top set and a description', /SPLIT DAY/i.test(heading) && /TOP SET/i.test(heading) && /DESCRIBE IT/i.test(heading), heading.slice(0, 160));
 check('an AI box is offered like the log has', Boolean(await p.$('.strava-review-sheet textarea')));
 
-/* Nothing can be saved until both answers exist. */
+/* THE MATCHED DAY IS ALREADY AN ANSWER. A gym session belongs to the day Forge
+   had up, so that is filled in rather than demanded — and demanding it again
+   was the whole complaint. Cleared by hand, there is nothing to save. */
 const saveDisabled = () => p.evaluate(() => [...document.querySelectorAll('.strava-review-sheet button.button')].find(b => /Save this day/.test(b.textContent))?.disabled);
-check('save is refused with no answers at all', await saveDisabled() === true);
+check('the split day arrives already matched', await p.evaluate(() => document.querySelector('.strava-review-sheet select')?.value) !== '');
+check('so saving is offered straight away', await saveDisabled() === false);
+await p.evaluate(() => {
+  const el = document.querySelector('.strava-review-sheet select');
+  const setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set;
+  setter.call(el, ''); el.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await p.waitForTimeout(400);
+check('cleared by hand, there is nothing left to save', await saveDisabled() === true);
 
 const days = await p.evaluate(() => [...(document.querySelector('.strava-review-sheet select')?.options || [])].map(o => o.text));
 check('every split day is offered', days.includes('Chest & Back') && days.includes('Lower Body'), JSON.stringify(days));
