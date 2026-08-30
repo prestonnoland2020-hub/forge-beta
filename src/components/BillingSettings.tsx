@@ -6,9 +6,17 @@ import { APPLE_MANAGE_URL, beginCheckout, openBillingPortal, restorePurchases, t
 import { billingRail, platform } from '../features/billing/platform';
 import { deleteMyAccount } from '../features/profile/profileService';
 
+/* PRICED AGAINST THE CATEGORY, NOT AGAINST HOPE. The median Health & Fitness
+   subscription is about $9.99 a month and $39.99 a year; annual carries two
+   thirds of the category's revenue. $59.99 sits above the annual median
+   because a coach that calls a model on every question has a real marginal
+   cost a plain logging app does not — but it is deliberately not the $79.99 a
+   first draft reaches for, which is double the anchor buyers expect from an
+   app they have never heard of. If conversion disappoints, the annual price is
+   the first thing to test downward, not the feature set. */
 const PRICES: Record<Plan, { label: string; price: string; note: string }> = {
   pro_monthly: { label: 'Monthly', price: '$9.99', note: 'per month' },
-  pro_annual: { label: 'Annual', price: '$79.99', note: 'per year · two months free' },
+  pro_annual: { label: 'Annual', price: '$59.99', note: 'per year · half the monthly rate' },
 };
 
 const ENDPOINT_LABELS: Record<string, string> = {
