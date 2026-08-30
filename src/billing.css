@@ -237,3 +237,23 @@
   letter-spacing: .1em;
 }
 .coach-limit-notice p { margin: 0; color: var(--ink); }
+
+/* The settings list was written for <a> rows only. The billing row is a
+   <button> because it switches a tab rather than navigating, so it needs the
+   same shape — otherwise it renders as a bare button inside a card of rows. */
+.simple-settings-list > button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 18px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.simple-settings-list > button:last-child { border-bottom: 0; }
+.simple-settings-list > button > div { display: grid; gap: 4px; }
