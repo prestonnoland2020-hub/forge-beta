@@ -105,3 +105,17 @@
 .compact-workout-source .source-options button{white-space:normal;overflow:visible;text-overflow:clip;padding:10px 6px;align-content:center}
 .compact-workout-source .source-options b{font-size:11px!important;line-height:1.2;white-space:nowrap;overflow-wrap:normal;hyphens:none}
 .compact-workout-source .source-options span{font-size:9px!important;letter-spacing:.08em}
+
+/* A synced lift asks two questions and no more: which split day, and the top
+   set. Everything else Forge derives. */
+.strava-strength-review{display:grid;gap:14px}
+.strava-strength-review header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.strava-strength-review header>div{display:grid;gap:4px;min-width:0}
+.strava-strength-review header strong{font:800 19px var(--display-font);text-transform:uppercase}
+.strava-strength-review header small{color:var(--muted);line-height:1.4}
+.strava-strength-review label{display:grid;gap:7px;font-weight:800;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.strava-strength-review select,.strava-strength-review input{width:100%;box-sizing:border-box;background:var(--surface-sunken);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:13px 14px;font:700 16px inherit;text-transform:none;letter-spacing:0}
+.strength-review-set{display:grid;gap:12px}
+.strength-review-numbers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.strength-review-max{color:var(--accent);font-weight:800}
+.strength-review-saved{color:var(--accent);font-weight:700}

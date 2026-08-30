@@ -24,6 +24,16 @@ const METERS_PER_MILE = 1609.344;
 const reviewKey = 'forge-strava-review-v1';
 export const pendingStravaReviews = (): string[] => { try { const list = JSON.parse(localStorage.getItem(reviewKey) || '[]'); return Array.isArray(list) ? list : []; } catch { return []; } };
 export const markStravaReviewed = (sessionId: string) => { try { localStorage.setItem(reviewKey, JSON.stringify(pendingStravaReviews().filter(id => id !== sessionId))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
+/* A SYNCED LIFT IS HALF A RECORD. Strava knows the athlete was in the gym for
+   54 minutes; it does not know which split day that was or what they lifted —
+   and those are the two facts Forge's whole program runs on. So a strength
+   activity queues its DATE for a one-tap follow-up: pick the day, add the top
+   set, done. Keyed by date rather than session id because a strength import
+   creates no cardio session to hang an id on. */
+const strengthKey = 'forge-strava-strength-review-v1';
+export const pendingStrengthReviews = (): string[] => { try { const list = JSON.parse(localStorage.getItem(strengthKey) || '[]'); return Array.isArray(list) ? list : []; } catch { return []; } };
+export const markStrengthReviewed = (date: string) => { try { localStorage.setItem(strengthKey, JSON.stringify(pendingStrengthReviews().filter(item => item !== date))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
+const queueStrengthReviews = (dates: string[]) => { if (!dates.length) return; try { localStorage.setItem(strengthKey, JSON.stringify(Array.from(new Set([...pendingStrengthReviews(), ...dates])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
 const queueStravaReviews = (sessionIds: string[]) => { if (!sessionIds.length) return; try { localStorage.setItem(reviewKey, JSON.stringify(Array.from(new Set([...pendingStravaReviews(), ...sessionIds])).slice(-12))); } catch { /* fine */ } window.dispatchEvent(new Event('forge-strava-review-changed')); };
 export const runShapedActivity = (activity: string) => !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(activity);
 
@@ -180,7 +190,7 @@ export async function importStravaActivities(
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
   const handLogged = handLoggedCoverage(records);
   const watchMiles = stravaMilesByDay(rows);
-  const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[] }>();
+  const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[]; strength: boolean }>();
   let skipped = 0;
   /* Superseded rows are marked imported like any other, so a day the athlete
      logged by hand is settled once and never re-offered on the next sync. */
@@ -199,18 +209,18 @@ export async function importStravaActivities(
       const covered = watched === 0 || typed + COVERAGE_TOLERANCE_MILES >= watched;
       if (covered) { skipped++; supersededRowIds.push(row.id); continue; }
     }
-    const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [] };
+    const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [], strength: false };
     /* A LIFT IS NOT CARDIO. Strava reports a gym session as WeightTraining,
        and importing every activity as a cardio session made "Weight Training"
        the athlete's most-logged cardio type — 139 barbell sessions filed under
        running and rowing, skewing every cardio insight. A strength activity
        still marks the day as trained, but it is not a cardio session and the
        day does not become a cardio day because of it. */
-    if (group !== 'strength') entry.sessions.push(mapped.session);
+    if (group !== 'strength') entry.sessions.push(mapped.session); else entry.strength = true;
     entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
     byDate.set(mapped.date, entry);
   }
-  let imported = 0; const importedRowIds: string[] = []; const reviewIds: string[] = [];
+  let imported = 0; const importedRowIds: string[] = []; const reviewIds: string[] = []; const strengthDates: string[] = [];
   const reviewCutoff = new Date(); reviewCutoff.setDate(reviewCutoff.getDate() - 3);
   const reviewCutoffIso = reviewCutoff.toISOString().slice(0, 10);
   for (const [date, entry] of byDate) {
@@ -225,10 +235,15 @@ export async function importStravaActivities(
     } as Omit<WorkoutRecord, 'id'>);
     if (result.ok) {
       imported += entry.sessions.length; importedRowIds.push(...entry.rowIds);
-      if (date >= reviewCutoffIso) reviewIds.push(...entry.sessions.filter(session => runShapedActivity(session.activity || '')).map(session => String(session.id)));
+      if (date >= reviewCutoffIso) {
+        reviewIds.push(...entry.sessions.filter(session => runShapedActivity(session.activity || '')).map(session => String(session.id)));
+        /* Ask about a gym session only while it is fresh enough to remember. */
+        if (entry.strength) strengthDates.push(date);
+      }
     }
   }
   queueStravaReviews(reviewIds);
+  queueStrengthReviews(strengthDates);
   /* .in() takes a URL-length-bounded list, so a full history's worth of ids
      has to be marked in batches — one oversized request would fail and leave
      every row looking un-imported. */
