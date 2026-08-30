@@ -113,15 +113,22 @@ for each row execute function public.set_updated_at();
    runs without limits can be changed without a deploy. It is readable and
    writable by nobody through the API -- no policy is created for it, and RLS
    is on -- so only the service role and SECURITY DEFINER functions see it. */
+/* Plain text held lower-case rather than citext. The functions below run with
+   `search_path = ''`, where an unqualified `citext` cannot resolve — and
+   qualifying it means guessing whether the extension landed in `public` or
+   `extensions`, which differs between Supabase projects by age. Lower-casing
+   on the way in and comparing lower-cased is portable and needs no extension
+   at all. */
 create table if not exists public.unlimited_accounts (
-  email citext primary key,
+  email text primary key,
   note text not null default '',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint unlimited_accounts_lowercase check (email = lower(email))
 );
 alter table public.unlimited_accounts enable row level security;
 
 insert into public.unlimited_accounts(email, note)
-values ('prestonnoland2020@gmail.com', 'Forge owner — unmetered')
+values (lower('prestonnoland2020@gmail.com'), 'Forge owner — unmetered')
 on conflict (email) do nothing;
 
 /* Limits are data, not code, so they can be tuned live when real usage shows
@@ -188,11 +195,11 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_email citext;
+  v_email text;
   v_plan public.subscription_plan;
   v_status public.subscription_status;
 begin
-  select email into v_email from auth.users where id = p_owner;
+  select lower(email) into v_email from auth.users where id = p_owner;
   if v_email is not null and exists (select 1 from public.unlimited_accounts u where u.email = v_email) then
     return 'founder';
   end if;

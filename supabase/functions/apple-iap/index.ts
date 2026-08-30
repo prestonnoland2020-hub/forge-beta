@@ -104,14 +104,19 @@ Deno.serve(async request => {
 
     /* Walk every subscription group Apple returned and keep the newest
        transaction that is one of ours. */
-    let best: { transaction: Record<string, unknown>; renewal: Record<string, unknown> } | null = null;
+    /* Apple's numeric status travels on the same lastTransactions entry as the
+       transaction it describes, so it has to be carried along with the entry we
+       actually pick. Reading it off the first group's first entry — which is a
+       different subscription whenever an athlete has ever held more than one —
+       would have entitled or denied people based on somebody else's row. */
+    let best: { transaction: Record<string, unknown>; renewal: Record<string, unknown>; status: number } | null = null;
     for (const group of (status.data || []) as Array<Record<string, unknown>>) {
       for (const entry of (group.lastTransactions || []) as Array<Record<string, unknown>>) {
         const transaction = decodeJws(String(entry.signedTransactionInfo || ''));
         const renewal = decodeJws(String(entry.signedRenewalInfo || ''));
         if (String(transaction.bundleId) !== Deno.env.get('APPLE_BUNDLE_ID')) continue;
         if (!best || Number(transaction.purchaseDate || 0) > Number(best.transaction.purchaseDate || 0)) {
-          best = { transaction, renewal };
+          best = { transaction, renewal, status: Number(entry.status ?? 0) };
         }
       }
     }
@@ -128,12 +133,10 @@ Deno.serve(async request => {
     const expiresMs = Number(best.transaction.expiresDate || 0);
     const revoked = Boolean(best.transaction.revocationDate);
     /* Apple's numeric status: 1 active, 2 expired, 3 in billing retry,
-       4 in billing grace period, 5 revoked. Grace still entitles. */
-    const appleStatus = Number(
-      ((status.data || [])[0] as Record<string, unknown> | undefined)?.lastTransactions
-        ? ((((status.data || [])[0] as Record<string, unknown>).lastTransactions as Array<Record<string, unknown>>)[0]?.status ?? 0)
-        : 0,
-    );
+       4 in billing grace period, 5 revoked. Grace still entitles — the card
+       failed, Apple is retrying, and taking the app away mid-retry is how you
+       turn a payment hiccup into a cancellation. */
+    const appleStatus = best.status;
 
     const entitled = !revoked && (expiresMs > Date.now() || appleStatus === 4);
     const subscriptionStatus = revoked
