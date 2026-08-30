@@ -11,8 +11,14 @@ export type ParsedCardioRows = { reflection: string; note: string; rows: Array<{
 
 export type ForgeCoachResponse = {
   answer: string;
-  source: 'ai' | 'local';
+  /* 'limit' is not a failure to hide behind the local fallback. When the
+     server refuses on quota, answering with the generic rules-based text made
+     Forge look like it HAD answered: the athlete got a plausible paragraph,
+     never learned they had run out, and never saw that Pro exists. A limit is
+     something to say out loud. */
+  source: 'ai' | 'local' | 'limit';
   error?: string;
+  upgrade?: boolean;
   workout?: {
     title: string;
     rounds: number;
@@ -33,8 +39,18 @@ export async function requestForgeCoach(request: ForgeCoachRequest, localFallbac
   const { data, error } = await supabase.functions.invoke('forge-coach', { body: request });
   if (error || !data?.answer) {
     let detail='The AI service did not return a response.';
+    let limited=false;
+    let upgrade=false;
     const response=(error as { context?: Response } | null)?.context;
-    if(response){try{const body=await response.clone().json();if(typeof body?.error==='string')detail=body.error}catch{}}
+    if(response){try{
+      const body=await response.clone().json();
+      if(typeof body?.error==='string')detail=body.error;
+      /* 429 is the quota gate, and the message it carries is written for the
+         athlete. Say it instead of the fallback. */
+      limited=response.status===429;
+      upgrade=Boolean(body?.upgrade);
+    }catch{}}
+    if(limited)return{ answer: detail, source: 'limit', error: detail, upgrade };
     return { answer: localFallback, source: 'local', error: detail };
   }
   return { answer: String(data.answer), source: 'ai', workout: data.workout };

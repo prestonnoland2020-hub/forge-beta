@@ -11,7 +11,7 @@ import { requestForgeCoach } from '../features/training/coachService';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
 
 type GoalEvidence = { date: string; value: number; label: string };
-type GoalCoachTurn = { question: string; answer: string; source: 'ai' | 'local' };
+type GoalCoachTurn = { question: string; answer: string; source: 'ai' | 'local' | 'limit' };
 type CachedAssessment = { createdAt: number; fingerprint: string; estimate: { seconds: number; confidence: string; reason: string }; error?: string };
 type StrengthForecast = { predicted: number; low: number; high: number; weeklyRate: number; confidence: 'Low' | 'Medium' | 'High'; reason: string };
 const goalCoachStorageKey = (goal: CreatedGoal) => `forge-goal-coach-v1:${goal.type}:${goal.title}:${goal.date}`;
@@ -93,7 +93,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [coachLoading, setCoachLoading] = useState(false);
-  const [coachSource, setCoachSource] = useState<'ai' | 'local' | null>(null);
+  const [coachSource, setCoachSource] = useState<'ai' | 'local' | 'limit' | null>(null);
   const [coachTurns,setCoachTurns]=useState<GoalCoachTurn[]>(()=>loadGoalCoachTurns(coachKey));
   const [aiEstimate,setAiEstimate]=useState<{seconds:number;confidence:string;reason:string}|null>(null);
   const [aiEstimateLoading,setAiEstimateLoading]=useState(false);

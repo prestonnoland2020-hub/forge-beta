@@ -11,6 +11,7 @@ import { ProfileSetupProvider } from './features/profile/ProfileSetupProvider';
 import { CoachingStrategyProvider } from './features/training/CoachingStrategyProvider';
 import { TrainingLibraryProvider } from './features/training/TrainingLibraryProvider';
 import { DailyRecommendationProvider } from './features/training/DailyRecommendationProvider';
+import { BillingProvider } from './features/billing/BillingProvider';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import './styles.css';
 import './workout.css';
@@ -62,6 +63,7 @@ import './simplified-platform.css';
 import './frontend-polish.css';
 import './profile-customization.css';
 import './mobile-calm.css';
+import './billing.css';
 /* Loaded last: the authoritative token + primitive layer every earlier
    stylesheet now reads from. See the header comment in forge-system.css. */
 import './forge-system.css';
@@ -104,7 +106,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppErrorBoundary><HashRouter>
       <AuthProvider>
-        <AppearanceProvider><GoalsProvider><WorkoutHistoryProvider><AdaptiveTrainingProvider><ProfileSetupProvider><TrainingLibraryProvider><CoachingStrategyProvider><DailyRecommendationProvider><App /></DailyRecommendationProvider></CoachingStrategyProvider></TrainingLibraryProvider></ProfileSetupProvider></AdaptiveTrainingProvider></WorkoutHistoryProvider></GoalsProvider></AppearanceProvider>
+        <BillingProvider><AppearanceProvider><GoalsProvider><WorkoutHistoryProvider><AdaptiveTrainingProvider><ProfileSetupProvider><TrainingLibraryProvider><CoachingStrategyProvider><DailyRecommendationProvider><App /></DailyRecommendationProvider></CoachingStrategyProvider></TrainingLibraryProvider></ProfileSetupProvider></AdaptiveTrainingProvider></WorkoutHistoryProvider></GoalsProvider></AppearanceProvider></BillingProvider>
       </AuthProvider>
     </HashRouter></AppErrorBoundary>
   </StrictMode>,

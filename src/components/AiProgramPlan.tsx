@@ -193,8 +193,23 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      Forge shows exactly what to do instead of generating a hollow plan. */
   const baseline = useMemo(() => {
     const items: Array<{ key: string; label: string; done: boolean }> = [];
-    splitDays.filter(day => ['strength', 'mixed'].includes(day.dayType.toLowerCase()) && (day.exercises || []).length).forEach(day => {
-      items.push({ key: day.name, label: `Log one honest top set from ${day.name} — ${(day.exercises || [])[0]} works`, done: (day.exercises || []).some(name => bests.has(name)) });
+    /* THE GATE USED TO EXCLUDE EXACTLY THE DAYS THAT WERE NOT READY. The old
+       filter also required `(day.exercises || []).length`, and the starter
+       split every new athlete gets is created with `exercises: []` — so a
+       brand-new account matched no days at all, `baseline` came back empty,
+       `baselineReady` was therefore true, and the auto-generator fired with
+       `calcMaxes: {}`. A minute later that athlete had a ten-week block of
+       specific prescribed weights invented from nothing, and resolvePlanWeek
+       cannot correct a number it has no logged evidence for — so those numbers
+       are what Today and the roadmap showed as their program.
+
+       A day with no exercises mapped is not a day to skip; it is the first
+       thing that needs doing. */
+    splitDays.filter(day => ['strength', 'mixed'].includes(day.dayType.toLowerCase())).forEach(day => {
+      const exercises = day.exercises || [];
+      items.push(exercises.length
+        ? { key: day.name, label: `Log one honest top set from ${day.name} — ${exercises[0]} works`, done: exercises.some(name => bests.has(name)) }
+        : { key: `${day.name}-exercises`, label: `Choose the exercises for ${day.name} — Forge cannot program a day with none`, done: false });
     });
     if (goals.some(goal => goal.type === 'Endurance')) {
       items.push({ key: 'runs', label: recentRuns.length === 1 ? 'Log one more easy run (1 of 2) — or connect Strava' : 'Log 2 easy runs so Forge learns your real pace — or connect Strava', done: recentRuns.length >= 2 });

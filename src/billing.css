@@ -1,0 +1,239 @@
+/* BILLING AND ACCOUNT.
+
+   Reads from the system tokens in forge-system.css so it follows whichever UI
+   package the athlete picked, in either theme, without a single literal
+   colour of its own. */
+
+.billing-settings { --billing-gap: var(--s4); }
+
+/* ---- Plan status ------------------------------------------------------- */
+
+.billing-status header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s4);
+}
+.billing-status h3 { margin: var(--s1) 0 var(--s2); }
+.billing-status p { color: var(--ink-2); margin: 0; max-width: 46ch; }
+
+.billing-pill {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink-2);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+.billing-pill[data-pro] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ---- Usage meters ------------------------------------------------------ */
+
+.billing-usage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--hairline);
+}
+.billing-usage-row > div { min-width: 0; flex: 1; }
+.billing-usage-row strong { display: block; }
+.billing-usage-row span {
+  display: block;
+  color: var(--ink-2);
+  font-size: .82rem;
+  margin-top: 2px;
+}
+.billing-usage-row > b {
+  flex: none;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.billing-usage-row > b[data-empty] { color: var(--bad); }
+
+.billing-meter {
+  margin-top: var(--s2);
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.billing-meter i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--dur) var(--ease);
+}
+.billing-meter i[data-full] { background: var(--bad); }
+
+/* ---- The offer --------------------------------------------------------- */
+
+.billing-features {
+  list-style: none;
+  margin: 0 0 var(--s4);
+  padding: 0;
+  display: grid;
+  gap: var(--s2);
+}
+.billing-features li {
+  position: relative;
+  padding-left: var(--s5);
+  color: var(--ink-2);
+}
+.billing-features li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: .5em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s3);
+}
+.billing-plan {
+  display: grid;
+  gap: 2px;
+  padding: var(--s4);
+  text-align: left;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.billing-plan:hover:not(:disabled) { border-color: var(--accent); }
+.billing-plan:active:not(:disabled) { transform: translateY(1px); }
+.billing-plan:disabled { opacity: .6; cursor: default; }
+.billing-plan.recommended { border-color: var(--accent); }
+.billing-plan small {
+  color: var(--ink-2);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.billing-plan strong { font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.billing-plan span { color: var(--ink-2); font-size: .82rem; }
+.billing-plan b {
+  margin-top: var(--s2);
+  color: var(--accent);
+  font-size: .82rem;
+}
+
+.billing-fineprint {
+  margin: var(--s4) 0 0;
+  color: var(--ink-3);
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.billing-free-note { margin-top: var(--s3); }
+.billing-free-note summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: .84rem;
+}
+.billing-free-note ul {
+  margin: var(--s2) 0 0;
+  padding-left: var(--s5);
+  color: var(--ink-2);
+  font-size: .84rem;
+  display: grid;
+  gap: 4px;
+}
+
+/* ---- Manage ------------------------------------------------------------ */
+
+.billing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.billing-actions .button { flex: 0 1 auto; }
+
+.billing-message {
+  margin: var(--s3) 0 0;
+  color: var(--good);
+  font-size: .86rem;
+}
+.billing-message.error { color: var(--bad); }
+
+.billing-account-email {
+  margin: var(--s3) 0 0;
+  color: var(--ink-3);
+  font-size: .78rem;
+}
+
+/* ---- Deletion ---------------------------------------------------------- */
+
+.billing-danger { border-color: color-mix(in srgb, var(--bad) 40%, var(--hairline)); }
+.billing-danger p { color: var(--ink-2); max-width: 60ch; }
+
+.billing-confirm { display: grid; gap: var(--s3); }
+.billing-confirm label {
+  display: grid;
+  gap: var(--s2);
+  color: var(--ink-2);
+  font-size: .86rem;
+}
+.billing-confirm b { color: var(--ink); letter-spacing: .08em; }
+/* 16px minimum: anything smaller makes iOS Safari zoom the page on focus. */
+.billing-confirm input {
+  font-size: 16px;
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  letter-spacing: .12em;
+  max-width: 220px;
+}
+
+.button.danger,
+.button.danger-outline {
+  border: 1px solid var(--bad);
+  border-radius: var(--r-sm);
+}
+.button.danger { background: var(--bad); color: var(--bg); }
+.button.danger-outline { background: transparent; color: var(--bad); }
+.button.danger:disabled { opacity: .45; }
+
+@media (max-width: 560px) {
+  .billing-status header { flex-direction: column; }
+  .billing-actions .button { flex: 1 1 100%; text-align: center; }
+}
+
+/* The coach's quota refusal. Deliberately not styled as an error: nothing
+   went wrong, the athlete used what they had. */
+.coach-limit-notice {
+  margin-top: var(--s4);
+  padding: var(--s4);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-wash);
+  display: grid;
+  gap: var(--s2);
+  justify-items: start;
+}
+.coach-limit-notice span {
+  color: var(--accent);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+.coach-limit-notice p { margin: 0; color: var(--ink); }
