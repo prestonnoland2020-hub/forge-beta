@@ -55,3 +55,8 @@
   .overview-chart-controls>div{grid-column:1/-1}
   .overview-progress-plot svg{width:100%;height:auto;min-height:0}
 }
+
+/* Progress with nothing in it yet. Matches the empty cards on History, Goals
+   and Plan rather than leaving the page looking broken. */
+.ic-blank p { color: var(--ink-2); margin: 0 0 var(--s4); max-width: 52ch; line-height: 1.6; }
+.ic-blank .button { display: inline-block; }

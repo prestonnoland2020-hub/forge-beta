@@ -140,12 +140,24 @@ alter table public.ai_quota_limits enable row level security;
 drop policy if exists ai_quota_limits_read on public.ai_quota_limits;
 create policy ai_quota_limits_read on public.ai_quota_limits for select using (auth.uid() is not null);
 
+/* The free numbers are set by arithmetic, not generosity. A coach answer costs
+   roughly $0.015 and a full program build roughly $0.07 at current provider
+   prices. Freemium conversion for a new Health & Fitness app runs about 1.5%,
+   so every paying subscriber is carrying around 65 free accounts — and at
+   $9.99/month less Apple's 15% that subscriber nets about $8.50. A free tier
+   that can spend $0.90 a month is therefore a tier that loses money on volume
+   and gets worse as it grows.
+
+   30 coach questions and 2 program builds a month caps a maxed-out free
+   account near $0.59 — enough to prove the coach is real and worth paying
+   for, cheap enough that growth is not a liability. */
 insert into public.ai_quota_limits(tier, endpoint, daily_limit, monthly_limit) values
-  ('free', 'forge-coach', 5,  60),
-  ('free', 'forge-plan',  1,  4),
+  ('free', 'forge-coach', 3,  30),
+  ('free', 'forge-plan',  1,  2),
   ('pro',  'forge-coach', 60, 900),
   ('pro',  'forge-plan',  6,  60)
-on conflict (tier, endpoint) do nothing;
+on conflict (tier, endpoint) do update
+  set daily_limit = excluded.daily_limit, monthly_limit = excluded.monthly_limit;
 
 create table if not exists public.ai_usage (
   owner_id uuid not null references public.profiles(id) on delete cascade,

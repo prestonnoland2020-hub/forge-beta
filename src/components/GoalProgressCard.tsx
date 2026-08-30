@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CreatedGoal } from './GoalBuilder';
 import type { GoalRoadmap } from '../lib/goalPlanEngine';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
@@ -225,21 +225,17 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const differenceText = !comparisonValue ? '—' : timeGoal ? `${formatClock(Math.abs(difference), hoursFirst)} ${atTarget ? 'ahead' : 'to go'}` : `${Math.round(Math.abs(difference) * 10) / 10} ${goal.unit || ''} ${atTarget ? 'ahead' : 'to go'}`;
   const currentSource = currentEvidence?.label || 'No valid event evidence yet';
   const calculatedSource = goal.type==='Endurance'?(aiEstimate?`Legacy race assessment · ${aiEstimate.confidence} confidence`:aiEstimateLoading?'Legacy assessment in progress':aiEstimateError||'No legacy assessment available'):(calculatedEvidence?.label || (isHyrox ? 'Requires HYROX or simulation data' : 'No calculation available'));
-  const trajectoryRef=useRef<HTMLDivElement|null>(null);
-  const [trajectoryWidth,setTrajectoryWidth]=useState(720);
-  useEffect(()=>{
-    const node=trajectoryRef.current;
-    if(!node||typeof ResizeObserver==='undefined')return;
-    const observer=new ResizeObserver(entries=>{
-      const measured=entries[0]?.contentRect.width;
-      if(measured)setTrajectoryWidth(Math.max(300,Math.min(760,Math.round(measured))));
-    });
-    observer.observe(node);
-    return ()=>observer.disconnect();
-  },[]);
-  /* 1:1 between user units and CSS pixels keeps 11px text at 11px. */
-  const TW=trajectoryWidth,TH=176,TL=46,TR=TW-16,TSPAN=TR-TL,plotTop=24,plotBot=TH-42;
-  const chartStart=shownProgress[0]?.date||datedTrajectory[0]?.date||new Date().toISOString().slice(0,10);const chartStartMs=new Date(`${chartStart}T12:00:00`).getTime();const deadlineMs=new Date(`${goal.date}T12:00:00`).getTime();const chartSpan=Math.max(86400000,deadlineMs-chartStartMs);const chartX=(date:string)=>TL+Math.max(0,Math.min(1,(new Date(`${date}T12:00:00`).getTime()-chartStartMs)/chartSpan))*TSPAN;
+  /* A ResizeObserver measuring a div, a width held in state, and ~40 lines of
+     chart geometry (TW/TH/TL/TR/TSPAN, chartX, chartY, evidencePoints,
+     chartValues) all lived here for an SVG that was never written — nothing
+     in the returned JSX referenced any of it. chartValues also ran
+     Math.min/Math.max across an array that is EMPTY for a goal with no logged
+     evidence, so minValue was Infinity and every coordinate NaN; the only
+     reason nobody ever saw that is that the chart never rendered. */
+  /* chartStartMs and deadlineMs feed the regression and the endurance
+     projection, which are real. The chartSpan/chartX pair beside them fed
+     only the trajectory SVG that was never written. */
+  const chartStart=shownProgress[0]?.date||datedTrajectory[0]?.date||new Date().toISOString().slice(0,10);const chartStartMs=new Date(`${chartStart}T12:00:00`).getTime();const deadlineMs=new Date(`${goal.date}T12:00:00`).getTime();
   const regression=goal.type==='Body Composition'&&datedTrajectory.length>=2?(()=>{const points=datedTrajectory.map(item=>({x:(new Date(`${item.date}T12:00:00`).getTime()-chartStartMs)/86400000,y:item.value}));const meanX=points.reduce((sum,item)=>sum+item.x,0)/points.length,meanY=points.reduce((sum,item)=>sum+item.y,0)/points.length;const denominator=points.reduce((sum,item)=>sum+(item.x-meanX)**2,0);const slope=denominator?points.reduce((sum,item)=>sum+(item.x-meanX)*(item.y-meanY),0)/denominator:0;const intercept=meanY-slope*meanX;const deadlineX=(deadlineMs-chartStartMs)/86400000;return{slope,intercept,predicted:intercept+slope*deadlineX}})():null;
   const strengthForecast=goal.type==='Strength'?buildStrengthForecast(datedTrajectory,calculated,goal.date):null;
   const predictedAtDeadline=strengthForecast?.predicted??regression?.predicted;
@@ -253,12 +249,14 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      the recent window, evaluated at the goal date, clamped to sane bounds
      (never faster than slightly beyond the best logged effort). */
   const enduranceProjection=goal.type==='Endurance'&&shownProgress.length>=2?(()=>{const first=new Date(`${shownProgress[0].date}T12:00:00`).getTime();const pts=shownProgress.map(item=>({x:(new Date(`${item.date}T12:00:00`).getTime()-first)/86400000,y:item.value}));const mx=pts.reduce((sum,pt)=>sum+pt.x,0)/pts.length,my=pts.reduce((sum,pt)=>sum+pt.y,0)/pts.length;const den=pts.reduce((sum,pt)=>sum+(pt.x-mx)**2,0);const slope=den?pts.reduce((sum,pt)=>sum+(pt.x-mx)*(pt.y-my),0)/den:0;const gx=(deadlineMs-first)/86400000;const raw=my+slope*(gx-mx);const best=Math.min(...pts.map(pt=>pt.y)),worst=Math.max(...pts.map(pt=>pt.y));return Math.round(Math.max(Math.min(raw,worst*1.05),Math.min(best*.94,target)))})():0;
+  /* This was the last statement on the dead chart line and is the only
+     thing on it anyone reads — it drives the status pill. */
+  const trajectoryStatus=goalReached?'Goal reached':goal.type==='Endurance'?(calculated?(calculated<=target?'On track':'More progress needed'):enduranceProjection?(enduranceProjection<=target?'On track':'More progress needed'):'Assessment needed'):!predictedAtDeadline?'More data needed':lowerIsBetter?predictedAtDeadline<=target?'On track':'More progress needed':predictedAtDeadline>=target?'On track':strengthForecast&&strengthForecast.predicted>calculated?'Progressing':'More progress needed';
   const projectedSource=goal.type==='Endurance'
     ?`${aiEstimate?`Legacy race assessment · ${aiEstimate.confidence} confidence`:aiEstimateLoading?'Legacy assessment in progress':aiEstimateError||(enduranceProjection?`Trend across ${shownProgress.length} logged efforts`:'No legacy assessment available')}${aiEstimate?` · ${aiEstimate.reason}`:''}`
     :predictedAtDeadline
       ?`Trend across ${trendPointCount} check-in${trendPointCount===1?'':'s'}, carried to ${formatDate(goal.date)}`
       :`Not enough logged history to project yet — ${trendPointCount<2?'two check-ins':'a clearer trend'} would give one`;
-  const chartValues=[target,calculated,...shownProgress.map(item=>item.value),...(predictedAtDeadline?[predictedAtDeadline]:[])].filter(value=>Number.isFinite(value)&&value>0);const minValue=Math.min(...chartValues),maxValue=Math.max(...chartValues),padding=Math.max(1,(maxValue-minValue)*.12);const chartY=(value:number)=>goal.type==='Endurance'?plotTop+(value-(minValue-padding))/Math.max(1,(maxValue+padding)-(minValue-padding))*(plotBot-plotTop):plotBot-(value-(minValue-padding))/Math.max(1,(maxValue+padding)-(minValue-padding))*(plotBot-plotTop);const evidencePoints=shownProgress.map(item=>`${chartX(item.date)},${chartY(item.value)}`).join(' ');const trajectoryStatus=goalReached?'Goal reached':goal.type==='Endurance'?(calculated?(calculated<=target?'On track':'More progress needed'):enduranceProjection?(enduranceProjection<=target?'On track':'More progress needed'):'Assessment needed'):!predictedAtDeadline?'More data needed':lowerIsBetter?predictedAtDeadline<=target?'On track':'More progress needed':predictedAtDeadline>=target?'On track':strengthForecast&&strengthForecast.predicted>calculated?'Progressing':'More progress needed';
 
   const askCoach = async () => {
     const context = !comparisonValue

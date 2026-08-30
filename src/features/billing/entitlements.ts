@@ -23,11 +23,14 @@ export type Entitlements = {
   endpoints: Record<string, EndpointUsage>;
 };
 
+/* Shown only when the entitlement lookup itself fails. The real numbers live
+   in ai_quota_limits and are what the server enforces; these mirror the free
+   row so a failed lookup shows something plausible rather than nothing. */
 export const FREE_FALLBACK: Entitlements = {
   tier: 'free',
   endpoints: {
-    'forge-coach': { dailyLimit: 5, monthlyLimit: 60, usedToday: 0, usedThisMonth: 0 },
-    'forge-plan': { dailyLimit: 1, monthlyLimit: 4, usedToday: 0, usedThisMonth: 0 },
+    'forge-coach': { dailyLimit: 3, monthlyLimit: 30, usedToday: 0, usedThisMonth: 0 },
+    'forge-plan': { dailyLimit: 1, monthlyLimit: 2, usedToday: 0, usedThisMonth: 0 },
   },
 };
 
@@ -70,7 +73,7 @@ export function remaining(usage?: EndpointUsage): number | null {
 }
 
 export const PRO_FEATURES = [
-  'Forge Coach answers up to 60 questions a day, not 5',
+  'Forge Coach answers up to 60 questions a day, not 3',
   'Rebuild your training block whenever your split or goals change',
   'Long-range roadmap kept current against every session you log',
   'Priority on new coaching features as they ship',

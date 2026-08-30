@@ -14,7 +14,6 @@ const isoOf = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 
    labelled a week early and Monday sessions landed in the prior week's bar. */
 const weekStartIso = (iso: string) => { const day = new Date(`${iso}T12:00:00`); day.setDate(day.getDate() - ((day.getDay() + 6) % 7)); return isoOf(day); };
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-const monthDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 const isStrengthSession = (record: WorkoutRecord) => (record.topSets || []).some(set => set.completed !== false) || (record.muscles || []).some(muscle => !['cardio', 'rest', 'none'].includes(muscle.trim().toLowerCase()));
 const hasCardioSession = (record: WorkoutRecord) => (record.cardioSessions || []).length > 0;
 
@@ -55,25 +54,22 @@ export function InsightsClassic() {
     const thisWeek = weekStartIso(todayIso);
     return Array.from({ length: 8 }, (_, index) => {
       const start = new Date(`${thisWeek}T12:00:00`); start.setDate(start.getDate() - (7 - index) * 7);
-      const startIso = start.toISOString().slice(0, 10);
+      /* Local, for the same reason weekStartIso is: these dates are compared
+         against record.date, which is a local calendar day. */
+      const startIso = isoOf(start);
       const end = new Date(start); end.setDate(end.getDate() + 6);
-      const endIso = end.toISOString().slice(0, 10);
+      const endIso = isoOf(end);
       const inWeek = records.filter(record => record.date >= startIso && record.date <= endIso);
       return { startIso, lift: inWeek.filter(isStrengthSession).length, cardio: inWeek.filter(hasCardioSession).length };
     });
   }, [records, todayIso]);
-  const weekPeak = Math.max(1, ...weeks.map(week => week.lift + week.cardio));
-  const completedWeeks = weeks.slice(0, 7);
-  const activeWeeks = completedWeeks.filter(week => week.lift + week.cardio > 0).length;
-  const perWeek = completedWeeks.reduce((sum, week) => sum + week.lift + week.cardio, 0) / Math.max(1, completedWeeks.length);
-
-  /* -------------------------------------------------- weight trend · month */
-  const weightPoints = useMemo(() => {
-    const monthStart = todayIso.slice(0, 8) + '01';
-    return records.filter(record => record.date >= monthStart && typeof record.bodyWeight === 'number' && record.bodyWeight! > 0)
-      .map(record => ({ date: record.date, value: record.bodyWeight! }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [records, todayIso]);
+  /* `weekPeak`, `activeWeeks`, `perWeek`, a month-of-body-weight series and a
+     month-history table were all computed here and never rendered — the JSX
+     for them does not exist. tsconfig has no noUnusedLocals, so it compiled
+     silently and ran on every records change for nobody. Removed rather than
+     wired up: the sections they fed were never designed, and computing data
+     for an absent chart is not a feature in progress, it is work the app does
+     for no one. */
 
   /* --------------------------------------- frequency (follows the range) */
   const frequency = useMemo(() => {
@@ -180,17 +176,6 @@ export function InsightsClassic() {
     return { latest, best, delta };
   }, [enduranceSeries, endMetric]);
 
-  /* ------------------------------------------------- PR history · month */
-  const monthHistory = useMemo(() => {
-    const monthStart = todayIso.slice(0, 8) + '01';
-    const rows: Array<{ lift: string; weight: number; reps: number; date: string }> = [];
-    records.filter(record => record.date >= monthStart).forEach(record => (record.topSets || []).forEach(set => {
-      if (set.completed === false || !set.lift || !set.weight) return;
-      rows.push({ lift: set.lift, weight: set.weight, reps: set.reps, date: record.date });
-    }));
-    return rows.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
-  }, [records, todayIso]);
-
   /* The exact chart renderer from the original app: quadratic-midpoint
      smoothing (straight when dense), vertical gradient area fill, 2px round
      stroke, 2.4px dots with a haloed endpoint, nice ticks, and a three-date
@@ -235,6 +220,19 @@ export function InsightsClassic() {
       <div className="ic-datebar"><span>{dateLabel(minX)}</span><span>{dateLabel(mid)}</span><span>{dateLabel(maxX)}</span></div>
     </>;
   };
+
+  /* EVERY OTHER ZERO-DATA SCREEN IN FORGE SAYS SOMETHING. History, Goals and
+     Plan all have a proper empty card with a way forward; Progress had none —
+     a new athlete got six zeros, an "not enough cardio to chart" line and two
+     negations, with no heading, no explanation and no route out. It read like
+     the page had failed rather than like there was nothing to show yet. */
+  if (!records.length) return <div className="insights-classic">
+    <section className="card ic-card ic-blank">
+      <header className="ic-head"><i /><h3>Nothing to measure yet</h3></header>
+      <p>Progress is built entirely from what you log — top sets, cardio, body weight. The first session starts the chart; a couple of weeks make the trends worth reading.</p>
+      <a className="button" href="#/workout">Log today's workout →</a>
+    </section>
+  </div>;
 
   return <div className="insights-classic">
     {lifts.length > 0 && <section className="card ic-card">
