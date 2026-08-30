@@ -1,3 +1,28 @@
+/* A CALENDAR DAY IS WHERE THE ATHLETE IS STANDING, NOT WHERE GREENWICH IS.
+
+   Most of the app already parses stored 'YYYY-MM-DD' dates as local noon,
+   which is right: bare `new Date('2026-08-30')` is parsed as UTC midnight, so
+   everyone west of Greenwich reads it as the 29th. The places that forgot
+   produced dates that shifted with the hour of day — today's session marked
+   "Missed" every evening after 5 pm Pacific while the day was still going, a
+   race countdown flickering between 11 and 12 weeks, and weekly mileage filed
+   under the wrong Monday in New Zealand.
+
+   Noon rather than midnight, so no DST transition can push the parse across a
+   day boundary in either direction. */
+export function parseLocalDay(iso:string){return new Date(`${String(iso).slice(0,10)}T12:00:00`)}
+
+/* Today as the athlete's own calendar reads it. `toISOString().slice(0,10)` is
+   the UTC day, which is never the right answer to "what day is it here". */
+export function localDayIso(value:Date=new Date()){
+  return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`;
+}
+
+/* Whole days from today to a stored date, both read in local time. */
+export function daysUntil(iso:string){
+  return Math.round((parseLocalDay(iso).getTime()-parseLocalDay(localDayIso()).getTime())/86400000);
+}
+
 export function decimalMinutesToClock(value:number){
   const seconds=Math.max(0,Math.round(value*60));
   const hours=Math.floor(seconds/3600),minutes=Math.floor((seconds%3600)/60),remainder=seconds%60;

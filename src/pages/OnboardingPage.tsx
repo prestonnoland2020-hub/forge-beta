@@ -76,29 +76,55 @@ export function OnboardingPage() {
   };
 
   const finish = async () => {
-    if (!data.acceptedSafety) return setError('Confirm the safety note to finish.');
+    /* The safety note is confirmed on step 2, which the `needsGoal` re-entry
+       deliberately skips — it opens straight on the goal step for an athlete
+       who already finished setup. Demanding the checkbox here asked them to
+       confirm something that was not on screen, and on the fresh device that
+       sends them here in the first place the stored value is `false`. The
+       result was an unfinishable screen: "Confirm the safety note to finish",
+       no checkbox anywhere, and Back reaching only steps that have none.
+       Someone who already accepted it is not asked twice. */
+    if (!isEditing && !needsGoal && !data.acceptedSafety) return setError('Confirm the safety note to finish.');
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
     if (!goals.length) return setError('Add one goal to finish. Forge builds the plan around it.');
+    /* profiles.current_weight is constrained to 40–1500 but the dial offers
+       values from 0 and zod only asked for "positive", so spinning the
+       optional weight too far down failed the finish button with a raw
+       check-constraint violation. */
+    const weight = Number(data.currentWeight);
+    const weightGiven = Boolean(String(data.currentWeight || '').trim()) && Number.isFinite(weight) && weight > 0;
+    if (weightGiven && (weight < 40 || weight > 1500)) {
+      return setError(`Enter a body weight between 40 and 1500 ${data.units === 'Metric' ? 'kg' : 'lb'}, or leave it blank.`);
+    }
     setSaving(true); setError('');
-    let username = (data.username || data.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '')).slice(0, 18);
-    if (username.length < 3) username = `athlete${user?.id.slice(0, 6) || 'fit'}`;
+    const requested = (data.username || data.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '')).slice(0, 18);
     const splitDays = setup?.splitDays?.length ? setup.splitDays : starterSplit(data.primaryFocus, data.trainingDays);
-    const completed = { ...data, username, splitDays, splitSource: 'Recommended' as const, completedAt: new Date().toISOString() };
     try {
-      await saveProfile({
-        username, displayName: data.displayName, birthDate: data.birthDate || null, heightCm: null,
-        startingWeight: null, currentWeight: Number(data.currentWeight) || null,
-        unitSystem: data.units === 'Metric' ? 'metric' : 'imperial', experienceLevel: 'intermediate',
-        primaryGoal: data.primaryFocus === 'Strength' ? 'strength' : data.primaryFocus === 'Endurance' ? 'endurance' : data.primaryFocus === 'Body composition' ? 'weight_change' : 'general_fitness',
-        equipment: [], preferredTrainingDays: Array.from({ length: data.trainingDays }, (_, index) => index),
-      });
+      /* THE SPLIT IS WRITTEN FIRST. saveProfile is what sets
+         onboarding_completed, and doing that before the split meant a failed
+         split write left an account flagged complete with no split: the
+         athlete retried, the gate now waved them through, and they entered
+         Forge on the generic default days instead of the focus-matched split
+         they had just been shown — no error, and no way to notice. The
+         irreversible flag goes last, so a failure here is only ever a retry. */
       if (!isEditing) {
         await saveTrainingSplit('Forge starter split', splitDays.map((day, index) => ({
           position: index + 1, name: day.name, muscleGroups: day.muscles || [], goalLifts: [],
           cardioTypes: day.type === 'Cardio' || day.type === 'Mixed' ? ['Forge'] : [],
         })));
       }
+      /* saveProfile resolves the username it actually reserved, which carries
+         a suffix when the derived one was already taken. */
+      const username = await saveProfile({
+        username: requested.length >= 3 ? requested : `athlete${(user?.id || '').replace(/[^a-z0-9]/g, '').slice(0, 6) || 'fit'}`,
+        displayName: data.displayName, birthDate: data.birthDate || null, heightCm: null,
+        startingWeight: null, currentWeight: weightGiven ? weight : null,
+        unitSystem: data.units === 'Metric' ? 'metric' : 'imperial', experienceLevel: 'intermediate',
+        primaryGoal: data.primaryFocus === 'Strength' ? 'strength' : data.primaryFocus === 'Endurance' ? 'endurance' : data.primaryFocus === 'Body composition' ? 'weight_change' : 'general_fitness',
+        equipment: [], preferredTrainingDays: Array.from({ length: data.trainingDays }, (_, index) => index),
+      });
+      const completed = { ...data, username, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString() };
       saveSetup(completed);
       updateProfile({ runningDays: Math.min(data.trainingDays, data.runningDays), injuryConstraint: data.injuryConstraint });
       const from = (location.state as { from?: string } | null)?.from;
@@ -158,7 +184,14 @@ export function OnboardingPage() {
                 <span>A lift you want to hit, or a race you want to run. The 8/6/4/2/1 wave, your weekly mileage and max week all exist to move it — without one, Forge has nothing to program toward.</span>
                 <button type="button" className="button" onClick={() => setGoalOpen(true)}>Set your first goal</button>
               </div>}
-          {goalOpen && <GoalBuilder onClose={() => setGoalOpen(false)} onSave={(goal: CreatedGoal) => { saveGoal(goal, null); setGoalOpen(false); setError(''); }} />}
+          {/* The split does not exist in the database yet — it is written by
+              the finish button — so hand the builder the days it is about to
+              create. Without this the first goal an athlete ever sets has an
+              empty "training connection" list. */}
+          {goalOpen && <GoalBuilder
+            splitDays={setup?.splitDays?.length ? setup.splitDays : starterSplit(data.primaryFocus, data.trainingDays)}
+            onClose={() => setGoalOpen(false)}
+            onSave={(goal: CreatedGoal) => { saveGoal(goal, null); setGoalOpen(false); setError(''); }} />}
         </div>}
         {error && <div className="setup-error">{error}</div>}
         <footer className="setup-actions">{step ? <button className="button ghost" disabled={saving} onClick={() => { setError(''); setStep(current => Math.max(0, current - 1)); }}>← Back</button> : <span />}<button className="button" disabled={saving} onClick={step === LAST_STEP ? finish : next}>{step === LAST_STEP ? saving ? 'Saving…' : isEditing ? 'Save profile' : 'Enter Forge' : 'Continue'} →</button></footer>

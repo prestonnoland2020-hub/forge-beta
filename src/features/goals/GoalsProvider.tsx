@@ -19,13 +19,23 @@ export function GoalsProvider({children}:{children:ReactNode}){
   const {user}=useAuth();
   const [goals,setGoals]=useState<CreatedGoal[]>(()=>{try{const saved=JSON.parse(localStorage.getItem('forge-goals')||'null') as CreatedGoal[]|null;return saved?.filter(goal=>['Strength','Endurance','Body Composition'].includes(goal.type))||[]}catch{return[]}});
   useEffect(()=>localStorage.setItem('forge-goals',JSON.stringify(goals)),[goals]);
-  const [hydrated,setHydrated]=useState(isDemoMode);
+  /* A goal can arrive from either of two places, and BOTH have to answer
+     before emptiness means anything. The goals TABLE holds lift and race
+     goals; body-composition goals live in athlete_settings, because the
+     table's lift/race enum has no row for them. Flipping `hydrated` when only
+     the table replied is what threw an athlete whose only goal is a body-
+     weight target back into onboarding on every fresh device: the table is
+     legitimately empty for them, the gate saw an empty list it believed was
+     final, and the settings copy arrived a moment too late to matter. */
+  const [goalsAnswered,setGoalsAnswered]=useState(isDemoMode);
+  const [settingsAnswered,setSettingsAnswered]=useState(isDemoMode);
+  const hydrated=goalsAnswered&&settingsAnswered;
   /* Signed out, or in the preview build, there is nothing to wait for. */
-  useEffect(()=>{if(isDemoMode||!user)setHydrated(true)},[user]);
+  useEffect(()=>{if(isDemoMode||!user){setGoalsAnswered(true);setSettingsAnswered(true)}},[user]);
   useEffect(()=>{if(isDemoMode||!user)return;let active=true;void supabase.from('goals').select('*').eq('owner_id',user.id).order('created_at').then(({data,error})=>{
     if(!active)return;
     /* Answered — even an error or an empty list settles the question. */
-    setHydrated(true);
+    setGoalsAnswered(true);
     if(error||!data?.length)return;
     const imported=data.map(row=>{const strength=row.type==='lift';const value=Number(row.target_value);const connection=normalizeMuscleGroups([row.muscle_group]).join(', ')||'No fixed day';return{type:strength?'Strength':'Endurance',title:strength?`${value} lb ${row.name}`:`${row.name} goal`,target:strength?`${value} lb`:decimalMinutesToClock(value),date:row.target_date||'',connection,exercise:row.name,metric:strength?'Real 1RM':'Finish time',unit:strength?'lb':'mm:ss',trackingSource:'Workout history',minWeeklyMileage:row.min_weekly_mileage==null?undefined:String(row.min_weekly_mileage),peakWeeklyMileage:row.peak_weekly_mileage==null?undefined:String(row.peak_weekly_mileage)} as CreatedGoal});
     setGoals(local=>{const remoteKeys=new Set(imported.map(goalKey));return[...imported,...local.filter(goal=>!remoteKeys.has(goalKey(goal)))]});
@@ -34,11 +44,12 @@ export function GoalsProvider({children}:{children:ReactNode}){
      copy and the goals table never held them. */
   useEffect(()=>{if(isDemoMode||!user)return;let active=true;void loadAthleteSettings().then(settings=>{
     if(!active)return;
+    setSettingsAnswered(true);
     const stored=Array.isArray(settings?.goals)?settings?.goals as CreatedGoal[]:[];
     const bodyGoals=stored.filter(item=>item?.type==='Body Composition'&&item.title);
     if(!bodyGoals.length)return;
     setGoals(local=>{const keys=new Set(local.map(goalKey));return[...local,...bodyGoals.filter(item=>!keys.has(goalKey(item)))]});
-  });return()=>{active=false}},[user]);
+  }).catch(()=>{if(active)setSettingsAnswered(true)});return()=>{active=false}},[user]);
   /* A wiped device can race auth: local storage empty, first fetch missed.
      One delayed retry restores the server copy without user action. */
   useEffect(()=>{if(isDemoMode||!user||goals.length)return;const timer=window.setTimeout(()=>{void supabase.from('goals').select('*').eq('owner_id',user.id).order('created_at').then(({data,error})=>{

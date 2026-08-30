@@ -198,8 +198,15 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const cardio=cardioCandidate?{id:`cardio-${cardioCandidate.id}`,title:cardioCandidate.title,summary:formatCardio(cardioCandidate),rationale:cardioCandidate.rationale,session:cardioCandidate,selected:true}:undefined;
   const lastCompletedDate=input.records.map(record=>record.date).sort().at(-1);
   const selectedCount=topSets.filter(set=>set.selected).length;
+  /* DAY ONE HAS NOT COMPLETED ANYTHING. This sentence used to assert that
+     "the last completed recommendation advanced the split to position 1" on
+     an account with zero workouts — the position on day one comes from a
+     default, not from a completion. The same string is handed to the coach as
+     verified context, so a fabricated completion was being quoted back to the
+     athlete as fact by two different surfaces. */
+  const started=Boolean(lastCompletedDate);
   const explanation=input.splitDay.type==='rest'
     ?'The completed-workout cursor reached a rest day. No hard work is required; any displayed strength option is optional and does not replace recovery.'
-    :`${input.splitDay.name} is next because the last completed recommendation advanced the split to position ${input.splitDay.position}. ${selectedCount?`${selectedCount} history-grounded top-set ${selectedCount===1?'option is':'options are'} ready.`:''}${cardio?' Cardio comes from the same goals, pace history, and recovery inputs.':''}`;
+    :`${input.splitDay.name} is ${started?`next because the last completed recommendation advanced the split to position ${input.splitDay.position}`:`where your split starts — position ${input.splitDay.position}, with nothing completed yet`}. ${selectedCount?`${selectedCount} history-grounded top-set ${selectedCount===1?'option is':'options are'} ready.`:started?'':'Your first logged sets become the baseline everything after this is measured against.'}${cardio?' Cardio comes from the same goals, pace history, and recovery inputs.':''}`;
   return{id:undefined,date:input.date,status:'active',algorithmVersion:DAILY_RECOMMENDATION_VERSION,inputFingerprint:input.inputFingerprint,splitDay:input.splitDay,topSets,cardio,headline:input.splitDay.type==='rest'?'Recovery is next':`${input.splitDay.name} is next`,explanation,evidence:{lastCompletedDate,activeDays7:intelligence.activeDays7,historyCount:input.records.length,goalNames:input.goals.map(goal=>goal.title)}};
 }

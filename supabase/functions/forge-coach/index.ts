@@ -1,9 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { consumeQuota, corsFor, errorResponse, HttpError, refundQuota, requireCaller } from '../_shared/guard.ts';
 
 const outputText = (response: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }) =>
   response.output?.flatMap(item => item.content || []).find(item => item.type === 'output_text')?.text || '';
@@ -53,18 +48,21 @@ RULES
 - If the description is not a cardio workout, return one row with cardioType "Run", distance 0, timeMinutes 0, and a reflection saying you could not read a workout from it.`;
 
 Deno.serve(async request => {
+  const corsHeaders = corsFor(request);
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  let caller: Awaited<ReturnType<typeof requireCaller>> | null = null;
+  let spent = false;
   try {
-    const authorization = request.headers.get('Authorization');
-    if (!authorization) throw new Error('Authentication required.');
-    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authorization } } });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
-    if (userError || !userData.user) throw new Error('Authentication required.');
+    caller = await requireCaller(request);
     const body = await request.json();
     const question = String(body.question || '').trim().slice(0, 2000);
-    if (!question) throw new Error('Ask Forge a question first.');
+    if (!question) throw new HttpError(400, 'Ask Forge a question first.');
+    /* Metered BEFORE the provider call, and only after the request is known to
+       be well-formed -- a blank question must not cost the athlete a use. */
+    await consumeQuota(caller, 'forge-coach');
+    spent = true;
     const context = JSON.stringify(body.context || {}).slice(0, 30000);
-    const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userData.user.id));
+    const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(caller.id));
     const safetyIdentifier = Array.from(new Uint8Array(identifierBytes)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32);
     const workoutScope = String(body.scope || '') === 'workout';
     const cardioScope = String(body.scope || '') === 'cardio-log';
@@ -189,6 +187,11 @@ Return one editable cardio/circuit using only exact movement names and units in 
     }
     return Response.json({ answer }, { headers: corsHeaders });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Coach request failed.' }, { status: 400, headers: corsHeaders });
+    /* The athlete asked, the meter ticked, and nothing came back. Give the use
+       back -- a provider outage is not something they should pay for. A 429
+       never reaches here: consumeQuota rolls its own count back before it
+       throws, so `spent` is still false. */
+    if (spent && caller) await refundQuota(caller, 'forge-coach');
+    return errorResponse(error, corsHeaders);
   }
 });

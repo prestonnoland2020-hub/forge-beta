@@ -2,13 +2,18 @@ import type { CreatedGoal } from '../components/GoalBuilder';
 import type { PlannedCardio } from '../components/CardioPlanBuilder';
 import type { AdaptiveProfile,RunResult } from '../features/training/AdaptiveTrainingProvider';
 import { LONG_RUN_MAX_SHARE } from '../features/training/aiPlanService';
+import { daysUntil } from './time';
 
 export type RunEvent='Mile'|'5K'|'10K'|'Half Marathon'|'Marathon'|'HYROX'|'Custom Run';
 export type EventProfile={event:RunEvent;distanceMeters:number;durationWeeks:number;qualityFocus:string;longRunPeak:number;surface:string;demands:string[]};
 export type GeneratedSession={id:string;goal:string;event:RunEvent;role:'Quality'|'Easy'|'Long'|'Race specific'|'Test';title:string;phase:string;week:number;plan:PlannedCardio;rationale:string;placement:string;stress:'Low'|'Moderate'|'High';progression:string;scaleNotes:string[];status:'Scheduled'|'Reduced'|'Repeat'|'Deferred'};
 export type AdaptiveInput={profile:AdaptiveProfile;history:RunResult[];week?:number;lowerBodyDays?:number[]};
 const standardMeters:Record<Exclude<RunEvent,'HYROX'|'Custom Run'>,number>={Mile:1609.344,'5K':5000,'10K':10000,'Half Marathon':21097.5,Marathon:42195};
-const fallbackProfile:AdaptiveProfile={weeklyMileage:12,longestRunMiles:4,runningDays:3,experience:'Recreational',readiness:82,sleepHours:7.5,soreness:2,injuryConstraint:false,strengthFatigue:'Moderate',environment:'Road',heatAdjusted:true,watchConnected:false,easyHrMin:135,easyHrMax:150,thresholdHrMin:165,thresholdHrMax:178};
+/* Same rule as AdaptiveTrainingProvider: mileage and longest run are things
+   observed, not things assumed. An athlete with no logged running gets a
+   baseline of zero, and the volume scale below floors at 0.6 rather than
+   dividing by it. */
+const fallbackProfile:AdaptiveProfile={weeklyMileage:0,longestRunMiles:0,runningDays:3,experience:'Recreational',readiness:82,sleepHours:7.5,soreness:2,injuryConstraint:false,strengthFatigue:'Moderate',environment:'Road',heatAdjusted:true,watchConnected:false,easyHrMin:135,easyHrMax:150,thresholdHrMin:165,thresholdHrMax:178};
 const parseClock=(value?:string,hoursFirst=false)=>{if(!value)return 0;const clock=value.match(/\d+(?::\d+){0,2}/)?.[0]||'';const parts=clock.split(':').map(Number);if(parts.some(Number.isNaN))return 0;if(parts.length===3)return parts[0]*3600+parts[1]*60+parts[2];if(parts.length===2)return hoursFirst?parts[0]*3600+parts[1]*60:parts[0]*60+parts[1];return parts[0]||0};
 const formatClock=(seconds:number,decimals=false)=>{if(seconds>=3600){const h=Math.floor(seconds/3600),m=Math.floor(seconds%3600/60),s=Math.round(seconds%60);return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}const m=Math.floor(seconds/60);const s=seconds-m*60;return `${m}:${s.toFixed(decimals?1:0).padStart(decimals?4:2,'0')}`};
 const milesFrom=(value:number,unit='miles')=>unit.startsWith('kilo')?value*.621371:unit.startsWith('meter')?value/1609.344:value;
@@ -22,7 +27,9 @@ const pacePerMile=(seconds:number,meters:number)=>formatClock(seconds*1609.344/m
 const plan=(id:number,activity:string,structure:PlannedCardio['structure'],extra:Partial<PlannedCardio>):PlannedCardio=>({id,activity,structure,targetSource:'Goal generated',...extra});
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
 function adaptiveState(input?:Partial<AdaptiveInput>){const history=input?.history||[];const ordered=history.slice().sort((a,b)=>b.date.localeCompare(a.date));const anchor=ordered[0]?new Date(ordered[0].date).getTime():Date.now();const rolling=ordered.filter(run=>anchor-new Date(run.date).getTime()<=28*86400000);const observedWeekly=rolling.reduce((sum,run)=>sum+run.distanceMiles,0)/4;const observedLongest=rolling.reduce((max,run)=>Math.max(max,run.distanceMiles),0);const profile={...fallbackProfile,...input?.profile,...(rolling.length>=3?{weeklyMileage:Number(observedWeekly.toFixed(1)),longestRunMiles:Number(observedLongest.toFixed(1))}:{})};const recent=ordered.slice(0,4);const failed=recent.some(run=>!run.completed||(run.plannedReps&&Number(run.completedReps)<run.plannedReps*.8));const poorRecovery=(profile.watchConnected&&(profile.readiness<60||profile.sleepHours<6||profile.soreness>=4))||profile.injuryConstraint;const fatigue=profile.strengthFatigue==='High';const experienceScale={New:.72,Recreational:.88,Experienced:1,Competitive:1.08}[profile.experience];const capacityScale=clamp(profile.weeklyMileage/20,.6,1.15);const reduction=poorRecovery?.65:failed?.82:fatigue?.88:1;return{profile,history,failed,poorRecovery,fatigue,volumeScale:experienceScale*capacityScale*reduction,status:poorRecovery?'Reduced':failed?'Repeat':'Scheduled' as GeneratedSession['status']}};
-function daysTo(date:string){return Math.ceil((new Date(date).getTime()-Date.now())/86400000)}
+/* Local days between today and the race, so the plan week does not advance at
+   whatever hour UTC happens to roll over. */
+function daysTo(date:string){return daysUntil(date)}
 export function getCurrentPlanWeek(goal:CreatedGoal){const profile=getEventProfile(goal);if(!profile)return 1;return clamp(profile.durationWeeks-Math.ceil(Math.max(0,daysTo(goal.date))/7)+1,1,profile.durationWeeks)}
 function phaseFor(goal:CreatedGoal,week:number,duration:number){const remaining=daysTo(goal.date);if(remaining<=14)return'Taper & race';const ratio=week/duration;return ratio<.3?'Foundation':ratio<.7?'Build':ratio<.9?'Specific':'Taper & test'}
 function terrainPace(profile:AdaptiveProfile){const heat=profile.heatAdjusted?'heat-adjusted when conditions require':'';const terrain=profile.environment==='Road'?'':`${profile.environment.toLowerCase()} effort-adjusted`;return[terrain,heat].filter(Boolean).join(' · ')}

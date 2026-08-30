@@ -1,28 +1,13 @@
 import Stripe from 'npm:stripe@18';
-import { createClient } from 'npm:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { appOrigin, corsFor, errorResponse, HttpError, requireCaller } from '../_shared/guard.ts';
 
 Deno.serve(async (request) => {
+  const corsHeaders = corsFor(request);
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const authorization = request.headers.get('Authorization');
-    if (!authorization) throw new Error('Authentication required.');
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const caller = await requireCaller(request);
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!);
-
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authorization } },
-    });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
-    if (userError || !userData.user) throw new Error('Authentication required.');
 
     const { plan } = await request.json();
     const priceByPlan: Record<string, string | undefined> = {
@@ -30,45 +15,54 @@ Deno.serve(async (request) => {
       pro_annual: Deno.env.get('STRIPE_PRO_ANNUAL_PRICE_ID'),
     };
     const priceId = priceByPlan[plan];
-    if (!priceId) throw new Error('Unsupported billing plan.');
+    if (!priceId) throw new HttpError(400, 'Unsupported billing plan.');
 
-    const admin = createClient(supabaseUrl, serviceRoleKey);
-    const { data: existing } = await admin
+    /* maybeSingle, not single: an athlete whose subscriptions row is missing
+       for any reason should get a checkout session, not a thrown error on the
+       one screen where they are trying to pay. */
+    const { data: existing } = await caller.admin
       .from('subscriptions')
       .select('stripe_customer_id')
-      .eq('owner_id', userData.user.id)
-      .single();
+      .eq('owner_id', caller.id)
+      .maybeSingle();
 
     let customerId = existing?.stripe_customer_id as string | null;
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: userData.user.email,
-        metadata: { owner_id: userData.user.id },
+        email: caller.email ?? undefined,
+        metadata: { owner_id: caller.id },
       });
       customerId = customer.id;
-      await admin.from('subscriptions').update({
-        stripe_customer_id: customerId,
-      }).eq('owner_id', userData.user.id);
+      await caller.admin.from('subscriptions')
+        .upsert({ owner_id: caller.id, stripe_customer_id: customerId }, { onConflict: 'owner_id' });
     }
 
-    const origin = request.headers.get('origin') ?? Deno.env.get('PUBLIC_APP_URL')!;
+    /* The return URL is the app's own origin, never the request's Origin
+       header. Origin is freely settable outside a browser: reflecting it let
+       anyone mint a genuine checkout.stripe.com session that returns the payer
+       to a site of their choosing -- a handoff that starts on Stripe's real
+       domain and ends wherever the attacker wants. It is also a plain open
+       redirect on the billing surface.
+
+       Hash routes, because that is how this app is addressed. `/settings/
+       billing` was never a route here; a completed payment landed on a
+       redirect to Today with no confirmation that anything had happened. */
+    const origin = appOrigin(request);
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/settings/billing?checkout=success`,
-      cancel_url: `${origin}/settings/billing?checkout=canceled`,
+      success_url: `${origin}/#/profile?checkout=success`,
+      cancel_url: `${origin}/#/profile?checkout=canceled`,
       allow_promotion_codes: true,
+      client_reference_id: caller.id,
       subscription_data: {
-        metadata: { owner_id: userData.user.id, plan },
+        metadata: { owner_id: caller.id, plan },
       },
     });
 
     return Response.json({ url: session.url }, { headers: corsHeaders });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : 'Checkout failed.' },
-      { status: 400, headers: corsHeaders },
-    );
+    return errorResponse(error, corsHeaders);
   }
 });

@@ -180,7 +180,11 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     }
     if (!legacyPrediction) {
       setAiEstimate(null);
-      setAiEstimateError('Forge needs at least three recent two-week running periods for the legacy race assessment.');
+      /* Say the rule the code actually applies. predictRaceFromLegacyMethod
+         returns null when no run in the last 180 days falls within 80–125% of
+         the goal distance — nothing to do with "three two-week periods", which
+         sent athletes hunting for a requirement that does not exist. */
+      setAiEstimateError('Forge needs a run near this distance in the last six months before it will project a finish time.');
       return;
     }
     const assessmentFingerprint=JSON.stringify([Math.round(legacyPrediction.seconds),legacyPrediction.supportingRuns,legacyPrediction.recentRunMiles,legacyPrediction.recentRunDays,aiEvidence]);

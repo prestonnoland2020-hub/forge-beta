@@ -1,9 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { consumeQuota, corsFor, errorResponse, HttpError, refundQuota, requireCaller } from '../_shared/guard.ts';
 
 const outputText = (response: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }) =>
   response.output?.flatMap(item => item.content || []).find(item => item.type === 'output_text')?.text || '';
@@ -106,20 +101,34 @@ GENERAL
 - Every number must be consistent with the athlete's supplied data. Never invent exercises or split days not supplied.`;
 
 Deno.serve(async request => {
+  const corsHeaders = corsFor(request);
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  let caller: Awaited<ReturnType<typeof requireCaller>> | null = null;
+  let spent = false;
   try {
-    const authorization = request.headers.get('Authorization');
-    if (!authorization) throw new Error('Authentication required.');
-    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authorization } } });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
-    if (userError || !userData.user) throw new Error('Authentication required.');
+    caller = await requireCaller(request);
     const body = await request.json();
-    /* Cooldown: a block was just generated — refuse rapid regeneration so a
-       stuck client or refresh-mashing cannot burn provider credits. */
-    const { data: existingPlan } = await userClient.from('training_plans').select('generated_at').maybeSingle();
+
+    /* COOLDOWN, REBUILT. The old one read `training_plans` through the caller's
+       own client, compared against a `generated_at` the client itself wrote,
+       and threw the PostgREST error away -- against a table no migration
+       created, so `existingPlan` was always undefined and the cooldown never
+       once fired. Now: the service role reads it, `generated_at` is stamped by
+       a database trigger (migration 0021), and an error is a refusal rather
+       than a silent pass. A whole program generation is the most expensive
+       call Forge makes; it does not get the benefit of the doubt. */
+    const { data: existingPlan, error: planError } = await caller.admin
+      .from('training_plans').select('generated_at').eq('owner_id', caller.id).maybeSingle();
+    if (planError) throw new HttpError(503, 'Forge could not check your program status. Try again in a moment.');
     if (existingPlan?.generated_at && Date.now() - new Date(existingPlan.generated_at).getTime() < 120000) {
-      return Response.json({ error: 'Your program was just generated. Wait a couple of minutes before refreshing again.' }, { status: 429, headers: corsHeaders });
+      throw new HttpError(429, 'Your program was just generated. Wait a couple of minutes before rebuilding.');
     }
+
+    /* Then the standing quota: the cooldown stops a stuck client, this stops a
+       patient one. */
+    await consumeQuota(caller, 'forge-plan');
+    spent = true;
+
     const context = JSON.stringify(body.context || {}).slice(0, 30000);
     /* The athlete's own words for this rebuild, quoted to the builder rather
        than buried in 30 kB of JSON. Bounded and flattened: it is free text
@@ -127,7 +136,7 @@ Deno.serve(async request => {
        the wave, the goal gate, the mileage clamp, here and again in the
        client -- still holds whatever it says. */
     const adjustments = String((body.context as Record<string, unknown> | undefined)?.adjustments || '').replace(/\s+/g, ' ').trim().slice(0, 400);
-    const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userData.user.id));
+    const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(caller.id));
     const safetyIdentifier = Array.from(new Uint8Array(identifierBytes)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32);
     const aiResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -310,6 +319,7 @@ Deno.serve(async request => {
     });
     return Response.json({ plan }, { headers: corsHeaders });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : 'Plan generation failed.' }, { status: 400, headers: corsHeaders });
+    if (spent && caller) await refundQuota(caller, 'forge-plan');
+    return errorResponse(error, corsHeaders);
   }
 });

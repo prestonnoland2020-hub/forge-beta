@@ -7,7 +7,26 @@ export type RunningExperience='New'|'Recreational'|'Experienced'|'Competitive';
 export type Environment='Road'|'Track'|'Trail'|'Treadmill'|'Mixed';
 export type RunResult={id:string;date:string;kind:'Easy'|'Long'|'Intervals'|'Race';distanceMiles:number;durationMinutes:number;completed:boolean;plannedReps?:number;completedReps?:number;averageHr?:number;elevationFeet?:number;temperatureF?:number};
 export type AdaptiveProfile={weeklyMileage:number;longestRunMiles:number;runningDays:number;experience:RunningExperience;readiness:number;sleepHours:number;soreness:number;injuryConstraint:boolean;strengthFatigue:'Low'|'Moderate'|'High';environment:Environment;heatAdjusted:boolean;watchConnected:boolean;easyHrMin:number;easyHrMax:number;thresholdHrMin:number;thresholdHrMax:number};
-const preferences={weeklyMileage:12,longestRunMiles:4,runningDays:3,experience:'Recreational' as RunningExperience,soreness:2,injuryConstraint:false,environment:'Road' as Environment,heatAdjusted:true,easyHrMin:135,easyHrMax:150,thresholdHrMin:165,thresholdHrMax:178};
+/* ZERO IS THE HONEST ANSWER FOR SOMEONE WHO HAS NOT RUN.
+
+   weeklyMileage and longestRunMiles are OBSERVATIONS: they are replaced by
+   what the athlete logged the moment there is anything to replace them with.
+   Seeding them at 12 and 4 meant an account with no workouts at all was
+   described everywhere as a runner covering 12 miles a week off a 4-mile long
+   run. Profile stated it as fact under a heading promising nothing is
+   estimated; the 12-week roadmap ramped a mileage progression from it; the
+   split editor pre-filled 10–14 mile bounds and persisted them on sight; and
+   cardioEngine prescribed paced sessions to someone who had never logged a
+   step. One line, four screens lying in unison.
+
+   With zeros, longRangePlanEngine's `hasRunBaseline` is correctly false and
+   the "Forge needs a real running baseline before progressing volume" copy it
+   already carries finally renders. aiPlanService's mileage clamp already reads
+   0 as "no bound", so nothing downstream collapses to zero miles.
+
+   runningDays stays: it is a stated preference set during onboarding — what
+   the athlete intends to do — not a claim about what they have done. */
+const preferences={weeklyMileage:0,longestRunMiles:0,runningDays:3,experience:'Recreational' as RunningExperience,soreness:2,injuryConstraint:false,environment:'Road' as Environment,heatAdjusted:true,easyHrMin:135,easyHrMax:150,thresholdHrMin:165,thresholdHrMax:178};
 const localDateIso=(value=new Date())=>`${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`;
 const today=localDateIso();
 const unavailableHealth=():DailyHealthSnapshot=>({date:today,provider:'Unavailable',sleepMinutes:0,acuteLoad:0,sourceUpdatedAt:new Date().toISOString()});

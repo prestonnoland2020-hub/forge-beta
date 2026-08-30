@@ -10,8 +10,16 @@ const goalTypes = [
   { id:'body', label:'Body Composition', copy:'Track a weight or measurement outcome responsibly.' },
 ];
 
-export function GoalBuilder({ onClose, onSave, initialGoal }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal }) {
+/* `splitDays` is an override for the one caller that needs it: onboarding.
+   ProfileSetupProvider keeps `setup` null until setup is COMPLETE, and the
+   starter split is not written until the finish button runs — so the very
+   first goal an athlete ever creates had an empty "Best training connection"
+   dropdown offering nothing but "Cardio only" and "No fixed day", and saved
+   with no muscle group attached. Onboarding passes the split it is about to
+   create. */
+export function GoalBuilder({ onClose, onSave, initialGoal, splitDays }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal; splitDays?:{name:string;type:string}[] }) {
   const {setup}=useProfileSetup();
+  const connectionDays=(splitDays?.length?splitDays:setup?.splitDays||[]).filter(day=>day.type!=='Rest');
   const initialType=goalTypes.find(item=>item.label===initialGoal?.type)?.id ?? 'strength';
   const [step,setStep]=useState(initialGoal?2:1); const [type,setType]=useState(initialType);
   /* Goal exercises come ONLY from the athlete's exercise library — free-typed
@@ -30,7 +38,7 @@ export function GoalBuilder({ onClose, onSave, initialGoal }: { onClose:()=>void
 const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':(initialGoal?.exercise ?? '')); const [metric,setMetric]=useState(initialGoal?.type==='Strength'?'Real 1RM':initialGoal?.type==='Body Composition'?'Body weight':initialGoal?.metric ?? 'Real 1RM');
   const [current,setCurrent]=useState(initialGoal?.current ?? ''); const [target,setTarget]=useState(initialGoal?.target?.split(' ')[0] ?? ''); const [unit,setUnit]=useState(initialGoal?.unit ?? initialGoal?.target?.split(' ').slice(1).join(' ') ?? 'lb');
   const [targetDate,setTargetDate]=useState(initialGoal?.date ?? (()=>{const date=new Date();date.setDate(date.getDate()+84);return date.toISOString().slice(0,10)})());
-  const [connection,setConnection]=useState(initialGoal?.connection ?? setup?.splitDays.find(day=>day.type!=='Rest')?.name ?? 'No fixed day');
+  const [connection,setConnection]=useState(initialGoal?.connection ?? connectionDays[0]?.name ?? 'No fixed day');
   const [muscles,setMuscles]=useState<string[]>(['Quads','Glutes','Hamstrings']);
   const standardEnduranceEvents=['1 Mile Run','5K Run','10K Run','Half Marathon','Marathon','HYROX','Cycling','Rowing','Swimming'];
   const [customEnduranceEvent,setCustomEnduranceEvent]=useState(initialGoal?.type==='Endurance'&&!standardEnduranceEvents.includes(initialGoal.exercise ?? '')?initialGoal.exercise ?? '':'');
@@ -158,7 +166,7 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
 <small>{metric} · Target {targetDate}</small>
 </div>
 <label>Best training connection<select value={connection} onChange={e=>setConnection(e.target.value)}>
-{setup?.splitDays.filter(day=>day.type!=='Rest').map(day=><option key={day.name}>{day.name}</option>)}
+{connectionDays.map(day=><option key={day.name}>{day.name}</option>)}
 <option>Cardio only</option>
 <option>No fixed day</option>
 </select>

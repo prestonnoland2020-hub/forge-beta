@@ -8,6 +8,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { isDemoMode } from '../lib/env';
+import { localDayIso } from '../lib/time';
 import { canonicalLiftKey, splitDayKey } from '../lib/liftAliases';
 import { cardioMiles, summarizeCardioDraft, formatCardioMinutes } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -463,8 +464,16 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
          gets its tick and shows what was done; a past day with nothing is
          marked missed rather than pretending it is still coming. Future days
          stay prescriptive. */
-      const iso = session.date.toISOString().slice(0, 10);
-      const todayIso = new Date().toISOString().slice(0, 10);
+      /* BOTH SIDES OF THIS COMPARISON MUST BE THE SAME CALENDAR. session.date
+         is built at local noon, so toISOString() gave the LOCAL day, while
+         todayIso gave the UTC day — and after about 5 pm Pacific the UTC clock
+         has already rolled over, so `iso < todayIso` was true for today and
+         the athlete watched the session they were about to do get marked
+         "Missed" while the evening was still in front of them. East of
+         UTC+12 it failed the other way and completed days never got their
+         tick. */
+      const iso = localDayIso(session.date);
+      const todayIso = localDayIso();
       const logged = records.find(record => record.date === iso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0 || record.muscles.some(muscle => muscle !== 'Cardio')));
       const missed = !logged && iso < todayIso && session.stress !== 'Rest';
       const doneDetail = logged ? [
