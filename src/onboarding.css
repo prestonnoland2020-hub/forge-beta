@@ -13,3 +13,8 @@
 .setup-goal-row small{color:var(--muted);font-weight:600}
 .setup-goal-row b{color:var(--accent);font-size:18px;flex:none}
 .setup-goal-list .button{justify-self:start}
+
+/* Start-fresh muscle picker on the log screen. */
+.free-muscle-picker{display:grid;gap:12px;padding:16px 0 0}
+.free-muscle-picker small{color:var(--muted);line-height:1.45;display:block;margin-top:4px}
+.free-muscle-hint{color:var(--muted);font-size:12px}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -74,27 +74,39 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const { recovery } = useAdaptiveTraining();
   const { setup } = useProfileSetup();
   const { loading: historyLoading, syncing, syncError, retrySync, records: stravaRecords, addRecord: stravaAddRecord } = useWorkoutHistory();
-  /* Strava auto-sync: when connected, new activities flow into the log on
-     app open without a tap — throttled to every 6 hours, always silent. It
-     waits for history to load: importing against an empty record set would
-     defeat dedupe and double-log synced activities. */
-  useEffect(() => {
+  /* STRAVA SYNC RUNS WHEN THE ATHLETE LOOKS. A six-hour throttle meant a run
+     recorded on the watch could sit unseen for most of a day: post it, open
+     Forge, and it is not there — which reads as a broken integration, not a
+     schedule. The athlete opening the app IS the signal that they want to see
+     it, so the sync runs on open and again whenever they come back to the tab.
+     A two-minute floor is all the throttling needed: it stops a burst of
+     navigation from hammering Strava's rate limit while keeping "post a run,
+     open Forge, it's there" true.
+
+     It waits for history to load — importing against an empty record set
+     would defeat the dedupe and double-log everything. */
+  const SYNC_FLOOR_MS = 2 * 60 * 1000;
+  const syncStravaNow = useCallback(async () => {
     if (isDemoMode || historyLoading) return;
     const throttleKey = 'forge-strava-auto-sync';
-    const last = Number(localStorage.getItem(throttleKey) || 0);
-    if (Date.now() - last < 6 * 3600000) return;
-    let active = true;
-    void (async () => {
-      try {
-        const status = await getActivityConnection();
-        if (!active || !status.connected) return;
-        localStorage.setItem(throttleKey, String(Date.now()));
-        await syncStravaActivities();
-        if (active) await importStravaActivities(stravaRecords, stravaAddRecord);
-      } catch { /* silent — manual sync remains in Profile → Connections */ }
-    })();
-    return () => { active = false; };
-  }, [historyLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (Date.now() - Number(localStorage.getItem(throttleKey) || 0) < SYNC_FLOOR_MS) return;
+    try {
+      const status = await getActivityConnection();
+      if (!status.connected) return;
+      localStorage.setItem(throttleKey, String(Date.now()));
+      await syncStravaActivities();
+      await importStravaActivities(stravaRecords, stravaAddRecord);
+    } catch { /* silent — manual sync remains in Profile → Connections */ }
+  }, [historyLoading, stravaRecords, stravaAddRecord]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void syncStravaNow(); }, [historyLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    /* Coming back from Strava is the most likely moment a new activity
+       exists, and on a phone that is a visibility change, not a page load. */
+    const onReturn = () => { if (document.visibilityState === 'visible') void syncStravaNow(); };
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+    return () => { document.removeEventListener('visibilitychange', onReturn); window.removeEventListener('focus', onReturn); };
+  }, [syncStravaNow]);
   const { recommendation } = useDailyRecommendation();
   const { notes } = useAthleteNotes();
   const [coachOpen, setCoachOpen] = useState(false);
