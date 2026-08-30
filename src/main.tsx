@@ -64,6 +64,8 @@ import './frontend-polish.css';
 import './profile-customization.css';
 import './mobile-calm.css';
 import './billing.css';
+import './legal.css';
+import './native.css';
 /* Loaded last: the authoritative token + primitive layer every earlier
    stylesheet now reads from. See the header comment in forge-system.css. */
 import './forge-system.css';
@@ -98,7 +100,7 @@ if ((!launch || launch === 'navigate')
   && !launchQuery
   && callbackQuery.get('strava') !== 'callback'
   && launchPath && launchPath !== '/'
-  && !/^\/(login|auth\/callback|workout)/.test(launchPath)) {
+  && !/^\/(login|auth\/callback|workout|legal)/.test(launchPath)) {
   window.location.hash = '/';
 }
 

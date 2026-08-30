@@ -1,0 +1,56 @@
+/* WHAT MAKES A WEBVIEW STOP FEELING LIKE A WEBVIEW.
+
+   None of this changes the app in a browser; it removes the handful of
+   browser behaviours that, inside a native shell, read as bugs — a long press
+   that offers to copy a button's label, a rubber-band scroll that reveals grey
+   underneath the header, a blue flash on every tap. */
+
+html {
+  /* Stops the whole document rubber-banding past its own background. */
+  overscroll-behavior-y: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* A long press on a control should do nothing. It should still work on
+     actual prose, so this is switched back on for text below. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Anything an athlete might legitimately want to select or copy — a coach
+   answer, a legal page, their own notes — keeps normal text behaviour. */
+p, li, td, th, pre, code, blockquote,
+.coach-message, .athlete-message, .legal-body, .setup-error, .billing-message {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+input, textarea, select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Scroll containers inside the app keep their own momentum without dragging
+   the page behind them. */
+.page, .coach-bubble-content, .coach-chat-stream, .legal-body {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch targets. Apple's guidance is 44×44pt minimum, and several of the
+   app's chrome buttons were sized for a mouse. */
+@media (pointer: coarse) {
+  button, .button, .bottom-nav a, .profile-tabs button {
+    min-height: 44px;
+  }
+}
+
+/* A native app does not show a text cursor over its own chrome. */
+@media (pointer: coarse) {
+  button, .button { cursor: default; }
+}

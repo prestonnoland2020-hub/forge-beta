@@ -1,0 +1,121 @@
+/* Sign-in providers, and the legal pages a reviewer reads before signing in. */
+
+.login-providers {
+  display: grid;
+  gap: var(--s3);
+  margin: var(--s5) 0 var(--s4);
+}
+
+/* Apple's button is required to be at least as prominent as any third-party
+   sign-in (Guideline 4.8 and the Human Interface Guidelines), so it matches
+   the Google button's weight exactly rather than sitting under it as a
+   secondary option. */
+.apple-button,
+.google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--s4);
+  border-radius: var(--r-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.apple-button {
+  background: var(--ink);
+  color: var(--bg);
+  border: 1px solid var(--ink);
+}
+.apple-button:active:not(:disabled),
+.google-button:active:not(:disabled) { transform: translateY(1px); }
+.apple-button:disabled,
+.google-button:disabled { opacity: .6; cursor: default; }
+
+.provider-mark {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.login-legal {
+  margin-top: var(--s3);
+  color: var(--ink-3);
+  font-size: .76rem;
+  line-height: 1.6;
+}
+.login-legal a { color: var(--ink-2); text-decoration: underline; }
+
+/* ---- Legal pages ------------------------------------------------------- */
+
+.legal-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  padding: max(var(--s5), env(safe-area-inset-top)) var(--s4) calc(var(--s7) + env(safe-area-inset-bottom));
+}
+
+.legal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  max-width: 68ch;
+  margin: 0 auto var(--s6);
+}
+
+.legal-nav { display: flex; gap: var(--s2); }
+.legal-nav a {
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hairline);
+  color: var(--ink-2);
+  font-size: .8rem;
+  text-decoration: none;
+}
+.legal-nav a.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.legal-body {
+  max-width: 68ch;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+.legal-body h1 {
+  font-size: clamp(1.7rem, 5vw, 2.4rem);
+  margin: 0 0 var(--s2);
+  text-wrap: balance;
+}
+.legal-body h2 {
+  font-size: 1.05rem;
+  margin: var(--s6) 0 var(--s2);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--hairline);
+}
+.legal-body p { margin: 0 0 var(--s3); color: var(--ink-2); }
+.legal-body strong { color: var(--ink); }
+.legal-body ul { margin: 0 0 var(--s4); padding-left: var(--s5); display: grid; gap: var(--s2); }
+.legal-body li { color: var(--ink-2); }
+.legal-body a { color: var(--accent); }
+
+.legal-meta {
+  color: var(--ink-3) !important;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.legal-foot {
+  max-width: 68ch;
+  margin: var(--s7) auto 0;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--hairline);
+}
+.legal-foot a { color: var(--ink-2); text-decoration: none; }
