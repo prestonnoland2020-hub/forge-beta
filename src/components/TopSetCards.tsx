@@ -4,6 +4,7 @@ import type { LibraryExercise } from '../features/training/TrainingLibraryProvid
 import type { LoggedTopSet, WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { lastCompletedSet } from './LastPerformance';
+import { STRENGTH_MUSCLES } from './TopSetSheet';
 
 type Props = {
   sets: LoggedTopSet[];
@@ -19,18 +20,24 @@ type Props = {
   onAdd: () => void;
   onRemove: (index: number) => void;
   onCreateExercise: (name: string, muscles: string[]) => void;
-  /* Sets that Forge prefilled from today's recommendation open collapsed —
-     the plan is a reference, not the thing taking over the logging screen. */
-  collapsible?: boolean;
   planLabel?: string;
 };
 
 const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${set.weight}::${set.reps}`;
 
-const strengthMuscles = ['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps','Triceps','Forearms','Abs'];
 
-export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onCreateExercise, collapsible = false, planLabel }: Props) {
-  const [expanded, setExpanded] = useState(!collapsible);
+/* A SAVED SET IS A LINE, NOT A CARD. Every set rendered as a full card whether
+   it was still being filled in or already logged, so a day with four lifts on
+   it was four screens of form for work that was already done, and the one set
+   still being entered sat somewhere in the middle of them.
+
+   A set that is saved collapses to what it is — the lift, the load, the max —
+   and opens on a tap when it needs correcting. A set still being entered is
+   open, because it is the question on the screen. */
+export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onCreateExercise, planLabel }: Props) {
+  /* Keyed, not indexed: rows are added and removed under this state. */
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
+  const [closedKeys, setClosedKeys] = useState<string[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<LoggedTopSet | null>(null);
   const [creatingExercise, setCreatingExercise] = useState(false);
@@ -38,7 +45,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
   const [newExerciseMuscles, setNewExerciseMuscles] = useState<string[]>([]);
   const [createError, setCreateError] = useState('');
   const options = exercises.filter(exercise => exercise.enabled && exercise.kind === 'Strength');
-  const availableMuscles = Array.from(new Set([...muscles.filter(muscle => strengthMuscles.includes(muscle)), ...strengthMuscles]));
+  const availableMuscles = Array.from(new Set([...muscles.filter(muscle => STRENGTH_MUSCLES.includes(muscle)), ...STRENGTH_MUSCLES]));
   const inferMuscle = (exerciseName: string, fallback = '') => {
     const exercise = exercises.find(item => item.name === exerciseName);
     return exercise?.muscles.find(muscle => muscles.includes(muscle)) || exercise?.muscles[0] || fallback || 'Primary';
@@ -66,21 +73,22 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
     setCreateError('');
   };
 
-  const loggedCount = sets.filter(set => set.lift && loggedKeys.includes(setKey(set))).length;
-  const named = sets.map(set => set.lift).filter(Boolean);
-  const preview = named.slice(0, 2).join(', ') + (named.length > 2 ? `, +${named.length - 2}` : '');
-
-  if (collapsible && !expanded) return <section className="top-set-card-stack collapsed">
-    <button type="button" className="top-set-collapsed-bar" onClick={() => setExpanded(true)}>
-      <span className="eyebrow">{planLabel || 'FROM TODAY’S PLAN'}</span>
-      <strong>{sets.length} top {sets.length === 1 ? 'set' : 'sets'}</strong>
-      {preview && <small>{preview}</small>}
-      <b>{loggedCount ? `${loggedCount}/${sets.length} logged` : 'Open'}</b>
-    </button>
-  </section>;
+  const isOpen = (set: LoggedTopSet) => {
+    const key = setKey(set);
+    if (openKeys.includes(key)) return true;
+    if (closedKeys.includes(key)) return false;
+    /* Default: a saved set is closed, an unfinished one is open. */
+    return !(set.lift && loggedKeys.includes(key));
+  };
+  const toggle = (set: LoggedTopSet) => {
+    const key = setKey(set);
+    const open = isOpen(set);
+    setOpenKeys(current => open ? current.filter(item => item !== key) : [...current, key]);
+    setClosedKeys(current => open ? [...current, key] : current.filter(item => item !== key));
+  };
 
   return <section className="top-set-card-stack">
-    <header><div><span className="eyebrow">TOP SETS</span><h2>{sets.length} {sets.length === 1 ? 'top set' : 'top sets'}</h2><p>Choose an exercise, then record the weight and reps you completed.</p></div><div className="top-set-header-actions"><button type="button" className="button ghost" onClick={onAdd}>＋ Add top set</button>{collapsible && <button type="button" className="button ghost" onClick={() => setExpanded(false)}>Collapse</button>}</div></header>
+    <header><div><span className="eyebrow">{planLabel || 'TOP SETS'}</span><h2>{sets.length} {sets.length === 1 ? 'top set' : 'top sets'}</h2><p>Tap a saved set to correct it. Anything you add is saved as completed.</p></div><div className="top-set-header-actions"><button type="button" className="button ghost" onClick={onAdd}>＋ Add top set</button></div></header>
     {creatingExercise && <section className="inline-log-exercise" aria-label="Add an exercise to your library">
       <header><div><span className="eyebrow">NEW STRENGTH EXERCISE</span><h3>Add it once. Log it now.</h3><p>The muscle mapping keeps future split recommendations accurate.</p></div><button type="button" className="text-button" onClick={() => setCreatingExercise(false)}>Cancel</button></header>
       <label>Exercise name<input autoFocus value={newExerciseName} onChange={event => { setNewExerciseName(event.target.value); setCreateError(''); }} placeholder="e.g. Dumbbell incline press" /></label>
@@ -109,9 +117,22 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
         if (onEditLogged(index, set, corrected)) cancelCorrection();
       };
 
+      const open = isOpen(set) || Boolean(isCorrecting);
+
+      /* Saved and closed: the whole set is one line of text. */
+      if (logged && !open) return <article className="card top-set-entry logged closed" key={set.id || `set-${index}`}>
+        <button type="button" className="top-set-row" aria-expanded="false" onClick={() => toggle(set)}>
+          <span className="top-set-row-name">{set.lift}</span>
+          <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
+          <b aria-hidden="true">⌄</b>
+        </button>
+      </article>;
+
       return <article className={`card top-set-entry ${logged ? 'logged' : ''}`} key={set.id || `set-${index}`}>
         <div className="top-set-entry-head">
-          <div><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></div>
+          {logged
+            ? <button type="button" className="top-set-entry-toggle" aria-expanded="true" onClick={() => toggle(set)}><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></button>
+            : <div><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></div>}
           {logged && !isCorrecting ? <div className="logged-top-set-actions"><strong className="logged-badge">Saved ✓</strong><button type="button" className="text-button" onClick={() => startCorrection(set)}>Edit</button></div> : <button type="button" className="text-button" onClick={isCorrecting ? cancelCorrection : () => onRemove(index)}>{isCorrecting ? 'Cancel' : 'Remove'}</button>}
         </div>
         {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} ×{set.reps}</strong><small>Calculated max {max ?? '—'} {unit}</small></div> : <>

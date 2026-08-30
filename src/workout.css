@@ -66,10 +66,10 @@
 }
 .multi-top-set-editor{display:grid;gap:14px}.multi-top-set-editor article{border:1px solid var(--line);border-radius:14px;padding:16px}.multi-top-set-editor article.skipped{opacity:.5}.multi-top-set-editor article header{display:flex;justify-content:space-between;gap:16px;margin-bottom:12px}.multi-top-set-editor article header label{display:flex;align-items:center;gap:8px;color:var(--gold);font-weight:800}.multi-top-set-editor article>small{display:block;margin-top:10px;color:var(--muted)}.workout-review .review-result{display:flex;flex-direction:column;gap:4px;margin-top:10px}
 .add-exercise-while-logging{align-self:flex-start;margin-top:-10px}.inline-exercise-creator{display:grid;gap:14px;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:12px;padding:16px;background:color-mix(in srgb,var(--gold) 4%,transparent)}.inline-exercise-creator .muscle-picker{margin-top:8px}
-.last-performance-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;background:color-mix(in srgb,var(--gold) 6%,transparent);padding:13px 16px}.last-performance-banner>div:first-child{display:grid;grid-template-columns:auto auto;align-items:baseline;gap:3px 14px}.last-performance-banner .eyebrow{grid-column:1/-1}.last-performance-banner strong{font-size:1.15rem}.last-performance-banner small{color:var(--muted)}.last-performance-banner>div:last-child{display:flex;gap:10px;white-space:nowrap}.add-top-set-card{border-left:3px solid var(--gold)}@media(max-width:700px){.last-performance-banner{align-items:flex-start;flex-direction:column}.last-performance-banner>div:first-child{grid-template-columns:1fr}}
+.last-performance-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;background:color-mix(in srgb,var(--gold) 6%,transparent);padding:13px 16px}.last-performance-banner>div:first-child{display:grid;grid-template-columns:auto auto;align-items:baseline;gap:3px 14px}.last-performance-banner .eyebrow{grid-column:1/-1}.last-performance-banner strong{font-size:1.15rem}.last-performance-banner small{color:var(--muted)}.last-performance-banner>div:last-child{display:flex;gap:10px;white-space:nowrap}@media(max-width:700px){.last-performance-banner{align-items:flex-start;flex-direction:column}.last-performance-banner>div:first-child{grid-template-columns:1fr}}
 .split-day-selector{display:grid;gap:16px}.split-day-selector>div:first-child p{margin:4px 0 0;color:var(--muted)}.split-day-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}.split-day-options button{display:grid;grid-template-columns:auto 1fr;text-align:left;gap:2px 10px;border:1px solid var(--line);border-radius:11px;background:transparent;color:inherit;padding:12px}.split-day-options button.active{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 9%,transparent)}.split-day-options button span{grid-row:1/3;color:var(--gold);font-weight:800}.split-day-options button small{color:var(--muted)}
 .quick-log-top-sets{display:grid;gap:9px}.accent-card:has(+.quick-log-top-sets.embedded){padding-bottom:104px}.quick-log-top-sets.embedded{position:relative;z-index:2;margin-top:-112px;padding:14px 22px 20px;border:0;background:transparent}.quick-log-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid var(--line);padding-top:14px}.quick-log-row>span{display:flex;flex-direction:column;gap:3px}.quick-log-row small,.quick-log-message{color:var(--muted)}.quick-log-message{color:var(--mint);text-align:right}@media(max-width:700px){.accent-card:has(+.quick-log-top-sets.embedded){padding-bottom:132px}.quick-log-top-sets.embedded{margin-top:-140px}.quick-log-row{align-items:stretch;flex-direction:column}.quick-log-row .button{width:100%}}
-.workout-editor>.accent-card:has(.multi-top-set-editor){display:none}.top-set-card-stack~.add-top-set-card{display:none}.top-set-card-stack{display:grid;gap:14px}.top-set-card-stack>header{display:flex;align-items:center;justify-content:space-between;gap:18px}.top-set-card-stack>header p{margin:3px 0 0;color:var(--muted)}.top-set-entry{display:grid;gap:16px;border-left:3px solid var(--gold)}.top-set-entry.logged{border-color:var(--mint);background:rgba(85,220,167,.05)}.top-set-entry-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.logged-badge{color:var(--mint)}.logged-top-set-actions{display:flex;align-items:center;gap:14px}.logged-top-set-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.logged-top-set-summary>strong{font-size:1.4rem}.top-set-exercise-field{display:grid;gap:7px}.inline-last-set{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:rgba(255,255,255,.02)}.inline-last-set>span{grid-row:1/3;color:var(--gold);font-size:.7rem;font-weight:800}.inline-last-set small{color:var(--muted)}.top-set-card-result{display:flex;align-items:center;justify-content:space-between;border-radius:10px;background:color-mix(in srgb,var(--gold) 8%,transparent);padding:12px 14px}.top-set-card-result span{color:var(--gold);font-size:.72rem;font-weight:800}.top-set-card-result strong{font-size:1.3rem}.top-set-entry footer{display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid var(--line);padding-top:14px}.top-set-entry footer label{display:flex;align-items:center;gap:8px}@media(max-width:700px){.top-set-card-stack>header,.top-set-entry footer,.logged-top-set-summary{align-items:stretch;flex-direction:column}.top-set-entry footer .button{width:100%}}
+.workout-editor>.accent-card:has(.multi-top-set-editor){display:none}.top-set-card-stack{display:grid;gap:14px}.top-set-card-stack>header{display:flex;align-items:center;justify-content:space-between;gap:18px}.top-set-card-stack>header p{margin:3px 0 0;color:var(--muted)}.top-set-entry{display:grid;gap:16px;border-left:3px solid var(--gold)}.top-set-entry.logged{border-color:var(--mint);background:rgba(85,220,167,.05)}.top-set-entry-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.logged-badge{color:var(--mint)}.logged-top-set-actions{display:flex;align-items:center;gap:14px}.logged-top-set-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.logged-top-set-summary>strong{font-size:1.4rem}.top-set-exercise-field{display:grid;gap:7px}.inline-last-set{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:rgba(255,255,255,.02)}.inline-last-set>span{grid-row:1/3;color:var(--gold);font-size:.7rem;font-weight:800}.inline-last-set small{color:var(--muted)}.top-set-card-result{display:flex;align-items:center;justify-content:space-between;border-radius:10px;background:color-mix(in srgb,var(--gold) 8%,transparent);padding:12px 14px}.top-set-card-result span{color:var(--gold);font-size:.72rem;font-weight:800}.top-set-card-result strong{font-size:1.3rem}.top-set-entry footer{display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid var(--line);padding-top:14px}.top-set-entry footer label{display:flex;align-items:center;gap:8px}@media(max-width:700px){.top-set-card-stack>header,.top-set-entry footer,.logged-top-set-summary{align-items:stretch;flex-direction:column}.top-set-entry footer .button{width:100%}}
 .top-set-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.inline-log-exercise{display:grid;gap:15px;padding:18px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:13px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 6%,transparent),var(--panel))}.inline-log-exercise>header{display:flex;justify-content:space-between;gap:16px}.inline-log-exercise h3{margin:4px 0;font-size:24px}.inline-log-exercise header p{margin:0;color:var(--muted);font-size:11px}.inline-log-exercise>footer{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:4px}.inline-log-exercise>footer small{color:var(--muted)}.inline-exercise-error{color:#ff9d72;font-weight:700}
 @media(max-width:700px){.top-set-header-actions{display:grid;grid-template-columns:1fr 1fr}.top-set-header-actions .button{min-width:0;padding-inline:10px}.inline-log-exercise{padding:15px}.inline-log-exercise>header,.inline-log-exercise>footer{align-items:stretch;flex-direction:column}.inline-log-exercise>footer .button{width:100%}}
 .text-button.danger{color:#ff7a68}
@@ -87,18 +87,19 @@
 .lift-scope-note{display:block;margin-top:7px;color:var(--muted);font-size:11px;line-height:1.4}
 .lift-scope-note .text-button{font-size:11px;padding:0}
 
-/* Collapsed plan sets: one tappable summary bar instead of a stack of cards. */
-.top-set-card-stack.collapsed{display:block}
-.top-set-collapsed-bar{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 12px;width:100%;min-height:60px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);text-align:left}
-.top-set-collapsed-bar .eyebrow{grid-column:1/2;font-size:10px;letter-spacing:.1em;color:var(--accent)}
-.top-set-collapsed-bar strong{grid-column:1/2;font-size:15px;font-weight:800}
-.top-set-collapsed-bar small{grid-column:1/2;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
-.top-set-collapsed-bar b{grid-column:2/3;grid-row:1/4;align-self:center;font-size:11px;font-weight:800;color:var(--accent);white-space:nowrap}
-.add-top-set-card summary{list-style:none;cursor:pointer;display:grid;gap:3px}
-.add-top-set-card summary::-webkit-details-marker{display:none}
-.add-top-set-card summary h3{margin:0;font-size:15px}
-.add-top-set-card summary p{margin:0;font-size:12px;color:var(--muted)}
-.add-top-set-card[open] summary{margin-bottom:12px}
+/* A SAVED SET IS A LINE. Four logged lifts used to be four screens of form for
+   work already done. Closed, a set is what it is: the lift, the load, the max.
+   It opens on a tap when it needs correcting. */
+.top-set-entry.closed{display:block;gap:0;padding:0;overflow:hidden}
+.top-set-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;width:100%;min-height:56px;padding:12px 15px;border:0;background:none;color:var(--text);text-align:left}
+.top-set-row-name{font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-set-row-figures{display:grid;justify-items:end;gap:1px;font-size:14px;font-weight:800;color:var(--mint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.top-set-row-figures small{font-size:11px;font-weight:600;color:var(--muted)}
+.top-set-row b{font-size:15px;color:var(--muted);line-height:1}
+.top-set-row:active{background:rgba(255,255,255,.03)}
+/* Open, the head is the way back to closed. */
+.top-set-entry-toggle{display:grid;gap:2px;padding:0;border:0;background:none;color:inherit;text-align:left;min-width:0}
+.top-set-entry-toggle h3{margin:0}
 
 /* Three-up source picker: the labels are words, not ellipses. "Recommended"
    was clipping to "RECOMM…" at 390px, which reads as a bug. */
@@ -184,3 +185,38 @@
 .cardio-log-distance .dial-field-button,.cardio-log-time .dial-field-button{padding:11px 12px}
 .cardio-log-distance .dial-field-button b,.cardio-log-time .dial-field-button b{font-size:18px}
 .dial-plus{font:800 18px var(--display-font);color:var(--muted);align-self:center;opacity:.7}
+
+/* ADDING A TOP SET IS ONE ANSWER. The old disclosure asked for a muscle group
+   from the split day, then an exercise mapped to it — so a day whose muscles
+   did not cover the lift offered an empty list and no way through, and a lift
+   that was not already in the library had no path at all. One sheet: type it,
+   pick it or create it, load, reps, save. */
+.top-set-sheet-backdrop{position:fixed;inset:0;z-index:65;background:#000c;backdrop-filter:blur(6px);display:grid;place-items:center;padding:18px;overflow-y:auto}
+.top-set-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);overflow-y:auto;display:grid;gap:15px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,white 4%),var(--card));border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 30px 80px #000b}
+.top-set-sheet header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.top-set-sheet header>div{display:grid;gap:5px;min-width:0}
+.top-set-sheet header strong{font:800 21px var(--display-font,inherit);text-transform:uppercase;line-height:1.06;text-wrap:balance}
+.top-set-sheet header small{color:var(--muted);line-height:1.45}
+.top-set-sheet-close{background:none;border:0;color:var(--muted);font-size:30px;line-height:1;padding:0 4px;flex:none}
+.top-set-sheet-search{display:grid;gap:8px;font:800 11px var(--display-font,inherit);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.top-set-sheet-search input{width:100%;box-sizing:border-box;background:var(--surface-sunken,var(--panel));color:var(--text);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:700 16px inherit;letter-spacing:0;text-transform:none}
+.top-set-sheet-search input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.top-set-sheet-results{display:grid;gap:8px;max-height:46vh;overflow-y:auto}
+.top-set-sheet-result,.top-set-sheet-new{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:56px;padding:11px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);text-align:left}
+.top-set-sheet-result>div,.top-set-sheet-new>div{display:grid;gap:2px;min-width:0}
+.top-set-sheet-result strong,.top-set-sheet-new strong{font-size:15px;font-weight:800;overflow:hidden;text-overflow:ellipsis}
+.top-set-sheet-result small,.top-set-sheet-new small{font-size:11.5px;color:var(--muted)}
+.top-set-sheet-result b{font-size:10px;font-weight:900;letter-spacing:.1em;color:var(--accent)}
+.top-set-sheet-new{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.top-set-sheet-new>span{font-size:20px;color:var(--accent);flex:none}
+.top-set-sheet-empty{margin:0;color:var(--muted);font-size:12.5px;line-height:1.45}
+.top-set-sheet-chosen{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:12px;background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.top-set-sheet-chosen>div{display:grid;gap:2px;min-width:0}
+.top-set-sheet-chosen strong{font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis}
+.top-set-sheet-muscles{display:grid;gap:8px}
+.top-set-sheet-muscles small{color:var(--muted);font-size:12px;line-height:1.4}
+.top-set-sheet-warning{color:var(--gold);font-size:12.5px;line-height:1.45}
+.top-set-sheet footer{display:grid;gap:10px}
+.top-set-sheet footer .button{width:100%}
+.top-set-sheet footer .button.ghost{border-color:transparent;background:none;color:var(--muted);font-weight:700}
+.add-top-set-button{justify-self:start;margin-top:2px}

@@ -740,12 +740,10 @@ body{background-color:var(--bg);color:var(--text)}
    two cards, so the right edge never aligned with the cards above it; the
    week card had no padding, so its content sat on the border; and the
    floating Ask Forge bubble could cover the last card on every page. */
-.feed-support-grid{grid-template-columns:1.15fr .85fr;gap:16px}
 .week-pulse-card{padding:20px 22px}
 .page{padding-bottom:132px}
 @media(max-width:900px){.page{padding-bottom:calc(158px + env(safe-area-inset-bottom))}}
-@media(max-width:840px){.feed-support-grid{grid-template-columns:1fr 1fr}.feed-support-grid>.goal-card{grid-column:1/-1;min-height:0}}
-@media(max-width:600px){.feed-support-grid{grid-template-columns:1fr}.feed-support-grid>.goal-card{grid-column:auto}.week-pulse-card{padding:15px}}
+@media(max-width:600px){.week-pulse-card{padding:15px}}
 
 /* ============================================================= phone polish
    From on-device review (2026-08-24): the PWA draws under the iOS status bar
@@ -1406,13 +1404,6 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    install is running. Sits above the topbar, one tap, gone after reload. */
 .update-ready-pill{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);border-radius:999px;background:color-mix(in srgb,var(--surface-1) 92%,var(--accent));color:var(--ink);font:700 12px var(--display);letter-spacing:.02em;padding:9px 16px;box-shadow:var(--shadow-2);cursor:pointer}
 
-/* Regenerate today: deliberately tiny — a corner affordance for "this card
-   looks wrong", not a feature. It rebuilds the card from the current plan and
-   OVERWRITES the saved snapshot, so what comes back is fresh, not reloaded. */
-.feed-card-header{position:relative}
-.today-regen{position:absolute;top:0;right:0;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--hairline);border-radius:50%;background:none;color:var(--ink-3);cursor:pointer}
-.today-regen svg{width:14px;height:14px}
-.today-regen:active{color:var(--accent);transform:rotate(90deg)}
 
 /* ---------------------------------------------- week schedule, lived-in
    A day that happened gets its tick and shows the work; a past day with no

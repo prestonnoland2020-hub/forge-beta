@@ -1,12 +1,11 @@
 import { Link } from 'react-router-dom';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
-import { useGoals } from '../features/goals/GoalsProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { openCoachBubble } from '../features/training/coachService';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { StravaReviewModal } from '../components/StravaReviewModal';
-import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
+import { formatCardioSummary } from '../lib/cardioSession';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
 
@@ -15,37 +14,17 @@ const todayIso = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-const shortDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export function HomePage() {
-  const { recommendation, loading, syncError, toggleTopSet, setCardioSelected, refresh } = useDailyRecommendation();
+  const { recommendation, loading, syncError, toggleTopSet, setCardioSelected } = useDailyRecommendation();
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
-  const { goals } = useGoals();
   const { notes } = useAthleteNotes();
   const bufferedNotes = notes.filter(isBufferActive);
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const currentDate = todayIso();
   const completedToday = records.find(record => record.date === currentDate);
   const completedSets = (completedToday?.topSets || []).filter(set => set.completed !== false);
-  const priorWorkout = records.find(record => record.date < currentDate);
-  const priorSets = (priorWorkout?.topSets || []).filter(set => set.completed !== false);
-  const weekStart = new Date();
-  weekStart.setHours(0, 0, 0, 0);
-  weekStart.setDate(weekStart.getDate() - 6);
-  const weekStartIso = weekStart.toISOString().slice(0, 10);
-  const weekRecords = records.filter(record => record.date >= weekStartIso && record.date <= currentDate);
-  const weekTopSets = weekRecords.reduce((total, record) => total + (record.topSets || []).filter(set => set.completed !== false).length, 0);
-  const weekMiles = weekRecords.reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => sum + cardioMiles(session), 0), 0);
-  // The goal shown here should be the one today's session actually serves, not
-  // whichever goal happens to be first in the list. A mile-pace cardio day was
-  // headlining a Pull Ups target.
-  const byNearestDate = (a: typeof goals[number], b: typeof goals[number]) => String(a.date || '9999-12-31').localeCompare(String(b.date || '9999-12-31'));
-  const todayExercises = new Set((recommendation?.topSets || []).filter(set => set.selected).map(set => set.exercise.trim().toLowerCase()));
-  const strengthGoal = goals.filter(goal => goal.type === 'Strength' && goal.exercise && todayExercises.has(goal.exercise.trim().toLowerCase())).sort(byNearestDate)[0];
-  const enduranceGoal = recommendation?.cardio?.selected ? goals.filter(goal => goal.type === 'Endurance').sort(byNearestDate)[0] : undefined;
-  const primaryGoal = strengthGoal || enduranceGoal || [...goals].sort(byNearestDate)[0];
-  const goalReason = strengthGoal ? `Today’s ${strengthGoal.exercise} set moves this` : enduranceGoal ? 'Today’s run moves this' : primaryGoal ? 'Next target by date' : '';
   const firstName = (setup?.displayName || 'Athlete').trim().split(/\s+/)[0];
   const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
 
@@ -73,8 +52,19 @@ export function HomePage() {
         {(completedToday.cardioSessions || []).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}
       </div>}
       <footer><Link className="button" to={`/workout?edit=${completedToday.id}`}>Edit workout</Link><Link className="feed-text-link" to="/history">Open history →</Link></footer>
-    </section> : <section className="feed-card today-focus-card">
-      <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || 'Cardio and recovery'}</em></div></div><button type="button" className="today-regen" onClick={refresh} aria-label="Regenerate today's training" title="Regenerate today's training"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg></button></header>
+    </section> : /* THE HEADER ACTION HAS TO DO SOMETHING. This slot held a circular
+         regenerate button, and today's card is a pure derivation — the split
+         position, the block's prescription for that day, and the athlete's
+         logged bests. There was nothing to re-roll, so pressing it rewrote
+         the identical card and the screen never changed. (It also rendered as
+         an oval: a 30px circle stretched to 44px by the flex header.)
+
+         The real want behind it is "today is not the day I want to train",
+         and that has an answer now — the log's From Split mode, where the
+         athlete picks the day. The completed card puts Edit in this same
+         slot, so this is the same kind of link, doing the same kind of job. */
+      <section className="feed-card today-focus-card">
+      <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || 'Cardio and recovery'}</em></div></div><Link to="/workout?source=split">Change day</Link></header>
       <div className="today-workout-items">
         {recommendation.topSets.map(set => <label className={set.selected ? 'selected' : ''} key={set.id}><input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} /><span><small>{set.muscle}{set.optional ? ' · OPTIONAL' : ''}</small><strong>{set.exercise}</strong><em>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : 'Log a baseline set'}</em></span></label>)}
         {!recommendation.topSets.length && recommendation.splitDay.type !== 'rest' && <Link className="feed-empty-row" to="/exercises"><span><small>STRENGTH</small><strong>Choose exercises for this split day</strong><em>Forge needs a strength exercise mapped to this day.</em></span><b>Fix →</b></Link>}
@@ -84,10 +74,5 @@ export function HomePage() {
     </section>}
 
 
-    <section className="feed-support-grid" aria-label="Training overview">
-      <article className="feed-card compact-card"><header><span>LAST ACTIVITY</span><Link to="/history">View all</Link></header>{priorWorkout ? <><div className="compact-activity"><span className="feed-icon muted-icon">✓</span><div><strong>{priorWorkout.title}</strong><small>{shortDate(priorWorkout.date)} · {priorWorkout.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Cardio'}</small></div></div><div className="compact-result-list">{priorSets.slice(0, 2).map(set => <div key={set.id || `${set.lift}-${set.weight}-${set.reps}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}{priorWorkout.cardioSessions?.slice(0, 2).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}</div></> : <p className="feed-empty-copy">Nothing logged yet.</p>}</article>
-      
-      <article className="feed-card compact-card goal-card"><header><span>GOAL FOCUS</span><Link to="/goals">Goals</Link></header>{primaryGoal ? <><strong className="goal-name">{primaryGoal.title}</strong><p>{goalReason}{primaryGoal.date ? ` · ${shortDate(primaryGoal.date)}` : ''}</p><div className="goal-target"><span>TARGET</span><strong>{primaryGoal.target}</strong></div></> : <><p className="feed-empty-copy">No goal set.</p><Link className="feed-text-link" to="/goals">Create a goal →</Link></>}</article>
-    </section>
   </div>;
 }
