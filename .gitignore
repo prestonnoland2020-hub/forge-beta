@@ -23,3 +23,5 @@ rebuild.sh
 seed.mjs
 shot.mjs
 supabase/.temp/
+tools/__pycache__/
+forge-updates.bundle

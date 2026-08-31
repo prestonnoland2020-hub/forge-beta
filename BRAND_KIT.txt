@@ -1,0 +1,221 @@
+FORGE — BRAND KIT
+Exact values as built, 30 August 2026.
+Every number below is read out of the shipping stylesheets, not from memory.
+Source files: src/styles.css, src/forge-system.css, src/forge-packages.css
+
+Forge is a strength and endurance training log. Its one idea: you log the TOP
+SET — the single heaviest honest effort of a session — and the app coaches the
+progression from there. The look is dark, high-contrast, athletic. Not clinical,
+not soft, not "wellness".
+
+
+================================================================================
+1. THE SIGNATURE PALETTE  (package name: "Forge" — the default)
+================================================================================
+
+This is the app as it appears out of the box and the palette any logo should be
+designed against.
+
+  ACCENT / VOLT       #D7FF45     the brand colour. Acid lime-yellow.
+  ACCENT INK          #0E1305     text/icons placed ON the accent
+  BACKGROUND          #0A0E0D     app ground, near-black with a green cast
+  PANEL (card)        #131A18     surface one step up from the ground
+  PANEL 2             #1A2320     surface two steps up
+  HAIRLINE / LINE     #222D29     all borders and dividers
+  TEXT                #EEF4F1     primary text
+  MUTED               #9DABA5     secondary text
+
+Status colours (used for meaning, never decoration):
+
+  GOOD / SUCCESS      #58D68D
+  WARNING             #F6C453
+  BAD / ERROR         #EF8A7B
+  INFO                #6FC3FF
+
+Notes for a designer:
+  - The accent is a yellow-green, NOT a pure yellow and NOT a mint. It is the
+    single loudest element in the app and is used sparingly: buttons, active
+    states, key numbers, and the eyebrow labels.
+  - #0E1305 (near-black green) is what sits on top of the accent. Never white
+    on #D7FF45 — it fails contrast badly.
+  - The ground is not pure black. It carries a slight green cast (#0A0E0D).
+  - There is a faint accent glow in the app's background:
+    radial-gradient(circle at 72% -10%, rgba(215,255,69,.08), transparent 26%)
+
+
+================================================================================
+2. TYPEFACES
+================================================================================
+
+Three families, all free from Google Fonts. Loaded in src/styles.css line 1:
+
+  https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800
+    &family=IBM+Plex+Mono:wght@500;600;700
+    &family=Inter:wght@400;500;600;700;800&display=swap
+
+  DISPLAY   Barlow Condensed        weights 600, 700, 800
+            fallback: Impact, sans-serif
+            Used for: every heading, every large number, the FORGE wordmark,
+            stat values, buttons in some contexts.
+            ALWAYS UPPERCASE in the signature look.
+
+  BODY      Inter                   weights 400, 500, 600, 700, 800
+            fallback: system-ui, sans-serif
+            Used for: all paragraph text, labels, inputs, navigation.
+
+  MONO      IBM Plex Mono           weights 500, 600, 700
+            fallback: ui-monospace, SFMono-Regular, monospace
+            Used only by the "Monitor" appearance package, not the default.
+
+The wordmark as it currently appears in the app sidebar:
+  font: 800 27px 'Barlow Condensed'
+  letter-spacing: 0.1em
+  text: FORGE  (uppercase)
+
+
+================================================================================
+3. TYPE SCALE
+================================================================================
+
+Headings — Barlow Condensed, uppercase, letter-spacing 0.015em:
+
+  H1        clamp(19px, 4vw, 24px)
+  H2        clamp(27px, 5vw, 58px)      line-height 0.96
+  H3        clamp(19px, 3.4vw, 23px)
+
+Body — Inter:
+
+  Paragraph         16px, line-height 1.55, colour #9DABA5
+  Measure           max 62 characters per line
+
+Eyebrow / kicker label (appears above almost every heading in the app):
+
+  font-size: 10px
+  font-weight: 800
+  letter-spacing: 0.12em
+  text-transform: uppercase
+  colour: #D7FF45 (the accent)
+
+Numerals:
+  font-variant-numeric: tabular-nums  — wherever numbers are compared in a
+  column. Any logo or wordmark containing numbers should line up the same way.
+
+
+================================================================================
+4. SHAPE, SPACING, DEPTH
+================================================================================
+
+Corner radii:
+  --r-xs   6px
+  --r-sm   9px
+  --r-md   13px      (cards — the most-used radius in the app)
+  --r-lg   18px
+  --r-pill 999px     (all buttons are fully rounded pills)
+
+Spacing scale:
+  4px · 8px · 12px · 16px · 22px · 30px · 40px
+
+Shadows (dark theme):
+  level 1   0 1px 2px rgba(0,0,0,.40)
+  level 2   0 6px 20px rgba(0,0,0,.45)
+  level 3   0 18px 48px rgba(0,0,0,.60)
+
+Motion:
+  duration 150ms
+  easing   cubic-bezier(.2,.7,.3,1)
+
+Primary button, for reference:
+  min-height 46px, fully rounded, background #D7FF45, text #0E1305,
+  14px / weight 800 / letter-spacing 0.01em
+
+
+================================================================================
+5. APP ICON — CURRENT BACKGROUND VALUES
+================================================================================
+
+Whatever mark gets designed, these are the grounds it has to sit on:
+
+  Icon background      vertical gradient  #0C110F  →  #060908
+  PWA theme colour     #0B100E
+  Splash background    #0B100E
+
+Hard constraints from the App Store:
+  - 1024 × 1024 px, square, fully opaque, NO alpha channel. An icon with an
+    alpha channel is rejected at upload.
+  - No rounded corners baked in. iOS applies its own mask; corners drawn into
+    the artwork show up as visible notches.
+  - It must survive at 29 × 29 px. That is the real design constraint — most
+    detail disappears there.
+
+Sizes needed for iOS: 1024, 180, 167, 152, 144, 120, 114, 100, 87, 80, 76, 60,
+58, 40, 29, 20. Android/PWA: 512, 384, 256, 192, plus maskable 512 and 192 with
+the mark scaled to ~62% so Android's circular crop does not cut it.
+
+
+================================================================================
+6. THE OTHER FOUR APPEARANCE PACKAGES
+================================================================================
+
+Athletes can re-skin the whole app. A logo needs to survive all five grounds,
+so these are listed for contrast-checking — NOT as alternative brand palettes.
+"Forge" above is the brand.
+
+TRAIL — "Sunlit activity feed. White cards, a punch of orange."
+  bg #F5F5F7 · panel #FFFFFF · line #E3E3E9 · text #17181C · muted #5D6470
+  accent #FC5200 · accent-ink #FFFFFF · display Inter, sentence case
+  radii 5 / 8 / 12 / 16
+
+MONITOR — "Recovery lab. True black, teal data, mono labels."
+  bg #000000 · panel #0B0E0F · line #1E2427 · text #E6EDEB · muted #7F8C8A
+  accent #2EE6A8 · accent-ink #001510 · display IBM Plex Mono, uppercase
+  radii 4 / 6 / 9 / 12
+
+RINGS — "Midnight and hot pink. Big numerals, soft corners."
+  bg #000000 · panel #1C1C1E · line #3A3A3C · text #F5F5F7 · muted #98989F
+  accent #FA2D6C · accent-ink #FFFFFF · display system-ui, sentence case
+  radii 8 / 12 / 18 / 24 · buttons fully round
+
+CLUB — "Gallery white and ink black. No color, all type."
+  bg #FFFFFF · panel #FFFFFF · line #E5E5E5 · text #111111 · muted #6F6F72
+  accent #111111 · accent-ink #FFFFFF · display Barlow Condensed, uppercase
+  radii 2 / 3 / 4 / 6
+
+Practical consequence: the mark must read on near-black (#0A0E0D), on true
+black (#000000), and on white (#FFFFFF). A logo that only works on dark will
+break two of the five looks.
+
+
+================================================================================
+7. BRIEF NOTES FOR WHOEVER DESIGNS THE MARK
+================================================================================
+
+What the app is:
+  A training log built around the top set. Strength and endurance in one place.
+  An AI coach that programs from what you actually lifted and ran, never from
+  what you told it you could do. The tone throughout the product is direct and
+  evidence-first — it says "you have not run enough for me to project that"
+  rather than filling space with encouragement.
+
+Who uses it:
+  Adults training seriously. Hybrid athletes — people who lift and run — are
+  the sharpest niche and the least well served by existing apps.
+
+What already exists that a designer should have:
+  - This file.
+  - src/forge-icon.svg and src/forge-mark.svg in the repo (current mark).
+  - Screenshots of any app screen on request.
+
+Deliverables to ask for:
+  - Master vector (SVG or AI), mark alone, on transparent.
+  - Mark locked up with the FORGE wordmark, horizontal and stacked.
+  - Single-colour version (one flat colour, no gradient) for small sizes and
+    for the CLUB / TRAIL light packages.
+  - App icon artwork at 1024 × 1024, opaque, square, no baked corners.
+  - Proof that it reads at 29 px before anything else is approved.
+
+Things that will look wrong in this product:
+  - Gradients into muted or olive tones. #D7FF45 ramped toward anything
+    desaturated goes army-green immediately.
+  - White or light text sitting directly on the accent.
+  - Baked-in rounded corners on the app icon.
+  - Anything that relies on fine detail or thin strokes.
