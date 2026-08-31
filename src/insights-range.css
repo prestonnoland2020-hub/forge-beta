@@ -29,7 +29,7 @@
   font-weight: 800;
 }
 .range-options button:hover { color: var(--text); }
-.range-options button.active { background: var(--accent); color: var(--accent-ink); }
+.range-options button.active { background: var(--accent-strong); color: var(--accent-ink); }
 @media (max-width: 600px) {
   .insights-range-bar { align-items: stretch; flex-direction: column; }
   .range-options { overflow-x: auto; }

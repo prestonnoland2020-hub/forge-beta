@@ -16,7 +16,7 @@
 .exercise-selector-section{gap:14px}
 .selected-exercise-panel{display:grid;gap:10px;padding:14px;background:color-mix(in srgb, var(--tint) 3.5%, transparent);border:1px solid color-mix(in srgb, var(--tint) 20%, transparent);border-radius:10px}
 .selected-exercise-title{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.08em}
-.selected-exercise-title b{display:grid;place-items:center;min-width:24px;height:24px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-size:10px}
+.selected-exercise-title b{display:grid;place-items:center;min-width:24px;height:24px;border-radius:12px;background:var(--accent-strong);color:var(--accent-ink);font-size:10px}
 .selected-exercise-panel>p{margin:0;color:var(--muted);font-size:10px}
 .selected-exercise-chips{display:flex;flex-wrap:wrap;gap:7px}
 .selected-exercise-chips>button{display:flex;align-items:center;gap:7px;padding:7px 9px 7px 7px;border:1px solid color-mix(in srgb, var(--tint) 28%, transparent);border-radius:999px;background:var(--surface-2);color:var(--text);font-size:11px;font-weight:800}

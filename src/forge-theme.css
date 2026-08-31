@@ -1,149 +1,154 @@
 /* ============================================================================
    FORGE THEME — the single source of colour.
    ----------------------------------------------------------------------------
-   This replaces five "UI packages" and a pile of hand-mixed literals with one
-   palette expressed twice: once for light, once for dark.
+   Two independent axes, composed:
 
-   WHY THIS FILE EXISTS. The app was built dark-only — forge-system.css said so
-   outright — and grew 303 distinct colour literals across 45 stylesheets. Not
-   303 colours: 303 spellings of about twenty. Twenty-nine different olive
-   borders. Twenty-four different neutral borders. Seven progress-bar tracks
-   that are the same bar drawn seven times. #17221e and #17221f, one channel
-   apart, on adjacent components. Three competing declarations of --bg in three
-   files, whichever loaded last winning.
+     TONE     light · dark          the ground the app is lit on
+     ACCENT   signal · ember · …    the one colour that is not neutral
 
-   That drift is why the app never looked finished, and it is why light mode
-   could not simply be "switched on": a literal cannot know which theme it is
-   in.
+   They are separate because they answer different questions. Tone is "where am
+   I reading this" — a phone at 5am in bed, or a gym floor under fluorescents.
+   Accent is "whose app is this". Multiplying them out as complete palettes is
+   what the old five UI packages did, and it is why none of them was ever
+   finished: every fix had to be made five times, and never was.
 
-   HOW IT WORKS. Every colour is a semantic role, not a value. A component asks
-   for `--surface-1` (a card) or `--ink-2` (secondary text) and gets whatever
-   that means in the current theme. Three states, matching the three choices in
-   Settings:
+   HOW THE TWO AXES COMPOSE. An accent block declares each of its values TWICE
+   — once for a light ground (`--a-text`) and once for a dark one (`--a-text-d`)
+   — and declares nothing else. The tone blocks then choose which half is live:
+
+     :root                     { --accent-text: var(--a-text);   }   light
+     :root[data-theme="dark"]  { --accent-text: var(--a-text-d); }   dark
+
+   So five accents cost five value blocks, not fifteen palettes, and a component
+   asking for `--accent-text` gets the right answer for whatever pair the
+   athlete has chosen. Components NEVER read an --a-* variable; those are raw
+   material, not roles.
+
+   THREE TONE STATES, matching the three choices in Settings:
 
      data-theme="light"   the athlete chose light
      data-theme="dark"    the athlete chose dark
      (no attribute)       System — prefers-color-scheme decides
 
-   The bare :root block below is LIGHT. Dark is applied twice: once under
+   The bare :root block is LIGHT. Dark is applied twice: once under
    prefers-color-scheme for the un-attributed System case, and once under
-   [data-theme="dark"] so an explicit choice beats the OS. Never define a
-   colour only inside one of those blocks — a token that exists in only one
-   theme is exactly the bug this file was written to end.
+   [data-theme="dark"] so an explicit choice beats the OS. Never define a colour
+   only inside one of those blocks — a token that exists in one tone and not the
+   other is exactly the bug this file was written to end.
    ========================================================================== */
 
+/* ---------------------------------------------------------------------------
+   TONE — LIGHT
+   Neutrals are cool and very slightly cyan, pulled from #f3f5f5 and #3f4849 so
+   the ground belongs to the same family as the mark rather than being generic
+   grey placed near it.
+   ------------------------------------------------------------------------ */
 :root {
   color-scheme: light;
 
-  /* ---- Brand ------------------------------------------------------------
-     The accent is the one colour that does NOT flip. It shifts value slightly
-     so it stays legible on both grounds, but it is the same hue in both
-     themes — that is what makes it a brand colour rather than a theme colour. */
-  --accent: #d7ff45;            /* the brand lime — identical in both themes */
-  --accent-ink: #0e1305;        /* text ON the accent */
-  /* Lime is a FILL colour. As TEXT on a light ground it is unreadable (1.2:1),
-     so accent-coloured type gets its own value — the same hue, dark enough to
-     read. In dark mode the two are the same, which is why this only looks like
-     an extra token from the light side. */
-  --accent-text: #3f6212;
-  --accent-dim: #a8c94a;
-  --accent-wash: rgba(120, 160, 30, .10);
-  --accent-wash-strong: rgba(120, 160, 30, .18);
-
-  /* ---- Tint --------------------------------------------------------------
-     Dozens of components paint an accent-tinted wash — a selected row, an
-     active chip, the gradient on a highlighted card — and every one of them
-     was a hand-mixed rgba() of the lime. On a dark ground a translucent lime
-     reads as a faint glow; on white the same mix reads as weak yellow bile.
-     --tint is the hue those washes mix FROM, so `color-mix(in srgb, var(--tint)
-     6%, transparent)` is a green hint in light and a lime glow in dark. */
-  --tint: #78a01e;
-
-  /* A modal scrim is not the same thing as --overlay: it sits under a sheet
-     and has to actually hide the page behind it. */
-  --scrim: rgba(20, 21, 15, .46);
-
-  /* The colour every ad-hoc box-shadow reached for. Light UI needs it soft and
-     neutral; dark UI needs it near-opaque or the shadow disappears into the
-     ground. */
-  --shadow-color: rgba(20, 21, 15, .14);
-
-  /* The graph-paper grid on the page ground — Forge's oldest visual habit.
-     A hairline that is right for a 1px border between two surfaces is much
-     too loud repeated every 42px across a whole white page, so the grid gets
-     its own value rather than borrowing --hairline. */
-  --grid-line: rgba(20, 21, 15, .035);
+  /* Which half of the accent block is live. */
+  --accent: var(--a-fill);
+  --accent-strong: var(--a-strong);
+  --accent-ink: var(--a-ink);
+  --accent-text: var(--a-text);
+  --accent-dim: var(--a-dim);
+  --tint: var(--a-tint);
+  --chart-1: var(--a-chart);
 
   /* ---- Grounds and surfaces --------------------------------------------
      A ladder, not a set. Each step is one perceptible lift from the last, so
      depth reads without a shadow. */
-  /* Neutral, not green. The first pass tinted every light surface toward the
-     accent and the whole app read olive — a green ground under a green accent
-     leaves nothing for the accent to be brighter than. */
-  --bg: #f7f7f5;
+  --bg: #f3f5f5;
   --surface-1: #ffffff;         /* a card on the ground */
-  --surface-2: #f2f2f0;         /* a control on a card */
-  --surface-3: #e8e8e5;         /* hover, active chip */
-  --surface-sunken: #eeeeeb;    /* an inset well: track, input */
+  --surface-2: #e8ecec;         /* a control on a card */
+  --surface-3: #dbe1e1;         /* hover, active chip */
+  --surface-sunken: #eaeeee;    /* an inset well: track, input */
 
   /* ---- Lines ------------------------------------------------------------ */
-  --hairline: #e4e4e0;
-  --hairline-strong: #cacac5;
+  --hairline: #dce2e2;
+  --hairline-strong: #bac3c3;
 
   /* ---- Text -------------------------------------------------------------
      Three steps and no more. Every "muted grey" in the old CSS was one of
-     these three wearing a different hex. */
-  --ink: #14150f;
-  --ink-2: #5c5f55;
-  --ink-3: #86897e;
+     these three wearing a different hex.
+
+     All three are legible, including the third. The palette's own #7b807e is a
+     good grey and it is NOT here: it carries 4.0:1 on white and 3.0:1 on
+     --surface-3, and a rendered audit of every route found it under every
+     calendar date, every timestamp and every caption in the app. "Tertiary" is
+     a rank in the hierarchy, not permission to be unreadable — this is a
+     training log people read mid-set. #7b807e keeps its job on dark grounds
+     and in the mark; it does not get to set type on white. */
+  --ink: #14181a;
+  --ink-2: #454c4b;
+  --ink-3: #5f6563;
 
   /* ---- Status -----------------------------------------------------------
-     Meaning, never decoration. Distinct from the accent on purpose: a green
-     accent and a green "good" would make success invisible. */
+     Meaning, never decoration.
+
+     --info is violet, not blue, and that is deliberate. It marks forecasts,
+     projections and the coach's own suggestions — the things the app is
+     guessing rather than recording. With a blue accent, a blue "info" would be
+     invisible on exactly the charts where the distinction matters most. */
   --good: #1f7a3d;
-  --warn: #9a6400;
+  --warn: #8a5a00;
   --bad: #b3261e;
-  --info: #1663a8;
+  --info: #6d4ac4;
 
   /* ---- Data --------------------------------------------------------------
-     Six series that stay distinguishable in both themes and hold up for the
-     ~8% of men with red-green colour vision deficiency: the pairs are
-     separated by lightness as well as hue. */
-  --chart-1: #4d7c0f;
-  --chart-2: #1663a8;
-  --chart-3: #b3261e;
-  --chart-4: #7a4bbd;
-  --chart-5: #0f7d74;
-  --chart-6: #9a6400;
+     Series 1 follows the accent (see the accent blocks). The rest are fixed and
+     chosen to stay distinguishable from it and from each other for the ~8% of
+     men with red-green colour vision deficiency: the pairs are separated by
+     lightness as well as hue. */
+  --chart-2: #c2410c;
+  --chart-3: #6d4ac4;
+  --chart-4: #0f7d74;
+  --chart-5: #8a5a00;
+  --chart-6: #b3261e;
 
   /* ---- An intentionally inverted surface --------------------------------
      Chart tooltips and toasts sit ON TOP of content and want to contrast with
-     it rather than match it, so they flip with the theme instead of following
+     it rather than match it, so they flip with the tone instead of following
      it. Without this pair, the tooltip was a near-white box on a near-white
      page. */
-  --inverse-surface: #14150f;
-  --inverse-ink: #f4f4f1;
+  --inverse-surface: #14181a;
+  --inverse-ink: #f3f5f5;
 
   /* ---- Depth ------------------------------------------------------------
      Light UI reads depth from soft shadows; dark UI reads it from surface
      lightness and hairlines. Both are defined, and the dark block below
      deliberately makes them heavier and tighter. */
-  --shadow-1: 0 1px 2px rgba(20, 21, 15, .06);
-  --shadow-2: 0 6px 18px rgba(20, 21, 15, .09);
-  --shadow-3: 0 18px 44px rgba(20, 21, 15, .16);
-  --overlay: rgba(20, 21, 15, .38);
+  --shadow-1: 0 1px 2px rgba(20, 24, 26, .06);
+  --shadow-2: 0 6px 18px rgba(20, 24, 26, .09);
+  --shadow-3: 0 18px 44px rgba(20, 24, 26, .16);
+  --shadow-color: rgba(20, 24, 26, .14);
+  --overlay: rgba(20, 24, 26, .38);
+  --scrim: rgba(20, 24, 26, .46);
 
   /* ---- The tint mixer ----------------------------------------------------
      Several components lift a surface by mixing WHITE into it, which works on
      a dark ground and does nothing on a light one. --lift is whichever
-     direction actually separates in the current theme, so `color-mix(in srgb,
+     direction actually separates in the current tone, so `color-mix(in srgb,
      var(--surface-1) 96%, var(--lift))` reads correctly in both. */
-  --lift: #14150f;
+  --lift: #14181a;
 
   /* The ambient glow behind the page. On dark it is the accent catching the
-     top-right corner; on light the same wash reads as a stain on white, so
-     light gets none. */
+     top-right corner; on light the same wash reads as a stain, so light gets
+     none. */
   --page-glow: transparent;
+
+  /* The graph-paper grid on the page ground — Forge's oldest visual habit. A
+     hairline that is right for a 1px border between two surfaces is much too
+     loud repeated every 42px across a whole page, so the grid gets its own
+     value rather than borrowing --hairline. */
+  --grid-line: rgba(20, 24, 26, .035);
+
+  /* ---- Accent washes -----------------------------------------------------
+     Derived, not declared. Every wash mixes from --tint, which is already
+     tone-resolved, so a wash is correct in both tones and for every accent
+     without a single extra rgba() anywhere. */
+  --accent-wash: color-mix(in srgb, var(--tint) 10%, transparent);
+  --accent-wash-strong: color-mix(in srgb, var(--tint) 18%, transparent);
 
   /* ---- Shape and rhythm -------------------------------------------------- */
   --r-xs: 6px; --r-sm: 9px; --r-md: 13px; --r-lg: 18px; --r-pill: 999px;
@@ -158,9 +163,8 @@
      Barlow Condensed, set uppercase at 800, was doing a lot of shouting — it
      is a sports-poster face and it made every heading feel like a banner.
      Archivo is a grotesque built for headlines AND small text: squarer, more
-     engineered, with real mass at 700–800 without narrowing. It reads as
-     equipment rather than as a race bib, which is the right register for an
-     app whose whole claim is that it tells you the truth about your training.
+     engineered, with real mass at 700-800 without narrowing. It answers the
+     mark, which is all straight cuts and hard angles.
 
      Inter stays for body and data. It has the best tabular figures of any free
      UI face, and this app is mostly numbers in columns. */
@@ -169,120 +173,257 @@
 }
 
 /* ---------------------------------------------------------------------------
-   DARK — applied twice on purpose.
+   TONE — DARK, applied twice on purpose.
 
    1. Under prefers-color-scheme, guarded against an explicit light choice, so
       the System setting follows the OS.
    2. Under [data-theme="dark"], so an explicit dark choice beats a light OS.
 
-   Only tokens are redefined. No component rules live in here; if a component
-   needs to know the theme, it needs a token it does not yet have.
+   The ladder is built so #3f4849 — the charcoal the mark sits on — lands as
+   --surface-3, the step an athlete actually touches. The page itself goes
+   deeper than the logo's ground: at #3f4849 the brand blue only reaches 3.1:1,
+   which is not enough to read, and no amount of care elsewhere fixes a ground
+   that is too close to the thing on it.
    ------------------------------------------------------------------------ */
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --accent: #d7ff45;
-    --accent-ink: #0e1305;
-    --accent-text: #d7ff45;
-    --accent-dim: #9fbf3c;
-    --accent-wash: rgba(215, 255, 69, .08);
-    --accent-wash-strong: rgba(215, 255, 69, .16);
+    --accent: var(--a-fill-d);
+    --accent-strong: var(--a-strong-d);
+    --accent-ink: var(--a-ink-d);
+    --accent-text: var(--a-text-d);
+    --accent-dim: var(--a-dim-d);
+    --tint: var(--a-tint-d);
+    --chart-1: var(--a-chart-d);
 
-  --tint: #d7ff45;
-  --scrim: rgba(0, 0, 0, .72);
-  --shadow-color: rgba(0, 0, 0, .45);
-  --grid-line: rgba(255, 255, 255, .035);
+    --bg: #131819;
+    --surface-1: #1b2223;
+    --surface-2: #252e2f;
+    --surface-3: #3f4849;
+    --surface-sunken: #0d1213;
 
-    --tint: #d7ff45;
-    --scrim: rgba(0, 0, 0, .72);
-    --shadow-color: rgba(0, 0, 0, .45);
-    --grid-line: rgba(255, 255, 255, .035);
+    --hairline: #2c3435;
+    --hairline-strong: #4a5556;
 
-    --bg: #0a0e0d;
-    --surface-1: #131a18;
-    --surface-2: #1a2320;
-    --surface-3: #232e2a;
-    --surface-sunken: #070c0b;
-
-    --hairline: #222d29;
-    --hairline-strong: #3b4944;
-
-    --ink: #eef4f1;
-    --ink-2: #9daba5;
-    --ink-3: #6f7c77;
+    --ink: #edf1f1;
+    --ink-2: #b9c1c0;
+    --ink-3: #939997;
 
     --good: #58d68d;
     --warn: #f6c453;
     --bad: #ef8a7b;
-    --info: #6fc3ff;
+    --info: #b49bff;
 
-    --chart-1: #d7ff45;
-    --chart-2: #6fc3ff;
-    --chart-3: #ef8a7b;
-    --chart-4: #c4a2ff;
-    --chart-5: #5fe0c6;
-    --chart-6: #f6c453;
+    --chart-2: #fb923c;
+    --chart-3: #b49bff;
+    --chart-4: #5fe0c6;
+    --chart-5: #f6c453;
+    --chart-6: #ef8a7b;
 
-    --inverse-surface: #eef4f1;
-    --inverse-ink: #0a0e0d;
+    --inverse-surface: #edf1f1;
+    --inverse-ink: #131819;
 
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .40);
     --shadow-2: 0 6px 20px rgba(0, 0, 0, .45);
     --shadow-3: 0 18px 48px rgba(0, 0, 0, .60);
+    --shadow-color: rgba(0, 0, 0, .45);
     --overlay: rgba(0, 0, 0, .66);
+    --scrim: rgba(0, 0, 0, .72);
 
     --lift: #ffffff;
     --page-glow: var(--accent-wash);
+    --grid-line: rgba(255, 255, 255, .035);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --accent: #d7ff45;
-  --accent-ink: #0e1305;
-  --accent-text: #d7ff45;
-  --accent-dim: #9fbf3c;
-  --accent-wash: rgba(215, 255, 69, .08);
-  --accent-wash-strong: rgba(215, 255, 69, .16);
+  --accent: var(--a-fill-d);
+  --accent-strong: var(--a-strong-d);
+  --accent-ink: var(--a-ink-d);
+  --accent-text: var(--a-text-d);
+  --accent-dim: var(--a-dim-d);
+  --tint: var(--a-tint-d);
+  --chart-1: var(--a-chart-d);
 
-  --bg: #0a0e0d;
-  --surface-1: #131a18;
-  --surface-2: #1a2320;
-  --surface-3: #232e2a;
-  --surface-sunken: #070c0b;
+  --bg: #131819;
+  --surface-1: #1b2223;
+  --surface-2: #252e2f;
+  --surface-3: #3f4849;
+  --surface-sunken: #0d1213;
 
-  --hairline: #222d29;
-  --hairline-strong: #3b4944;
+  --hairline: #2c3435;
+  --hairline-strong: #4a5556;
 
-  --ink: #eef4f1;
-  --ink-2: #9daba5;
-  --ink-3: #6f7c77;
+  --ink: #edf1f1;
+  --ink-2: #b9c1c0;
+  --ink-3: #939997;
 
   --good: #58d68d;
   --warn: #f6c453;
   --bad: #ef8a7b;
-  --info: #6fc3ff;
+  --info: #b49bff;
 
-  --chart-1: #d7ff45;
-  --chart-2: #6fc3ff;
-  --chart-3: #ef8a7b;
-  --chart-4: #c4a2ff;
-  --chart-5: #5fe0c6;
-  --chart-6: #f6c453;
+  --chart-2: #fb923c;
+  --chart-3: #b49bff;
+  --chart-4: #5fe0c6;
+  --chart-5: #f6c453;
+  --chart-6: #ef8a7b;
 
-  --inverse-surface: #eef4f1;
-  --inverse-ink: #0a0e0d;
+  --inverse-surface: #edf1f1;
+  --inverse-ink: #131819;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .40);
   --shadow-2: 0 6px 20px rgba(0, 0, 0, .45);
   --shadow-3: 0 18px 48px rgba(0, 0, 0, .60);
+  --shadow-color: rgba(0, 0, 0, .45);
   --overlay: rgba(0, 0, 0, .66);
+  --scrim: rgba(0, 0, 0, .72);
 
   --lift: #ffffff;
   --page-glow: var(--accent-wash);
+  --grid-line: rgba(255, 255, 255, .035);
+}
+
+/* ===========================================================================
+   ACCENT — raw material only. No component reads these.
+
+   Seven values, each declared for a light ground and again for a dark one:
+
+     --a-fill     the brand colour itself. Borders, indicators, chart lines,
+                  the thing that says "this one".
+     --a-strong   a FILLED control, with --a-ink on top. Usually a deeper value
+                  than the fill, because most brand colours are chosen to look
+                  good, not to carry 4.5:1 against white.
+     --a-ink      text sitting on --a-strong.
+     --a-text     the accent used AS TEXT on a page ground.
+     --a-dim      a de-emphasised companion: disabled states, gradient ends.
+     --a-tint     the hue that translucent washes mix FROM.
+     --a-chart    data series 1.
+
+   Every pair below clears WCAG AA (4.5:1) for --a-ink on --a-strong and for
+   --a-text on its ground. That is the entry requirement for an accent, not a
+   nice-to-have: an accent that cannot be read is a decoration, and this app is
+   read at 5am and mid-set.
+
+   WHY --a-strong EXISTS. #259de2 is a good blue and carries exactly 3.0:1
+   against white — white text on it fails, charcoal text on it fails at 3.1:1,
+   there is no ink that works. So a filled button in light tone uses the deeper
+   #1571ae with white; in dark tone the brand blue itself is the fill and the
+   ink goes near-black. You only ever see one tone, so the button reads as one
+   colour, correctly, in both.
+   ======================================================================== */
+
+/* SIGNAL — the brand. Default for everyone who has not chosen otherwise, which
+   is why it is declared on bare :root as well as on its own attribute. */
+:root,
+[data-accent="signal"] {
+  --a-fill: #259de2;   --a-fill-d: #259de2;
+  --a-strong: #1571ae; --a-strong-d: #259de2;
+  --a-ink: #ffffff;    --a-ink-d: #08222e;
+  --a-text: #17699e;   --a-text-d: #259de2;
+  --a-dim: #8cc8ea;    --a-dim-d: #1d6e9c;
+  --a-tint: #1e80bc;   --a-tint-d: #259de2;
+  --a-chart: #17699e;  --a-chart-d: #4fb4ee;
+}
+
+/* EMBER — the warm opposite of the charcoal ground. */
+[data-accent="ember"] {
+  --a-fill: #e2622b;   --a-fill-d: #f2762f;
+  --a-strong: #b34715; --a-strong-d: #f2762f;
+  --a-ink: #ffffff;    --a-ink-d: #25120a;
+  --a-text: #b0480f;   --a-text-d: #f2762f;
+  --a-dim: #eda482;    --a-dim-d: #b3541f;
+  --a-tint: #c25321;   --a-tint-d: #f2762f;
+  --a-chart: #b0480f;  --a-chart-d: #fb923c;
+}
+
+/* VOLT — what Forge looked like before the rebrand. Kept because some athletes
+   have been staring at it for months and it is theirs too. */
+[data-accent="volt"] {
+  --a-fill: #d7ff45;   --a-fill-d: #d7ff45;
+  --a-strong: #4d7c0f; --a-strong-d: #d7ff45;
+  --a-ink: #ffffff;    --a-ink-d: #0e1305;
+  --a-text: #3f6212;   --a-text-d: #d7ff45;
+  --a-dim: #a8c94a;    --a-dim-d: #9fbf3c;
+  --a-tint: #78a01e;   --a-tint-d: #d7ff45;
+  --a-chart: #3f6212;  --a-chart-d: #d7ff45;
+}
+
+/* SAND — the palette's warm neutral, used as the accent rather than as a
+   surface. A tan card in a charcoal app looks like a mistake; a tan accent
+   looks like a decision. */
+[data-accent="sand"] {
+  --a-fill: #cdbaae;   --a-fill-d: #cdbaae;
+  --a-strong: #8a6a55; --a-strong-d: #cdbaae;
+  --a-ink: #ffffff;    --a-ink-d: #2a2018;
+  --a-text: #7a5c48;   --a-text-d: #cdbaae;
+  --a-dim: #e0d3cb;    --a-dim-d: #94816f;
+  --a-tint: #9c7c66;   --a-tint-d: #cdbaae;
+  --a-chart: #7a5c48;  --a-chart-d: #cdbaae;
+}
+
+/* SLATE — no accent at all. Everything the accent would have coloured goes
+   neutral, and the only colour left in the app is the status set: good, warn,
+   bad. Some people want the numbers and nothing else. */
+[data-accent="slate"] {
+  --a-fill: #7b807e;   --a-fill-d: #9aa3a2;
+  --a-strong: #4e5657; --a-strong-d: #9aa3a2;
+  --a-ink: #ffffff;    --a-ink-d: #14181a;
+  --a-text: #4e5657;   --a-text-d: #9aa3a2;
+  --a-dim: #b5bcbb;    --a-dim-d: #616b6a;
+  --a-tint: #5f6867;   --a-tint-d: #9aa3a2;
+  --a-chart: #4e5657;  --a-chart-d: #c3cbca;
+}
+
+
+/* ---------------------------------------------------------------------------
+   THE SAME MAPPING, SCOPED.
+
+   `[data-accent]` on any element gives that subtree a different accent while
+   keeping the page's tone. The settings screen uses it so each accent chip is
+   painted from the real tokens rather than from hand-picked preview hexes —
+   the old package picker kept its own copy of every palette inline in the JSX,
+   and the previews drifted from the app the moment a token changed.
+
+   Three blocks, matching the three tone states above, because a scoped preview
+   still has to know which half of its accent block is live.
+   ------------------------------------------------------------------------ */
+[data-accent] {
+  --accent: var(--a-fill);
+  --accent-strong: var(--a-strong);
+  --accent-ink: var(--a-ink);
+  --accent-text: var(--a-text);
+  --accent-dim: var(--a-dim);
+  --tint: var(--a-tint);
+  --chart-1: var(--a-chart);
+  --accent-wash: color-mix(in srgb, var(--tint) 10%, transparent);
+  --accent-wash-strong: color-mix(in srgb, var(--tint) 18%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-accent] {
+    --accent: var(--a-fill-d);
+    --accent-strong: var(--a-strong-d);
+    --accent-ink: var(--a-ink-d);
+    --accent-text: var(--a-text-d);
+    --accent-dim: var(--a-dim-d);
+    --tint: var(--a-tint-d);
+    --chart-1: var(--a-chart-d);
+  }
+}
+
+:root[data-theme="dark"] [data-accent] {
+  --accent: var(--a-fill-d);
+  --accent-strong: var(--a-strong-d);
+  --accent-ink: var(--a-ink-d);
+  --accent-text: var(--a-text-d);
+  --accent-dim: var(--a-dim-d);
+  --tint: var(--a-tint-d);
+  --chart-1: var(--a-chart-d);
 }
 
 /* ---------------------------------------------------------------------------
@@ -317,10 +458,10 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Form controls follow the theme rather than the OS default. */
+/* Form controls follow the tone rather than the OS default. */
 input, select, textarea, button { color-scheme: inherit; }
 
-/* Theme changes should not animate — a 150ms colour crossfade across every
+/* Tone changes should not animate — a 150ms colour crossfade across every
    surface on the page reads as a glitch, not a transition. */
 @media (prefers-reduced-motion: no-preference) {
   :root { transition: none; }

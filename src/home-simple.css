@@ -31,17 +31,17 @@
   .coach-home{gap:12px}.today-signal{display:none}.today-plan-head{padding:18px 17px 14px}.today-plan-head h2{font-size:42px}.today-plan-readiness{min-width:60px}.today-plan-summary{align-items:flex-start;flex-direction:column;padding:12px 17px}.today-plan-summary>div{width:100%;overflow:auto}.today-session-list article{padding:16px 17px}.today-session-list article strong{font-size:15px}.today-plan-card>footer{display:grid;grid-template-columns:1fr;padding:16px 17px}.today-plan-card>footer .button{width:100%}.home-next-step{display:none}.today-exercise-choices{margin-inline:-8px;padding:10px}.today-exercise-choices .top-set-group{padding:10px}.today-exercise-choices .exercise-target-list button{padding:11px}}
 .cohesive-recommendation .recommendation-checklist article{align-items:flex-start;gap:14px}
 .recommendation-select{display:flex;align-items:flex-start;gap:12px;flex:1;cursor:pointer}
-.recommendation-select input{width:20px;height:20px;margin-top:3px;accent-color:var(--accent,var(--accent))}
+.recommendation-select input{width:20px;height:20px;margin-top:3px;accent-color:var(--accent)}
 .recommendation-select span{display:grid;gap:3px}
-.recommendation-select small{font-size:10px;letter-spacing:.1em;color:var(--accent,var(--accent))}
+.recommendation-select small{font-size:10px;letter-spacing:.1em;color:var(--accent-text)}
 .recommendation-select strong{font-size:17px}
-.recommendation-select em{font-style:normal;color:var(--muted,var(--ink-2));font-size:13px}
+.recommendation-select em{font-style:normal;color:var(--ink-2);font-size:13px}
 .recommendation-checklist article.skipped{opacity:.52}
 .recommendation-checklist details{max-width:360px}
-.recommendation-checklist details p{font-size:12px;line-height:1.45;color:var(--muted,var(--ink-2))}
+.recommendation-checklist details p{font-size:12px;line-height:1.45;color:var(--ink-2)}
 .saved-recommendation-source{display:grid;gap:4px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface-1) 98%,var(--lift))}
-.saved-recommendation-source span{font-size:10px;letter-spacing:.1em;color:var(--accent,var(--accent));text-transform:uppercase}
-.saved-recommendation-source small{color:var(--muted,var(--ink-2))}
+.saved-recommendation-source span{font-size:10px;letter-spacing:.1em;color:var(--accent-text);text-transform:uppercase}
+.saved-recommendation-source small{color:var(--ink-2)}
 @media(max-width:720px){.recommendation-checklist article{display:block}.recommendation-checklist details{margin:10px 0 0 32px}.cohesive-recommendation footer{display:grid;grid-template-columns:1fr}.cohesive-recommendation footer .button{width:100%}}
 
 /* Home is a focused activity feed: today's decision first, supporting context second. */
@@ -57,8 +57,8 @@
 .feed-identity small,.compact-card>header>span{color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.12em}
 .feed-identity strong{overflow:hidden;font-size:18px;text-overflow:ellipsis;white-space:nowrap}
 .feed-identity em{overflow:hidden;color:var(--muted);font-size:12px;font-style:normal;text-overflow:ellipsis;white-space:nowrap}
-.feed-icon{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--tint) 14%,var(--panel-2));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--accent-text);font:800 15px var(--display)}
-.feed-icon.completed{background:var(--accent);color:var(--accent-ink)}
+/* The wash mixes into the CARD, not into the control surface under it: at 14% over --panel-2 the slate accent darkened the disc far enough that its own text colour fell to 2.8:1. A wash is meant to tint a light ground, not to become one. */.feed-icon{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--tint) 8%,var(--surface-1));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));color:var(--accent-text);font:800 15px var(--display)}
+.feed-icon.completed{background:var(--accent-strong);color:var(--accent-ink)}
 .feed-status{padding:6px 9px;border-radius:99px;background:color-mix(in srgb, var(--good) 10%, transparent);color:var(--mint);font-size:10px;font-weight:900;letter-spacing:.1em}
 .today-focus-card{border-top:3px solid var(--accent)}
 .today-focus-title{padding:24px 22px 18px}

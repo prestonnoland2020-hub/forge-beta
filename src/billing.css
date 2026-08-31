@@ -28,7 +28,7 @@
   letter-spacing: .1em;
 }
 .billing-pill[data-pro] {
-  background: var(--accent);
+  background: var(--accent-strong);
   border-color: var(--accent);
   color: var(--accent-ink);
 }

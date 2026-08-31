@@ -1,37 +1,63 @@
 FORGE — BRAND KIT
-Updated 31 August 2026. Supersedes every earlier copy.
+31 August 2026. Supersedes every earlier copy.
 
 This file is a readable mirror of src/forge-theme.css. That file is the source
-of truth; if the two ever disagree, the CSS is right and this is stale.
+of truth; if the two disagree, the CSS is right and this is stale.
 
 
 ────────────────────────────────────────────────────────────────────────────
-1. THE ONE RULE
+1. THE MARK
 ────────────────────────────────────────────────────────────────────────────
 
-Nothing in Forge names a colour. Everything names a ROLE, and the role
-resolves to a value based on the active theme.
+An angular F, cut on the diagonal, in three facets: the two arms in the brand
+colour, the stem's upper wedge in near-white, its lower wedge in grey. It sits
+on a charcoal tile with a long 45° shadow falling to the lower right.
+
+  brand/forge-logo.svg    faceted, full colour
+  brand/forge-mark.svg    flat silhouette, currentColor — for masks and icons
+  brand/source-logo.png   the original raster the vectors were traced from
+
+Everything Forge ships is generated from those two SVGs by
+
+  python3 tools/make-icons.py
+
+which writes public/icons/<accent>/ for all five accents, mirrors the default
+into the paths index.html and the manifest reference, and rebuilds favicon.ico
+and every iOS size. Nothing is hand-drawn at a pixel size — that is how icon
+sets drift apart.
+
+IN THE APP the mark is a CSS mask (--forge-mark), so it is one flat colour, and
+that colour is --accent-text. A solid brand-blue mark on white is a smudge;
+--accent-text is the same hue at a value that survives both grounds.
+
+
+────────────────────────────────────────────────────────────────────────────
+2. THE ONE RULE
+────────────────────────────────────────────────────────────────────────────
+
+Nothing in Forge names a colour. Everything names a ROLE, and the role resolves
+from the athlete's tone and accent.
 
     background: var(--surface-1);     ← correct
-    background: #131a18;              ← wrong, even if it looks identical
+    background: #1b2223;              ← wrong, even if it looks identical
 
-There are exactly two places in the app that contain colour literals:
-forge-theme.css (which defines the roles) and appearance.css (whose swatches
-must preview a theme the page is NOT currently in, so they cannot use
-variables). Everything else — 45 stylesheets — is roles only.
+Two files contain colour literals: forge-theme.css, which defines the roles, and
+appearance.css, whose tone swatches must preview a ground the page is not
+currently on. Everything else — 45 stylesheets — is roles only.
 
 
 ────────────────────────────────────────────────────────────────────────────
-2. THREE STATES
+3. TWO AXES
 ────────────────────────────────────────────────────────────────────────────
 
-Settings → Appearance offers three tones, and nothing else:
+  TONE      light · system · dark          the ground the app is lit on
+  ACCENT    signal · ember · volt · sand · slate
 
-    Light      always light
-    System     follows the device, and changes with it at sunset
-    Dark       the original Forge — volt on carbon
+They are independent and they compose: 3 × 5 = 15 finished looks from one set
+of components. This replaced five "UI packages" that were 5 looks from five
+parallel palettes, none of which was ever finished.
 
-How the choice reaches CSS:
+How tone reaches CSS:
 
     <html data-theme="light">    the athlete chose light
     <html data-theme="dark">     the athlete chose dark
@@ -40,101 +66,163 @@ How the choice reaches CSS:
 Dark is declared TWICE in forge-theme.css: once under
 @media (prefers-color-scheme: dark) guarded by :root:not([data-theme="light"]),
 and once under :root[data-theme="dark"]. The first makes System follow the OS;
-the second makes an explicit dark choice beat a light OS. A token that exists
-in only one of those blocks is a bug.
+the second makes an explicit dark choice beat a light OS. A token that exists in
+one tone and not the other is a bug.
 
-Stored under localStorage key `forge-appearance-v3`, and mirrored to the
-athlete's account so a new phone opens looking the same. index.html reads that
-key inline before first paint so there is no white flash on a cold open.
+How accent reaches CSS: <html data-accent="signal">. Each accent block declares
+its values TWICE — --a-text for a light ground, --a-text-d for a dark one — and
+declares nothing else. The tone blocks pick which half is live. Components never
+read an --a-* variable; those are raw material, not roles.
 
-Brand colours the athlete can pick — an accent laid on top of these three
-tones — are the NEXT step, not part of this.
+[data-accent] on any element scopes a different accent to that subtree while
+keeping the page's tone. The settings screen uses it so every accent chip is
+painted from the real tokens instead of a hand-picked stand-in.
+
+Stored under localStorage key `forge-appearance-v4` as
+{ theme, accent, icon } and mirrored to the athlete's account. index.html reads
+that key inline before first paint, so there is no flash of the wrong ground
+OR the wrong colour on a cold open. Anyone carrying a pre-rebrand setting keeps
+the lime: their app does not change colour overnight because we changed our
+minds about ours.
 
 
 ────────────────────────────────────────────────────────────────────────────
-3. COLOUR
+4. TONE — the neutrals
 ────────────────────────────────────────────────────────────────────────────
 
                           LIGHT          DARK
-BRAND
-  --accent                #d7ff45        #d7ff45     the volt. Never flips.
-  --accent-ink            #0e1305        #0e1305     text ON the accent
-  --accent-text           #3f6212        #d7ff45     accent used AS text
-  --accent-dim            #a8c94a        #9fbf3c
-  --accent-wash           rgba(120,160,30,.10)   rgba(215,255,69,.08)
-  --accent-wash-strong    rgba(120,160,30,.18)   rgba(215,255,69,.16)
-  --tint                  #78a01e        #d7ff45     hue that washes mix FROM
+GROUNDS — a ladder, one perceptible step each
+  --bg                    #f3f5f5        #131819
+  --surface-1             #ffffff        #1b2223     a card on the ground
+  --surface-2             #e8ecec        #252e2f     a control on a card
+  --surface-3             #dbe1e1        #3f4849     hover, active chip
+  --surface-sunken        #eaeeee        #0d1213     an inset well, a track
 
-  The volt is a FILL colour. As TEXT on a light ground it measures 1.2:1 and
-  is unreadable, which is why --accent-text exists: same hue, dark enough to
-  read. In dark they are the same value, which is why this only looks like an
-  extra token from the light side.
-
-  --tint is the same idea for translucent washes. A 7% volt wash on carbon is
-  a faint glow; the identical mix on white is weak yellow bile. Mixing from
-  --tint gives a green hint on white and the glow on carbon.
-
-GROUNDS AND SURFACES — a ladder, one perceptible step each
-  --bg                    #f7f7f5        #0a0e0d
-  --surface-1             #ffffff        #131a18     a card on the ground
-  --surface-2             #f2f2f0        #1a2320     a control on a card
-  --surface-3             #e8e8e5        #232e2a     hover, active chip
-  --surface-sunken        #eeeeeb        #070c0b     an inset well, a track
+  #3f4849 — the charcoal the mark sits on — is --surface-3, the step a thumb
+  actually touches. The page goes DEEPER than the logo's ground on purpose: at
+  #3f4849 the brand blue reaches only 3.1:1, and no amount of care elsewhere
+  fixes a ground that is too close to the thing on it.
 
 LINES
-  --hairline              #e4e4e0        #222d29
-  --hairline-strong       #cacac5        #3b4944
-  --grid-line             rgba(20,21,15,.035)    rgba(255,255,255,.035)
-                                                  the graph-paper page ground
+  --hairline              #dce2e2        #2c3435
+  --hairline-strong       #bac3c3        #4a5556
+  --grid-line             rgba(20,24,26,.035)   rgba(255,255,255,.035)
 
-TEXT — three steps and no more
-  --ink                   #14150f        #eef4f1
-  --ink-2                 #5c5f55        #9daba5
-  --ink-3                 #86897e        #6f7c77
+TEXT — three steps, all of them legible
+  --ink                   #14181a        #edf1f1
+  --ink-2                 #454c4b        #b9c1c0
+  --ink-3                 #5f6563        #939997
+
+  The palette's #7b807e is NOT in this ladder. It carries 4.0:1 on white and
+  3.0:1 on --surface-3, and a rendered audit found it under every calendar
+  date, timestamp and caption in the app. "Tertiary" is a rank, not permission
+  to be unreadable. #7b807e keeps its job in the mark and on dark grounds.
 
 STATUS — meaning, never decoration
   --good                  #1f7a3d        #58d68d
-  --warn                  #9a6400        #f6c453
+  --warn                  #8a5a00        #f6c453
   --bad                   #b3261e        #ef8a7b
-  --info                  #1663a8        #6fc3ff
+  --info                  #6d4ac4        #b49bff
 
-  Deliberately not green-on-green with the accent: a volt accent beside a volt
-  "good" would make success invisible.
+  --info is violet, not blue. It marks forecasts, projections and the coach's
+  guesses — and with a blue accent, a blue "info" would be invisible on exactly
+  the charts where the distinction matters.
 
-DATA — six series, separated by lightness as well as hue so they survive
-red-green colour vision deficiency
-  --chart-1               #4d7c0f        #d7ff45
-  --chart-2               #1663a8        #6fc3ff
-  --chart-3               #b3261e        #ef8a7b
-  --chart-4               #7a4bbd        #c4a2ff
-  --chart-5               #0f7d74        #5fe0c6
-  --chart-6               #9a6400        #f6c453
+DATA — series 1 follows the accent; the rest are fixed
+  --chart-2               #c2410c        #fb923c
+  --chart-3               #6d4ac4        #b49bff
+  --chart-4               #0f7d74        #5fe0c6
+  --chart-5               #8a5a00        #f6c453
+  --chart-6               #b3261e        #ef8a7b
 
-  Charts use --chart-1, never --accent, for exactly the reason above.
-
-INVERTED SURFACES — tooltips and toasts sit ON TOP of content and want to
-contrast with it rather than match it, so they flip with the theme
-  --inverse-surface       #14150f        #eef4f1
-  --inverse-ink           #f4f4f1        #0a0e0d
+INVERTED SURFACES — tooltips and toasts contrast with content, not match it
+  --inverse-surface       #14181a        #edf1f1
+  --inverse-ink           #f3f5f5        #131819
 
 DEPTH
-  --shadow-1              0 1px 2px rgba(20,21,15,.06)   0 1px 2px rgba(0,0,0,.40)
-  --shadow-2              0 6px 18px rgba(20,21,15,.09)  0 6px 20px rgba(0,0,0,.45)
-  --shadow-3              0 18px 44px rgba(20,21,15,.16) 0 18px 48px rgba(0,0,0,.60)
-  --shadow-color          rgba(20,21,15,.14)             rgba(0,0,0,.45)
-  --overlay               rgba(20,21,15,.38)             rgba(0,0,0,.66)
-  --scrim                 rgba(20,21,15,.46)             rgba(0,0,0,.72)
-  --lift                  #14150f        #ffffff
-  --page-glow             transparent    var(--accent-wash)
+  --shadow-1              0 1px 2px rgba(20,24,26,.06)    0 1px 2px rgba(0,0,0,.40)
+  --shadow-2              0 6px 18px rgba(20,24,26,.09)   0 6px 20px rgba(0,0,0,.45)
+  --shadow-3              0 18px 44px rgba(20,24,26,.16)  0 18px 48px rgba(0,0,0,.60)
+  --shadow-color          rgba(20,24,26,.14)              rgba(0,0,0,.45)
+  --overlay               rgba(20,24,26,.38)              rgba(0,0,0,.66)
+  --scrim                 rgba(20,24,26,.46)              rgba(0,0,0,.72)
+  --lift                  #14181a                         #ffffff
+  --page-glow             transparent                     var(--accent-wash)
 
-  --lift is the tint mixer. Several components lift a surface by mixing WHITE
-  into it, which separates on carbon and does nothing on white. --lift is
-  whichever direction actually separates, so
+  --lift is the tint mixer. Components lift a surface by mixing white into it,
+  which separates on charcoal and does nothing on white; --lift is whichever
+  direction actually separates, so
   `color-mix(in srgb, var(--surface-1) 96%, var(--lift))` reads in both.
 
-  --page-glow is the ambient wash behind the page. On carbon it is the volt
-  catching the top-right corner; on white the same wash reads as a stain, so
-  light gets none.
+
+────────────────────────────────────────────────────────────────────────────
+5. ACCENT — seven values, twice each
+────────────────────────────────────────────────────────────────────────────
+
+  --a-fill     the brand colour. Borders, indicators, chart lines.
+  --a-strong   a FILLED control, with --a-ink on top.
+  --a-ink      text sitting on --a-strong.
+  --a-text     the accent used AS TEXT on a page ground.
+  --a-dim      disabled states, gradient ends.
+  --a-tint     the hue washes mix FROM.
+  --a-chart    data series 1.
+
+WHY --a-strong EXISTS. #259de2 carries exactly 3.0:1 against white. White text
+on it fails; charcoal text on it fails at 3.1:1; there is no ink that works. So
+a filled button in light tone is the deeper #1571ae with white, and in dark tone
+the brand blue itself with near-black. You only ever see one tone, so the button
+reads as one colour, correctly, in both.
+
+                    LIGHT                        DARK
+SIGNAL — the brand, and the default
+  fill              #259de2                      #259de2
+  strong / ink      #1571ae / #ffffff            #259de2 / #08222e
+  text              #17699e                      #259de2
+  dim               #8cc8ea                      #1d6e9c
+  tint              #1e80bc                      #259de2
+  chart             #17699e                      #4fb4ee
+
+EMBER — warm against the charcoal
+  fill              #e2622b                      #f2762f
+  strong / ink      #b34715 / #ffffff            #f2762f / #25120a
+  text              #b0480f                      #f2762f
+  dim               #eda482                      #b3541f
+  tint              #c25321                      #f2762f
+  chart             #b0480f                      #fb923c
+
+VOLT — what Forge looked like before the rebrand
+  fill              #d7ff45                      #d7ff45
+  strong / ink      #4d7c0f / #ffffff            #d7ff45 / #0e1305
+  text              #3f6212                      #d7ff45
+  dim               #a8c94a                      #9fbf3c
+  tint              #78a01e                      #d7ff45
+  chart             #3f6212                      #d7ff45
+
+SAND — the palette's warm neutral, as accent rather than surface
+  fill              #cdbaae                      #cdbaae
+  strong / ink      #8a6a55 / #ffffff            #cdbaae / #2a2018
+  text              #7a5c48                      #cdbaae
+  dim               #e0d3cb                      #94816f
+  tint              #9c7c66                      #cdbaae
+  chart             #7a5c48                      #cdbaae
+
+SLATE — no accent at all; the only colour left is good / warn / bad
+  fill              #7b807e                      #9aa3a2
+  strong / ink      #4e5657 / #ffffff            #9aa3a2 / #14181a
+  text              #4e5657                      #9aa3a2
+  dim               #b5bcbb                      #616b6a
+  tint              #5f6867                      #9aa3a2
+  chart             #4e5657                      #c3cbca
+
+WASHES ARE DERIVED, NOT DECLARED
+  --accent-wash          color-mix(in srgb, var(--tint) 10%, transparent)
+  --accent-wash-strong   color-mix(in srgb, var(--tint) 18%, transparent)
+
+THE ENTRY REQUIREMENT FOR A NEW ACCENT is that --a-ink clears 4.5:1 on
+--a-strong and --a-text clears 4.5:1 on every ground it can land on, in both
+tones. `node contrastcheck.mjs` measures the rendered pages — 10 routes × 2
+tones × 5 accents — and fails if anything is under its WCAG AA floor. Run it
+before shipping a palette change.
 
 BRAND COLOURS THAT ARE NOT OURS — never tokenised, never theme-flipped
   Strava orange           #fc4c02   (and #fc5200, #fc7c4c in their panel)
@@ -145,25 +233,21 @@ BRAND COLOURS THAT ARE NOT OURS — never tokenised, never theme-flipped
 
 
 ────────────────────────────────────────────────────────────────────────────
-4. TYPE
+6. TYPE
 ────────────────────────────────────────────────────────────────────────────
 
   --display   'Archivo', 'Helvetica Neue', Arial, sans-serif
   --body      'Inter', system-ui, -apple-system, sans-serif
 
-Loaded in index.html <head>, with preconnect to fonts.gstatic.com:
+Loaded in index.html <head> with preconnect to fonts.gstatic.com:
   Archivo   500 600 700 800
   Inter     400 500 600 700 800
 
-WHY. Barlow Condensed, set uppercase at 800, was doing a lot of shouting — a
-sports-poster face that made every heading feel like a race bib. Archivo is a
-grotesque built for headlines AND small text: squarer, more engineered, with
-real mass at 700–800 without narrowing. It reads as equipment, which is the
-right register for an app whose whole claim is that it tells you the truth
-about your training.
-
-Inter stays for body and data. It has the best tabular figures of any free UI
-face, and this app is mostly numbers in columns.
+Archivo is a grotesque built for headlines AND small text: squarer, more
+engineered, with real mass at 700–800 without narrowing. It answers the mark,
+which is all straight cuts and hard angles. Inter stays for body and data —
+best tabular figures of any free UI face, and this app is mostly numbers in
+columns.
 
 USAGE
   Display    page titles, big numbers, metric values, avatar initials.
@@ -176,7 +260,7 @@ Inputs never go below 16px — anything smaller makes iOS Safari zoom the page.
 
 
 ────────────────────────────────────────────────────────────────────────────
-5. SHAPE AND RHYTHM
+7. SHAPE AND RHYTHM
 ────────────────────────────────────────────────────────────────────────────
 
   --r-xs   6px      --s1  4px      --ease  cubic-bezier(.2,.7,.3,1)
@@ -187,26 +271,12 @@ Inputs never go below 16px — anything smaller makes iOS Safari zoom the page.
                     --s6 30px
                     --s7 40px
 
-Theme changes are NOT animated. A 150ms colour crossfade across every surface
-on the page reads as a glitch, not a transition.
+Tone changes are NOT animated. A 150ms colour crossfade across every surface on
+the page reads as a glitch, not a transition.
 
 
 ────────────────────────────────────────────────────────────────────────────
-6. THE MARK
-────────────────────────────────────────────────────────────────────────────
-
-.brand-mark is a mask, not an image: the shape comes from --forge-mark and the
-colour from `background: var(--accent-text)`. That is deliberate — a solid volt
-mark on white is a smudge, and --accent-text is the same hue at a value that
-survives both grounds.
-
-The wordmark is FORGE, --display 800, letter-spacing .1em.
-
-The app icon is unresolved and is NOT covered by this file.
-
-
-────────────────────────────────────────────────────────────────────────────
-7. LEGACY ALIASES
+8. LEGACY ALIASES
 ────────────────────────────────────────────────────────────────────────────
 
 Older stylesheets read these. They point at the new roles so nothing had to be

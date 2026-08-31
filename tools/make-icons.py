@@ -1,192 +1,196 @@
 #!/usr/bin/env python3
-"""Generate the complete Forge icon set from one geometric definition.
+"""Build every icon Forge ships, from one vector.
 
-THE MARK. Forge logs the top set — the one heaviest honest effort of a session
-— so the mark is a loaded barbell seen straight on, sitting on the line the
-app already uses as its wordmark glyph. The bar is the accent; the plates are
-solid blocks with no gradient, no bevel and no perspective, because an icon is
-read at 40 pixels on a home screen far more often than at 1024 in a store
-listing.
+The mark is traced once into brand/forge-mark.svg (silhouette) and
+brand/forge-logo.svg (faceted). Everything below is composed from those, so a
+change to the letterform propagates to the App Store icon, the PWA manifest,
+the favicon and every alternate icon in one run. Nothing here is hand-drawn at
+a pixel size, which is how icon sets drift apart.
 
-Everything is drawn at 4x and downsampled with LANCZOS, which is what keeps
-the plate edges clean at small sizes instead of stair-stepping.
+    python3 tools/make-icons.py
 
-Apple rules this obeys: the App Store icon is fully opaque, square, has no
-rounded corners of its own (the system masks it), and no alpha channel at all
-— an icon with alpha is rejected at upload.
+Writes public/icons/<accent>/… for each accent, and mirrors the default accent
+to the paths index.html and the manifest already reference.
 """
+import io
+import json
+import re
+import shutil
+from pathlib import Path
 
-from __future__ import annotations
-import os
-from PIL import Image, ImageDraw
 import numpy as np
+from PIL import Image
+import cairosvg
 
-OUT = os.path.join(os.path.dirname(__file__), '..', 'public', 'icons')
-S = 1024          # design canvas
-SS = 4            # supersample factor
+ROOT = Path(__file__).resolve().parent.parent
+BRAND = ROOT / "brand"
+OUT = ROOT / "public"
 
-BG_TOP = (12, 17, 15)
-BG_BOTTOM = (6, 9, 8)
-ACCENT = (215, 255, 69)
-GLOW = (215, 255, 69)
+# Keep in step with the accent blocks in src/forge-theme.css. Only --a-fill
+# matters here: the white and grey facets are part of the mark, not the accent.
+ACCENTS = {
+    "signal": "#259de2",
+    "ember":  "#e2622b",
+    "volt":   "#d7ff45",
+    "sand":   "#cdbaae",
+    # The icon ground is #3f4849, so slate uses its LIGHT value here — the
+    # mid grey that reads as text on a page disappears on the tile.
+    "slate":  "#c3cbca",
+}
+DEFAULT = "signal"
 
+FACET_WHITE = "#f3f5f5"
+FACET_GREY = "#7b807e"
 
-def canvas(size: int) -> Image.Image:
-    """Dark vertical gradient with a soft accent glow behind the bar."""
-    y = np.linspace(0, 1, size, dtype=np.float32)[:, None]
-    top = np.array(BG_TOP, dtype=np.float32)
-    bottom = np.array(BG_BOTTOM, dtype=np.float32)
-    base = top * (1 - y[..., None]) + bottom * y[..., None]
-    base = np.repeat(base, size, axis=1)
+# The ground, from the supplied artwork: charcoal, lit from the upper left.
+GROUND_LIT = (86, 95, 95)
+GROUND_MID = (63, 72, 73)      # #3f4849
+GROUND_DEEP = (46, 54, 55)
 
-    # Radial glow, centred slightly above the middle so the composition sits up.
-    yy, xx = np.mgrid[0:size, 0:size].astype(np.float32)
-    cx, cy = size * 0.5, size * 0.44
-    dist = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / (size * 0.62)
-    # Tight and faint. A broad halo turned the background muddy grey-green at
-    # small sizes instead of reading as black.
-    halo = np.clip(1 - dist, 0, 1) ** 3.4 * 0.065
-    base = base + np.array(GLOW, dtype=np.float32) * halo[..., None]
-
-    return Image.fromarray(np.clip(base, 0, 255).astype(np.uint8), 'RGB')
-
-
-TILT = 19  # degrees, right end lifted
+SIZES = [16, 32, 48, 64, 128, 180, 192, 256, 384, 512, 1024]
+IOS = [20, 29, 40, 58, 60, 76, 80, 87, 100, 114, 120, 152, 167, 180, 1024]
 
 
-def barbell(image: Image.Image, size: int, scale: float = 1.0) -> Image.Image:
-    """A LOADED BAR ON THE WAY UP.
+def render(svg_text: str, px: int) -> Image.Image:
+    return Image.open(io.BytesIO(cairosvg.svg2png(
+        bytestring=svg_text.encode(), output_width=px, output_height=None,
+    ))).convert("RGBA")
 
-    Two attempts preceded this one. A level dumbbell was indistinguishable
-    from every other icon in the category — it said 'fitness app' and stopped
-    there. Three stacked pills said 'top set' honestly but read, at any size,
-    as a loading skeleton.
 
-    So: the bar itself, loaded, tilted so the right end rises. It is a barbell
-    and it is an upward stroke at the same time, which is the whole product —
-    log the heaviest honest set, watch the line move. The diagonal is what
-    stops it being stock art, and at 29 pixels it survives as a bold rising
-    slash with weight on the ends.
+def ground(px: int) -> Image.Image:
+    """Charcoal with a soft diagonal light, matching the source artwork."""
+    y, x = np.mgrid[0:px, 0:px].astype(np.float32) / max(px - 1, 1)
+    # Distance from the upper-left corner, eased, drives the lit-to-deep ramp.
+    d = np.clip(np.sqrt(x ** 2 + y ** 2) / 1.414, 0, 1) ** 0.85
+    a = np.empty((px, px, 3), np.float32)
+    for i in range(3):
+        lit, mid, deep = GROUND_LIT[i], GROUND_MID[i], GROUND_DEEP[i]
+        near = lit + (mid - lit) * np.clip(d / 0.5, 0, 1)
+        far = mid + (deep - mid) * np.clip((d - 0.5) / 0.5, 0, 1)
+        a[:, :, i] = np.where(d < 0.5, near, far)
+    return Image.fromarray(a.round().clip(0, 255).astype("uint8")).convert("RGBA")
 
-    Drawn flat on its own layer and rotated afterwards, because rotating
-    finished geometry at 4x supersample keeps the plate corners clean; drawing
-    on the diagonal directly would alias them.
+
+def long_shadow(alpha: np.ndarray) -> np.ndarray:
+    """Smear the silhouette to the lower-right corner.
+
+    Built by doubling: OR the mask with itself shifted 1px diagonally, then
+    2px, then 4px… so a full-canvas smear costs log2(n) passes instead of n.
     """
-    u = size / 1024.0
-    k = scale * 1.15
-    layer = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(layer)
-    cx = cy = size / 2
-
-    def bar(w, h, offset, radius):
-        draw.rounded_rectangle(
-            [cx + (offset - w / 2) * u * k, cy - h / 2 * u * k,
-             cx + (offset + w / 2) * u * k, cy + h / 2 * u * k],
-            radius=radius * u * k, fill=ACCENT + (255,),
-        )
-
-    bar(660, 68, 0, 34)                       # the bar
-    for side in (-1, 1):
-        bar(78, 310, side * 214, 22)          # inner plates — the heavy pair
-    for side in (-1, 1):
-        bar(54, 196, side * 310, 16)          # outer plates
-
-    layer = layer.rotate(TILT, resample=Image.BICUBIC, center=(cx, cy))
-    image.paste(layer, (0, 0), layer)
-    return image
+    m = alpha.copy()
+    step = 1
+    while step < m.shape[0]:
+        shifted = np.zeros_like(m)
+        shifted[step:, step:] = m[:-step, :-step]
+        m = np.maximum(m, shifted)
+        step *= 2
+    return m
 
 
-def render(size: int, mark_scale: float = 1.0) -> Image.Image:
-    big = size * SS
-    image = barbell(canvas(big), big, mark_scale)
-    return image.convert('RGB').resize((size, size), Image.LANCZOS)
+def compose(px: int, fill: str, pad: float = 0.205) -> Image.Image:
+    """One square icon: ground, long shadow, then the faceted mark."""
+    logo_svg = (BRAND / "forge-logo.svg").read_text().replace("#259de2", fill)
+    mark_svg = (BRAND / "forge-mark.svg").read_text().replace("currentColor", "#000")
+
+    inner = max(int(round(px * (1 - 2 * pad))), 1)
+    logo = render(logo_svg, inner)
+    mark = render(mark_svg, inner)
+
+    # Centre the mark's own box on the canvas.
+    ox = (px - logo.width) // 2
+    oy = (px - logo.height) // 2
+
+    silhouette = np.zeros((px, px), np.float32)
+    m = np.asarray(mark)[:, :, 3].astype(np.float32) / 255
+    silhouette[oy:oy + mark.height, ox:ox + mark.width] = m
+
+    canvas = ground(px)
+    shade = long_shadow(silhouette)
+    # The smear must not darken the mark itself, or the letterform muddies.
+    shade = np.clip(shade - silhouette, 0, 1) * 0.26
+    veil = Image.fromarray(np.dstack([
+        np.zeros((px, px), "uint8"), np.zeros((px, px), "uint8"),
+        np.zeros((px, px), "uint8"), (shade * 255).astype("uint8"),
+    ]))
+    canvas = Image.alpha_composite(canvas, veil)
+    canvas.alpha_composite(logo, (ox, oy))
+    return canvas
 
 
-def save(image: Image.Image, name: str) -> None:
-    path = os.path.join(OUT, name)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    image.save(path, 'PNG', optimize=True)
-    print(f'  {name}  {image.size[0]}×{image.size[1]}')
+def write(img: Image.Image, path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.convert("RGB").save(path, "PNG", optimize=True)
 
 
-def svg(background: bool) -> str:
-    """The same geometry as vectors, from the same constants, so the favicon
-    and the in-app mark can never drift away from the store icon."""
-    k = 1.15
-    accent = '#%02x%02x%02x' % ACCENT
-    parts = []
-    for w, h, offset, radius in ((660, 68, 0, 34), (78, 310, -214, 22), (78, 310, 214, 22),
-                                 (54, 196, -310, 16), (54, 196, 310, 16)):
-        w, h, offset, radius = w * k, h * k, offset * k, radius * k
-        parts.append(
-            f'<rect x="{512 + offset - w / 2:.1f}" y="{512 - h / 2:.1f}" '
-            f'width="{w:.1f}" height="{h:.1f}" rx="{radius:.1f}" fill="{accent}"/>'
-        )
-    shapes = '\n    '.join(parts)
-    # SVG rotates clockwise in screen coordinates, so the right end lifts at
-    # NEGATIVE degrees — the mirror of PIL's convention above.
-    ground = '<rect width="1024" height="1024" fill="#0b100e"/>\n  ' if background else ''
-    return (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" '
-        'role="img" aria-label="Forge">\n  '
-        f'{ground}<g transform="rotate({-TILT} 512 512)">\n    {shapes}\n  </g>\n</svg>\n'
+def build_accent(name: str, fill: str):
+    base = OUT / "icons" / name
+    master = compose(1024, fill)
+    for s in SIZES:
+        write(master.resize((s, s), Image.LANCZOS), base / f"icon-{s}.png")
+    # Maskable: Android crops to a circle, so the mark shrinks into the safe zone.
+    maskable = compose(1024, fill, pad=0.29)
+    for s in (192, 512):
+        write(maskable.resize((s, s), Image.LANCZOS), base / f"maskable-{s}.png")
+    write(master.resize((180, 180), Image.LANCZOS), base / "apple-touch-icon.png")
+
+    # A vector icon for browsers that prefer one.
+    logo = (BRAND / "forge-logo.svg").read_text().replace("#259de2", fill)
+    inner = re.sub(r"^<svg[^>]*>|</svg>$", "", logo).strip()
+    vb = re.search(r'viewBox="0 0 (\d+) (\d+)"', logo)
+    w, h = int(vb.group(1)), int(vb.group(2))
+    side = round(max(w, h) / (1 - 2 * 0.205))
+    dx, dy = (side - w) / 2, (side - h) / 2
+    (base / "icon.svg").write_text(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {side} {side}">'
+        f'<rect width="{side}" height="{side}" fill="#3f4849"/>'
+        f'<g transform="translate({dx:.1f},{dy:.1f})">{inner}</g></svg>'
     )
+    return base
 
 
-def main() -> None:
-    os.makedirs(OUT, exist_ok=True)
+def main():
+    for name, fill in ACCENTS.items():
+        base = build_accent(name, fill)
+        print(f"  {name:7s} -> {base.relative_to(ROOT)}")
 
-    print('App Store / Play Store')
-    # No alpha, no rounded corners: Apple masks the shape and rejects alpha.
-    save(render(1024), 'icon-1024.png')
-    save(render(512), 'icon-512.png')
+    # index.html and the manifest point at stable paths. The default accent's
+    # files are copied there so a first load never waits on JavaScript to pick
+    # an icon, and so the favicon is right before React exists.
+    src = OUT / "icons" / DEFAULT
+    for a, b in [
+        ("icon-32.png", OUT / "favicon-32.png"),
+        ("icon-16.png", OUT / "favicon-16.png"),
+        ("apple-touch-icon.png", OUT / "apple-touch-icon.png"),
+        ("icon.svg", OUT / "forge-icon.svg"),
+        ("icon-192.png", OUT / "icons/icon-192.png"),
+        ("icon-256.png", OUT / "icons/icon-256.png"),
+        ("icon-384.png", OUT / "icons/icon-384.png"),
+        ("icon-512.png", OUT / "icons/icon-512.png"),
+        ("icon-1024.png", OUT / "icons/icon-1024.png"),
+        ("maskable-192.png", OUT / "icons/maskable-192.png"),
+        ("maskable-512.png", OUT / "icons/maskable-512.png"),
+        ("icon-32.png", OUT / "icons/favicon-32.png"),
+        ("icon-16.png", OUT / "icons/favicon-16.png"),
+        ("icon-48.png", OUT / "icons/favicon-48.png"),
+        ("apple-touch-icon.png", OUT / "icons/apple-touch-icon.png"),
+    ]:
+        b.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src / a, b)
 
-    print('iOS app icon set')
-    for size in (180, 167, 152, 144, 120, 114, 100, 87, 80, 76, 60, 58, 40, 29, 20):
-        save(render(size), f'ios/icon-{size}.png')
+    ico = Image.open(src / "icon-256.png").convert("RGBA")
+    ico.save(OUT / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
 
-    print('Android / PWA')
-    for size in (192, 256, 384, 512):
-        save(render(size), f'icon-{size}.png')
-    # Maskable: Android crops to a circle inscribed in the safe zone, so the
-    # mark shrinks to ~62% and the background carries the rest.
-    for size in (192, 512):
-        save(render(size, mark_scale=0.62), f'maskable-{size}.png')
+    # Xcode wants every rasterised size present in the asset catalogue.
+    master = Image.open(src / "icon-1024.png").convert("RGBA")
+    for s in IOS:
+        write(master.resize((s, s), Image.LANCZOS), OUT / "icons/ios" / f"icon-{s}.png")
 
-    print('Web')
-    save(render(180), 'apple-touch-icon.png')
-    for size in (16, 32, 48):
-        save(render(size, mark_scale=1.12), f'favicon-{size}.png')
-
-    # Multi-resolution .ico for legacy browser chrome.
-    ico = render(48, mark_scale=1.12)
-    ico.save(os.path.join(OUT, '..', 'favicon.ico'), sizes=[(16, 16), (32, 32), (48, 48)])
-    print('  favicon.ico')
-
-    print('Vectors')
-    public = os.path.join(OUT, '..')
-    for name, has_bg in (('forge-icon.svg', True), ('forge-mark.svg', False)):
-        with open(os.path.join(public, name), 'w', encoding='utf-8') as handle:
-            handle.write(svg(has_bg))
-        print(f'  {name}')
-
-    # The names the app and manifest already reference, so nothing downstream
-    # has to change to pick up the new mark.
-    print('Replacing the previous set in place')
-    aliases = {
-        'forge-icon-192.png': render(192),
-        'forge-icon-512.png': render(512),
-        'forge-icon-maskable-512.png': render(512, mark_scale=0.62),
-        'apple-touch-icon.png': render(180),
-        'favicon-16.png': render(16, mark_scale=1.12),
-        'favicon-32.png': render(32, mark_scale=1.12),
-    }
-    for name, image in aliases.items():
-        image.save(os.path.join(public, name), 'PNG', optimize=True)
-        print(f'  {name}')
-
-    print('\nDone. Every icon is opaque RGB with no alpha channel.')
+    manifest = json.loads((OUT / "manifest.webmanifest").read_text())
+    manifest["background_color"] = "#131819"
+    manifest["theme_color"] = "#131819"
+    (OUT / "manifest.webmanifest").write_text(json.dumps(manifest, indent=2) + "\n")
+    print("  defaults mirrored, favicon.ico and iOS sizes written")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

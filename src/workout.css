@@ -21,7 +21,7 @@
 .automatic-hint { color: var(--mint); font-size:11px; font-weight: 600; }
 .muscle-picker { display: flex; gap: 8px; flex-wrap: wrap; }
 .muscle-chip { border: 1px solid var(--hairline-strong); background: var(--panel-2); color: var(--ink-2); border-radius: 999px; padding: 9px 14px; font-weight: 700; font-size: 12px; }
-.muscle-chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.muscle-chip.active { background: var(--accent-strong); border-color: var(--accent); color: var(--accent-ink); }
 .compact-title { padding-bottom: 14px; }
 .compact-title h3 small { font: 600 12px Inter; text-transform: none; color: var(--muted); }
 .cardio-entry { background: var(--surface-sunken); border: 1px solid var(--hairline-strong); border-radius: 10px; padding: 17px; display: grid; gap: 16px; }
@@ -168,7 +168,7 @@
 .dial-suffix{font:800 13px var(--display-font);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);align-self:center;min-width:34px;text-align:left}
 .dial-sheet footer{display:grid;grid-template-columns:1fr 1fr;gap:10px;border-top:1px solid var(--line);padding-top:14px}
 .dial-cancel,.dial-ok{padding:14px;border-radius:12px;font:800 15px inherit;border:1px solid var(--line);background:transparent;color:var(--muted)}
-.dial-ok{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast)}
+.dial-ok{background:var(--accent-strong);border-color:var(--accent);color:var(--accent-contrast)}
 
 /* The field that opens it. */
 .dial-field{display:grid;gap:7px;min-width:0}
@@ -181,7 +181,7 @@
 .dial-field-hint{color:var(--muted);font-size:11px}
 
 /* Logging is a header action, not a destination. */
-.top-log{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:var(--accent-contrast);border:0}
+.top-log{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--accent-strong);color:var(--accent-contrast);border:0}
 .top-log svg{width:20px;height:20px}
 .top-log:active{transform:scale(.94)}
 .bottom-nav{grid-template-columns:repeat(5,1fr)}
@@ -205,7 +205,7 @@
 .top-set-sheet header small{color:var(--muted);line-height:1.45}
 .top-set-sheet-close{background:none;border:0;color:var(--muted);font-size:30px;line-height:1;padding:0 4px;flex:none}
 .top-set-sheet-search{display:grid;gap:8px;font:800 11px var(--display-font,inherit);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-.top-set-sheet-search input{width:100%;box-sizing:border-box;background:var(--surface-sunken,var(--panel));color:var(--text);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:700 16px inherit;letter-spacing:0;text-transform:none}
+.top-set-sheet-search input{width:100%;box-sizing:border-box;background:var(--surface-sunken);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:700 16px inherit;letter-spacing:0;text-transform:none}
 .top-set-sheet-search input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .top-set-sheet-results{display:grid;gap:8px;max-height:46vh;overflow-y:auto}
 .top-set-sheet-result,.top-set-sheet-new{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:56px;padding:11px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);text-align:left}
@@ -229,7 +229,7 @@
 
 /* Sets already logged for a synced day: assigning the day ties them to it —
    there is nothing to re-enter. */
-.strava-review-tied{display:grid;gap:4px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--mint,var(--good)) 34%,transparent);border-radius:12px;background:color-mix(in srgb,var(--mint,var(--good)) 7%,transparent)}
-.strava-review-tied .eyebrow{color:var(--mint,var(--good));font-size:10px;letter-spacing:.1em}
+.strava-review-tied{display:grid;gap:4px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--good) 34%,transparent);border-radius:12px;background:color-mix(in srgb,var(--good) 7%,transparent)}
+.strava-review-tied .eyebrow{color:var(--good);font-size:10px;letter-spacing:.1em}
 .strava-review-tied strong{font-size:15px}
 .strava-review-tied small{color:var(--muted);font-size:12px;line-height:1.4}
