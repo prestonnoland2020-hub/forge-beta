@@ -47,15 +47,22 @@ currently on. Everything else — 45 stylesheets — is roles only.
 
 
 ────────────────────────────────────────────────────────────────────────────
-3. TWO AXES
+3. FOUR AXES
 ────────────────────────────────────────────────────────────────────────────
 
-  TONE      light · system · dark          the ground the app is lit on
-  ACCENT    signal · ember · volt · sand · slate
+  TONE      light · system · dark            how bright the app is
+  GROUND    carbon · midnight · ink · espresso     what the neutrals are made of
+  ACCENT    signal · flare · coral · amber · tide · harbor
+  ICON      match · any accent               what sits on the home screen
 
-They are independent and they compose: 3 × 5 = 15 finished looks from one set
-of components. This replaced five "UI packages" that were 5 looks from five
-parallel palettes, none of which was ever finished.
+They are independent and they compose: 3 × 4 × 6 × 7 = 504 finished looks from
+one set of components. This replaced five "UI packages" that were 5 looks from
+five parallel palettes, none of which was ever finished.
+
+TONE AND GROUND ARE DIFFERENT QUESTIONS, which is why they are different
+controls. Tone is how much light is in the room. Ground is what the app is
+built out of. And because every ground reuses the same rung LIGHTNESSES and
+moves only hue, choosing one can never make anything harder to read — see §4.
 
 How tone reaches CSS:
 
@@ -69,6 +76,10 @@ and once under :root[data-theme="dark"]. The first makes System follow the OS;
 the second makes an explicit dark choice beat a light OS. A token that exists in
 one tone and not the other is a bug.
 
+How ground reaches CSS: <html data-ground="carbon">. Carbon is the bare tone
+blocks in forge-theme.css; the other three are generated into
+src/forge-grounds.css by tools/build-grounds.py.
+
 How accent reaches CSS: <html data-accent="signal">. Each accent block declares
 its values TWICE — --a-text for a light ground, --a-text-d for a dark one — and
 declares nothing else. The tone blocks pick which half is live. Components never
@@ -78,62 +89,100 @@ read an --a-* variable; those are raw material, not roles.
 keeping the page's tone. The settings screen uses it so every accent chip is
 painted from the real tokens instead of a hand-picked stand-in.
 
-Stored under localStorage key `forge-appearance-v4` as
-{ theme, accent, icon } and mirrored to the athlete's account. index.html reads
-that key inline before first paint, so there is no flash of the wrong ground
-OR the wrong colour on a cold open. Anyone carrying a pre-rebrand setting keeps
-the lime: their app does not change colour overnight because we changed our
-minds about ours.
+[data-ground] scopes a ladder the same way, and [data-force-tone="light"|"dark"]
+puts the OTHER tone's ladder on an element — that is how the settings screen
+shows you a tone and a ground you are not currently in without a single
+hardcoded hex.
+
+Stored under localStorage key `forge-appearance-v5` as
+{ theme, ground, accent, icon } and mirrored to the athlete's account.
+index.html reads it inline before first paint, so there is no flash of the
+wrong ground OR the wrong colour on a cold open. Each key bump added an axis
+rather than changing one, so an older record is a valid partial and merges
+forward.
+
+RETIRED ACCENTS. The first set (ember, volt, sand, slate) was invented before
+Preston's secondary palettes existed. Each retires to its nearest survivor —
+ember→coral, volt→amber, sand→harbor, slate→harbor — in BOTH the head script
+and the provider, so the first painted frame is the same colour as the second.
+Nobody opens the app to a colour they did not pick.
 
 
 ────────────────────────────────────────────────────────────────────────────
-4. TONE — the neutrals
+4. GROUND — the neutrals
 ────────────────────────────────────────────────────────────────────────────
+
+CARBON is the reference ladder, and every other ground is derived from it.
 
                           LIGHT          DARK
-GROUNDS — a ladder, one perceptible step each
   --bg                    #f3f5f5        #131819
   --surface-1             #ffffff        #1b2223     a card on the ground
   --surface-2             #e8ecec        #252e2f     a control on a card
   --surface-3             #dbe1e1        #3f4849     hover, active chip
   --surface-sunken        #eaeeee        #0d1213     an inset well, a track
+  --hairline              #dce2e2        #2c3435
+  --hairline-strong       #bac3c3        #4a5556
+  --ink                   #14181a        #edf1f1
+  --ink-2                 #454c4b        #b9c1c0
+  --ink-3                 #5f6563        #939997
+  --grid-line             rgba(20,24,26,.035)   rgba(255,255,255,.035)
 
   #3f4849 — the charcoal the mark sits on — is --surface-3, the step a thumb
   actually touches. The page goes DEEPER than the logo's ground on purpose: at
   #3f4849 the brand blue reaches only 3.1:1, and no amount of care elsewhere
   fixes a ground that is too close to the thing on it.
 
-LINES
-  --hairline              #dce2e2        #2c3435
-  --hairline-strong       #bac3c3        #4a5556
-  --grid-line             rgba(20,24,26,.035)   rgba(255,255,255,.035)
-
-TEXT — three steps, all of them legible
-  --ink                   #14181a        #edf1f1
-  --ink-2                 #454c4b        #b9c1c0
-  --ink-3                 #5f6563        #939997
-
-  The palette's #7b807e is NOT in this ladder. It carries 4.0:1 on white and
+  The palette's #7b807e is NOT in the ink ladder. It carries 4.0:1 on white and
   3.0:1 on --surface-3, and a rendered audit found it under every calendar
   date, timestamp and caption in the app. "Tertiary" is a rank, not permission
-  to be unreadable. #7b807e keeps its job in the mark and on dark grounds.
+  to be unreadable. #7b807e keeps its job in the mark.
 
-STATUS — meaning, never decoration
+THE OTHER THREE ARE GENERATED, and the rule that generates them is the whole
+reason this system holds together:
+
+  Held constant per rung:  OKLab L, taken from Carbon
+  Varied per ground:       hue, and a chroma budget
+
+So Midnight's card is exactly as light as Carbon's card, and any colour that
+clears 4.5:1 on one ground clears it on all four. Without that constraint every
+new ground would need its own accent set — the packages problem wearing a hat.
+
+                    hue    chroma   dark --bg   light --bg
+  carbon            205    0.010    #131819     #f3f5f5
+  midnight          255    0.042    #09172a     #eef5fe
+  ink               250    0.008    #14171b     #f3f5f6
+  espresso           27    0.030    #23110f     #fcf2f1
+
+Text rungs take half the chroma; light surfaces take a third, because coloured
+paper is a different and worse idea than a tinted ground. --surface-1 is
+#ffffff on every ground: there is no room at L=1 for a tint, and pushing one in
+only bends the colour out of sRGB.
+
+  python3 tools/build-grounds.py
+
+regenerates src/forge-grounds.css. It REFUSES TO WRITE if any rung drifts in
+real luminance or if any accent's type falls under 4.5:1 on any ground. OKLab is
+load-bearing: in HSL two colours with the same "lightness" can differ by a third
+of a stop in real luminance, and ladders built that way drift.
+
+STATUS AND DATA are tone-level, not ground-level — they mean the same thing
+whatever the app is built out of.
+
+                          LIGHT          DARK
   --good                  #1f7a3d        #58d68d
   --warn                  #8a5a00        #f6c453
   --bad                   #b3261e        #ef8a7b
   --info                  #6d4ac4        #b49bff
-
-  --info is violet, not blue. It marks forecasts, projections and the coach's
-  guesses — and with a blue accent, a blue "info" would be invisible on exactly
-  the charts where the distinction matters.
-
-DATA — series 1 follows the accent; the rest are fixed
   --chart-2               #c2410c        #fb923c
   --chart-3               #6d4ac4        #b49bff
   --chart-4               #0f7d74        #5fe0c6
   --chart-5               #8a5a00        #f6c453
   --chart-6               #b3261e        #ef8a7b
+
+  --chart-1 follows the accent. --info is violet, not blue: it marks forecasts
+  and the coach's guesses, and with a blue accent a blue info is invisible on
+  exactly the charts where the distinction matters.
+
 
 INVERTED SURFACES — tooltips and toasts contrast with content, not match it
   --inverse-surface       #14181a        #edf1f1
@@ -173,56 +222,84 @@ a filled button in light tone is the deeper #1571ae with white, and in dark tone
 the brand blue itself with near-black. You only ever see one tone, so the button
 reads as one colour, correctly, in both.
 
+EVERY VALUE EXCEPT --a-fill IS SOLVED, NOT PICKED. tools/solve-accents.py walks
+OKLab lightness along the accent's own hue until the value clears its contrast
+requirement, and stops at the first one that does — so each is the closest
+version to the brand colour that the job allows, rather than "a darker blue"
+chosen by eye. --a-text is measured against --surface-2, the DARKEST light
+surface type lands on; solving against white is how you ship an accent that
+looks fine on the page and fails on a card.
+
                     LIGHT                        DARK
-SIGNAL — the brand, and the default
+SIGNAL — the brand, and the default          #259de2
   fill              #259de2                      #259de2
-  strong / ink      #1571ae / #ffffff            #259de2 / #08222e
-  text              #17699e                      #259de2
-  dim               #8cc8ea                      #1d6e9c
-  tint              #1e80bc                      #259de2
-  chart             #17699e                      #4fb4ee
+  strong / ink      #0078bb / #ffffff            #259de2 / #1a2c3a
+  text / chart      #006bad                      #29a0e5
+  dim               #a4daff                      #086b9f
+  tint              #0084c7                      #259de2
 
-EMBER — warm against the charcoal
-  fill              #e2622b                      #f2762f
-  strong / ink      #b34715 / #ffffff            #f2762f / #25120a
-  text              #b0480f                      #f2762f
-  dim               #eda482                      #b3541f
-  tint              #c25321                      #f2762f
-  chart             #b0480f                      #fb923c
+FLARE — hot red                              #e2383a
+  fill              #e2383a                      #e2383a
+  strong / ink      #da2e33 / #ffffff            #e2383a / #0d0101
+  text / chart      #ca1926                      #ff635d
+  dim               #ffa199                      #9a161d
+  tint              #c50f21                      #e2383a
 
-VOLT — what Forge looked like before the rebrand
-  fill              #d7ff45                      #d7ff45
-  strong / ink      #4d7c0f / #ffffff            #d7ff45 / #0e1305
-  text              #3f6212                      #d7ff45
-  dim               #a8c94a                      #9fbf3c
-  tint              #78a01e                      #d7ff45
-  chart             #3f6212                      #d7ff45
+CORAL — the same red, cooled down            #e85949
+  fill              #e85949                      #e85949
+  strong / ink      #ce4033 / #ffffff            #e85949 / #2d1815
+  text / chart      #bf3126                      #f96957
+  dim               #ffb5a8                      #a2362b
+  tint              #cc3e31                      #e85949
 
-SAND — the palette's warm neutral, as accent rather than surface
-  fill              #cdbaae                      #cdbaae
-  strong / ink      #8a6a55 / #ffffff            #cdbaae / #2a2018
-  text              #7a5c48                      #cdbaae
-  dim               #e0d3cb                      #94816f
-  tint              #9c7c66                      #cdbaae
-  chart             #7a5c48                      #cdbaae
+AMBER — burnt gold                           #f6ac01
+  fill              #f6ac01                      #f6ac01
+  strong / ink      #a86200 / #ffffff            #f6ac01 / #524532
+  text / chart      #9a5600                      #f6ac01
+  dim               #fff5b6                      #b67e00
+  tint              #db9200                      #f6ac01
 
-SLATE — no accent at all; the only colour left is good / warn / bad
-  fill              #7b807e                      #9aa3a2
-  strong / ink      #4e5657 / #ffffff            #9aa3a2 / #14181a
-  text              #4e5657                      #9aa3a2
-  dim               #b5bcbb                      #616b6a
-  tint              #5f6867                      #9aa3a2
-  chart             #4e5657                      #c3cbca
+  The widest gap in the set. #f6ac01 on white is 1.9:1, so its type goes all
+  the way down to a burnt gold four steps below the fill. Same hue; only one of
+  them can be read.
+
+TIDE — cool water                            #5ab9ca
+  fill              #5ab9ca                      #5ab9ca
+  strong / ink      #0b7e8f / #ffffff            #5ab9ca / #254147
+  text / chart      #007181                      #5ab9ca
+  dim               #c3f3fd                      #3c8591
+  tint              #3ea0b0                      #5ab9ca
+
+HARBOR — barely an accent                    #627a88
+  fill              #627a88                      #627a88
+  strong / ink      #5f7684 / #ffffff            #627a88 / #000000
+  text / chart      #536a78                      #829ba9
+  dim               #a7b5bd                      #3a4c56
+  tint              #4c6370                      #627a88
+
+  Everything the accent would have coloured goes quiet, and the only real
+  colour left in the app is the status set. Some people want the numbers and
+  nothing else.
 
 WASHES ARE DERIVED, NOT DECLARED
   --accent-wash          color-mix(in srgb, var(--tint) 10%, transparent)
   --accent-wash-strong   color-mix(in srgb, var(--tint) 18%, transparent)
 
-THE ENTRY REQUIREMENT FOR A NEW ACCENT is that --a-ink clears 4.5:1 on
---a-strong and --a-text clears 4.5:1 on every ground it can land on, in both
-tones. `node contrastcheck.mjs` measures the rendered pages — 10 routes × 2
-tones × 5 accents — and fails if anything is under its WCAG AA floor. Run it
-before shipping a palette change.
+ADDING AN ACCENT
+
+  1. put the brand hex in tools/solve-accents.py and run it; it prints the
+     CSS block and the ACCENT_TEXT entry
+  2. paste both, and run tools/build-grounds.py — it re-verifies the new
+     accent against all four grounds and refuses to write if it fails
+  3. add it to accentChoices and the head script's regex in index.html
+  4. run tools/make-icons.py for its icon set
+  5. run `node contrastcheck.mjs` — the rendered audit, 144 page loads across
+     tones, grounds and accents — and ship only on a clean run
+
+The entry requirement is not negotiable: --a-ink clears 4.5:1 on --a-strong and
+--a-text clears 4.5:1 on every surface it can land on, in both tones, on every
+ground. An accent that cannot be read is a decoration, and this app is read at
+5am and mid-set.
 
 BRAND COLOURS THAT ARE NOT OURS — never tokenised, never theme-flipped
   Strava orange           #fc4c02   (and #fc5200, #fc7c4c in their panel)

@@ -311,74 +311,95 @@
 
    WHY --a-strong EXISTS. #259de2 is a good blue and carries exactly 3.0:1
    against white — white text on it fails, charcoal text on it fails at 3.1:1,
-   there is no ink that works. So a filled button in light tone uses the deeper
-   #1571ae with white; in dark tone the brand blue itself is the fill and the
+   there is no ink that works. So a filled button in light tone uses a deeper
+   value with white; in dark tone the brand colour itself is the fill and the
    ink goes near-black. You only ever see one tone, so the button reads as one
-   colour, correctly, in both.
+   colour, correctly, in both. Amber is the extreme case: #f6ac01 carries
+   1.9:1 on white, and its --a-strong lands four steps down.
    ======================================================================== */
+
+/* Every value below except --a-fill is SOLVED, not picked: tools/solve-accents.py
+   walks OKLab lightness along the accent's own hue until the value clears its
+   contrast requirement, and stops at the first one that does. So each is the
+   closest version to Preston's colour that the job allows, rather than a
+   darker shade chosen by eye. Re-run that tool if a brand colour changes; it
+   prints these blocks.
+
+   --a-text is measured against --surface-2, the DARKEST light surface type
+   lands on. Solving against white instead is how you ship an accent that looks
+   fine on the page and fails on a card. */
 
 /* SIGNAL — the brand. Default for everyone who has not chosen otherwise, which
    is why it is declared on bare :root as well as on its own attribute. */
 :root,
 [data-accent="signal"] {
   --a-fill: #259de2;   --a-fill-d: #259de2;
-  --a-strong: #1571ae; --a-strong-d: #259de2;
-  --a-ink: #ffffff;    --a-ink-d: #08222e;
-  --a-text: #17699e;   --a-text-d: #259de2;
-  --a-dim: #8cc8ea;    --a-dim-d: #1d6e9c;
-  --a-tint: #1e80bc;   --a-tint-d: #259de2;
-  --a-chart: #17699e;  --a-chart-d: #4fb4ee;
+  --a-strong: #0078bb; --a-strong-d: #259de2;
+  --a-ink: #ffffff;    --a-ink-d: #1a2c3a;
+  --a-text: #006bad;   --a-text-d: #29a0e5;
+  --a-dim: #a4daff;    --a-dim-d: #086b9f;
+  --a-tint: #0084c7;   --a-tint-d: #259de2;
+  --a-chart: #006bad;  --a-chart-d: #29a0e5;
 }
 
-/* EMBER — the warm opposite of the charcoal ground. */
-[data-accent="ember"] {
-  --a-fill: #e2622b;   --a-fill-d: #f2762f;
-  --a-strong: #b34715; --a-strong-d: #f2762f;
-  --a-ink: #ffffff;    --a-ink-d: #25120a;
-  --a-text: #b0480f;   --a-text-d: #f2762f;
-  --a-dim: #eda482;    --a-dim-d: #b3541f;
-  --a-tint: #c25321;   --a-tint-d: #f2762f;
-  --a-chart: #b0480f;  --a-chart-d: #fb923c;
+/* FLARE — the hot red. */
+[data-accent="flare"] {
+  --a-fill: #e2383a;   --a-fill-d: #e2383a;
+  --a-strong: #da2e33; --a-strong-d: #e2383a;
+  --a-ink: #ffffff;    --a-ink-d: #0d0101;
+  --a-text: #ca1926;   --a-text-d: #ff635d;
+  --a-dim: #ffa199;    --a-dim-d: #9a161d;
+  --a-tint: #c50f21;   --a-tint-d: #e2383a;
+  --a-chart: #ca1926;  --a-chart-d: #ff635d;
 }
 
-/* VOLT — what Forge looked like before the rebrand. Kept because some athletes
-   have been staring at it for months and it is theirs too. */
-[data-accent="volt"] {
-  --a-fill: #d7ff45;   --a-fill-d: #d7ff45;
-  --a-strong: #4d7c0f; --a-strong-d: #d7ff45;
-  --a-ink: #ffffff;    --a-ink-d: #0e1305;
-  --a-text: #3f6212;   --a-text-d: #d7ff45;
-  --a-dim: #a8c94a;    --a-dim-d: #9fbf3c;
-  --a-tint: #78a01e;   --a-tint-d: #d7ff45;
-  --a-chart: #3f6212;  --a-chart-d: #d7ff45;
+/* CORAL — the same family, cooled down. */
+[data-accent="coral"] {
+  --a-fill: #e85949;   --a-fill-d: #e85949;
+  --a-strong: #ce4033; --a-strong-d: #e85949;
+  --a-ink: #ffffff;    --a-ink-d: #2d1815;
+  --a-text: #bf3126;   --a-text-d: #f96957;
+  --a-dim: #ffb5a8;    --a-dim-d: #a2362b;
+  --a-tint: #cc3e31;   --a-tint-d: #e85949;
+  --a-chart: #bf3126;  --a-chart-d: #f96957;
 }
 
-/* SAND — the palette's warm neutral, used as the accent rather than as a
-   surface. A tan card in a charcoal app looks like a mistake; a tan accent
-   looks like a decision. */
-[data-accent="sand"] {
-  --a-fill: #cdbaae;   --a-fill-d: #cdbaae;
-  --a-strong: #8a6a55; --a-strong-d: #cdbaae;
-  --a-ink: #ffffff;    --a-ink-d: #2a2018;
-  --a-text: #7a5c48;   --a-text-d: #cdbaae;
-  --a-dim: #e0d3cb;    --a-dim-d: #94816f;
-  --a-tint: #9c7c66;   --a-tint-d: #cdbaae;
-  --a-chart: #7a5c48;  --a-chart-d: #cdbaae;
+/* AMBER — the widest gap between fill and text in the set. #f6ac01 on white is
+   1.9:1, so its type goes all the way down to a burnt gold. Both are the same
+   hue; only one of them can be read. */
+[data-accent="amber"] {
+  --a-fill: #f6ac01;   --a-fill-d: #f6ac01;
+  --a-strong: #a86200; --a-strong-d: #f6ac01;
+  --a-ink: #ffffff;    --a-ink-d: #524532;
+  --a-text: #9a5600;   --a-text-d: #f6ac01;
+  --a-dim: #fff5b6;    --a-dim-d: #b67e00;
+  --a-tint: #db9200;   --a-tint-d: #f6ac01;
+  --a-chart: #9a5600;  --a-chart-d: #f6ac01;
 }
 
-/* SLATE — no accent at all. Everything the accent would have coloured goes
-   neutral, and the only colour left in the app is the status set: good, warn,
-   bad. Some people want the numbers and nothing else. */
-[data-accent="slate"] {
-  --a-fill: #7b807e;   --a-fill-d: #9aa3a2;
-  --a-strong: #4e5657; --a-strong-d: #9aa3a2;
-  --a-ink: #ffffff;    --a-ink-d: #14181a;
-  --a-text: #4e5657;   --a-text-d: #9aa3a2;
-  --a-dim: #b5bcbb;    --a-dim-d: #616b6a;
-  --a-tint: #5f6867;   --a-tint-d: #9aa3a2;
-  --a-chart: #4e5657;  --a-chart-d: #c3cbca;
+/* TIDE — the cool one. */
+[data-accent="tide"] {
+  --a-fill: #5ab9ca;   --a-fill-d: #5ab9ca;
+  --a-strong: #0b7e8f; --a-strong-d: #5ab9ca;
+  --a-ink: #ffffff;    --a-ink-d: #254147;
+  --a-text: #007181;   --a-text-d: #5ab9ca;
+  --a-dim: #c3f3fd;    --a-dim-d: #3c8591;
+  --a-tint: #3ea0b0;   --a-tint-d: #5ab9ca;
+  --a-chart: #007181;  --a-chart-d: #5ab9ca;
 }
 
+/* HARBOR — barely an accent. Everything the accent would have coloured goes
+   quiet, and the only real colour left in the app is the status set: good,
+   warn, bad. Some people want the numbers and nothing else. */
+[data-accent="harbor"] {
+  --a-fill: #627a88;   --a-fill-d: #627a88;
+  --a-strong: #5f7684; --a-strong-d: #627a88;
+  --a-ink: #ffffff;    --a-ink-d: #000000;
+  --a-text: #536a78;   --a-text-d: #829ba9;
+  --a-dim: #a7b5bd;    --a-dim-d: #3a4c56;
+  --a-tint: #4c6370;   --a-tint-d: #627a88;
+  --a-chart: #536a78;  --a-chart-d: #829ba9;
+}
 
 /* ---------------------------------------------------------------------------
    THE SAME MAPPING, SCOPED.

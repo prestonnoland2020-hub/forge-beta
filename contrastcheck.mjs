@@ -5,9 +5,23 @@
 import { chromium } from 'playwright';
 import { setup, goals, days } from './seed.mjs';
 
-const BASE = 'http://localhost:4192';
-const ROUTES = ['/', '/plan', '/insights', '/history', '/goals', '/coach', '/exercises', '/profile', '/profile?view=appearance', '/profile?view=billing'];
-const ACCENTS = ['signal', 'ember', 'volt', 'sand', 'slate'];
+const BASE = 'http://localhost:4193';
+const ALL_ROUTES = ['/', '/plan', '/insights', '/history', '/goals', '/coach', '/exercises', '/profile', '/profile?view=appearance', '/profile?view=billing'];
+const ACCENTS = ['signal', 'flare', 'coral', 'amber', 'tide', 'harbor'];
+const GROUNDS = ['carbon', 'midnight', 'ink', 'espresso'];
+
+/* Two passes instead of the full 480-load cross product.
+   Pass 1 sweeps every accent over every route on the default ground, because
+   component-level pairings are what accents actually break.
+   Pass 2 sweeps every ground over a few dense routes, because grounds move only
+   hue at fixed lightness — tools/build-grounds.py already proves every rung and
+   every accent's type analytically, so this is confirmation, not discovery. */
+const PASSES = [
+  ...ACCENTS.flatMap(accent => ['light', 'dark'].flatMap(theme =>
+    ALL_ROUTES.map(route => ({ accent, theme, route, ground: 'carbon' })))),
+  ...GROUNDS.flatMap(ground => ['light', 'dark'].flatMap(theme =>
+    ['/', '/insights', '/profile?view=appearance'].map(route => ({ accent: 'signal', theme, route, ground })))),
+];
 
 const AUDIT = `(() => {
   const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
@@ -67,29 +81,25 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const seen = new Map();
 let checked = 0;
 
-for (const accent of ACCENTS) {
-  for (const theme of ['light', 'dark']) {
-    for (const route of ROUTES) {
-      const page = await browser.newPage({ viewport: { width: 430, height: 1200 } });
-      await page.route('**/*', r => r.request().url().startsWith(BASE) ? r.continue() : r.abort());
-      await page.addInitScript(([s, g, d, t, a]) => {
-        localStorage.clear();
-        localStorage.setItem('forge-athlete-setup-v1:preview-user', JSON.stringify(s));
-        localStorage.setItem('forge-goals', JSON.stringify(g));
-        localStorage.setItem('forge-workout-history-v1', JSON.stringify(d));
-        localStorage.setItem('forge-appearance-v4', JSON.stringify({ theme: t, accent: a, icon: 'match' }));
-      }, [setup, goals, days, theme, accent]);
-      await page.goto(`${BASE}/#${route}${route.includes('?') ? '&' : '?'}t=1`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(1800);
-      for (const hit of await page.evaluate(AUDIT)) {
-        const key = `${hit.sel}|${hit.text}`;
-        const prev = seen.get(key);
-        if (!prev || hit.r < prev.r) seen.set(key, { ...hit, where: `${accent}/${theme}${route}` });
-      }
-      checked++;
-      await page.close();
-    }
+for (const { accent, theme, route, ground } of PASSES) {
+  const page = await browser.newPage({ viewport: { width: 430, height: 1200 } });
+  await page.route('**/*', r => r.request().url().startsWith(BASE) ? r.continue() : r.abort());
+  await page.addInitScript(([s, g, d, t, a, gr]) => {
+    localStorage.clear();
+    localStorage.setItem('forge-athlete-setup-v1:preview-user', JSON.stringify(s));
+    localStorage.setItem('forge-goals', JSON.stringify(g));
+    localStorage.setItem('forge-workout-history-v1', JSON.stringify(d));
+    localStorage.setItem('forge-appearance-v5', JSON.stringify({ theme: t, ground: gr, accent: a, icon: 'match' }));
+  }, [setup, goals, days, theme, accent, ground]);
+  await page.goto(`${BASE}/#${route}${route.includes('?') ? '&' : '?'}t=1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1500);
+  for (const hit of await page.evaluate(AUDIT)) {
+    const key = `${hit.sel}|${hit.text}`;
+    const prev = seen.get(key);
+    if (!prev || hit.r < prev.r) seen.set(key, { ...hit, where: `${ground}/${accent}/${theme}${route}` });
   }
+  checked++;
+  await page.close();
 }
 await browser.close();
 

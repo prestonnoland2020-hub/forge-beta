@@ -10,7 +10,7 @@ import { wearableConnections } from '../features/training/wearableService';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { useAppearance, themeChoices, accentChoices } from '../features/preferences/AppearanceProvider';
+import { useAppearance, themeChoices, groundChoices, accentChoices } from '../features/preferences/AppearanceProvider';
 import { beginStravaConnection, disconnectStrava, finishStravaConnection, getActivityConnection, syncStravaActivities, type ActivityConnectionStatus } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
 
@@ -18,7 +18,7 @@ type View='profile'|'coach'|'recovery'|'connections'|'appearance'|'billing';
 const VIEWS=['profile','coach','recovery','connections','appearance','billing'] as const;
 const isView=(value:string|null):value is View=>(VIEWS as readonly string[]).includes(String(value));
 export function ProfilePage(){
-  const {setup}=useProfileSetup();const {profile,recovery,health}=useAdaptiveTraining();const {goals}=useGoals();const {records,addRecord}=useWorkoutHistory();const {settings:appearance,setTheme,setAccent,setIcon,resolved:resolvedTheme,resolvedIcon}=useAppearance();const [params]=useSearchParams();const requested=params.get('view');const [view,setView]=useState<View>(isView(requested)?requested:'profile');const {notes,upsert}=useAthleteNotes();const {isPro}=useBilling();
+  const {setup}=useProfileSetup();const {profile,recovery,health}=useAdaptiveTraining();const {goals}=useGoals();const {records,addRecord}=useWorkoutHistory();const {settings:appearance,setTheme,setGround,setAccent,setIcon,resolved:resolvedTheme,resolvedIcon}=useAppearance();const [params]=useSearchParams();const requested=params.get('view');const [view,setView]=useState<View>(isView(requested)?requested:'profile');const {notes,upsert}=useAthleteNotes();const {isPro}=useBilling();
   useEffect(()=>{if(isView(requested))setView(requested)},[requested]);const [activity,setActivity]=useState<ActivityConnectionStatus|null>(null);const [connectionMessage,setConnectionMessage]=useState('');const [connectionBusy,setConnectionBusy]=useState(false);const latest=health[health.length-1];const name=setup?.displayName||'Athlete';const initials=name.split(' ').map(part=>part[0]).join('').slice(0,2).toUpperCase();const metric=setup?.units==='Metric';const distanceUnit=metric?'km':'mi';const distanceValue=(miles:number)=>Number((metric?miles*1.609344:miles).toFixed(1));const weeklyDistance=distanceValue(profile.weeklyMileage);const longestDistance=distanceValue(profile.longestRunMiles);
   const loadConnection=async()=>{try{setActivity(await getActivityConnection())}catch(reason){setConnectionMessage(reason instanceof Error?reason.message:'Connection status is unavailable.')}};
   useEffect(()=>{void loadConnection();const params=new URLSearchParams(window.location.search);const code=params.get('code');const state=params.get('state');if(params.get('strava')==='callback'&&code&&state){setView('connections');setConnectionBusy(true);void finishStravaConnection(code,state).then(async()=>{window.history.replaceState({},'',`${window.location.pathname}#/profile`);await syncStravaActivities().catch(()=>null);const merged=await importStravaActivities(records,addRecord).catch(()=>({imported:0}));setConnectionMessage(`Strava connected${merged.imported?` — ${merged.imported} activities added to your training log`:''}. New activities import automatically.`);return loadConnection()}).catch(reason=>setConnectionMessage(reason instanceof Error?reason.message:'Strava could not connect.')).finally(()=>setConnectionBusy(false))}},[]);
@@ -53,11 +53,17 @@ export function ProfilePage(){
             const active=appearance.theme===choice.id;
             return <button type="button" key={choice.id} role="radio" aria-checked={active}
               className={active?'pick-card active':'pick-card'} onClick={()=>setTheme(choice.id)}>
-              <span className={`theme-swatch theme-swatch-${choice.id}`} aria-hidden="true">
+              {/* data-force-tone puts the OTHER tone's ladder on the element
+                  itself — custom properties inherit, so the swatch renders in a
+                  tone the page is not in without a single hardcoded hex, and it
+                  follows the athlete's chosen ground for free. */}
+              <span className={`theme-swatch theme-swatch-${choice.id}`} aria-hidden="true"
+                data-ground={appearance.ground}
+                data-force-tone={choice.id==='system'?undefined:choice.id}>
                 {choice.id==='system'
                   ? <>
-                      <span className="ts-half theme-swatch-dark"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
-                      <span className="ts-half theme-swatch-light"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
+                      <span className="ts-half" data-ground={appearance.ground} data-force-tone="dark"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
+                      <span className="ts-half" data-ground={appearance.ground} data-force-tone="light"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
                     </>
                   : <><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></>}
               </span>
@@ -65,6 +71,38 @@ export function ProfilePage(){
                 <strong>{choice.name}</strong>
                 <small>{choice.description}</small>
                 {active&&<em>{choice.id==='system'?`ON — currently ${resolvedTheme}`:'ON'}</em>}
+              </span>
+            </button>;
+          })}
+        </div>
+      </section>
+
+      <section className="appearance-section">
+        <header>
+          <span className="eyebrow">APPEARANCE · GROUND</span>
+          <h2>What it&rsquo;s built from</h2>
+          <p>Tone is how bright the app is. Ground is what the greys are made of. Every ground uses the same steps of lightness, so this one is purely a matter of taste &mdash; nothing here can make anything harder to read.</p>
+        </header>
+        <div className="ground-grid" role="radiogroup" aria-label="Ground">
+          {groundChoices.map(choice=>{
+            const active=appearance.ground===choice.id;
+            return <button type="button" key={choice.id} role="radio" aria-checked={active}
+              className={active?'pick-card ground-card active':'pick-card ground-card'}
+              onClick={()=>setGround(choice.id)}>
+              {/* Both tones at once. A ground's character is mostly in its
+                  dark ladder — the light ones are damped on purpose — so a
+                  swatch showing only the tone you are currently in would make
+                  Carbon and Ink look identical and the choice arbitrary.
+                  data-ground + data-force-tone put the real ladders on these
+                  elements, so this is the ground, not a picture of it. */}
+              <span className="ground-swatch" aria-hidden="true">
+                <span className="gs-half" data-ground={choice.id} data-force-tone="dark"><i/><i/></span>
+                <span className="gs-half" data-ground={choice.id} data-force-tone="light"><i/><i/></span>
+              </span>
+              <span className="pick-meta">
+                <strong>{choice.name}</strong>
+                <small>{choice.description}</small>
+                {active&&<em>ON</em>}
               </span>
             </button>;
           })}
@@ -113,8 +151,8 @@ export function ProfilePage(){
             <span className="icon-stack" aria-hidden="true">
               {/* The resolved icon sits in front, flanked by two others, so the
                   tile reads as "whichever one you pick" instead of a sixth icon. */}
-              <img src={`./icons/${resolvedIcon==='signal'?'ember':'signal'}/icon-192.png`} alt=""/>
-              <img src={`./icons/${resolvedIcon==='volt'?'sand':'volt'}/icon-192.png`} alt=""/>
+              <img src={`./icons/${resolvedIcon==='signal'?'flare':'signal'}/icon-192.png`} alt=""/>
+              <img src={`./icons/${resolvedIcon==='amber'?'tide':'amber'}/icon-192.png`} alt=""/>
               <img src={`./icons/${resolvedIcon}/icon-192.png`} alt=""/>
             </span>
             <strong>Match accent</strong>

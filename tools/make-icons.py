@@ -30,12 +30,13 @@ OUT = ROOT / "public"
 # matters here: the white and grey facets are part of the mark, not the accent.
 ACCENTS = {
     "signal": "#259de2",
-    "ember":  "#e2622b",
-    "volt":   "#d7ff45",
-    "sand":   "#cdbaae",
-    # The icon ground is #3f4849, so slate uses its LIGHT value here — the
-    # mid grey that reads as text on a page disappears on the tile.
-    "slate":  "#c3cbca",
+    "flare":  "#e2383a",
+    "coral":  "#e85949",
+    "amber":  "#f6ac01",
+    "tide":   "#5ab9ca",
+    # The icon ground is #3f4849, so Harbor uses its LIGHT value here — the mid
+    # grey that reads as type on a page disappears on the tile.
+    "harbor": "#a7b5bd",
 }
 DEFAULT = "signal"
 

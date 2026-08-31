@@ -13,16 +13,24 @@ import { loadAthleteSettings, saveAthleteSettings } from '../profile/settingsSyn
 
    What replaced it is three independent axes that compose:
 
-     tone     light · system · dark      the ground the app is lit on
+     tone     light · system · dark      how bright the app is
+     ground   what the neutrals are made of — cool charcoal, navy, near-black,
+              or warm brown
      accent   the one colour that is not neutral
      icon     which app icon sits on the home screen
 
-   Independent is the point. Five packages was 5 looks; three axes is
-   3 x 5 x 5 = 75, from far less code, and every one of them is finished
-   because there is only one set of components underneath. */
+   Independent is the point. Five packages was 5 looks; four axes is
+   3 x 4 x 6 x 7 = 504, from far less code, and every one of them is finished
+   because there is only one set of components underneath.
+
+   TONE AND GROUND ARE NOT THE SAME QUESTION, which is why they are not the
+   same control. Tone is how much light is in the room. Ground is what the app
+   is built out of — and because every ground reuses the same rung lightnesses
+   and moves only hue, choosing one can never make anything harder to read. */
 
 export type ThemeChoice = 'light' | 'dark' | 'system';
-export type AccentChoice = 'signal' | 'ember' | 'volt' | 'sand' | 'slate';
+export type GroundChoice = 'carbon' | 'midnight' | 'ink' | 'espresso';
+export type AccentChoice = 'signal' | 'flare' | 'coral' | 'amber' | 'tide' | 'harbor';
 /* The icon defaults to matching the accent. `match` is stored rather than
    resolved so that changing the accent later moves the icon with it, which is
    what someone who never opened this section expects. */
@@ -30,6 +38,7 @@ export type IconChoice = AccentChoice | 'match';
 
 export type AppearanceSettings = {
   theme: ThemeChoice;
+  ground: GroundChoice;
   accent: AccentChoice;
   icon: IconChoice;
 };
@@ -37,20 +46,37 @@ export type AppearanceSettings = {
 export const themeChoices: Array<{ id: ThemeChoice; name: string; description: string }> = [
   { id: 'light', name: 'Light', description: 'Bright surfaces, dark text.' },
   { id: 'system', name: 'System', description: 'Follows your device, and changes with it.' },
-  { id: 'dark', name: 'Dark', description: 'Charcoal ground. The default Forge.' },
+  { id: 'dark', name: 'Dark', description: 'The default Forge.' },
+];
+
+export const groundChoices: Array<{ id: GroundChoice; name: string; description: string }> = [
+  { id: 'carbon', name: 'Carbon', description: 'Cool charcoal. The Forge tile.' },
+  { id: 'midnight', name: 'Midnight', description: 'Deep navy.' },
+  { id: 'ink', name: 'Ink', description: 'Neutral black. Nothing in the way.' },
+  { id: 'espresso', name: 'Espresso', description: 'Warm brown.' },
 ];
 
 export const accentChoices: Array<{ id: AccentChoice; name: string; description: string }> = [
   { id: 'signal', name: 'Signal', description: 'The Forge blue.' },
-  { id: 'ember', name: 'Ember', description: 'Warm against the charcoal.' },
-  { id: 'volt', name: 'Volt', description: 'The original lime.' },
-  { id: 'sand', name: 'Sand', description: 'Quiet and warm.' },
-  { id: 'slate', name: 'Slate', description: 'No colour but the numbers.' },
+  { id: 'flare', name: 'Flare', description: 'Hot red.' },
+  { id: 'coral', name: 'Coral', description: 'The same red, cooled down.' },
+  { id: 'amber', name: 'Amber', description: 'Burnt gold.' },
+  { id: 'tide', name: 'Tide', description: 'Cool water.' },
+  { id: 'harbor', name: 'Harbor', description: 'Barely an accent at all.' },
 ];
+
+/* The first accent set was mine, invented before Preston sent his secondary
+   palettes. Nobody who chose one of those should open the app to a colour they
+   did not pick, so each retires to its nearest survivor rather than to the
+   default — an Ember athlete gets Coral, not blue. */
+const retiredAccents: Record<string, AccentChoice> = {
+  ember: 'coral', volt: 'amber', sand: 'harbor', slate: 'harbor',
+};
 
 type AppearanceContextValue = {
   settings: AppearanceSettings;
   setTheme: (theme: ThemeChoice) => void;
+  setGround: (ground: GroundChoice) => void;
   setAccent: (accent: AccentChoice) => void;
   setIcon: (icon: IconChoice) => void;
   /* What the athlete is actually looking at right now. `system` resolves to
@@ -63,35 +89,45 @@ type AppearanceContextValue = {
 
 const AppearanceContext = createContext<AppearanceContextValue | null>(null);
 
-const storageKey = 'forge-appearance-v4';
+const storageKey = 'forge-appearance-v5';
+const legacyKeys = ['forge-appearance-v4', 'forge-appearance-v3', 'forge-appearance-v2'];
 const accents = accentChoices.map(choice => choice.id);
+const grounds = groundChoices.map(choice => choice.id);
 
 const isTheme = (value: unknown): value is ThemeChoice =>
   value === 'light' || value === 'dark' || value === 'system';
+const isGround = (value: unknown): value is GroundChoice =>
+  grounds.includes(value as GroundChoice);
 const isAccent = (value: unknown): value is AccentChoice =>
   accents.includes(value as AccentChoice);
 const isIcon = (value: unknown): value is IconChoice =>
   value === 'match' || isAccent(value);
 
-const fallback: AppearanceSettings = { theme: 'system', accent: 'signal', icon: 'match' };
+/* Retired names resolve to their replacement; anything else falls through. */
+const toAccent = (value: unknown): AccentChoice | null =>
+  isAccent(value) ? value : (typeof value === 'string' && retiredAccents[value]) || null;
+
+const fallback: AppearanceSettings = { theme: 'system', ground: 'carbon', accent: 'signal', icon: 'match' };
 
 function readSettings(): AppearanceSettings {
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey) || '{}') as Partial<Record<keyof AppearanceSettings, unknown>>;
+    /* Read the current key, then fall back through the older ones. Each bump
+       added an axis rather than changing the meaning of an existing one, so an
+       old record is a valid partial and merging forward loses nothing. */
+    const raw = [storageKey, ...legacyKeys]
+      .map(key => localStorage.getItem(key))
+      .find(Boolean);
+    const stored = JSON.parse(raw || '{}') as Partial<Record<string, unknown>>;
     return {
       /* Anyone carrying a choice from the five-package era lands on dark —
          which is what four of those five packages were, and what the app has
          always looked like. */
       theme: isTheme(stored.theme)
         ? stored.theme
-        : (localStorage.getItem('forge-appearance-v2') || localStorage.getItem('forge-appearance-v3') ? 'dark' : 'system'),
-      /* Anyone who was using Forge before the rebrand keeps the lime until
-         they choose otherwise. Their app should not change colour overnight
-         because we changed our minds about ours. */
-      accent: isAccent(stored.accent)
-        ? stored.accent
-        : (localStorage.getItem('forge-appearance-v3') ? 'volt' : 'signal'),
-      icon: isIcon(stored.icon) ? stored.icon : 'match',
+        : (localStorage.getItem('forge-appearance-v2') ? 'dark' : 'system'),
+      ground: isGround(stored.ground) ? stored.ground : 'carbon',
+      accent: toAccent(stored.accent) ?? 'signal',
+      icon: isIcon(stored.icon) ? stored.icon : (toAccent(stored.icon) ?? 'match'),
     };
   } catch { return fallback; }
 }
@@ -108,6 +144,7 @@ function applyToRoot(settings: AppearanceSettings) {
      the OS live without JavaScript re-rendering anything. */
   if (settings.theme === 'system') delete root.dataset.theme;
   else root.dataset.theme = settings.theme;
+  root.dataset.ground = settings.ground;
   root.dataset.accent = settings.accent;
   /* Every attribute the old packages set — data-package, data-surface,
      data-mode, data-type, data-atmosphere — is removed along with the
@@ -183,8 +220,9 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       if (!active || !remote) return;
       setSettings(current => ({
         theme: isTheme(remote.theme) ? remote.theme : current.theme,
-        accent: isAccent(remote.accent) ? remote.accent : current.accent,
-        icon: isIcon(remote.icon) ? remote.icon : current.icon,
+        ground: isGround(remote.ground) ? remote.ground : current.ground,
+        accent: toAccent(remote.accent) ?? current.accent,
+        icon: isIcon(remote.icon) ? remote.icon : (toAccent(remote.icon) ?? current.icon),
       }));
     });
     return () => { active = false; };
@@ -199,6 +237,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     return {
       settings,
       setTheme: (theme: ThemeChoice) => commit({ ...settings, theme }),
+      setGround: (ground: GroundChoice) => commit({ ...settings, ground }),
       setAccent: (accent: AccentChoice) => commit({ ...settings, accent }),
       setIcon: (icon: IconChoice) => commit({ ...settings, icon }),
       resolved: settings.theme === 'system' ? (systemDark ? 'dark' : 'light') : settings.theme,
