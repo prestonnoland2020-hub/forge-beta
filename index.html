@@ -8,7 +8,10 @@
          underneath it, and it matters most in the Capacitor WebView where a
          zoomed page cannot be pinched back out to fit. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b100e" />
+    <!-- The browser paints its own chrome from this before any CSS runs, so it
+         needs one value per scheme or the notch area fights the page. -->
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0e0d" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Forge logs the top set — the one heaviest honest effort — and coaches the progression from there." />
     <!-- Long-press on a native WebView otherwise offers text selection and a
          callout menu over buttons, which reads as a bug rather than an app. -->
@@ -24,6 +27,39 @@
     <link rel="alternate icon" href="./favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <title>Forge Training</title>
+    <!-- ARCHIVO for display, INTER for body and data. preconnect first: the
+         stylesheet lives on googleapis.com but the font files come from
+         gstatic.com, and without the second hint that TCP+TLS handshake does
+         not start until the CSS has been parsed. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" />
+    <!-- NO FLASH OF THE WRONG THEME.
+
+         React mounts, reads localStorage and stamps data-theme — but that all
+         happens after the browser has already painted. A dark-mode athlete
+         would see a white page for a frame or two on every cold open, which on
+         a phone at 5am is genuinely unpleasant and reads as a broken app.
+
+         This runs before first paint. It is deliberately inline (a separate
+         file would be another request to wait on), deliberately tiny, and
+         deliberately fails silent: a browser with storage blocked falls
+         through to the prefers-color-scheme block in the CSS, which is the
+         correct answer anyway. Keep it in sync with AppearanceProvider's
+         storage key. -->
+    <script>
+      (function () {
+        try {
+          var saved = JSON.parse(localStorage.getItem('forge-appearance-v3') || '{}').theme;
+          if (saved === 'light' || saved === 'dark') {
+            document.documentElement.dataset.theme = saved;
+          } else if (!saved && localStorage.getItem('forge-appearance-v2')) {
+            /* Carried over from the five-package era: those were dark. */
+            document.documentElement.dataset.theme = 'dark';
+          }
+        } catch (error) { /* System it is. */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

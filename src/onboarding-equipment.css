@@ -1,3 +1,3 @@
 .equipment-choices{display:flex;flex-wrap:wrap;gap:9px}
-.equipment-choices button{padding:11px 13px;border-radius:999px;border:1px solid #34413d;background:#0a1411;color:var(--muted);font-weight:800}
-.equipment-choices button.active{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,#0a1411)}
+.equipment-choices button{padding:11px 13px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-sunken);color:var(--muted);font-weight:800}
+.equipment-choices button.active{border-color:var(--accent);color:var(--accent-text);background:color-mix(in srgb,var(--tint) 12%,var(--surface-sunken))}

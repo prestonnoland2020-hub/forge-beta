@@ -69,6 +69,17 @@
   margin: 0 auto var(--s6);
 }
 
+/* .login-brand is absolutely positioned for the sign-in screen, where it sits
+   over a full-bleed visual. Here it is one half of a flex header, and left
+   absolute it lifted out of flow and printed straight through the Privacy /
+   Terms pills. */
+.legal-head .login-brand {
+  position: static;
+  top: auto;
+  left: auto;
+  font-size: 1.4rem;
+}
+
 .legal-nav { display: flex; gap: var(--s2); }
 .legal-nav a {
   padding: 6px 12px;
@@ -80,7 +91,7 @@
 }
 .legal-nav a.active {
   border-color: var(--accent);
-  color: var(--accent);
+  color:var(--accent-text);
 }
 
 .legal-body {
@@ -103,7 +114,7 @@
 .legal-body strong { color: var(--ink); }
 .legal-body ul { margin: 0 0 var(--s4); padding-left: var(--s5); display: grid; gap: var(--s2); }
 .legal-body li { color: var(--ink-2); }
-.legal-body a { color: var(--accent); }
+.legal-body a { color:var(--accent-text); }
 
 .legal-meta {
   color: var(--ink-3) !important;

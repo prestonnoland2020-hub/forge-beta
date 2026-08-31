@@ -1,221 +1,219 @@
 FORGE — BRAND KIT
-Exact values as built, 30 August 2026.
-Every number below is read out of the shipping stylesheets, not from memory.
-Source files: src/styles.css, src/forge-system.css, src/forge-packages.css
+Updated 31 August 2026. Supersedes every earlier copy.
 
-Forge is a strength and endurance training log. Its one idea: you log the TOP
-SET — the single heaviest honest effort of a session — and the app coaches the
-progression from there. The look is dark, high-contrast, athletic. Not clinical,
-not soft, not "wellness".
+This file is a readable mirror of src/forge-theme.css. That file is the source
+of truth; if the two ever disagree, the CSS is right and this is stale.
 
 
-================================================================================
-1. THE SIGNATURE PALETTE  (package name: "Forge" — the default)
-================================================================================
+────────────────────────────────────────────────────────────────────────────
+1. THE ONE RULE
+────────────────────────────────────────────────────────────────────────────
 
-This is the app as it appears out of the box and the palette any logo should be
-designed against.
+Nothing in Forge names a colour. Everything names a ROLE, and the role
+resolves to a value based on the active theme.
 
-  ACCENT / VOLT       #D7FF45     the brand colour. Acid lime-yellow.
-  ACCENT INK          #0E1305     text/icons placed ON the accent
-  BACKGROUND          #0A0E0D     app ground, near-black with a green cast
-  PANEL (card)        #131A18     surface one step up from the ground
-  PANEL 2             #1A2320     surface two steps up
-  HAIRLINE / LINE     #222D29     all borders and dividers
-  TEXT                #EEF4F1     primary text
-  MUTED               #9DABA5     secondary text
+    background: var(--surface-1);     ← correct
+    background: #131a18;              ← wrong, even if it looks identical
 
-Status colours (used for meaning, never decoration):
-
-  GOOD / SUCCESS      #58D68D
-  WARNING             #F6C453
-  BAD / ERROR         #EF8A7B
-  INFO                #6FC3FF
-
-Notes for a designer:
-  - The accent is a yellow-green, NOT a pure yellow and NOT a mint. It is the
-    single loudest element in the app and is used sparingly: buttons, active
-    states, key numbers, and the eyebrow labels.
-  - #0E1305 (near-black green) is what sits on top of the accent. Never white
-    on #D7FF45 — it fails contrast badly.
-  - The ground is not pure black. It carries a slight green cast (#0A0E0D).
-  - There is a faint accent glow in the app's background:
-    radial-gradient(circle at 72% -10%, rgba(215,255,69,.08), transparent 26%)
+There are exactly two places in the app that contain colour literals:
+forge-theme.css (which defines the roles) and appearance.css (whose swatches
+must preview a theme the page is NOT currently in, so they cannot use
+variables). Everything else — 45 stylesheets — is roles only.
 
 
-================================================================================
-2. TYPEFACES
-================================================================================
+────────────────────────────────────────────────────────────────────────────
+2. THREE STATES
+────────────────────────────────────────────────────────────────────────────
 
-Three families, all free from Google Fonts. Loaded in src/styles.css line 1:
+Settings → Appearance offers three tones, and nothing else:
 
-  https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800
-    &family=IBM+Plex+Mono:wght@500;600;700
-    &family=Inter:wght@400;500;600;700;800&display=swap
+    Light      always light
+    System     follows the device, and changes with it at sunset
+    Dark       the original Forge — volt on carbon
 
-  DISPLAY   Barlow Condensed        weights 600, 700, 800
-            fallback: Impact, sans-serif
-            Used for: every heading, every large number, the FORGE wordmark,
-            stat values, buttons in some contexts.
-            ALWAYS UPPERCASE in the signature look.
+How the choice reaches CSS:
 
-  BODY      Inter                   weights 400, 500, 600, 700, 800
-            fallback: system-ui, sans-serif
-            Used for: all paragraph text, labels, inputs, navigation.
+    <html data-theme="light">    the athlete chose light
+    <html data-theme="dark">     the athlete chose dark
+    <html>  (no attribute)       System — prefers-color-scheme decides
 
-  MONO      IBM Plex Mono           weights 500, 600, 700
-            fallback: ui-monospace, SFMono-Regular, monospace
-            Used only by the "Monitor" appearance package, not the default.
+Dark is declared TWICE in forge-theme.css: once under
+@media (prefers-color-scheme: dark) guarded by :root:not([data-theme="light"]),
+and once under :root[data-theme="dark"]. The first makes System follow the OS;
+the second makes an explicit dark choice beat a light OS. A token that exists
+in only one of those blocks is a bug.
 
-The wordmark as it currently appears in the app sidebar:
-  font: 800 27px 'Barlow Condensed'
-  letter-spacing: 0.1em
-  text: FORGE  (uppercase)
+Stored under localStorage key `forge-appearance-v3`, and mirrored to the
+athlete's account so a new phone opens looking the same. index.html reads that
+key inline before first paint so there is no white flash on a cold open.
 
-
-================================================================================
-3. TYPE SCALE
-================================================================================
-
-Headings — Barlow Condensed, uppercase, letter-spacing 0.015em:
-
-  H1        clamp(19px, 4vw, 24px)
-  H2        clamp(27px, 5vw, 58px)      line-height 0.96
-  H3        clamp(19px, 3.4vw, 23px)
-
-Body — Inter:
-
-  Paragraph         16px, line-height 1.55, colour #9DABA5
-  Measure           max 62 characters per line
-
-Eyebrow / kicker label (appears above almost every heading in the app):
-
-  font-size: 10px
-  font-weight: 800
-  letter-spacing: 0.12em
-  text-transform: uppercase
-  colour: #D7FF45 (the accent)
-
-Numerals:
-  font-variant-numeric: tabular-nums  — wherever numbers are compared in a
-  column. Any logo or wordmark containing numbers should line up the same way.
+Brand colours the athlete can pick — an accent laid on top of these three
+tones — are the NEXT step, not part of this.
 
 
-================================================================================
-4. SHAPE, SPACING, DEPTH
-================================================================================
+────────────────────────────────────────────────────────────────────────────
+3. COLOUR
+────────────────────────────────────────────────────────────────────────────
 
-Corner radii:
-  --r-xs   6px
-  --r-sm   9px
-  --r-md   13px      (cards — the most-used radius in the app)
-  --r-lg   18px
-  --r-pill 999px     (all buttons are fully rounded pills)
+                          LIGHT          DARK
+BRAND
+  --accent                #d7ff45        #d7ff45     the volt. Never flips.
+  --accent-ink            #0e1305        #0e1305     text ON the accent
+  --accent-text           #3f6212        #d7ff45     accent used AS text
+  --accent-dim            #a8c94a        #9fbf3c
+  --accent-wash           rgba(120,160,30,.10)   rgba(215,255,69,.08)
+  --accent-wash-strong    rgba(120,160,30,.18)   rgba(215,255,69,.16)
+  --tint                  #78a01e        #d7ff45     hue that washes mix FROM
 
-Spacing scale:
-  4px · 8px · 12px · 16px · 22px · 30px · 40px
+  The volt is a FILL colour. As TEXT on a light ground it measures 1.2:1 and
+  is unreadable, which is why --accent-text exists: same hue, dark enough to
+  read. In dark they are the same value, which is why this only looks like an
+  extra token from the light side.
 
-Shadows (dark theme):
-  level 1   0 1px 2px rgba(0,0,0,.40)
-  level 2   0 6px 20px rgba(0,0,0,.45)
-  level 3   0 18px 48px rgba(0,0,0,.60)
+  --tint is the same idea for translucent washes. A 7% volt wash on carbon is
+  a faint glow; the identical mix on white is weak yellow bile. Mixing from
+  --tint gives a green hint on white and the glow on carbon.
 
-Motion:
-  duration 150ms
-  easing   cubic-bezier(.2,.7,.3,1)
+GROUNDS AND SURFACES — a ladder, one perceptible step each
+  --bg                    #f7f7f5        #0a0e0d
+  --surface-1             #ffffff        #131a18     a card on the ground
+  --surface-2             #f2f2f0        #1a2320     a control on a card
+  --surface-3             #e8e8e5        #232e2a     hover, active chip
+  --surface-sunken        #eeeeeb        #070c0b     an inset well, a track
 
-Primary button, for reference:
-  min-height 46px, fully rounded, background #D7FF45, text #0E1305,
-  14px / weight 800 / letter-spacing 0.01em
+LINES
+  --hairline              #e4e4e0        #222d29
+  --hairline-strong       #cacac5        #3b4944
+  --grid-line             rgba(20,21,15,.035)    rgba(255,255,255,.035)
+                                                  the graph-paper page ground
+
+TEXT — three steps and no more
+  --ink                   #14150f        #eef4f1
+  --ink-2                 #5c5f55        #9daba5
+  --ink-3                 #86897e        #6f7c77
+
+STATUS — meaning, never decoration
+  --good                  #1f7a3d        #58d68d
+  --warn                  #9a6400        #f6c453
+  --bad                   #b3261e        #ef8a7b
+  --info                  #1663a8        #6fc3ff
+
+  Deliberately not green-on-green with the accent: a volt accent beside a volt
+  "good" would make success invisible.
+
+DATA — six series, separated by lightness as well as hue so they survive
+red-green colour vision deficiency
+  --chart-1               #4d7c0f        #d7ff45
+  --chart-2               #1663a8        #6fc3ff
+  --chart-3               #b3261e        #ef8a7b
+  --chart-4               #7a4bbd        #c4a2ff
+  --chart-5               #0f7d74        #5fe0c6
+  --chart-6               #9a6400        #f6c453
+
+  Charts use --chart-1, never --accent, for exactly the reason above.
+
+INVERTED SURFACES — tooltips and toasts sit ON TOP of content and want to
+contrast with it rather than match it, so they flip with the theme
+  --inverse-surface       #14150f        #eef4f1
+  --inverse-ink           #f4f4f1        #0a0e0d
+
+DEPTH
+  --shadow-1              0 1px 2px rgba(20,21,15,.06)   0 1px 2px rgba(0,0,0,.40)
+  --shadow-2              0 6px 18px rgba(20,21,15,.09)  0 6px 20px rgba(0,0,0,.45)
+  --shadow-3              0 18px 44px rgba(20,21,15,.16) 0 18px 48px rgba(0,0,0,.60)
+  --shadow-color          rgba(20,21,15,.14)             rgba(0,0,0,.45)
+  --overlay               rgba(20,21,15,.38)             rgba(0,0,0,.66)
+  --scrim                 rgba(20,21,15,.46)             rgba(0,0,0,.72)
+  --lift                  #14150f        #ffffff
+  --page-glow             transparent    var(--accent-wash)
+
+  --lift is the tint mixer. Several components lift a surface by mixing WHITE
+  into it, which separates on carbon and does nothing on white. --lift is
+  whichever direction actually separates, so
+  `color-mix(in srgb, var(--surface-1) 96%, var(--lift))` reads in both.
+
+  --page-glow is the ambient wash behind the page. On carbon it is the volt
+  catching the top-right corner; on white the same wash reads as a stain, so
+  light gets none.
+
+BRAND COLOURS THAT ARE NOT OURS — never tokenised, never theme-flipped
+  Strava orange           #fc4c02   (and #fc5200, #fc7c4c in their panel)
+  Google blue             #4285f4
+  Google button           #ffffff ground, #1f1f1f text, #dadce0 border
+  Apple button            --ink ground, --bg text (required to be at least as
+                          prominent as any third-party sign-in, Guideline 4.8)
 
 
-================================================================================
-5. APP ICON — CURRENT BACKGROUND VALUES
-================================================================================
+────────────────────────────────────────────────────────────────────────────
+4. TYPE
+────────────────────────────────────────────────────────────────────────────
 
-Whatever mark gets designed, these are the grounds it has to sit on:
+  --display   'Archivo', 'Helvetica Neue', Arial, sans-serif
+  --body      'Inter', system-ui, -apple-system, sans-serif
 
-  Icon background      vertical gradient  #0C110F  →  #060908
-  PWA theme colour     #0B100E
-  Splash background    #0B100E
+Loaded in index.html <head>, with preconnect to fonts.gstatic.com:
+  Archivo   500 600 700 800
+  Inter     400 500 600 700 800
 
-Hard constraints from the App Store:
-  - 1024 × 1024 px, square, fully opaque, NO alpha channel. An icon with an
-    alpha channel is rejected at upload.
-  - No rounded corners baked in. iOS applies its own mask; corners drawn into
-    the artwork show up as visible notches.
-  - It must survive at 29 × 29 px. That is the real design constraint — most
-    detail disappears there.
+WHY. Barlow Condensed, set uppercase at 800, was doing a lot of shouting — a
+sports-poster face that made every heading feel like a race bib. Archivo is a
+grotesque built for headlines AND small text: squarer, more engineered, with
+real mass at 700–800 without narrowing. It reads as equipment, which is the
+right register for an app whose whole claim is that it tells you the truth
+about your training.
 
-Sizes needed for iOS: 1024, 180, 167, 152, 144, 120, 114, 100, 87, 80, 76, 60,
-58, 40, 29, 20. Android/PWA: 512, 384, 256, 192, plus maskable 512 and 192 with
-the mark scaled to ~62% so Android's circular crop does not cut it.
+Inter stays for body and data. It has the best tabular figures of any free UI
+face, and this app is mostly numbers in columns.
 
+USAGE
+  Display    page titles, big numbers, metric values, avatar initials.
+             800 weight, uppercase, letter-spacing .01–.02em.
+  Body       everything else. 400–600.
+  Eyebrows   11px, 800, letter-spacing .14em, uppercase, --ink-2.
+  Data       Inter with font-variant-numeric: tabular-nums.
 
-================================================================================
-6. THE OTHER FOUR APPEARANCE PACKAGES
-================================================================================
-
-Athletes can re-skin the whole app. A logo needs to survive all five grounds,
-so these are listed for contrast-checking — NOT as alternative brand palettes.
-"Forge" above is the brand.
-
-TRAIL — "Sunlit activity feed. White cards, a punch of orange."
-  bg #F5F5F7 · panel #FFFFFF · line #E3E3E9 · text #17181C · muted #5D6470
-  accent #FC5200 · accent-ink #FFFFFF · display Inter, sentence case
-  radii 5 / 8 / 12 / 16
-
-MONITOR — "Recovery lab. True black, teal data, mono labels."
-  bg #000000 · panel #0B0E0F · line #1E2427 · text #E6EDEB · muted #7F8C8A
-  accent #2EE6A8 · accent-ink #001510 · display IBM Plex Mono, uppercase
-  radii 4 / 6 / 9 / 12
-
-RINGS — "Midnight and hot pink. Big numerals, soft corners."
-  bg #000000 · panel #1C1C1E · line #3A3A3C · text #F5F5F7 · muted #98989F
-  accent #FA2D6C · accent-ink #FFFFFF · display system-ui, sentence case
-  radii 8 / 12 / 18 / 24 · buttons fully round
-
-CLUB — "Gallery white and ink black. No color, all type."
-  bg #FFFFFF · panel #FFFFFF · line #E5E5E5 · text #111111 · muted #6F6F72
-  accent #111111 · accent-ink #FFFFFF · display Barlow Condensed, uppercase
-  radii 2 / 3 / 4 / 6
-
-Practical consequence: the mark must read on near-black (#0A0E0D), on true
-black (#000000), and on white (#FFFFFF). A logo that only works on dark will
-break two of the five looks.
+Inputs never go below 16px — anything smaller makes iOS Safari zoom the page.
 
 
-================================================================================
-7. BRIEF NOTES FOR WHOEVER DESIGNS THE MARK
-================================================================================
+────────────────────────────────────────────────────────────────────────────
+5. SHAPE AND RHYTHM
+────────────────────────────────────────────────────────────────────────────
 
-What the app is:
-  A training log built around the top set. Strength and endurance in one place.
-  An AI coach that programs from what you actually lifted and ran, never from
-  what you told it you could do. The tone throughout the product is direct and
-  evidence-first — it says "you have not run enough for me to project that"
-  rather than filling space with encouragement.
+  --r-xs   6px      --s1  4px      --ease  cubic-bezier(.2,.7,.3,1)
+  --r-sm   9px      --s2  8px      --dur   150ms
+  --r-md  13px      --s3 12px
+  --r-lg  18px      --s4 16px      --tap   44px   minimum touch target
+  --r-pill 999px    --s5 22px
+                    --s6 30px
+                    --s7 40px
 
-Who uses it:
-  Adults training seriously. Hybrid athletes — people who lift and run — are
-  the sharpest niche and the least well served by existing apps.
+Theme changes are NOT animated. A 150ms colour crossfade across every surface
+on the page reads as a glitch, not a transition.
 
-What already exists that a designer should have:
-  - This file.
-  - src/forge-icon.svg and src/forge-mark.svg in the repo (current mark).
-  - Screenshots of any app screen on request.
 
-Deliverables to ask for:
-  - Master vector (SVG or AI), mark alone, on transparent.
-  - Mark locked up with the FORGE wordmark, horizontal and stacked.
-  - Single-colour version (one flat colour, no gradient) for small sizes and
-    for the CLUB / TRAIL light packages.
-  - App icon artwork at 1024 × 1024, opaque, square, no baked corners.
-  - Proof that it reads at 29 px before anything else is approved.
+────────────────────────────────────────────────────────────────────────────
+6. THE MARK
+────────────────────────────────────────────────────────────────────────────
 
-Things that will look wrong in this product:
-  - Gradients into muted or olive tones. #D7FF45 ramped toward anything
-    desaturated goes army-green immediately.
-  - White or light text sitting directly on the accent.
-  - Baked-in rounded corners on the app icon.
-  - Anything that relies on fine detail or thin strokes.
+.brand-mark is a mask, not an image: the shape comes from --forge-mark and the
+colour from `background: var(--accent-text)`. That is deliberate — a solid volt
+mark on white is a smudge, and --accent-text is the same hue at a value that
+survives both grounds.
+
+The wordmark is FORGE, --display 800, letter-spacing .1em.
+
+The app icon is unresolved and is NOT covered by this file.
+
+
+────────────────────────────────────────────────────────────────────────────
+7. LEGACY ALIASES
+────────────────────────────────────────────────────────────────────────────
+
+Older stylesheets read these. They point at the new roles so nothing had to be
+converted twice. Do not use them in new code.
+
+  --panel → --surface-1      --text  → --ink        --gold → --accent
+  --panel-2 → --surface-2    --muted → --ink-2      --mint → --good
+  --line, --border → --hairline                     --card → --surface-1
+  --success → --good         --warning → --warn     --radius-ui → --r-md
+  --accent-contrast → --accent-ink

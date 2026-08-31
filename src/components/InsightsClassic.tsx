@@ -209,13 +209,13 @@ export function InsightsClassic() {
     const dateLabel = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return <>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150, display: 'block' }} role="img">
-        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" /><stop offset="100%" stopColor="var(--accent)" stopOpacity="0" /></linearGradient></defs>
+        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.28" /><stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" /></linearGradient></defs>
         {ticks.map((tick, index) => <g key={index}><line x1={PL} y1={y(tick)} x2={W - PR} y2={y(tick)} stroke="var(--hairline)" strokeWidth="1" /><text x={PL - 6} y={y(tick) + 3} fontSize="9" textAnchor="end" fill="var(--ink-3)">{step >= 1 ? Math.round(tick) : tick}</text></g>)}
         <path d={areaD} fill={`url(#${gid})`} stroke="none" />
-        <path d={lineD} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {!dense && pts.slice(0, -1).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="2.4" fill="var(--accent)" />)}
-        <circle cx={last.x} cy={last.y} r="7" fill="var(--accent)" opacity="0.18" />
-        <circle cx={last.x} cy={last.y} r="4" fill="var(--accent)" stroke="var(--surface-1)" strokeWidth="1.5" />
+        <path d={lineD} fill="none" stroke="var(--chart-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {!dense && pts.slice(0, -1).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="2.4" fill="var(--chart-1)" />)}
+        <circle cx={last.x} cy={last.y} r="7" fill="var(--chart-1)" opacity="0.18" />
+        <circle cx={last.x} cy={last.y} r="4" fill="var(--chart-1)" stroke="var(--surface-1)" strokeWidth="1.5" />
       </svg>
       <div className="ic-datebar"><span>{dateLabel(minX)}</span><span>{dateLabel(mid)}</span><span>{dateLabel(maxX)}</span></div>
     </>;

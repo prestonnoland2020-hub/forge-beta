@@ -2,11 +2,11 @@
 .workout-date { display: grid; gap: 5px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .workout-date strong { font: 800 22px var(--display); text-transform: uppercase; }
 .workout-source-card { display: grid; gap: 16px; }
-.coach-loaded{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:15px 18px;border:1px solid #4b5d30;border-radius:10px;background:rgba(215,255,69,.07)}.coach-loaded>div{display:grid;gap:3px}.coach-loaded span{color:var(--accent);font-size:10px;font-weight:900;letter-spacing:.1em}.coach-loaded strong{font:800 20px var(--display);text-transform:uppercase}.coach-loaded small{color:var(--muted);font-size:11px}.coach-loaded>a{color:var(--accent);font-size:10px;font-weight:800;white-space:nowrap}.recent-workout-picker{display:grid;gap:7px;padding-top:5px}.recent-workout-picker>div{display:grid;gap:3px;margin-bottom:3px}.recent-workout-picker>div small{color:var(--muted);font-size:11px}.recent-workout-picker>button{display:grid;grid-template-columns:55px 1fr auto;gap:11px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-sunken);color:var(--text);text-align:left}.recent-workout-picker>button.active{border-color:var(--accent);background:rgba(215,255,69,.05)}.recent-workout-picker>button>span{color:var(--accent);font-size:11px;font-weight:900}.recent-workout-picker>button>div{display:grid}.recent-workout-picker>button small{color:var(--muted);font-size:11px}.recent-workout-picker>button>b{color:var(--muted);font-size:11px}.recent-workout-picker>button.active>b{color:var(--accent)}
+.coach-loaded{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:15px 18px;border:1px solid var(--accent-dim);border-radius:10px;background:color-mix(in srgb, var(--tint) 7%, transparent)}.coach-loaded>div{display:grid;gap:3px}.coach-loaded span{color:var(--accent-text);font-size:10px;font-weight:900;letter-spacing:.1em}.coach-loaded strong{font:800 20px var(--display);text-transform:uppercase}.coach-loaded small{color:var(--muted);font-size:11px}.coach-loaded>a{color:var(--accent-text);font-size:10px;font-weight:800;white-space:nowrap}.recent-workout-picker{display:grid;gap:7px;padding-top:5px}.recent-workout-picker>div{display:grid;gap:3px;margin-bottom:3px}.recent-workout-picker>div small{color:var(--muted);font-size:11px}.recent-workout-picker>button{display:grid;grid-template-columns:55px 1fr auto;gap:11px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-sunken);color:var(--text);text-align:left}.recent-workout-picker>button.active{border-color:var(--accent);background:color-mix(in srgb, var(--tint) 5%, transparent)}.recent-workout-picker>button>span{color:var(--accent-text);font-size:11px;font-weight:900}.recent-workout-picker>button>div{display:grid}.recent-workout-picker>button small{color:var(--muted);font-size:11px}.recent-workout-picker>button>b{color:var(--muted);font-size:11px}.recent-workout-picker>button.active>b{color:var(--accent-text)}
 .source-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .source-options button { display: grid; gap: 4px; min-height: 105px; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-sunken); color: var(--text); text-align: left; }
-.source-options button.active { border-color: var(--accent); background: rgba(215,255,69,.06); box-shadow: inset 3px 0 var(--accent); }
-.source-options span { color: var(--accent); font-size:10px; font-weight: 900; letter-spacing: .12em; }
+.source-options button.active { border-color: var(--accent); background: color-mix(in srgb, var(--tint) 6%, transparent); box-shadow: inset 3px 0 var(--accent); }
+.source-options span { color:var(--accent-text); font-size:10px; font-weight: 900; letter-spacing: .12em; }
 .source-options b { font: 800 16px var(--display); text-transform: uppercase; }
 .source-options small { color: var(--muted); font-size:11px; line-height: 1.4; }
 .workout-block { display: grid; gap: 9px; }
@@ -20,24 +20,24 @@
 .input-with-unit b { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 11px; }
 .automatic-hint { color: var(--mint); font-size:11px; font-weight: 600; }
 .muscle-picker { display: flex; gap: 8px; flex-wrap: wrap; }
-.muscle-chip { border: 1px solid #34413d; background: var(--panel-2); color: #c6cfcc; border-radius: 999px; padding: 9px 14px; font-weight: 700; font-size: 12px; }
+.muscle-chip { border: 1px solid var(--hairline-strong); background: var(--panel-2); color: var(--ink-2); border-radius: 999px; padding: 9px 14px; font-weight: 700; font-size: 12px; }
 .muscle-chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .compact-title { padding-bottom: 14px; }
 .compact-title h3 small { font: 600 12px Inter; text-transform: none; color: var(--muted); }
-.cardio-entry { background: var(--surface-sunken); border: 1px solid #2f3d38; border-radius: 10px; padding: 17px; display: grid; gap: 16px; }
+.cardio-entry { background: var(--surface-sunken); border: 1px solid var(--hairline-strong); border-radius: 10px; padding: 17px; display: grid; gap: 16px; }
 .auto-result { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 13px; }
 .auto-result span { font-size: 10px; letter-spacing: .12em; color: var(--muted); font-weight: 800; }
-.auto-result strong { font: 800 20px var(--display); color: var(--accent); }
+.auto-result strong { font: 800 20px var(--display); color:var(--accent-text); }
 .cardio-total { display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; background: var(--surface-sunken); border-radius: 8px; color: var(--muted); font-size: 11px; }
-.cardio-total strong { color: var(--accent); font: 800 18px var(--display); }
+.cardio-total strong { color:var(--accent-text); font: 800 18px var(--display); }
 .body-fields { padding-top: 2px; }
-.body-fields input[readonly] { color: var(--accent); font-weight: 800; }
+.body-fields input[readonly] { color:var(--accent-text); font-weight: 800; }
 .recent-set-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-.recent-set-row button { border: 1px solid #34413d; background: #222e2a; color: #dfe6e3; border-radius: 999px; padding: 9px 12px; font-size: 11px; }
+.recent-set-row button { border: 1px solid var(--hairline-strong); background: var(--surface-3); color: var(--ink); border-radius: 999px; padding: 9px 12px; font-size: 11px; }
 .recent-set-row button:hover { border-color: var(--accent); }
-.recent-set-row b { color: var(--accent); margin-left: 3px; }
+.recent-set-row b { color:var(--accent-text); margin-left: 3px; }
 .step-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.step-controls button { border: 1px solid #3b4844; background: #22302b; color: var(--text); border-radius: 7px; padding: 8px; font-weight: 800; }
+.step-controls button { border: 1px solid var(--hairline-strong); background: var(--surface-3); color: var(--text); border-radius: 7px; padding: 8px; font-weight: 800; }
 .save-workout { font-size: 16px; min-height: 54px; }
 .save-confirmation { text-align: center; color: var(--mint); font-size: 12px; font-weight: 700; margin-top: -12px; }
 .derived-muscles { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 15px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-sunken); }
@@ -45,13 +45,13 @@
 .derived-muscles > div:first-child small { color: var(--muted); font-size:11px; }
 .derived-muscles .muscle-picker { grid-column: 1 / -1; }
 .derived-muscles .muscle-picker:not(.editable) .muscle-chip { cursor: default; }
-.derived-muscles .muscle-picker.automatic .muscle-chip.muted { opacity: .42; background: #111916; }
+.derived-muscles .muscle-picker.automatic .muscle-chip.muted { opacity: .42; background: var(--surface-2); }
 .empty-muscles { color: var(--muted); font-size: 10px; line-height: 1.4; }
 .session-context { align-items: end; }
-.calculated-max { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 20px; padding: 16px; border: 1px solid #4b5c2f; border-radius: 9px; background: linear-gradient(100deg,rgba(215,255,69,.1),var(--surface-sunken)); }
+.calculated-max { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 20px; padding: 16px; border: 1px solid var(--accent-dim); border-radius: 9px; background: linear-gradient(100deg,color-mix(in srgb, var(--tint) 10%, transparent),var(--surface-sunken)); }
 .calculated-max > div { display: grid; gap: 3px; }
-.calculated-max span { color: var(--accent); font-size:11px; font-weight: 900; letter-spacing: .12em; }
-.calculated-max strong { color: var(--accent); font: 800 35px var(--display); }
+.calculated-max span { color:var(--accent-text); font-size:11px; font-weight: 900; letter-spacing: .12em; }
+.calculated-max strong { color:var(--accent-text); font: 800 35px var(--display); }
 .calculated-max strong small { font-size: 17px; }
 .calculated-max b { font-size: 10px; text-align: right; }
 .calculated-max div:last-child small { color: var(--muted); font-size:11px; }
@@ -69,12 +69,12 @@
 .last-performance-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;background:color-mix(in srgb,var(--gold) 6%,transparent);padding:13px 16px}.last-performance-banner>div:first-child{display:grid;grid-template-columns:auto auto;align-items:baseline;gap:3px 14px}.last-performance-banner .eyebrow{grid-column:1/-1}.last-performance-banner strong{font-size:1.15rem}.last-performance-banner small{color:var(--muted)}.last-performance-banner>div:last-child{display:flex;gap:10px;white-space:nowrap}@media(max-width:700px){.last-performance-banner{align-items:flex-start;flex-direction:column}.last-performance-banner>div:first-child{grid-template-columns:1fr}}
 .split-day-selector{display:grid;gap:16px}.split-day-selector>div:first-child p{margin:4px 0 0;color:var(--muted)}.split-day-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}.split-day-options button{display:grid;grid-template-columns:auto 1fr;text-align:left;gap:2px 10px;border:1px solid var(--line);border-radius:11px;background:transparent;color:inherit;padding:12px}.split-day-options button.active{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 9%,transparent)}.split-day-options button span{grid-row:1/3;color:var(--gold);font-weight:800}.split-day-options button small{color:var(--muted)}
 .quick-log-top-sets{display:grid;gap:9px}.accent-card:has(+.quick-log-top-sets.embedded){padding-bottom:104px}.quick-log-top-sets.embedded{position:relative;z-index:2;margin-top:-112px;padding:14px 22px 20px;border:0;background:transparent}.quick-log-row{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid var(--line);padding-top:14px}.quick-log-row>span{display:flex;flex-direction:column;gap:3px}.quick-log-row small,.quick-log-message{color:var(--muted)}.quick-log-message{color:var(--mint);text-align:right}@media(max-width:700px){.accent-card:has(+.quick-log-top-sets.embedded){padding-bottom:132px}.quick-log-top-sets.embedded{margin-top:-140px}.quick-log-row{align-items:stretch;flex-direction:column}.quick-log-row .button{width:100%}}
-.workout-editor>.accent-card:has(.multi-top-set-editor){display:none}.top-set-card-stack{display:grid;gap:14px}.top-set-card-stack>header{display:flex;align-items:center;justify-content:space-between;gap:18px}.top-set-card-stack>header p{margin:3px 0 0;color:var(--muted)}.top-set-entry{display:grid;gap:16px;border-left:3px solid var(--gold)}.top-set-entry.logged{border-color:var(--mint);background:rgba(85,220,167,.05)}.top-set-entry-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.logged-badge{color:var(--mint)}.logged-top-set-actions{display:flex;align-items:center;gap:14px}.logged-top-set-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.logged-top-set-summary>strong{font-size:1.4rem}.top-set-exercise-field{display:grid;gap:7px}.inline-last-set{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:rgba(255,255,255,.02)}.inline-last-set>span{grid-row:1/3;color:var(--gold);font-size:.7rem;font-weight:800}.inline-last-set small{color:var(--muted)}.top-set-card-result{display:flex;align-items:center;justify-content:space-between;border-radius:10px;background:color-mix(in srgb,var(--gold) 8%,transparent);padding:12px 14px}.top-set-card-result span{color:var(--gold);font-size:.72rem;font-weight:800}.top-set-card-result strong{font-size:1.3rem}.top-set-entry footer{display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid var(--line);padding-top:14px}.top-set-entry footer label{display:flex;align-items:center;gap:8px}@media(max-width:700px){.top-set-card-stack>header,.top-set-entry footer,.logged-top-set-summary{align-items:stretch;flex-direction:column}.top-set-entry footer .button{width:100%}}
-.top-set-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.inline-log-exercise{display:grid;gap:15px;padding:18px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:13px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 6%,transparent),var(--panel))}.inline-log-exercise>header{display:flex;justify-content:space-between;gap:16px}.inline-log-exercise h3{margin:4px 0;font-size:24px}.inline-log-exercise header p{margin:0;color:var(--muted);font-size:11px}.inline-log-exercise>footer{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:4px}.inline-log-exercise>footer small{color:var(--muted)}.inline-exercise-error{color:#ff9d72;font-weight:700}
+.workout-editor>.accent-card:has(.multi-top-set-editor){display:none}.top-set-card-stack{display:grid;gap:14px}.top-set-card-stack>header{display:flex;align-items:center;justify-content:space-between;gap:18px}.top-set-card-stack>header p{margin:3px 0 0;color:var(--muted)}.top-set-entry{display:grid;gap:16px;border-left:3px solid var(--gold)}.top-set-entry.logged{border-color:var(--mint);background:color-mix(in srgb, var(--good) 5%, transparent)}.top-set-entry-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.logged-badge{color:var(--mint)}.logged-top-set-actions{display:flex;align-items:center;gap:14px}.logged-top-set-summary{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.logged-top-set-summary>strong{font-size:1.4rem}.top-set-exercise-field{display:grid;gap:7px}.inline-last-set{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:color-mix(in srgb,var(--surface-1) 98%,var(--lift))}.inline-last-set>span{grid-row:1/3;color:var(--gold);font-size:.7rem;font-weight:800}.inline-last-set small{color:var(--muted)}.top-set-card-result{display:flex;align-items:center;justify-content:space-between;border-radius:10px;background:color-mix(in srgb,var(--gold) 8%,transparent);padding:12px 14px}.top-set-card-result span{color:var(--gold);font-size:.72rem;font-weight:800}.top-set-card-result strong{font-size:1.3rem}.top-set-entry footer{display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid var(--line);padding-top:14px}.top-set-entry footer label{display:flex;align-items:center;gap:8px}@media(max-width:700px){.top-set-card-stack>header,.top-set-entry footer,.logged-top-set-summary{align-items:stretch;flex-direction:column}.top-set-entry footer .button{width:100%}}
+.top-set-header-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.inline-log-exercise{display:grid;gap:15px;padding:18px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:13px;background:linear-gradient(120deg,color-mix(in srgb,var(--tint) 6%,transparent),var(--panel))}.inline-log-exercise>header{display:flex;justify-content:space-between;gap:16px}.inline-log-exercise h3{margin:4px 0;font-size:24px}.inline-log-exercise header p{margin:0;color:var(--muted);font-size:11px}.inline-log-exercise>footer{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:4px}.inline-log-exercise>footer small{color:var(--muted)}.inline-exercise-error{color:var(--bad);font-weight:700}
 @media(max-width:700px){.top-set-header-actions{display:grid;grid-template-columns:1fr 1fr}.top-set-header-actions .button{min-width:0;padding-inline:10px}.inline-log-exercise{padding:15px}.inline-log-exercise>header,.inline-log-exercise>footer{align-items:stretch;flex-direction:column}.inline-log-exercise>footer .button{width:100%}}
-.text-button.danger{color:#ff7a68}
+.text-button.danger{color:var(--bad)}
 
-.compact-workout-source{gap:13px}.compact-workout-source .workout-date{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px}.compact-workout-source .workout-date strong{font-size:17px}.compact-workout-source .source-options button{min-height:64px;align-content:center;padding:10px 13px}.compact-workout-source .source-options small{display:none}.compact-workout-source .source-options b{font-size:14px}.compact-split-picker{padding-top:12px;border-top:1px solid var(--line)}.compact-split-picker summary{display:flex;align-items:center;justify-content:space-between;gap:14px;list-style:none;cursor:pointer}.compact-split-picker summary::-webkit-details-marker{display:none}.compact-split-picker summary>span{display:grid;gap:3px}.compact-split-picker summary small{color:var(--muted)}.compact-split-picker summary>strong{color:var(--accent);font-size:10px}.compact-split-picker .split-day-options{margin-top:14px}
+.compact-workout-source{gap:13px}.compact-workout-source .workout-date{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px}.compact-workout-source .workout-date strong{font-size:17px}.compact-workout-source .source-options button{min-height:64px;align-content:center;padding:10px 13px}.compact-workout-source .source-options small{display:none}.compact-workout-source .source-options b{font-size:14px}.compact-split-picker{padding-top:12px;border-top:1px solid var(--line)}.compact-split-picker summary{display:flex;align-items:center;justify-content:space-between;gap:14px;list-style:none;cursor:pointer}.compact-split-picker summary::-webkit-details-marker{display:none}.compact-split-picker summary>span{display:grid;gap:3px}.compact-split-picker summary small{color:var(--muted)}.compact-split-picker summary>strong{color:var(--accent-text);font-size:10px}.compact-split-picker .split-day-options{margin-top:14px}
 @media(max-width:700px){
   .workout-editor{gap:12px}.workout-editor>.page-intro{align-items:flex-start}.workout-editor>.page-intro h2{font-size:34px;margin:4px 0}.workout-editor>.page-intro p{display:none}.workout-editor>.card{padding:16px}.compact-workout-source .source-options{grid-template-columns:repeat(3,1fr)}.compact-workout-source .source-options button{min-height:58px}.compact-workout-source .source-options span{font-size:10px}.compact-workout-source .source-options b{font-size:13px}.compact-split-picker .split-day-options{grid-template-columns:1fr}.top-set-entry{padding:16px}.top-set-entry-head{align-items:flex-start}.top-set-entry .field-grid{grid-template-columns:1fr 1fr;gap:10px}.top-set-entry input{font-size:16px}.session-details .muscle-picker{gap:5px}.session-details .muscle-chip{padding:7px 10px;font-size:10px}.save-workout{position:sticky;bottom:calc(67px + env(safe-area-inset-bottom));z-index:4;width:calc(100% - 68px)!important;box-shadow:0 -12px 28px var(--bg)}
 }
@@ -82,8 +82,8 @@
 /* A rejected save must say so where the athlete is looking. This message used to
    render after the sticky save button, in normal flow at the foot of the document,
    so a blocked save read as the button doing nothing at all. */
-.review-blocked{margin:0;padding:12px 14px;border:1px solid #6b4a20;border-left:3px solid var(--warning);border-radius:9px;background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);font-size:13px;line-height:1.45}
-.save-confirmation.save-warning{margin:0 0 10px;padding:11px 13px;border-radius:9px;border:1px solid #6b4a20;background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);text-align:left}
+.review-blocked{margin:0;padding:12px 14px;border:1px solid var(--warn);border-left:3px solid var(--warning);border-radius:9px;background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);font-size:13px;line-height:1.45}
+.save-confirmation.save-warning{margin:0 0 10px;padding:11px 13px;border-radius:9px;border:1px solid var(--warn);background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--text);text-align:left}
 .lift-scope-note{display:block;margin-top:7px;color:var(--muted);font-size:11px;line-height:1.4}
 .lift-scope-note .text-button{font-size:11px;padding:0}
 
@@ -96,7 +96,7 @@
 .top-set-row-figures{display:grid;justify-items:end;gap:1px;font-size:14px;font-weight:800;color:var(--mint);font-variant-numeric:tabular-nums;white-space:nowrap}
 .top-set-row-figures small{font-size:11px;font-weight:600;color:var(--muted)}
 .top-set-row b{font-size:15px;color:var(--muted);line-height:1}
-.top-set-row:active{background:rgba(255,255,255,.03)}
+.top-set-row:active{background:color-mix(in srgb,var(--surface-1) 96%,var(--lift))}
 /* Open, the head is the way back to closed. */
 .top-set-entry-toggle{display:grid;gap:2px;padding:0;border:0;background:none;color:inherit;text-align:left;min-width:0}
 .top-set-entry-toggle h3{margin:0}
@@ -118,13 +118,13 @@
 .strava-strength-review select,.strava-strength-review input{width:100%;box-sizing:border-box;background:var(--surface-sunken);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:13px 14px;font:700 16px inherit;text-transform:none;letter-spacing:0}
 .strength-review-set{display:grid;gap:12px}
 .strength-review-numbers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.strength-review-max{color:var(--accent);font-weight:800}
-.strength-review-saved{color:var(--accent);font-weight:700}
+.strength-review-max{color:var(--accent-text);font-weight:800}
+.strength-review-saved{color:var(--accent-text);font-weight:700}
 
 /* A synced day takes over the screen. It was a strip at the top of Today —
    easy to scroll past, too small to answer in. */
-.strava-review-backdrop{position:fixed;inset:0;z-index:60;background:#000c;backdrop-filter:blur(6px);display:grid;place-items:center;padding:18px;overflow-y:auto}
-.strava-review-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);overflow-y:auto;display:grid;gap:16px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,white 4%),var(--card));border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 30px 80px #000b}
+.strava-review-backdrop{position:fixed;inset:0;z-index:60;background:var(--scrim);backdrop-filter:blur(6px);display:grid;place-items:center;padding:18px;overflow-y:auto}
+.strava-review-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);overflow-y:auto;display:grid;gap:16px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,var(--lift) 4%),var(--card));border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 30px 80px var(--scrim)}
 .strava-review-sheet header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .strava-review-sheet header>div{display:grid;gap:5px;min-width:0}
 .strava-review-sheet header strong{font:800 22px var(--display-font);text-transform:uppercase;line-height:1.05}
@@ -136,7 +136,7 @@
 .strava-review-sheet textarea{font-weight:500;line-height:1.5;resize:vertical}
 .strava-review-set{display:grid;gap:12px}
 .strava-review-numbers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.strava-review-max,.strava-review-reflection{color:var(--accent);font-weight:700}
+.strava-review-max,.strava-review-reflection{color:var(--accent-text);font-weight:700}
 .strava-review-hint{color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0}
 .strava-review-sheet footer{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:420px){.strava-review-sheet{padding:18px;border-radius:18px}.strava-review-sheet header strong{font-size:19px}}
@@ -150,14 +150,14 @@
    the whole dial across the screen mid-spin and lost the value being aimed at.
    The backdrop takes no gestures at all; the sheet and the wheels take pan-y
    and nothing else; and nothing in the stack may scroll horizontally. */
-.dial-backdrop{position:fixed;inset:0;z-index:80;background:#000d;backdrop-filter:blur(8px);display:grid;place-items:end center;padding:0;overflow:hidden;touch-action:none;overscroll-behavior:contain}
-.dial-sheet{width:min(520px,100%);background:linear-gradient(180deg,color-mix(in srgb,var(--card) 94%,white 6%),var(--card));border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:20px 20px calc(16px + env(safe-area-inset-bottom));display:grid;gap:14px;box-shadow:0 -24px 70px #000b;animation:dial-rise .18s ease-out;overflow-x:hidden;touch-action:pan-y}
+.dial-backdrop{position:fixed;inset:0;z-index:80;background:var(--scrim);backdrop-filter:blur(8px);display:grid;place-items:end center;padding:0;overflow:hidden;touch-action:none;overscroll-behavior:contain}
+.dial-sheet{width:min(520px,100%);background:linear-gradient(180deg,color-mix(in srgb,var(--card) 94%,var(--lift) 6%),var(--card));border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;padding:20px 20px calc(16px + env(safe-area-inset-bottom));display:grid;gap:14px;box-shadow:0 -24px 70px var(--scrim);animation:dial-rise .18s ease-out;overflow-x:hidden;touch-action:pan-y}
 @keyframes dial-rise{from{transform:translateY(18px);opacity:.6}to{transform:translateY(0);opacity:1}}
 .dial-sheet header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .dial-sheet header strong{font:800 13px var(--display-font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.dial-preview{font:800 26px var(--display-font);color:var(--accent);font-variant-numeric:tabular-nums}
+.dial-preview{font:800 26px var(--display-font);color:var(--accent-text);font-variant-numeric:tabular-nums}
 .dial-columns{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;height:220px;overflow-x:hidden;touch-action:pan-y}
-.dial-band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:44px;border-radius:12px;background:color-mix(in srgb,var(--accent) 11%,transparent);border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);pointer-events:none}
+.dial-band{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:44px;border-radius:12px;background:color-mix(in srgb,var(--tint) 11%,transparent);border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);pointer-events:none}
 .dial-wheel{height:220px;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;scrollbar-width:none;-ms-overflow-style:none;display:grid;min-width:88px;text-align:center;overscroll-behavior:contain;touch-action:pan-y}
 .dial-wheel::-webkit-scrollbar{display:none}
 .dial-wheel:focus-visible{outline:2px solid var(--accent);border-radius:12px}
@@ -197,8 +197,8 @@
    did not cover the lift offered an empty list and no way through, and a lift
    that was not already in the library had no path at all. One sheet: type it,
    pick it or create it, load, reps, save. */
-.top-set-sheet-backdrop{position:fixed;inset:0;z-index:65;background:#000c;backdrop-filter:blur(6px);display:grid;place-items:center;padding:18px;overflow-y:auto}
-.top-set-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);overflow-y:auto;display:grid;gap:15px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,white 4%),var(--card));border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 30px 80px #000b}
+.top-set-sheet-backdrop{position:fixed;inset:0;z-index:65;background:var(--scrim);backdrop-filter:blur(6px);display:grid;place-items:center;padding:18px;overflow-y:auto}
+.top-set-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);overflow-y:auto;display:grid;gap:15px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,var(--lift) 4%),var(--card));border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 30px 80px var(--scrim)}
 .top-set-sheet header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .top-set-sheet header>div{display:grid;gap:5px;min-width:0}
 .top-set-sheet header strong{font:800 21px var(--display-font,inherit);text-transform:uppercase;line-height:1.06;text-wrap:balance}
@@ -212,11 +212,11 @@
 .top-set-sheet-result>div,.top-set-sheet-new>div{display:grid;gap:2px;min-width:0}
 .top-set-sheet-result strong,.top-set-sheet-new strong{font-size:15px;font-weight:800;overflow:hidden;text-overflow:ellipsis}
 .top-set-sheet-result small,.top-set-sheet-new small{font-size:11.5px;color:var(--muted)}
-.top-set-sheet-result b{font-size:10px;font-weight:900;letter-spacing:.1em;color:var(--accent)}
-.top-set-sheet-new{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
-.top-set-sheet-new>span{font-size:20px;color:var(--accent);flex:none}
+.top-set-sheet-result b{font-size:10px;font-weight:900;letter-spacing:.1em;color:var(--accent-text)}
+.top-set-sheet-new{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--tint) 8%,transparent)}
+.top-set-sheet-new>span{font-size:20px;color:var(--accent-text);flex:none}
 .top-set-sheet-empty{margin:0;color:var(--muted);font-size:12.5px;line-height:1.45}
-.top-set-sheet-chosen{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:12px;background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.top-set-sheet-chosen{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:12px;background:color-mix(in srgb,var(--tint) 7%,transparent)}
 .top-set-sheet-chosen>div{display:grid;gap:2px;min-width:0}
 .top-set-sheet-chosen strong{font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis}
 .top-set-sheet-muscles{display:grid;gap:8px}
@@ -229,7 +229,7 @@
 
 /* Sets already logged for a synced day: assigning the day ties them to it —
    there is nothing to re-enter. */
-.strava-review-tied{display:grid;gap:4px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--mint,#55dca7) 34%,transparent);border-radius:12px;background:color-mix(in srgb,var(--mint,#55dca7) 7%,transparent)}
-.strava-review-tied .eyebrow{color:var(--mint,#55dca7);font-size:10px;letter-spacing:.1em}
+.strava-review-tied{display:grid;gap:4px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--mint,var(--good)) 34%,transparent);border-radius:12px;background:color-mix(in srgb,var(--mint,var(--good)) 7%,transparent)}
+.strava-review-tied .eyebrow{color:var(--mint,var(--good));font-size:10px;letter-spacing:.1em}
 .strava-review-tied strong{font-size:15px}
 .strava-review-tied small{color:var(--muted);font-size:12px;line-height:1.4}

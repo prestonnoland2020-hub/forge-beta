@@ -1,1 +1,141 @@
-:root[data-accent="ocean"]{--accent:#35c8ff;--accent-ink:#04141a;--mint:#66e0c2}:root[data-accent="ember"]{--accent:#ff6548;--accent-ink:#1a0703;--mint:#ffb454}:root[data-accent="violet"]{--accent:#a98bff;--accent-ink:#0d0719;--mint:#69dfc0}:root[data-surface="graphite"]{--bg:#111212;--panel:#1b1d1c;--panel-2:#242725;--line:#383d3a}:root[data-surface="deep-navy"]{--bg:#061018;--panel:#0c1b25;--panel-2:#122632;--line:#29404c}html[data-surface="graphite"] body{background:radial-gradient(circle at 72% -10%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 26%),var(--bg)}html[data-surface="deep-navy"] body{background:radial-gradient(circle at 72% -10%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 26%),var(--bg)}html[data-surface="graphite"] .sidebar,html[data-surface="deep-navy"] .sidebar{background:color-mix(in srgb,var(--bg) 88%,#000)}html[data-surface="graphite"] input,html[data-surface="graphite"] select,html[data-surface="graphite"] textarea{background:var(--surface-sunken)}html[data-surface="deep-navy"] input,html[data-surface="deep-navy"] select,html[data-surface="deep-navy"] textarea{background:#07131b}html[data-compact="true"] .page{padding-top:28px}html[data-compact="true"] .stack-xl{gap:16px}html[data-compact="true"] .card{padding:20px}.coach-shortcut{display:flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel-2);font-size:10px;font-weight:800}.coach-shortcut span{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:var(--accent);color:var(--accent-ink);font-size:11px}.notification-link{display:grid;place-items:center}@media(max-width:600px){.coach-shortcut{padding:7px}.coach-shortcut>span+*{display:none}.coach-shortcut{font-size:0}}
+/* THE APPEARANCE TAB — three tones.
+
+   A preview has to show a theme the page is NOT currently in, so these swatch
+   values cannot be var(--bg) and friends: those resolve to whatever theme the
+   athlete is looking at, and all three options would render identically. The
+   literals below are therefore deliberate, and they are the ONLY colour
+   literals outside forge-theme.css. They are copied from it, and the block is
+   marked so that changing a ground there means changing it here too.
+
+   KEEP IN SYNC WITH forge-theme.css: --bg, --surface-1, --hairline, --ink,
+   --accent. */
+
+.theme-picker { display: grid; gap: var(--s5); }
+.theme-picker > header { display: grid; gap: var(--s2); }
+.theme-picker h2 { margin: 0; }
+.theme-picker > header p { margin: 0; color: var(--ink-2); max-width: 56ch; }
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--s3);
+}
+
+.theme-card {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3);
+  text-align: left;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.theme-card:hover { border-color: var(--hairline-strong); }
+.theme-card:active { transform: translateY(1px); }
+.theme-card.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.theme-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- The swatch --------------------------------------------------------
+   A miniature of the app: a ground, a card on it, an accent bar, two lines of
+   text. Enough to judge the tone at a glance without pretending to be a
+   screenshot. */
+.theme-swatch {
+  position: relative;
+  display: grid;
+  align-content: end;
+  gap: 5px;
+  height: 84px;
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--swatch-line);
+  background: var(--swatch-bg);
+  overflow: hidden;
+}
+.theme-swatch::before {
+  content: '';
+  position: absolute;
+  inset: var(--s2) var(--s2) auto;
+  height: 26px;
+  border-radius: var(--r-xs);
+  background: var(--swatch-surface);
+  border: 1px solid var(--swatch-line);
+}
+.ts-bar {
+  width: 34px; height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--swatch-accent);
+}
+.ts-line {
+  width: 100%; height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--swatch-ink);
+  opacity: .82;
+}
+.ts-line.short { width: 58%; opacity: .42; }
+
+/* Each swatch declares the palette it is previewing. The light swatch uses the
+   STRONG hairline rather than the ordinary one: at 84px the card edge is the
+   only thing separating white from near-white, and the subtler line vanished. */
+.theme-swatch-light {
+  --swatch-bg: #f7f7f5; --swatch-surface: #ffffff; --swatch-line: #cacac5;
+  --swatch-ink: #14150f; --swatch-accent: #d7ff45;
+}
+.theme-swatch-dark {
+  --swatch-bg: #0a0e0d; --swatch-surface: #131a18; --swatch-line: #222d29;
+  --swatch-ink: #eef4f1; --swatch-accent: #d7ff45;
+}
+/* System is the only option whose answer is "it depends", so its swatch shows
+   both answers side by side rather than one of them with a stripe. It is built
+   from two real half-swatches in the markup — a single swatch with a light
+   panel laid over half of it looked right until you noticed the text lines: one
+   ink colour cannot read on both a black and a white ground, so the right half
+   was always blank. */
+.theme-swatch-system {
+  padding: 0;
+  display: flex;
+  border-color: var(--hairline-strong);
+}
+.theme-swatch-system::before { content: none; }
+
+.ts-half {
+  position: relative;
+  flex: 1 1 50%;
+  min-width: 0;
+  display: grid;
+  align-content: end;
+  gap: 5px;
+  padding: var(--s3) 10px;
+  background: var(--swatch-bg);
+}
+.ts-half + .ts-half { border-left: 1px solid var(--hairline-strong); }
+.ts-half::before {
+  content: '';
+  position: absolute;
+  inset: var(--s2) 7px auto;
+  height: 22px;
+  border-radius: var(--r-xs);
+  background: var(--swatch-surface);
+  border: 1px solid var(--swatch-line);
+}
+.ts-half .ts-bar { width: 26px; }
+
+.theme-meta { display: grid; gap: 3px; }
+.theme-meta strong { font-family: var(--display); font-size: 15px; letter-spacing: .01em; }
+.theme-meta small { color: var(--ink-2); font-size: .8rem; line-height: 1.4; }
+.theme-meta em {
+  margin-top: 2px;
+  font-style: normal;
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color:var(--accent-text);
+}
+
+@media (max-width: 560px) {
+  .theme-grid { grid-template-columns: 1fr; }
+  .theme-swatch { height: 72px; }
+}

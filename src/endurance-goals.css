@@ -14,16 +14,16 @@
   display: grid;
   gap: 14px;
   padding: 16px;
-  border: 1px solid #45552f;
+  border: 1px solid var(--accent-dim);
   border-radius: 10px;
-  background: rgba(215, 255, 69, 0.055);
+  background: color-mix(in srgb, var(--tint) 5.5%, transparent);
 }
 
 .running-event-builder {
   display: grid;
   gap: 14px;
   padding: 16px;
-  border: 1px solid #3b4b45;
+  border: 1px solid var(--hairline-strong);
   border-radius: 10px;
   background: var(--surface-sunken);
 }
@@ -58,11 +58,11 @@
   gap: 9px;
   padding: 11px;
   border-left: 3px solid var(--accent);
-  background: rgba(215, 255, 69, 0.05);
+  background: color-mix(in srgb, var(--tint) 5%, transparent);
 }
 
 .event-summary span {
-  color: var(--accent);
+  color:var(--accent-text);
   font-weight: 900;
 }
 

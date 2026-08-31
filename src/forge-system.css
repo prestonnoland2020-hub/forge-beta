@@ -15,81 +15,14 @@
    surface is painted explicitly rather than inheriting.
    ========================================================================== */
 
-:root{
-  /* Base palette. This is the DEFAULT only. The appearance settings override
-     these same names from `html[data-surface="…"]`, `html[data-mode="light"]`
-     and `:root[data-accent="…"]`, all of which outrank a bare `:root` — so the
-     system tokens below are derived FROM these names rather than defined
-     alongside them. Getting that backwards meant a card kept its dark green
-     while the rest of the app followed the chosen theme. */
-  --bg:#0a0e0d;
-  --panel:#131a18;
-  --panel-2:#1a2320;
-  --line:#222d29;
-  --text:#eef4f1;
-  --muted:#9daba5;
-  --accent:#d7ff45;
-  --accent-ink:#0e1305;
+/* TOKENS MOVED OUT. This file used to open with a :root block defining the
+   whole palette, a light-mode shadow patch, and the body rule. All three now
+   live in forge-theme.css, which is the single place colour is decided and
+   the only file that knows light from dark.
 
-  /* Surfaces climb toward the viewer. Dark UI reads depth from surface
-     lightness and hairlines far better than from drop shadows — and because
-     each step is mixed from the theme's own values, the same ladder holds in
-     light mode and in every accent. */
-  --surface-0:var(--bg);
-  --surface-1:var(--panel);
-  --surface-2:var(--panel-2);
-  --surface-3:color-mix(in srgb,var(--panel-2) 90%,var(--text) 9%);
-  --surface-sunken:color-mix(in srgb,var(--bg) 84%,var(--text) 3%);
-
-  --hairline:var(--line);
-  --hairline-strong:color-mix(in srgb,var(--line) 70%,var(--text) 20%);
-
-  --ink:var(--text);
-  --ink-2:var(--muted);
-  --ink-3:color-mix(in srgb,var(--muted) 74%,var(--bg));
-
-  --accent-dim:color-mix(in srgb,var(--accent) 78%,var(--bg));
-  --accent-wash:color-mix(in srgb,var(--accent) 10%,transparent);
-  --accent-wash-strong:color-mix(in srgb,var(--accent) 18%,transparent);
-
-  --good:#58d68d;
-  --warn:#f6c453;
-  --bad:#ef8a7b;
-  --info:#6fc3ff;
-
-  --r-xs:6px; --r-sm:9px; --r-md:13px; --r-lg:18px; --r-pill:999px;
-
-  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:22px; --s6:30px; --s7:40px;
-
-  --shadow-1:0 1px 2px rgba(0,0,0,.4);
-  --shadow-2:0 6px 20px rgba(0,0,0,.45);
-  --shadow-3:0 18px 48px rgba(0,0,0,.6);
-
-  --ease:cubic-bezier(.2,.7,.3,1);
-  --dur:150ms;
-
-  /* Remaining legacy aliases still read by the older stylesheets. */
-  --card:var(--panel);
-  --border:var(--line);
-  --success:var(--good);
-  --warning:var(--warn);
-  --gold:var(--accent);
-  --accent-contrast:var(--accent-ink);
-}
-
-/* Light mode wants far softer shadows than a near-black ground does. */
-html[data-mode="light"]{
-  --shadow-1:0 1px 2px rgba(16,23,20,.08);
-  --shadow-2:0 6px 18px rgba(16,23,20,.10);
-  --shadow-3:0 18px 44px rgba(16,23,20,.18);
-}
-
-body{
-  background:var(--surface-0);
-  color:var(--ink);
-  -webkit-font-smoothing:antialiased;
-  text-rendering:optimizeLegibility;
-}
+   Leaving them here would not merely duplicate: the conversion turned
+   `--bg:#0a0e0d` into `--bg:var(--bg)`, a circular definition that resolves
+   to nothing and takes every surface reading it down with it. */
 
 /* Numerals line up in columns everywhere they are compared. */
 .metric strong,.stat-row strong,.feed-metric-row strong,.week-score strong,
@@ -177,7 +110,7 @@ body{
   font-size:14px;font-weight:800;letter-spacing:.01em;
   transition:transform var(--dur) var(--ease),background var(--dur) var(--ease),opacity var(--dur) var(--ease);
 }
-.button:hover{background:color-mix(in srgb,var(--accent) 86%,#fff)}
+.button:hover{background:color-mix(in srgb,var(--accent) 86%,var(--ink))}
 .button:active{transform:scale(.975)}
 .button:disabled{opacity:.4;transform:none}
 .button.secondary,.button.ghost{
@@ -187,12 +120,12 @@ body{
 .button.wide{width:100%}
 .text-button{
   min-height:38px;padding:0 var(--s2);border:0;background:transparent;
-  color:var(--accent);font-size:13px;font-weight:700;border-radius:var(--r-xs);
+  color:var(--accent-text);font-size:13px;font-weight:700;border-radius:var(--r-xs);
   transition:background var(--dur) var(--ease);
 }
 .text-button:hover{background:var(--accent-wash)}
 .text-button.danger{color:var(--bad)}
-.text-button.danger:hover{background:rgba(239,138,123,.12)}
+.text-button.danger:hover{background:color-mix(in srgb, var(--bad) 12%, transparent)}
 
 /* ------------------------------------------------------------------- chips
    Pill group with a filled active state. Scrolls horizontally rather than
@@ -259,7 +192,7 @@ label>span.field-caption,.field-caption{
 .eyebrow{
   display:inline-block;
   font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--accent);
+  color:var(--accent-text);
 }
 .feed-card-header small,.feed-identity small{
   font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
@@ -279,7 +212,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:.005em;text-wrap:balance}
   -webkit-backdrop-filter:saturate(140%) blur(14px);
   border-top:1px solid var(--hairline);
   padding-bottom:env(safe-area-inset-bottom);
-  box-shadow:0 -1px 0 rgba(0,0,0,.3);
+  box-shadow:0 -1px 0 var(--shadow-color);
 }
 .bottom-nav a{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
@@ -290,7 +223,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:.005em;text-wrap:balance}
 .bottom-nav a small{font-size:10px;font-weight:700;letter-spacing:.02em}
 .bottom-nav a .nav-icon svg{width:23px;height:23px}
 .bottom-nav a:active{color:var(--ink-2)}
-.bottom-nav a.active{color:var(--accent)}
+.bottom-nav a.active{color:var(--accent-text)}
 .bottom-nav a.active::before{
   content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
   width:26px;height:2px;border-radius:0 0 2px 2px;background:var(--accent);
@@ -303,7 +236,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:.005em;text-wrap:balance}
   transition:background var(--dur) var(--ease),color var(--dur) var(--ease);
 }
 .side-nav a:hover{background:var(--surface-2);color:var(--ink)}
-.side-nav a.active{background:var(--accent-wash);color:var(--accent)}
+.side-nav a.active{background:var(--accent-wash);color:var(--accent-text)}
 .sidebar{background:var(--surface-1);border-right:1px solid var(--hairline)}
 
 .topbar{
@@ -323,7 +256,7 @@ details>summary::-webkit-details-marker{display:none}
   border-radius:var(--r-lg);box-shadow:var(--shadow-3);
 }
 .workout-review-backdrop,.mobile-editor-backdrop,.coach-bubble-backdrop{
-  background:rgba(4,7,6,.7);backdrop-filter:blur(3px);
+  background:var(--scrim);backdrop-filter:blur(3px);
 }
 
 /* -------------------------------------------------------------------- charts
@@ -331,10 +264,10 @@ details>summary::-webkit-details-marker{display:none}
    emphasised. Everything else is scaffolding and should recede. */
 .chart-grid line,.chart-gridline{stroke:var(--hairline);stroke-width:1}
 .chart-series-fill{fill:url(#forgeAccentFill)}
-.chart-series-line{stroke:var(--accent);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}
-.chart-endpoint{fill:var(--accent);stroke:var(--surface-1);stroke-width:3}
+.chart-series-line{stroke:var(--chart-1);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.chart-endpoint{fill:var(--chart-1);stroke:var(--surface-1);stroke-width:3}
 .chart-bar{fill:var(--accent-dim);transition:fill var(--dur) var(--ease)}
-.chart-bar:hover,.chart-bar.active{fill:var(--accent)}
+.chart-bar:hover,.chart-bar.active{fill:var(--chart-1)}
 .chart-axis-label{font-size:10px;font-weight:700;letter-spacing:.06em;fill:var(--ink-3)}
 
 /* Bars authored as divs across the older insight components. */
@@ -463,7 +396,7 @@ select,input:not([type=checkbox]):not([type=radio]){min-height:38px}
   padding:3px 7px;border-radius:var(--r-xs);
   background:var(--surface-2);color:var(--ink-2);border:1px solid var(--hairline);
 }
-.session-tags i:first-child{background:var(--accent-wash);color:var(--accent);border-color:transparent}
+.session-tags i:first-child{background:var(--accent-wash);color:var(--accent-text);border-color:transparent}
 
 /* The page ground itself must follow the theme. `:root` and `body` were painted
    with literal near-blacks, so a light theme produced white cards floating on a
@@ -482,14 +415,14 @@ body{background-color:var(--bg);color:var(--text)}
   display:grid;place-items:center;
   margin-top:-22px;
   border:4px solid var(--surface-0);
-  box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 35%, transparent),0 2px 6px rgba(0,0,0,.35);
+  box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 35%, transparent),0 2px 6px var(--shadow-color);
   transition:transform var(--dur) var(--ease),filter var(--dur) var(--ease);
 }
 .nav-log-circle svg{width:22px;height:22px}
 .bottom-nav a.nav-log-action:active .nav-log-circle{transform:scale(.94)}
 .bottom-nav a.nav-log-action.active .nav-log-circle{filter:brightness(1.08)}
 .bottom-nav a.nav-log-action small{color:var(--ink-3);font-size:10px;font-weight:700}
-.bottom-nav a.nav-log-action.active small{color:var(--accent)}
+.bottom-nav a.nav-log-action.active small{color:var(--accent-text)}
 
 /* ------------------------------------------------------------------ You tab
    Identity header + segmented views (Progress / Goals / Activities). */
@@ -535,8 +468,8 @@ body{background-color:var(--bg);color:var(--text)}
 .goal-stat-row>div:last-child{border-right:0}
 .goal-stat-row span{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--ink-3);white-space:nowrap}
 .goal-stat-row strong{font:800 clamp(17px,4.6vw,22px)/1.15 var(--display);letter-spacing:.02em;color:var(--ink);overflow-wrap:anywhere}
-.goal-stat-row .goal-value-current strong{color:var(--accent)}
-.goal-stat-row .goal-value-difference.close strong{color:var(--mint,#58d68d)}
+.goal-stat-row .goal-value-current strong{color:var(--accent-text)}
+.goal-stat-row .goal-value-difference.close strong{color:var(--mint,var(--good))}
 .goal-head-side{display:grid;gap:4px;justify-items:end;text-align:right;flex:none}
 .goal-head-side small{color:var(--ink-3);font-size:11px;white-space:nowrap}
 .goal-sources-details{border:1px solid var(--hairline);border-radius:var(--r-md);background:var(--surface-1)}
@@ -595,8 +528,8 @@ body{background-color:var(--bg);color:var(--text)}
   transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease);
 }
 .week-pulse-chips button svg{width:16px;height:16px}
-.week-pulse-chips button.active{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
-.week-pulse-more{font-size:12px;font-weight:800;color:var(--accent);white-space:nowrap}
+.week-pulse-chips button.active{color:var(--accent-text);border-color:var(--accent);background:var(--accent-wash)}
+.week-pulse-more{font-size:12px;font-weight:800;color:var(--accent-text);white-space:nowrap}
 .week-pulse-title{font-size:18px;margin:0;letter-spacing:.03em}
 .week-pulse-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3)}
 .week-pulse-stats>div{display:grid;gap:1px;min-width:0}
@@ -608,10 +541,10 @@ body{background-color:var(--bg);color:var(--text)}
 .week-pulse-caption{font-size:11px;color:var(--ink-3);font-weight:700}
 .week-pulse-grid line{stroke:var(--hairline);stroke-width:1}
 .week-pulse-grid text{fill:var(--ink-3);font-size:10px;font-weight:600}
-.week-pulse-area{fill:color-mix(in srgb,var(--accent) 16%,transparent)}
-.week-pulse-line{stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
-.week-pulse-dot{fill:var(--surface-1);stroke:var(--accent);stroke-width:2}
-.week-pulse-dot:last-of-type{fill:var(--accent)}
+.week-pulse-area{fill:color-mix(in srgb,var(--tint) 16%,transparent)}
+.week-pulse-line{stroke:var(--chart-1);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.week-pulse-dot{fill:var(--surface-1);stroke:var(--chart-1);stroke-width:2}
+.week-pulse-dot:last-of-type{fill:var(--chart-1)}
 .week-pulse-month{fill:var(--ink-3);font-size:10px;font-weight:700;letter-spacing:.06em}
 
 /* Compact data points on the completed-today card. */
@@ -631,9 +564,9 @@ body{background-color:var(--bg);color:var(--text)}
   display:grid;gap:var(--s2);
   border:1px solid color-mix(in srgb,var(--accent) 35%,var(--hairline));
   border-radius:var(--r-md);padding:var(--s3);
-  background:linear-gradient(140deg,color-mix(in srgb,var(--accent) 7%,var(--surface-1)),var(--surface-1) 55%);
+  background:linear-gradient(140deg,color-mix(in srgb,var(--tint) 7%,var(--surface-1)),var(--surface-1) 55%);
 }
-.cardio-ai-label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.cardio-ai-label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text)}
 .cardio-ai-label svg{width:15px;height:15px}
 .cardio-ai-box textarea{min-height:52px;font-size:14px}
 .cardio-ai-actions{display:flex;align-items:center;gap:var(--s3)}
@@ -642,7 +575,7 @@ body{background-color:var(--bg);color:var(--text)}
   margin:0;display:grid;gap:3px;font-size:13px;line-height:1.5;color:var(--ink);
   border-left:3px solid var(--accent);padding:6px 0 6px var(--s3);
 }
-.cardio-ai-reflection b{font-size:10px;letter-spacing:.1em;color:var(--accent)}
+.cardio-ai-reflection b{font-size:10px;letter-spacing:.1em;color:var(--accent-text)}
 .cardio-ai-reflection.local{border-left-color:var(--ink-3)}
 .cardio-ai-reflection.local b{color:var(--ink-3)}
 
@@ -659,7 +592,7 @@ body{background-color:var(--bg);color:var(--text)}
   border:1px solid var(--hairline-strong);background:var(--surface-1);color:var(--ink-2);
   border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;min-height:38px;
 }
-.body-log-buffer button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-wash)}
+.body-log-buffer button.active{border-color:var(--accent);color:var(--accent-text);background:var(--accent-wash)}
 .body-log-list{display:grid;gap:var(--s3)}
 .body-log-note{border:1px solid var(--hairline);border-radius:var(--r-md);padding:var(--s3);display:grid;gap:var(--s2);background:var(--surface-1)}
 .body-log-note>header{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
@@ -668,8 +601,8 @@ body{background-color:var(--bg);color:var(--text)}
 .body-log-note>header .text-button{margin-left:auto;min-height:32px}
 .body-log-note>p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.5}
 .body-log-kind{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid var(--hairline-strong);color:var(--ink-2)}
-.body-log-kind.injury{color:#ff9f6e;border-color:color-mix(in srgb,#ff9f6e 45%,transparent);background:color-mix(in srgb,#ff9f6e 10%,transparent)}
-.body-log-kind.fatigue{color:#7ec8ff;border-color:color-mix(in srgb,#7ec8ff 45%,transparent);background:color-mix(in srgb,#7ec8ff 10%,transparent)}
+.body-log-kind.injury{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.body-log-kind.fatigue{color:var(--info);border-color:color-mix(in srgb,var(--info) 45%,transparent);background:color-mix(in srgb,var(--info) 10%,transparent)}
 .body-log-followup{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;border-top:1px solid var(--hairline);padding-top:var(--s2)}
 .body-log-followup>span{font-size:12.5px;font-weight:700;color:var(--ink)}
 .body-log-followup>div{display:flex;gap:var(--s2)}
@@ -677,8 +610,8 @@ body{background-color:var(--bg);color:var(--text)}
   border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);
   border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:700;min-height:38px;
 }
-.body-log-followup>div button:first-child{border-color:color-mix(in srgb,var(--mint,#58d68d) 55%,transparent);color:var(--mint,#58d68d)}
-.body-log-followup>div button:last-child{border-color:color-mix(in srgb,#ff9f6e 55%,transparent);color:#ff9f6e}
+.body-log-followup>div button:first-child{border-color:color-mix(in srgb,var(--mint,var(--good)) 55%,transparent);color:var(--mint,var(--good))}
+.body-log-followup>div button:last-child{border-color:color-mix(in srgb,var(--warn) 55%,transparent);color:var(--warn)}
 .body-log-last{color:var(--ink-3);font-size:11.5px}
 .body-log-empty{margin:0;font-size:13px;color:var(--ink-3)}
 .body-log-history summary{cursor:pointer;font-size:12px;color:var(--ink-3);font-weight:700;min-height:36px;display:flex;align-items:center}
@@ -689,12 +622,12 @@ body{background-color:var(--bg);color:var(--text)}
 /* Buffer banner on Today. */
 .buffer-banner{
   display:flex;align-items:center;gap:var(--s2);
-  border:1px solid color-mix(in srgb,#ff9f6e 40%,transparent);
-  background:color-mix(in srgb,#ff9f6e 8%,var(--surface-1));
+  border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);
+  background:color-mix(in srgb,var(--warn) 8%,var(--surface-1));
   color:var(--ink);border-radius:var(--r-md);padding:var(--s2) var(--s3);
   font-size:13px;font-weight:600;min-height:44px;
 }
-.buffer-banner svg{width:18px;height:18px;color:#ff9f6e;flex:none}
+.buffer-banner svg{width:18px;height:18px;color:var(--warn);flex:none}
 
 /* The Coach tab IS the coach — no floating bubble on top of it. */
 .coach-bubble-hidden{display:none}
@@ -759,9 +692,9 @@ body{background-color:var(--bg);color:var(--text)}
 .sidebar{padding-top:calc(30px + env(safe-area-inset-top))}
 
 /* The Log action is a button, not a beacon. */
-.nav-log-circle{box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.nav-log-circle{box-shadow:0 2px 8px var(--shadow-color)}
 .bottom-nav a.nav-log-action.active .nav-log-circle{filter:none}
-.bottom-nav a.nav-log-action.active small{color:var(--accent)}
+.bottom-nav a.nav-log-action.active small{color:var(--accent-text)}
 
 /* Goals as a table: one slim row per goal, the selected goal's insight card
    below is the page's real content. */
@@ -773,18 +706,18 @@ body{background-color:var(--bg);color:var(--text)}
 .compact-goal-table.slim .goal-row-name{display:flex;align-items:center;gap:8px;min-width:0}
 .compact-goal-table.slim .goal-row-name strong{font:800 14.5px var(--display);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .goal-type-tag{flex:none;font-size:9px;font-weight:900;letter-spacing:.08em;padding:3px 6px;border-radius:5px;border:1px solid var(--hairline-strong);color:var(--ink-2)}
-.goal-type-tag.strength{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.goal-type-tag.strength{color:var(--accent-text);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
 .goal-type-tag.endurance{color:var(--info);border-color:color-mix(in srgb,var(--info) 45%,transparent)}
 .compact-goal-table.slim .goal-row-target{font:800 14px var(--display);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
 .compact-goal-table.slim .goal-row-due{color:var(--ink-3);font-size:11.5px;text-align:right;white-space:nowrap}
 .compact-goal-table.slim .compact-goal-row.active .compact-goal-select{box-shadow:inset 2px 0 var(--accent);background:var(--accent-wash)}
 .compact-goal-table.slim .compact-goal-edit{min-height:48px;border:0;background:none;color:var(--ink-2);font-size:12px;font-weight:800}
-.compact-goal-table.slim .compact-goal-edit:hover{color:var(--accent)}
+.compact-goal-table.slim .compact-goal-edit:hover{color:var(--accent-text)}
 
 /* Tappable chart points. */
 .week-pulse-point{cursor:pointer}
 .week-pulse-hit{fill:transparent}
-.week-pulse-point.picked .week-pulse-dot{fill:var(--accent)}
+.week-pulse-point.picked .week-pulse-dot{fill:var(--chart-1)}
 .week-pulse-tip text{fill:var(--ink);font-size:11px;font-weight:800;paint-order:stroke;stroke:var(--surface-1);stroke-width:4px;stroke-linejoin:round}
 
 /* The AI composer breathes: full-width entry, button on its own line when
@@ -822,7 +755,7 @@ body{background-color:var(--bg);color:var(--text)}
 .cardio-template-row>div{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .cardio-template-row>div::-webkit-scrollbar{display:none}
 .cardio-template-row button{flex:none;min-height:38px;padding:8px 14px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-1);color:var(--ink);font-size:12.5px;font-weight:700}
-.cardio-template-row button:hover{border-color:var(--accent);color:var(--accent)}
+.cardio-template-row button:hover{border-color:var(--accent);color:var(--accent-text)}
 
 /* Roadmap: the whole trajectory as one dense, scannable table. */
 .roadmap-card{display:grid;gap:var(--s3)}
@@ -830,8 +763,8 @@ body{background-color:var(--bg);color:var(--text)}
 .roadmap-head h3{margin:2px 0 0}
 .horizon-chips{display:flex;gap:6px;align-items:center}
 .horizon-chips button{min-height:36px;padding:7px 13px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-1);color:var(--ink-2);font-size:12px;font-weight:800}
-.horizon-chips button.active{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
-.horizon-chips .roadmap-export{color:var(--accent);border-style:dashed}
+.horizon-chips button.active{color:var(--accent-text);border-color:var(--accent);background:var(--accent-wash)}
+.horizon-chips .roadmap-export{color:var(--accent-text);border-style:dashed}
 .roadmap-table{display:grid;max-height:440px;overflow-y:auto;border:1px solid var(--hairline);border-radius:var(--r-sm)}
 .roadmap-row{display:grid;grid-template-columns:86px 52px 56px minmax(0,1.4fr) minmax(0,1fr);gap:var(--s3);align-items:center;padding:8px 12px;border-bottom:1px solid var(--hairline);font-size:12.5px}
 .roadmap-row:last-child{border-bottom:0}
@@ -845,7 +778,7 @@ body{background-color:var(--bg);color:var(--text)}
 .roadmap-set b{color:var(--ink)}
 .roadmap-set small{color:var(--ink-3)}
 .roadmap-row.phase-deload .roadmap-week b,.roadmap-row.phase-taper .roadmap-week b{color:var(--info)}
-.roadmap-row.phase-test .roadmap-week b{color:var(--accent)}
+.roadmap-row.phase-test .roadmap-week b{color:var(--accent-text)}
 .roadmap-note{color:var(--ink-3)}
 @media(max-width:640px){.roadmap-row{grid-template-columns:74px 44px minmax(0,1.3fr) minmax(0,1fr)}.roadmap-long,.roadmap-row.head span:nth-child(3){display:none}}
 
@@ -867,7 +800,7 @@ body{background-color:var(--bg);color:var(--text)}
 .simple-week-schedule article>div>strong{order:1;font-size:14.5px;line-height:1.2}
 .simple-week-schedule article .session-tags{order:2;display:inline-flex;flex-wrap:wrap;align-items:baseline;margin:0;gap:0;column-gap:6px}
 .simple-week-schedule .session-tags i{border:0;background:transparent;padding:0;min-height:0;font-size:9px;font-weight:900;letter-spacing:.09em;color:var(--ink-3);border-radius:0}
-.simple-week-schedule .session-tags i:first-child{background:transparent;color:var(--accent)}
+.simple-week-schedule .session-tags i:first-child{background:transparent;color:var(--accent-text)}
 .simple-week-schedule .session-tags i+i:before{content:"· ";color:var(--ink-3)}
 .simple-week-schedule article>div>small{order:3;flex-basis:100%;font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .simple-week-schedule article.stress-moderate{border-left-color:color-mix(in srgb,var(--accent) 38%,transparent)}
@@ -1023,8 +956,8 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 /* Effort-trend chart: shorter proportional box. */
 .cardio-goal-chart svg{aspect-ratio:720/232}
 .cardio-goal-chart{padding:13px 14px}
-.cardio-goal-forecast{stroke:#57b9ff;stroke-width:3;stroke-dasharray:7 6}
-.cardio-goal-line-label.forecast{fill:#57b9ff}
+.cardio-goal-forecast{stroke:var(--chart-2);stroke-width:3;stroke-dasharray:7 6}
+.cardio-goal-line-label.forecast{fill:var(--chart-2)}
 .goal-trajectory-chart.simple svg{max-height:190px}
 
 /* ================================================ insights classic (old UI)
@@ -1034,7 +967,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .kpi-tile{display:grid;gap:2px;padding:13px 14px;border:1px solid var(--hairline);border-radius:12px;background:var(--surface-1)}
 .kpi-tile b{font:800 24px/1.05 var(--display);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-.kpi-tile.gold b{color:var(--accent)}
+.kpi-tile.gold b{color:var(--accent-text)}
 .kpi-tile.sage b{color:var(--good)}
 .kpi-tile span{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
 .kpi-tile small{font-size:10.5px;color:var(--ink-3)}
@@ -1059,8 +992,8 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ic-line{width:100%;height:auto}
 .ic-grid{stroke:var(--hairline)}
 .ic-axis{fill:var(--ink-3);font:700 8.5px Inter,sans-serif}
-.ic-stroke{stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
-.ic-dot{fill:var(--surface-1);stroke:var(--accent);stroke-width:2}
+.ic-stroke{stroke:var(--chart-1);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.ic-dot{fill:var(--surface-1);stroke:var(--chart-1);stroke-width:2}
 .ic-freq{display:grid;gap:8px}
 .ic-freq>div{display:grid;grid-template-columns:92px minmax(0,1fr) 22px;gap:10px;align-items:center}
 .ic-freq span{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1070,7 +1003,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ic-freq b{font-size:12.5px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
 .ic-pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .ic-pr-grid>div{display:grid;gap:2px;padding:12px 13px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-sunken)}
-.ic-pr-grid b{font:800 19px/1.1 var(--display);color:var(--accent);font-variant-numeric:tabular-nums}
+.ic-pr-grid b{font:800 19px/1.1 var(--display);color:var(--accent-text);font-variant-numeric:tabular-nums}
 .ic-pr-grid span{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
 .ic-pr-grid small{font-size:10.5px;color:var(--ink-3)}
 .ic-toggle{display:flex;padding:4px;gap:4px;border:1px solid var(--hairline);border-radius:999px;background:var(--surface-sunken)}
@@ -1093,7 +1026,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 /* Goal assessment block (replaces the charts). */
 .goal-assessment{display:grid;gap:8px;padding:13px 15px;border:1px solid var(--hairline);border-radius:var(--r-md);background:var(--surface-sunken)}
 .goal-assessment header{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.goal-assessment header span{font-size:10px;font-weight:900;letter-spacing:.12em;color:var(--accent)}
+.goal-assessment header span{font-size:10px;font-weight:900;letter-spacing:.12em;color:var(--accent-text)}
 .goal-assessment header b{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--hairline-strong);color:var(--ink-2)}
 .goal-assessment header b.on-track{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent)}
 .goal-assessment header b.behind{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
@@ -1109,7 +1042,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 /* Insights range chips + the split-day picker on the log page. */
 .ic-range{display:flex;gap:6px}
 .ic-range button{flex:1;min-height:36px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-1);color:var(--ink-2);font-size:12px;font-weight:800}
-.ic-range button.active{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
+.ic-range button.active{color:var(--accent-text);border-color:var(--accent);background:var(--accent-wash)}
 .plan-day-picker{display:grid;gap:6px;margin-top:2px}
 
 /* ═══ GOALS · phone-first stat tiles + stacked assessment (2026-08-25) ═══ */
@@ -1118,8 +1051,8 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .goal-stat-tiles .gst span{font-size:9.5px;font-weight:800;letter-spacing:.1em;color:var(--ink-3);white-space:nowrap}
 .goal-stat-tiles .gst strong{font:800 clamp(16px,4.8vw,21px)/1.12 var(--display);letter-spacing:.01em;color:var(--ink);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 .goal-stat-tiles .gst small{font-size:10.5px;color:var(--ink-3);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.goal-stat-tiles .gst.current strong{color:var(--accent)}
-.goal-stat-tiles .gst.difference.close strong{color:var(--mint,#58d68d)}
+.goal-stat-tiles .gst.current strong{color:var(--accent-text)}
+.goal-stat-tiles .gst.difference.close strong{color:var(--mint,var(--good))}
 @media (min-width:720px){.goal-stat-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}.goal-stat-tiles .gst strong{font-size:19px}}
 .goal-row-detail .goal-stat-tiles{gap:7px}
 .goal-row-detail .goal-stat-tiles .gst{padding:9px 11px}
@@ -1191,10 +1124,10 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .baseline-items>div{display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid var(--hairline);font-size:13px;line-height:1.4}
 .baseline-items>div:last-child{border-bottom:0}
 .baseline-items b{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:50%;border:1.5px solid var(--hairline-strong);font-size:12px;color:var(--ink-3)}
-.baseline-items .done b{color:var(--accent-ink,#101410);background:var(--accent);border-color:var(--accent)}
+.baseline-items .done b{color:var(--accent-ink,var(--accent-ink));background:var(--accent);border-color:var(--accent)}
 .baseline-items .done span{color:var(--ink-3);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink-3) 55%,transparent)}
 .plan-generating-eta{color:var(--ink-3);font-size:11.5px}
-.ai-program-adjusted{color:var(--accent);font-size:11px;font-weight:700}
+.ai-program-adjusted{color:var(--accent-text);font-size:11px;font-weight:700}
 
 /* ═══ Voice + why-this-number (overnight batch) ═══ */
 .topset-philosophy{display:block;margin-top:5px;color:var(--ink-3);font-size:11.5px;line-height:1.5;max-width:52ch}
@@ -1206,7 +1139,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .wave-explainer[open] summary>b{transform:rotate(45deg)}
 .wave-explainer-body{display:grid;gap:9px;margin-top:11px}
 .wave-explainer-body>div{display:flex;gap:11px;align-items:flex-start}
-.wave-explainer-body b{flex:none;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font-size:11px;font-weight:900}
+.wave-explainer-body b{flex:none;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--tint) 16%,transparent);color:var(--accent-text);font-size:11px;font-weight:900}
 .wave-explainer-body p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
 .wave-explainer-body p strong{color:var(--ink);font-variant-numeric:tabular-nums}
 .second-session-hint{display:block;color:var(--ink-3);font-size:11px;line-height:1.5;margin-top:2px}
@@ -1220,7 +1153,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .completed-day-card>.completed-day-check+div{grid-column:2/-1;grid-row:1}
 .completed-day-card footer{flex-wrap:wrap}
 .goal-exercise-hint{display:block;color:var(--ink-3);font-size:11.5px;line-height:1.45;margin-top:-4px}
-.max-week-tag{font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.09em;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:4px;padding:1px 5px}
+.max-week-tag{font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.09em;color:var(--accent-text);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:4px;padding:1px 5px}
 
 /* ================================================= floating-chrome clearance
    Two elements float over the bottom of every page: the pill tab bar (72px
@@ -1278,7 +1211,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ledger-rail small{font-size:11px;line-height:1.4;color:var(--ink-3);overflow-wrap:anywhere}
 .ledger-rail .ledger-empty{color:var(--ink-3);font-size:17px}
 .ledger-rail .ledger-target{border-left-color:var(--accent);background:var(--accent-wash)}
-.ledger-rail .ledger-target strong{color:var(--accent)}
+.ledger-rail .ledger-target strong{color:var(--accent-text)}
 .max-ledger-body p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
 .max-ledger-body p strong{color:var(--ink);font-variant-numeric:tabular-nums}
 @media(min-width:560px){
@@ -1321,7 +1254,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .history-month-name{font:800 13.5px var(--display);letter-spacing:.01em;white-space:nowrap}
 .history-month-meta{color:var(--ink-3);font-size:11.5px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .history-month-toggle>b{justify-self:end;color:var(--ink-3);font:700 17px/1 var(--display)}
-.history-log-month.open .history-month-toggle>b{color:var(--accent)}
+.history-log-month.open .history-month-toggle>b{color:var(--accent-text)}
 .history-log-month .history-log-list{border:0;border-radius:0}
 
 /* ============================================ split day editor, condensed
@@ -1390,8 +1323,8 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .day-recap .completed-cardio-summary b{white-space:normal;text-wrap:balance;font-size:14.5px}
 
 .day-recap article.is-pr{background:var(--accent-wash);box-shadow:inset 2px 0 var(--accent)}
-.day-recap article.is-pr>div:last-child b{color:var(--accent)}
-.day-recap .pr-flag{grid-column:1;justify-self:start;margin-top:1px;font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.14em;color:var(--accent-ink,#101410);background:var(--accent);border-radius:3px;padding:2px 6px}
+.day-recap article.is-pr>div:last-child b{color:var(--accent-text)}
+.day-recap .pr-flag{grid-column:1;justify-self:start;margin-top:1px;font-style:normal;font-size:8.5px;font-weight:900;letter-spacing:.14em;color:var(--accent-ink,var(--accent-ink));background:var(--accent);border-radius:3px;padding:2px 6px}
 
 /* One primary action; the other two share a row instead of stacking into
    three identical slabs taller than the recap above them. */
@@ -1408,8 +1341,8 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 /* ---------------------------------------------- week schedule, lived-in
    A day that happened gets its tick and shows the work; a past day with no
    log reads as missed, quietly — the week is a record and a plan at once. */
-.simple-week-schedule article.is-done{background:color-mix(in srgb,var(--accent) 5%,transparent)}
-.simple-week-schedule article.is-done .session-done-tick{color:var(--accent);font-weight:900}
+.simple-week-schedule article.is-done{background:color-mix(in srgb,var(--tint) 5%,transparent)}
+.simple-week-schedule article.is-done .session-done-tick{color:var(--accent-text);font-weight:900}
 .simple-week-schedule article.is-missed{opacity:.55}
 .simple-week-schedule article.is-missed small{font-style:italic}
 
@@ -1418,20 +1351,20 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    created first. */
 .goal-ledger-stack { display: flex; flex-direction: column; gap: 10px; }
 .goal-ledger-caption { display: flex; flex-direction: column; gap: 2px; padding: 0 4px; }
-.goal-ledger-caption small { color: var(--text-muted, #8b8f8a); font-size: 12px; line-height: 1.4; }
+.goal-ledger-caption small { color: var(--text-muted, var(--ink-2)); font-size: 12px; line-height: 1.4; }
 .goal-ledger-stack .max-ledger { margin: 0; }
-.wave-explainer summary small { display: block; color: var(--text-muted, #8b8f8a); font-size: 12px; margin-top: 2px; }
+.wave-explainer summary small { display: block; color: var(--text-muted, var(--ink-2)); font-size: 12px; margin-top: 2px; }
 
 /* Save plan pins a block the athlete approved; refreshing discards one, so it
    asks first. */
 .plan-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.plan-saved-badge { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent, #d4ff3f); background: color-mix(in srgb, var(--accent, #d4ff3f) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent, #d4ff3f) 34%, transparent); white-space: nowrap; }
+.plan-saved-badge { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent, var(--accent)); background: color-mix(in srgb, var(--accent, var(--accent)) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent, var(--accent)) 34%, transparent); white-space: nowrap; }
 /* REGENERATING IS A CONVERSATION. The old confirm was a strip inside the card
    with one question and one answer; this takes over the screen, the same way a
    synced day does, because the athlete is being asked to say something rather
    than to agree to something. */
-.plan-rebuild-backdrop { position: fixed; inset: 0; z-index: 70; background: #000c; backdrop-filter: blur(6px); display: grid; place-items: center; padding: 18px; overflow-y: auto; }
-.plan-rebuild-sheet { width: min(560px, 100%); max-height: calc(100vh - 36px); overflow-y: auto; display: grid; gap: 14px; background: linear-gradient(145deg, color-mix(in srgb, var(--card) 96%, white 4%), var(--card)); border: 1px solid var(--line); border-radius: 22px; padding: 22px; box-shadow: 0 30px 80px #000b; }
+.plan-rebuild-backdrop { position: fixed; inset: 0; z-index: 70; background: var(--scrim); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 18px; overflow-y: auto; }
+.plan-rebuild-sheet { width: min(560px, 100%); max-height: calc(100vh - 36px); overflow-y: auto; display: grid; gap: 14px; background: linear-gradient(145deg, color-mix(in srgb,var(--card) 96%,var(--lift) 4%), var(--card)); border: 1px solid var(--line); border-radius: 22px; padding: 22px; box-shadow: 0 30px 80px var(--scrim); }
 .plan-rebuild-sheet header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .plan-rebuild-sheet header > div { display: grid; gap: 6px; min-width: 0; }
 .plan-rebuild-sheet header strong { font: 800 20px var(--display-font); text-transform: uppercase; line-height: 1.08; text-wrap: balance; }
@@ -1443,8 +1376,8 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .plan-rebuild-sheet textarea:disabled { opacity: .55; }
 .plan-rebuild-hint, .plan-rebuild-foot { color: var(--muted); font-size: 12.5px; line-height: 1.45; margin: -6px 0 0; }
 .plan-rebuild-foot { margin: 0; }
-.plan-rebuild-busy { margin: 0; color: var(--accent); font-weight: 700; line-height: 1.45; }
-.plan-rebuild-error { margin: 0; color: #ff8a7a; font-weight: 700; line-height: 1.45; }
+.plan-rebuild-busy { margin: 0; color:var(--accent-text); font-weight: 700; line-height: 1.45; }
+.plan-rebuild-error { margin: 0; color: var(--bad); font-weight: 700; line-height: 1.45; }
 .plan-rebuild-sheet footer { display: grid; gap: 10px; }
 .plan-rebuild-sheet footer .button { width: 100%; }
 /* Three buttons, three weights: build the change, build without one, and walk
@@ -1453,26 +1386,26 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .plan-rebuild-sheet footer .button.ghost { border-color: transparent; background: none; color: var(--muted); font-weight: 700; }
 .plan-rebuild-sheet footer .button.ghost:active { color: var(--text); }
 /* What was asked for, kept beside the block it shaped. */
-.plan-adjustment { display: block; margin-top: 4px; color: var(--text-muted, #8b8f8a); font-size: 12.5px; line-height: 1.45; }
+.plan-adjustment { display: block; margin-top: 4px; color: var(--text-muted, var(--ink-2)); font-size: 12.5px; line-height: 1.45; }
 .plan-adjustment b { color: var(--text); font-weight: 800; }
 
 /* The AI program card carries the block stamp and its two actions — the
    generated summary duplicated the ledgers and schedule below it. */
 .ai-program-meta.compact { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .ai-program-meta.compact > div:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ai-program-progress { color: var(--text-muted, #8b8f8a); font-size: 12px; }
+.ai-program-progress { color: var(--text-muted, var(--ink-2)); font-size: 12px; }
 
 /* Today keeps its own mark on the calendar: a filled dot under the number,
    distinct from the selection ring so both read at once when they land on
    the same day. */
-.classic-calendar .calendar-grid button.is-today > span:first-child { position: relative; font-weight: 800; color: var(--accent, #d4ff3f); }
-.classic-calendar .calendar-grid button.is-today::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 5px; width: 14px; height: 2px; border-radius: 2px; background: var(--accent, #d4ff3f); }
+.classic-calendar .calendar-grid button.is-today > span:first-child { position: relative; font-weight: 800; color: var(--accent, var(--accent)); }
+.classic-calendar .calendar-grid button.is-today::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 5px; width: 14px; height: 2px; border-radius: 2px; background: var(--accent, var(--accent)); }
 .classic-calendar .calendar-grid button.is-today.trained::after { display: none; }
-.classic-calendar .calendar-grid button.is-today { background: color-mix(in srgb, var(--accent, #d4ff3f) 9%, transparent); }
-.classic-calendar .calendar-grid button.is-today.selected { background: color-mix(in srgb, var(--accent, #d4ff3f) 16%, transparent); }
+.classic-calendar .calendar-grid button.is-today { background: color-mix(in srgb, var(--accent, var(--accent)) 9%, transparent); }
+.classic-calendar .calendar-grid button.is-today.selected { background: color-mix(in srgb, var(--accent, var(--accent)) 16%, transparent); }
 
 /* A run logged without a distance is worth nothing to mileage or pace — say so
    at the moment of logging rather than letting the totals quietly stall. */
-.cardio-log-warning { margin: 6px 0 0; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: #f6c66b; background: rgba(246, 198, 107, .1); border: 1px solid rgba(246, 198, 107, .28); }
+.cardio-log-warning { margin: 6px 0 0; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 28%, transparent); }
 /* Why the attempt sits below the calc max, on the row the athlete sees. */
-.max-ledger-why { display: block; margin-top: 3px; color: var(--text-muted, #8b8f8a); font-size: 12px; line-height: 1.4; }
+.max-ledger-why { display: block; margin-top: 3px; color: var(--text-muted, var(--ink-2)); font-size: 12px; line-height: 1.4; }

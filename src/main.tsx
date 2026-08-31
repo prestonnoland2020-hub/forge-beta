@@ -13,6 +13,9 @@ import { TrainingLibraryProvider } from './features/training/TrainingLibraryProv
 import { DailyRecommendationProvider } from './features/training/DailyRecommendationProvider';
 import { BillingProvider } from './features/billing/BillingProvider';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
+/* THE THEME LAYER LOADS FIRST. It defines every colour token the rest of the
+   stylesheets read, and it is the only file that knows light from dark. */
+import './forge-theme.css';
 import './styles.css';
 import './workout.css';
 import './top-set-history.css';
@@ -43,9 +46,6 @@ import './coaching-insights.css';
 import './coach-page.css';
 import './profile-pro.css';
 import './profile-hub.css';
-import './appearance.css';
-import './appearance-elite.css';
-import './appearance-system.css';
 import './adaptive-plan.css';
 import './friends-pro.css';
 import './home-simple.css';
@@ -56,17 +56,14 @@ import './onboarding-split.css';
 import './long-range-plan.css';
 import './simplified-platform.css';
 import './frontend-polish.css';
-import './profile-customization.css';
 import './mobile-calm.css';
 import './billing.css';
 import './legal.css';
 import './native.css';
-/* Loaded last: the authoritative token + primitive layer every earlier
-   stylesheet now reads from. See the header comment in forge-system.css. */
+import './appearance.css';
+/* Shared primitives — cards, buttons, navigation. Colour comes from
+   forge-theme.css above. */
 import './forge-system.css';
-/* UI packages override the system tokens per selected look — after the system
-   layer so a package always wins. */
-import './forge-packages.css';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.
