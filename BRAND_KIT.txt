@@ -41,9 +41,11 @@ from the athlete's tone and accent.
     background: var(--surface-1);     ← correct
     background: #1b2223;              ← wrong, even if it looks identical
 
-Two files contain colour literals: forge-theme.css, which defines the roles, and
-appearance.css, whose tone swatches must preview a ground the page is not
-currently on. Everything else — 45 stylesheets — is roles only.
+ONE file contains colour literals: forge-theme.css, which defines the roles.
+forge-grounds.css holds more, but it is generated from them. Every other
+stylesheet in the app — all 45 — is roles only, including appearance.css, whose
+swatches used to be the one honest exception and now read the real ladders
+through data-ground and data-force-tone instead.
 
 
 ────────────────────────────────────────────────────────────────────────────

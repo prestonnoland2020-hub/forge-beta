@@ -1,0 +1,120 @@
+FORGE — WHAT IS DONE, WHAT IS LEFT
+31 August 2026
+
+────────────────────────────────────────────────────────────────────────
+DONE — applied to the live Supabase project (czefovdclflufixdpbnp)
+────────────────────────────────────────────────────────────────────────
+
+Two migrations applied and verified. Your data is untouched:
+7 athletes · 2,704 workout days · 122 top sets · 3,951 cardio sessions
+— identical counts before and after.
+
+  20260831010000_record_dashboard_applied_schema
+  20260831020000_production_hardening
+
+Verified live after applying:
+  · ai_usage, ai_quota_limits, unlimited_accounts    created
+  · forge_tier, consume_ai_quota, my_entitlements,
+    refund_ai_quota, delete_my_account               created
+  · private.activity_connections RLS                 ENABLED (was off)
+  · training_plans_generated_at trigger              created
+  · friendships_freeze_parties trigger               created
+  · subscriptions.source + apple columns             added
+  · your account resolves as                         founder (unmetered)
+  · another athlete resolves as                      free
+  · Strava: 2 connections, RPC still answering       intact
+
+────────────────────────────────────────────────────────────────────────
+DONE — in the repo, waiting on a push
+────────────────────────────────────────────────────────────────────────
+
+Three commits on branch `clean`, parent b680711:
+
+  f1792d0  light / system / dark, one palette expressed twice
+  cc01fd9  your mark and palette; blue on charcoal
+  a9e8a74  ground becomes an axis; the accents are all yours
+
+Your F is the app icon, in six colourways. My barbell is gone — that open
+question from the last version of this file is closed.
+
+Verified before each commit: tsc clean, vite build clean, usercases.mjs
+all green, and 144 rendered page loads across every tone, ground and accent
+with no text under its WCAG AA floor.
+
+────────────────────────────────────────────────────────────────────────
+LEFT — needs your Mac
+────────────────────────────────────────────────────────────────────────
+
+1. THE CODE.
+
+     git fetch ./forge-appearance.bundle clean:incoming
+     git merge --ff-only incoming
+     git push origin main
+
+   GitHub Actions builds and publishes to Pages on its own.
+
+   Use the bundle named above. Earlier messages in the thread carry
+   forge-updates.bundle and forge-theme.bundle; those are supersets-in-
+   progress of this one and merging an old one first is harmless but
+   pointless — this one contains all three commits.
+
+2. THE EDGE FUNCTIONS. This is what actually switches the rate limiting on.
+   The meter exists in the database, but the deployed forge-coach (v21) and
+   forge-plan (v18) do not call it yet, so the endpoints are still uncapped
+   — exactly as they were before, not worse.
+
+   Do this AFTER the merge: the new versions import _shared/guard.ts, which
+   only exists once the code lands.
+
+     npx supabase@latest functions deploy forge-coach --project-ref czefovdclflufixdpbnp
+     npx supabase@latest functions deploy forge-plan  --project-ref czefovdclflufixdpbnp
+
+   Optional, only when you wire up billing:
+
+     npx supabase@latest functions deploy create-checkout-session
+     npx supabase@latest functions deploy create-billing-portal
+     npx supabase@latest functions deploy apple-iap
+     npx supabase@latest functions deploy stripe-webhook --no-verify-jwt
+
+   I deliberately did NOT deploy these from here. The management API takes
+   the function source inline, which would have meant me re-typing 23,000
+   and 32,000 characters by hand into a tool call. A single transcription
+   slip breaks the coach for all seven of you. The CLI ships the actual
+   files. Use the CLI.
+
+Both are reversible: git revert for the code, and the Supabase dashboard
+keeps every previous function version.
+
+────────────────────────────────────────────────────────────────────────
+IF YOU REGENERATE THE ICONS
+────────────────────────────────────────────────────────────────────────
+
+`npm run icons` needs three Python packages, and cairosvg links against a
+system library pip will not install:
+
+  brew install cairo pango gdk-pixbuf libffi
+  python3 -m pip install -r tools/requirements.txt
+
+You do not need this to deploy — the generated icons are committed. It is
+only for changing the mark or adding an accent.
+
+────────────────────────────────────────────────────────────────────────
+NOT STARTED — the App Store itself
+────────────────────────────────────────────────────────────────────────
+
+APP_STORE.md is the runbook. Nothing in it can be done from here; all of it
+needs an Apple Developer account ($99/yr, 24–48h to approve) and Xcode.
+
+The long poles, roughly in order:
+  · the Apple Developer enrolment
+  · the native Capacitor project and the StoreKit bridge (~80 lines of Swift)
+  · subscription products in App Store Connect
+  · the Info.plist block for alternate icons (§2 of APP_STORE.md) — without
+    it the icon picker changes the browser tab and not the home screen
+  · a demo account for App Review, pre-loaded with history — the single most
+    common first-submission rejection
+  · six screenshots at 1320 × 2868
+
+None of that is blocked by anything above. The two commands in "LEFT" are
+worth doing this week regardless; the App Store work is a separate project
+that can start whenever you want it to.

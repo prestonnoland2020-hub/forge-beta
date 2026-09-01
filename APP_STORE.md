@@ -22,8 +22,9 @@ stands.
 | Subscription sold through StoreKit, not our own mechanism | 3.1.1 | Server half built (`apple-iap` function); needs the StoreKit bridge and products |
 | Restore purchases | 3.1.1 | Built in the UI; calls the bridge |
 | App icon at every required size, opaque, no alpha | — | Built — `npm run icons` |
-| Rate limiting so the AI endpoints cannot be drained | — | Built (migration 0021 + `_shared/guard.ts`) |
+| Rate limiting so the AI endpoints cannot be drained | — | Database side applied and live; **the edge functions that call it are not deployed yet** (see §5) |
 | Safe-area handling, no zoom-on-input, native touch behaviour | — | Built |
+| Alternate app icons | — | Built on the web; iOS needs the `Info.plist` block in §2 |
 
 What is left is: an Apple account, the native project, the StoreKit bridge,
 store metadata, and the submission itself.
@@ -59,11 +60,51 @@ npm run ios:open     # opens Xcode
 `capacitor.config.ts` is already written and covers the dark background, the
 splash, the keyboard resize behaviour and the URL schemes.
 
-**App icons.** `npm run icons` regenerates everything. In Xcode, open
-`App/Assets.xcassets/AppIcon.appiconset` and drop in the files from
-`public/icons/ios/` plus `public/icons/icon-1024.png` for the App Store slot.
-The 1024 must have no alpha channel — the generator already guarantees that,
-which is the single most common upload rejection.
+**App icons.** `npm run icons` regenerates everything from the traced vector.
+It needs three Python packages first, and cairosvg links against a system
+library pip will not install for you:
+
+```bash
+brew install cairo pango gdk-pixbuf libffi
+python3 -m pip install -r tools/requirements.txt
+```
+
+In Xcode, open `App/Assets.xcassets/AppIcon.appiconset` and drop in the files
+from `public/icons/ios/` plus `public/icons/icon-1024.png` for the App Store
+slot. The 1024 must have no alpha channel — the generator already guarantees
+that, which is the single most common upload rejection.
+
+**Alternate icons.** Settings → Appearance lets an athlete pick one of six
+icons, and on the web that works by rewriting the `<link rel="icon">` hrefs. On
+iOS it needs `UIApplication.setAlternateIconName`, and iOS only accepts a name
+already declared in `Info.plist`. Until you add that block the picker changes
+the browser tab and nothing on the home screen — the call is wrapped and fails
+silent, so nothing breaks, it just does not take.
+
+Add one `CFBundleAlternateIcons` entry per non-default accent (`flare`, `coral`,
+`amber`, `tide`, `harbor` — `signal` is the primary and stays `nil`):
+
+```xml
+<key>CFBundleIcons</key>
+<dict>
+  <key>CFBundlePrimaryIcon</key>
+  <dict><key>CFBundleIconFiles</key><array><string>AppIcon60x60</string></array></dict>
+  <key>CFBundleAlternateIcons</key>
+  <dict>
+    <key>flare</key>
+    <dict>
+      <key>CFBundleIconFiles</key><array><string>flare</string></array>
+      <key>UIPrerenderedIcon</key><false/>
+    </dict>
+    <!-- coral, amber, tide, harbor the same way -->
+  </dict>
+</dict>
+```
+
+The image files for these go in the app bundle as loose `flare@2x.png` /
+`flare@3x.png` (120px and 180px), NOT in the asset catalogue — alternate icons
+are the one case where Xcode's catalogue is not the answer. `public/icons/<accent>/icon-192.png`
+resized is the source.
 
 ---
 
@@ -177,9 +218,13 @@ work from the same binary.
 
 ## 5. Deploy the backend before the app
 
+The two migrations are **already applied to production** and verified —
+`20260831010000_record_dashboard_applied_schema` and
+`20260831020000_production_hardening`. `supabase db push` is a no-op unless you
+are standing up a fresh project.
+
 ```bash
-# The migration that closes the RLS holes and adds the quota meter.
-supabase db push
+supabase db push   # no-op on the live project; needed for a fresh one
 
 # Functions. stripe-webhook is the only one that must skip JWT verification,
 # because Stripe cannot present a Supabase token.
@@ -286,7 +331,8 @@ resolving.
 ## 9. Before you ship, once
 
 - [ ] `VITE_DEMO_MODE=false` in the production build (the Pages workflow already sets it)
-- [ ] Migration 0021 applied; every `public` table reports `relrowsecurity = true`
+- [ ] `forge-coach` and `forge-plan` redeployed — the quota meter does nothing until they are
+- [ ] Every `public` table reports `relrowsecurity = true`
 - [ ] Sign in with Apple works on a real device, not just the simulator
 - [ ] A sandbox purchase grants Pro, and Restore returns it on a second device
 - [ ] Delete-account actually deletes — check the row is gone in Supabase

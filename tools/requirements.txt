@@ -1,0 +1,17 @@
+# Only tools/make-icons.py needs these. build-grounds.py, solve-accents.py and
+# oklab.py are pure standard library on purpose — the colour maths that the
+# whole theme rests on should not be one pip install away from unrunnable.
+#
+#   python3 -m pip install -r tools/requirements.txt
+#
+# cairosvg links against the system Cairo library, which is NOT installed by
+# pip. On macOS:
+#
+#   brew install cairo pango gdk-pixbuf libffi
+#
+# Without it the import fails with "no library called cairo-2 was found",
+# which reads like a Python problem and is not one.
+
+pillow>=10.0
+numpy>=1.24
+cairosvg>=2.7
