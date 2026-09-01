@@ -128,7 +128,7 @@ export function OnboardingPage() {
       saveSetup(completed);
       updateProfile({ runningDays: Math.min(data.trainingDays, data.runningDays), injuryConstraint: data.injuryConstraint });
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from !== '/onboarding' ? from : '/', { replace: true });
+      navigate(from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
     }
@@ -151,7 +151,11 @@ export function OnboardingPage() {
   </main>;
 
   return <main className="onboarding-shell onboarding-simple">
-    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing && !needsGoal ? 'EDIT PROFILE' : `SETUP ${step + 1} OF ${steps.length}`}</span></header>
+    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing && !needsGoal ? 'EDIT PROFILE' : `SETUP ${step + 1} OF ${steps.length}`}</span>
+      {/* AN EDIT MUST BE ESCAPABLE. Opened from Profile, this screen had no
+          way out but completing all three steps — Save was the only door. */}
+      {isEditing && !needsGoal && <button type="button" className="onboarding-cancel" onClick={() => navigate('/profile')}>Cancel</button>}
+    </header>
     <div className="onboarding-grid">
       <aside><span className="eyebrow">START SIMPLE</span><h1>Ready in three steps.</h1><p>Forge learns performance from completed workouts. You do not need to estimate maxes, pace, equipment, or recovery during setup.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
       <section className="onboarding-card">
@@ -161,7 +165,7 @@ export function OnboardingPage() {
           <fieldset className="full"><legend>Main training focus</legend><div className="setup-choices">{(['Hybrid', 'Strength', 'Endurance', 'Body composition'] as const).map(item => <button type="button" className={data.primaryFocus === item ? 'active' : ''} onClick={() => set('primaryFocus', item)} key={item}>{item}</button>)}</div></fieldset>
           <DialField label="Training days per cycle" kind="days" value={String(data.trainingDays || '')} onChange={next => set('trainingDays', Number(next))} />
           <label>Units <select value={data.units} onChange={event => set('units', event.target.value as AthleteSetup['units'])}><option>Imperial</option><option>Metric</option></select></label>
-          <div className="full"><DialField label="Current weight" kind="weight" unit={data.units === 'Metric' ? 'kg' : 'lb'} value={data.currentWeight} onChange={next => set('currentWeight', next)} hint="Optional" /></div>
+          <div className="full"><DialField label="Current weight" kind="bodyweight" unit={data.units === 'Metric' ? 'kg' : 'lb'} value={data.currentWeight} onChange={next => set('currentWeight', next)} hint="Optional" /></div>
           <div className="setup-note full"><strong>That is enough to begin.</strong><span>Forge creates a starter split. You can adjust its days and exercises later from Plan.</span></div>
         </div>}
         {step === 1 && <div className="setup-fields">

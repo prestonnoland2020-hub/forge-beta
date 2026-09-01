@@ -181,7 +181,7 @@ const paceToMinutes = (pace?: string): number => {
   const match = String(pace || '').match(/(\d+):(\d{2})/);
   return match ? Number(match[1]) + Number(match[2]) / 60 : 0;
 };
-export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number; weeklyMileage?: number };
+export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number; weeklyMileage?: number; longestRunMiles?: number };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
@@ -259,11 +259,30 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const startMiles = clampMiles(Number(athlete.weeklyMileage) || floorMiles || Number(week.mileage) || 0);
   const progress = blockWeeks > 1 ? Math.min(1, weekIndex / (blockWeeks - 1)) : 0;
   const climb = ceilingMiles ? startMiles + (ceilingMiles - startMiles) * progress : startMiles;
-  const target = clampMiles(round1(weekIndex % 5 === 3 ? climb * 0.8 : climb));
+  /* THE MODEL'S WEEKLY NUMBER IS HONORED WHEN IT IS SANE. The athlete can ask
+     the coach for a specific progression — "add 5 miles a week until 40" — and
+     the model writes exactly that into each week. Overwriting it with our own
+     linear climb silently undid the one thing they asked for. So the model's
+     weekly mileage stands when it sits inside the athlete's stated bounds and
+     within a humane ramp of the current baseline (+6 mi or +40% per week over
+     the start, whichever is larger); anything wilder falls back to the climb. */
+  const modelMiles = Number(week.mileage) || 0;
+  const rampCap = startMiles + Math.max(6, startMiles * 0.4) * (weekIndex + 1);
+  const modelSane = modelMiles > 0
+    && (!ceilingMiles || modelMiles <= ceilingMiles + 1e-9)
+    && (!floorMiles || modelMiles >= Math.min(floorMiles, startMiles) - 1e-9)
+    && modelMiles <= rampCap;
+  const chosen = modelSane ? modelMiles : climb;
+  const target = clampMiles(round1(weekIndex % 5 === 3 ? Math.min(chosen, climb) * 0.8 : chosen));
 
   const pace = paceToMinutes(week.easyPace) || 9.5;
-  /* The long run is a share of the week, not an independent number. */
-  const longRunMiles = hasLong ? round1(Math.min(Math.max(Number(week.longRunMiles), target * LONG_RUN_MIN_SHARE), target * LONG_RUN_MAX_SHARE)) : 0;
+  /* The long run is a share of the week, not an independent number — and it is
+     also capped by the body doing it: no plan hands an athlete whose longest
+     run is 13.7 miles a 27-mile day. It may grow ~1 mile a week from their
+     longest logged run; with no logged longest, the share caps alone hold. */
+  const longestKnown = Number(athlete.longestRunMiles) || 0;
+  const longCap = longestKnown > 0 ? Math.max(6, longestKnown + 1 + weekIndex) : Infinity;
+  const longRunMiles = hasLong ? round1(Math.min(Math.max(Number(week.longRunMiles), target * LONG_RUN_MIN_SHARE), target * LONG_RUN_MAX_SHARE, longCap)) : 0;
   const qualityMiles = hasQuality ? qualitySessionMiles(String(week.quality), pace) : 0;
 
   /* Whatever is left is easy volume, split into real distances. */

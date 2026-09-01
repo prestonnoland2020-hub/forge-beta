@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 import { setup, goals, days } from './seed.mjs';
 
 const BASE = 'http://localhost:4193';
-const ALL_ROUTES = ['/', '/plan', '/insights', '/history', '/goals', '/coach', '/exercises', '/profile', '/profile?view=appearance', '/profile?view=billing'];
+const ALL_ROUTES = ['/', '/plan', '/split', '/workout', '/insights', '/history', '/goals', '/coach', '/exercises', '/profile', '/profile?view=appearance', '/profile?view=billing', '/profile?view=devices', '/profile?view=faq'];
 const ACCENTS = ['signal', 'flare', 'coral', 'amber', 'tide', 'harbor'];
 const GROUNDS = ['carbon', 'midnight', 'ink', 'espresso'];
 

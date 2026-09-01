@@ -233,3 +233,20 @@
 .strava-review-tied .eyebrow{color:var(--good);font-size:10px;letter-spacing:.1em}
 .strava-review-tied strong{font-size:15px}
 .strava-review-tied small{color:var(--muted);font-size:12px;line-height:1.4}
+
+/* The one-line confirmation after a set saves from the sheet. It replaces the
+   old embedded quick-log block, which existed to host the legacy manual form. */
+.quick-log-flash{padding:2px 6px}
+.quick-log-flash small{color:var(--accent-text);font-weight:700}
+.top-set-launch .add-top-set-button{justify-self:start;width:100%}
+/* Progress (chart) and Settings (gear) bubbles flank the log button. Quiet
+   circles — the accent stays on the one that adds work. */
+.top-insights,.top-settings{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2)}
+.top-insights .nav-icon,.top-settings .nav-icon{display:grid;place-items:center}
+.top-insights svg,.top-settings svg{width:19px;height:19px}
+.top-insights.active,.top-settings.active{color:var(--accent-text);border-color:var(--accent-dim)}
+.top-insights:active,.top-settings:active{transform:scale(.94)}
+/* A still-to-log set: gold rail, muted figures, an explicit invitation. */
+.top-set-entry.pending{border-left:3px solid var(--gold)}
+.top-set-row-figures.pending{color:var(--ink-2)}
+.top-set-row-figures.pending small{color:var(--gold)}

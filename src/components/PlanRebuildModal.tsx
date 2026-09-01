@@ -49,10 +49,10 @@ export function PlanRebuildModal({ saved, standing, busy, stage, error, onCancel
     <div className="plan-rebuild-sheet" onClick={event => event.stopPropagation()}>
       <header>
         <div>
-          <strong>Regenerate your plan</strong>
+          <strong>Are you sure you want to regenerate?</strong>
           <small>{saved
-            ? 'This replaces the block you saved. Tell Forge what should change, or just build a fresh one.'
-            : 'Tell Forge what should change about this block, or just build a fresh one.'}</small>
+            ? 'This throws away the block you saved and builds a new one. Tell Forge what should change, or just build a fresh one.'
+            : 'This throws away the current block and builds a new one. Tell Forge what should change, or just build a fresh one.'}</small>
         </div>
         <button type="button" className="plan-rebuild-close" aria-label="Close" disabled={busy} onClick={onCancel}>×</button>
       </header>

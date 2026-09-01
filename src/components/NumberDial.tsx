@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
    One dial, used everywhere a number is entered. Each caller states what kind
    of number it wants and the dial does the rest. */
 
-export type DialKind = 'weight' | 'reps' | 'distance' | 'minutes' | 'seconds' | 'clock' | 'days' | 'count';
+export type DialKind = 'weight' | 'bodyweight' | 'reps' | 'distance' | 'minutes' | 'seconds' | 'clock' | 'days' | 'count';
 
 type Column = { values: number[]; suffix?: string; label?: string };
 
@@ -28,6 +28,13 @@ const COLUMNS: Record<DialKind, (unit?: string) => Column[]> = {
   weight: unit => [
     { values: range(0, unit === 'kg' ? 400 : 900, 100) },
     { values: range(0, unit === 'kg' ? 97.5 : 95, unit === 'kg' ? 2.5 : 5) },
+    { values: [], suffix: unit || 'lb' },
+  ],
+  /* A body weight moves by ones, not fives — 187 is a real weigh-in and the
+     barbell's five-pound plates have nothing to do with it. */
+  bodyweight: unit => [
+    { values: range(0, unit === 'kg' ? 300 : 700, 100) },
+    { values: range(0, 99, 1) },
     { values: [], suffix: unit || 'lb' },
   ],
   reps: () => [{ values: range(1, 50, 1), suffix: 'reps' }],
@@ -113,11 +120,12 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
 }) {
   const columns = useMemo(() => COLUMNS[kind](unit), [kind, unit]);
   const numeric = Number(value) || 0;
+  const weightLike = kind === 'weight' || kind === 'bodyweight';
   const [whole, setWhole] = useState(() => {
     if (kind === 'distance') return Math.floor(numeric);
     if (kind === 'clock') return Number(String(value || '').split(':')[0]) || 0;
     /* 315 opens as 300 on the hundreds wheel and 15 on the remainder. */
-    if (kind === 'weight') return Math.floor(numeric / 100) * 100;
+    if (weightLike) return Math.floor(numeric / 100) * 100;
     const values = COLUMNS[kind](unit)[0].values;
     /* Snap an existing odd value to the nearest offered one, so a 227 lb
        import does not open the wheel at zero. */
@@ -126,6 +134,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
   const [fraction, setFraction] = useState(() => {
     if (kind === 'distance') return Math.round((numeric - Math.floor(numeric)) * 100);
     if (kind === 'clock') return Number(String(value || '').split(':')[1]) || 0;
+    if (kind === 'bodyweight') return Math.round(numeric - Math.floor(numeric / 100) * 100);
     if (kind === 'weight') {
       const step = unit === 'kg' ? 2.5 : 5;
       /* Snap an odd imported load (227) to the nearest step the wheel offers. */
@@ -136,7 +145,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
 
   const shown = kind === 'distance' ? `${whole}.${String(fraction).padStart(2, '0')}`
     : kind === 'clock' ? `${whole}:${String(fraction).padStart(2, '0')}`
-    : kind === 'weight' ? String(Math.round((whole + fraction) * 10) / 10)
+    : weightLike ? String(Math.round((whole + fraction) * 10) / 10)
     : String(whole);
   const confirm = () => onConfirm(kind === 'distance' ? String(Number(shown)) : shown);
 
@@ -146,7 +155,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
       <div className="dial-columns">
         {/* The highlighted band is the selection, exactly as a picker reads. */}
         <div className="dial-band" aria-hidden="true" />
-        {kind === 'weight'
+        {weightLike
           ? <>
               <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />
               <span className="dial-plus">+</span>

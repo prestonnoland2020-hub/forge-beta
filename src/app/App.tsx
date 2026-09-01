@@ -8,7 +8,9 @@ import { AppShell } from '../components/AppShell';
 import { WorkoutPage } from '../pages/ProductPages';
 import { OnboardingPage } from '../pages/OnboardingPage';
 import { TrainingPlanPage } from '../pages/TrainingPlanPage';
-import { YouPage } from '../pages/YouPage';
+import { HistoryPage } from '../pages/HistoryPage';
+import { InsightsPage } from '../pages/InsightsPage';
+import { GoalsPage } from '../pages/GoalsPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { CoachPage } from '../pages/CoachPage';
 
@@ -30,11 +32,16 @@ export function App() {
           <Route element={<AppShell coach={<CoachPage />} />}>
           <Route index element={<HomePage />} />
           <Route path="/workout" element={<WorkoutPage />} />
-          <Route path="/history" element={<YouPage />} />
-          <Route path="/insights" element={<YouPage />} />
+          {/* Activities, Progress and Goals are their own pages. The tabbed
+              "You" surface hid Goals two taps deep and duplicated Activities;
+              Preston's call: calendar-first Activities in the tab bar, Goals
+              findable on its own, Progress behind the chart bubble up top. */}
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/insights" element={<InsightsPage />} />
           <Route path="/coach" element={<CoachPage />} />
-          <Route path="/goals" element={<YouPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
           <Route path="/plan" element={<TrainingPlanPage />} />
+          <Route path="/split" element={<TrainingPlanPage mode="split" />} />
           <Route path="/exercises" element={<ExerciseLibraryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           </Route>

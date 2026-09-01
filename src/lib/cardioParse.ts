@@ -47,6 +47,20 @@ const normalizeUnit = (raw: string) => {
 
 /* One time expression: 32:10, 1:05:00, "30 min", "45 minutes", "1 hour". */
 const TIME = /(\d{1,2}:\d{2}(?::\d{2})?)|(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)\b|(\d+(?:\.\d+)?)\s*(?:hr|hrs|hour|hours|h)\b|(\d+(?:\.\d+)?)\s*(?:s|sec|secs|seconds)\b/i;
+/* A pace expression: "10 minute pace", "at 8:30 pace", "8:30/mi", "10 min/mile",
+   "5:00 per km". A pace is minutes-per-distance-unit — it is NOT the workout's
+   duration, so it is read (and stripped) before the duration is. */
+const PACE = /(?:@|at\s+)?(\d{1,2}(?::\d{2})?)\s*(?:min(?:ute)?s?)?\s*(?:\/|per\s+)?\s*(mi|mile|km|kilometer|k)?\s*pace\b|(\d{1,2}(?::\d{2})?)\s*(?:min(?:ute)?s?)?\s*(?:\/|per\s+)(mi|mile|km|kilometer|k)\b/i;
+const parsePace = (text: string): { minutesPerUnit: number; unit: string } | null => {
+  const match = text.match(PACE);
+  if (!match) return null;
+  const clock = match[1] || match[3];
+  if (!clock) return null;
+  const minutes = clock.includes(':') ? clockToMinutes(clock) : Number(clock);
+  if (!minutes || minutes < 3 || minutes > 30) return null; /* outside human locomotion paces — likely not a pace */
+  const rawUnit = (match[2] || match[4] || 'mile').toLowerCase();
+  return { minutesPerUnit: minutes, unit: rawUnit.startsWith('k') ? 'km' : 'miles' };
+};
 const DISTANCE = /(\d+(?:\.\d+)?)\s*(miles?|mi\b|kms?\b|k\b|kilometers?|meters?|m\b|yards?|yds?\b)/i;
 const INTERVAL = /(\d{1,2})\s*[x×]\s*(\d+(?:\.\d+)?)\s*(miles?|mi|kms?|k|meters?|m|yards?|yds?)?\b/i;
 const FIVE_K = /\b(5|10)k\b/i;
@@ -87,21 +101,40 @@ export function parseCardioDescription(text: string): ParsedCardio {
       if (rest) note = `${rest[1]} ${rest[2]} ${rest[3]} between repeats`;
       continue;
     }
-    const distanceMatch = segment.match(DISTANCE) || segment.match(FIVE_K);
-    const minutes = extractTime(segment);
-    if (!distanceMatch && !minutes) continue;
+    /* The pace is read first and struck from the segment, so "25 minutes at
+       10 minute pace" reads as duration 25 with pace 10 — not two durations. */
+    const pace = parsePace(segment);
+    const paceless = pace ? stripMatched(segment, PACE) : segment;
+    const distanceMatch = paceless.match(DISTANCE) || paceless.match(FIVE_K);
+    let minutes = extractTime(paceless);
+    if (!distanceMatch && !minutes && !pace) continue;
     let distance = 0, unit = 'miles';
     if (distanceMatch) {
-      if (distanceMatch[0].match(FIVE_K) && !segment.match(DISTANCE)) { distance = Number(distanceMatch[1]); unit = 'km'; }
+      if (distanceMatch[0].match(FIVE_K) && !paceless.match(DISTANCE)) { distance = Number(distanceMatch[1]); unit = 'km'; }
       else { distance = Number(distanceMatch[1]); unit = normalizeUnit(distanceMatch[2] || 'miles'); }
     }
+    /* Pace closes the triangle: any two of distance, time, pace give the third.
+       "25 minutes at 10 minute pace" is 2.5 miles — the athlete said so. */
+    if (pace) {
+      if (!distance && minutes > 0) { distance = Number((minutes / pace.minutesPerUnit).toFixed(2)); unit = pace.unit; }
+      else if (distance > 0 && !minutes && unit === pace.unit) minutes = distance * pace.minutesPerUnit;
+    }
+    if (!distance && !minutes) continue;
     rows.push({ cardioType: detectActivity(segment, activity), distance, unit, timeMinutes: Number(minutes.toFixed(2)) });
   }
 
   if (!rows.length) {
-    const minutes = extractTime(trimmed);
-    const distanceMatch = trimmed.match(DISTANCE);
-    if (minutes || distanceMatch) rows.push({ cardioType: activity, distance: distanceMatch ? Number(distanceMatch[1]) : 0, unit: distanceMatch ? normalizeUnit(distanceMatch[2] || 'miles') : 'miles', timeMinutes: Number(minutes.toFixed(2)) });
+    const pace = parsePace(trimmed);
+    const paceless = pace ? stripMatched(trimmed, PACE) : trimmed;
+    let minutes = extractTime(paceless);
+    const distanceMatch = paceless.match(DISTANCE);
+    let distance = distanceMatch ? Number(distanceMatch[1]) : 0;
+    let unit = distanceMatch ? normalizeUnit(distanceMatch[2] || 'miles') : 'miles';
+    if (pace) {
+      if (!distance && minutes > 0) { distance = Number((minutes / pace.minutesPerUnit).toFixed(2)); unit = pace.unit; }
+      else if (distance > 0 && !minutes && unit === pace.unit) minutes = distance * pace.minutesPerUnit;
+    }
+    if (minutes || distance) rows.push({ cardioType: activity, distance, unit, timeMinutes: Number(minutes.toFixed(2)) });
   }
 
   /* "5k, 28 minutes" reads as one effort, not two. */

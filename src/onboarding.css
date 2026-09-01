@@ -18,3 +18,6 @@
 .free-muscle-picker{display:grid;gap:12px;padding:16px 0 0}
 .free-muscle-picker small{color:var(--muted);line-height:1.45;display:block;margin-top:4px}
 .free-muscle-hint{color:var(--muted);font-size:12px}
+
+/* Editing an existing profile is escapable without saving. */
+.onboarding-brand .onboarding-cancel{margin-left:auto;border:0;background:none;color:var(--accent-text);font-weight:800;font-size:13px;cursor:pointer}

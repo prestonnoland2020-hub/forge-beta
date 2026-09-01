@@ -23,7 +23,7 @@
 import { chromium } from 'playwright';
 import { setup, goals, days } from './seed.mjs';
 
-const BASE = 'http://localhost:4191';
+const BASE = 'http://localhost:4193';
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 let fails = 0;

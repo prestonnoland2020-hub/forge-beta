@@ -53,3 +53,8 @@
 .muscle-picker.derived .muscle-chip:not(.active){opacity:.4}
 .muscle-picker.derived .muscle-chip:disabled{opacity:.4}
 .muscle-picker.derived .muscle-chip.active:disabled{opacity:1}
+
+/* Back header for the split editor now that it lives under Profile. */
+.split-page-back{display:flex;align-items:center;gap:12px}
+.split-page-back a{color:var(--accent-text);font-weight:800;text-decoration:none;font-size:14px}
+.split-page-back strong{font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}

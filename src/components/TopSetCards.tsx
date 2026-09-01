@@ -79,8 +79,10 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
     const key = setKey(set);
     if (openKeys.includes(key)) return true;
     if (closedKeys.includes(key)) return false;
-    /* Default: a saved set is closed, an unfinished one is open. */
-    return !(set.lift && loggedKeys.includes(key));
+    /* Default: EVERY named set is a closed one-line row — the screen stays
+       linear and small, and tapping a row opens just that set. Only a set
+       with no lift yet opens, because a blank line has nothing to show. */
+    return !set.lift;
   };
   const toggle = (set: LoggedTopSet) => {
     const key = setKey(set);
@@ -121,12 +123,15 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
 
       const open = isOpen(set) || Boolean(isCorrecting);
 
-      /* Saved and closed: the whole set is one line of text. */
-      if (logged && !open) return <article className="card top-set-entry logged closed" key={set.id || `set-${index}`}>
+      /* Closed: the whole set is one line of text — saved sets read as their
+         result, still-to-log sets read as the prescription with LOG waiting. */
+      if (!open && set.lift) return <article className={`card top-set-entry closed${logged ? ' logged' : ' pending'}`} key={set.id || `set-${index}`}>
         <button type="button" className="top-set-row" aria-expanded="false" onClick={() => toggle(set)}>
           <span className="top-set-row-name">{set.lift}</span>
-          <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
-          <b aria-hidden="true">⌄</b>
+          {logged
+            ? <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
+            : <span className="top-set-row-figures pending">{set.weight > 0 ? `${set.weight} ${unit} ×${set.reps}` : 'Not logged'}<small>tap to log</small></span>}
+          <b aria-hidden="true">{logged ? '⌄' : '›'}</b>
         </button>
       </article>;
 

@@ -1,5 +1,5 @@
 FORGE — WHAT IS DONE, WHAT IS LEFT
-31 August 2026
+1 September 2026
 
 ────────────────────────────────────────────────────────────────────────
 DONE — applied to the live Supabase project (czefovdclflufixdpbnp)
@@ -28,18 +28,33 @@ Verified live after applying:
 DONE — in the repo, waiting on a push
 ────────────────────────────────────────────────────────────────────────
 
-Three commits on branch `clean`, parent b680711:
+The appearance work (f1792d0 · cc01fd9 · a9e8a74 · 075cae8) is already
+pushed and live. On top of it sits the beta-feedback batch of 1 September:
 
-  f1792d0  light / system / dark, one palette expressed twice
-  cc01fd9  your mark and palette; blue on charcoal
-  a9e8a74  ground becomes an axis; the accents are all yours
+  · AI cardio reads pace ("25 min at 10 minute pace" logs 2.5 miles)
+  · saving a top set no longer ends the workout mid-session
+  · logging is linear: compact rows, the popup sheet is the one entry form
+  · plan page reordered (header → save/regenerate → week → block),
+    goal ledgers and wave explainer removed, regenerate asks first
+  · long runs capped near the athlete's longest; a requested weekly
+    progression ("+5 mi/wk to 40") is honored instead of overwritten
+  · nav: Coach tab gone (bubble stays), Goals and Activities standalone,
+    Progress is the chart bubble up top, Settings gear in the top bar
+  · Activities = calendar + edit day; streak and the all-sessions log gone
+  · Profile: Split inside (own page, back arrow), Recovery tab folded into
+    a "Recovery & smartwatch" row, FAQ added, Connections = Strava only,
+    Edit profile is escapable and returns to Profile
+  · body weight dial moves in 1s, not 5s
 
-Your F is the app icon, in six colourways. My barbell is gone — that open
-question from the last version of this file is closed.
+Verified: tsc clean, vite build clean, usercases.mjs all green,
+migratecheck all green, and 192 rendered page loads across every accent,
+ground and the new routes with no text under its WCAG AA floor.
 
-Verified before each commit: tsc clean, vite build clean, usercases.mjs
-all green, and 144 rendered page loads across every tone, ground and accent
-with no text under its WCAG AA floor.
+NOTE: this batch edits supabase/functions/forge-plan/index.ts (the prompt
+now honors explicit weekly progressions and pinned long-run days), so
+redeploy forge-plan after the merge:
+
+  npx supabase@latest functions deploy forge-plan --project-ref czefovdclflufixdpbnp
 
 ────────────────────────────────────────────────────────────────────────
 LEFT — needs your Mac
