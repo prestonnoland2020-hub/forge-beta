@@ -3,7 +3,7 @@ import type { CreatedGoal } from './GoalBuilder';
 import type { GoalRoadmap } from '../lib/goalPlanEngine';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
-import { clockToSeconds, formatGoalTarget } from '../lib/time';
+import { clockToSeconds, decimalMinutesToClock, formatGoalTarget } from '../lib/time';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { sameLift } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -105,10 +105,16 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const isHyrox = goalText.includes('hyrox');
   const hoursFirst = String(goal.unit).toLowerCase().includes('hh:mm:ss') || isHyrox;
   const timeGoal = goal.type === 'Endurance' && (String(goal.metric).toLowerCase().includes('time') || String(goal.unit).includes(':'));
+  /* A PACE GOAL IS A CLOCK, NOT A DECIMAL. "8.5 min/mi" typed as a target was
+     shown back as 8.5 — and a target typed as 8:30 was mangled to 830 by the
+     numeric strip. Pace values parse through the clock reader (8:30 and 8.5
+     both mean eight-and-a-half minutes) and render as m:ss with /mi. */
+  const paceGoal = goal.type === 'Endurance' && String(goal.metric).toLowerCase().includes('pace') && /^min\//i.test(String(goal.unit || ''));
+  const paceSuffix = String(goal.unit || 'min/mi').replace(/^min\//i, '/');
   const expectedMiles = isHyrox ? null : expectedRunMiles(goal);
-  const target = timeGoal ? clockToSeconds(goal.target, hoursFirst) : numeric(goal.target);
-  const entered = timeGoal ? clockToSeconds(goal.current || '', hoursFirst) : numeric(goal.current);
-  const lowerIsBetter = timeGoal || (goal.type === 'Body Composition' && target < entered);
+  const target = timeGoal ? clockToSeconds(goal.target, hoursFirst) : paceGoal ? clockToSeconds(goal.target) / 60 : numeric(goal.target);
+  const entered = timeGoal ? clockToSeconds(goal.current || '', hoursFirst) : paceGoal ? clockToSeconds(goal.current || '') / 60 : numeric(goal.current);
+  const lowerIsBetter = timeGoal || paceGoal || (goal.type === 'Body Composition' && target < entered);
   const recentCutoff=new Date();recentCutoff.setDate(recentCutoff.getDate()-120);const recentCutoffIso=recentCutoff.toISOString().slice(0,10);
   useEffect(()=>{setQuestion('');setAnswer('');setCoachSource(null);setCoachTurns(loadGoalCoachTurns(coachKey))},[coachKey]);
 
@@ -212,17 +218,20 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     return () => { active = false; };
   }, [goal.type, goal.exercise, goal.title, expectedMiles, target, aiEvidence, recentCutoffIso, records, legacyPrediction]);
   const actualCurrent = currentEvidence?.value || 0;
-  const calculated = goal.type==='Endurance'?(aiEstimate?.seconds||0):(calculatedEvidence?.value || 0);
+  /* The legacy AI assessment is a race FINISH TIME in seconds. For a pace
+     goal that number is the wrong kind and the wrong unit — shown through the
+     pace formatter it read "24:02:00 /mi". A pace goal takes no assessment. */
+  const calculated = goal.type==='Endurance'?(paceGoal?0:aiEstimate?.seconds||0):(calculatedEvidence?.value || 0);
   const comparisonValue = goal.type==='Endurance'?actualCurrent:(actualCurrent||calculated);
   const difference = comparisonValue && target ? comparisonValue - target : 0;
   const atTarget = Boolean(comparisonValue && target && (lowerIsBetter ? comparisonValue <= target : comparisonValue >= target));
   const goalReached = Boolean(actualCurrent && target && (lowerIsBetter ? actualCurrent <= target : actualCurrent >= target));
   const goalGapRatio = comparisonValue && target ? Math.abs(difference) / Math.abs(target) : null;
   const differenceStatus = goalGapRatio === null ? 'unknown' : atTarget || goalGapRatio <= 0.05 ? 'close' : goalGapRatio <= 0.15 ? 'within-reach' : 'far';
-  const formatValue = (value: number) => timeGoal ? formatClock(value, hoursFirst) : `${Math.round(value * 10) / 10} ${goal.unit || ''}`.trim();
+  const formatValue = (value: number) => timeGoal ? formatClock(value, hoursFirst) : paceGoal ? `${decimalMinutesToClock(value)} ${paceSuffix}` : `${Math.round(value * 10) / 10} ${goal.unit || ''}`.trim();
   const currentText = actualCurrent ? formatValue(actualCurrent) : 'Not logged';
   const calculatedText = calculated ? formatValue(calculated) : '—';
-  const differenceText = !comparisonValue ? '—' : timeGoal ? `${formatClock(Math.abs(difference), hoursFirst)} ${atTarget ? 'ahead' : 'to go'}` : `${Math.round(Math.abs(difference) * 10) / 10} ${goal.unit || ''} ${atTarget ? 'ahead' : 'to go'}`;
+  const differenceText = !comparisonValue ? '—' : timeGoal ? `${formatClock(Math.abs(difference), hoursFirst)} ${atTarget ? 'ahead' : 'to go'}` : paceGoal ? `${decimalMinutesToClock(Math.abs(difference))} ${paceSuffix} ${atTarget ? 'ahead' : 'to go'}` : `${Math.round(Math.abs(difference) * 10) / 10} ${goal.unit || ''} ${atTarget ? 'ahead' : 'to go'}`;
   const currentSource = currentEvidence?.label || 'No valid event evidence yet';
   const calculatedSource = goal.type==='Endurance'?(aiEstimate?`Legacy race assessment · ${aiEstimate.confidence} confidence`:aiEstimateLoading?'Legacy assessment in progress':aiEstimateError||'No legacy assessment available'):(calculatedEvidence?.label || (isHyrox ? 'Requires HYROX or simulation data' : 'No calculation available'));
   /* A ResizeObserver measuring a div, a width held in state, and ~40 lines of

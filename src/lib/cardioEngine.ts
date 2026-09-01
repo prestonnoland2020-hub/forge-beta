@@ -22,7 +22,9 @@ export function getEventProfile(goal:CreatedGoal):EventProfile|null{const event=
 const goalSeconds=(goal:CreatedGoal,event:RunEvent)=>parseClock(goal.target,event==='HYROX')||(event==='Mile'?420:event==='5K'?1500:event==='10K'?3300:event==='Half Marathon'?7200:event==='Marathon'?15000:5400);
 const currentSeconds=(goal:CreatedGoal,event:RunEvent)=>parseClock(goal.current,event==='HYROX');
 const equivalent=(seconds:number,fromMeters:number,toMeters:number)=>seconds*Math.pow(toMeters/fromMeters,1.06);
-const splitAt=(seconds:number,distance:number,rep:number)=>formatClock(seconds*rep/distance,true);
+/* A per-rep split is coached in whole seconds — "1:36", never "1:35.9". The
+   tenths implied a precision no watch hand-times and read as a decimal. */
+const splitAt=(seconds:number,distance:number,rep:number)=>formatClock(seconds*rep/distance);
 const pacePerMile=(seconds:number,meters:number)=>formatClock(seconds*1609.344/meters);
 const plan=(id:number,activity:string,structure:PlannedCardio['structure'],extra:Partial<PlannedCardio>):PlannedCardio=>({id,activity,structure,targetSource:'Goal generated',...extra});
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));

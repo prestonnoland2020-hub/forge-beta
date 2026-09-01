@@ -42,8 +42,19 @@ export function clockToSeconds(value:string,hoursFirst=false){
 }
 
 export function formatGoalTarget(target:string,metric?:string,unit?:string){
-  const isTime=String(metric).toLowerCase().includes('time')||/minutes?|mm:ss|hh:mm:ss/i.test(String(unit));
+  /* A PACE IS READ AS MINUTES AND SECONDS, NEVER AS A DECIMAL. An athlete who
+     typed 8.5 for a min/mi goal meant eight-and-a-half minutes — showing
+     "8.5" back reads as a stopwatch nobody owns. Convert to 8:30 and say the
+     unit the way a runner would. */
+  const unitText=String(unit||'');
+  const isPace=String(metric).toLowerCase().includes('pace')&&/^min\//i.test(unitText);
+  if(isPace){
+    const seconds=clockToSeconds(target);
+    const suffix=unitText.replace(/^min\//i,'/');
+    return seconds?`${decimalMinutesToClock(seconds/60)} ${suffix}`:target;
+  }
+  const isTime=String(metric).toLowerCase().includes('time')||/minutes?|mm:ss|hh:mm:ss/i.test(unitText);
   if(!isTime)return target;
-  const seconds=clockToSeconds(target,/hh:mm:ss/i.test(String(unit)));
+  const seconds=clockToSeconds(target,/hh:mm:ss/i.test(unitText));
   return seconds?decimalMinutesToClock(seconds/60):target;
 }

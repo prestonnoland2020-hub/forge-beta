@@ -145,7 +145,8 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
 </div>}<div className="field-grid three">
 <label>Current<input value={current} onChange={e=>setCurrent(e.target.value)} placeholder="Optional" />
 </label>
-<label>Target<input value={target} onChange={e=>setTarget(e.target.value)} />
+<label>Target<input value={target} onChange={e=>setTarget(e.target.value)} placeholder={String(metric).toLowerCase().includes('pace')?'8:30':undefined} />
+{String(metric).toLowerCase().includes('pace')&&<small>Minutes and seconds — 8:30 (8.5 also reads as 8:30).</small>}
 </label>
 <label>Unit<select value={unit} onChange={e=>setUnit(e.target.value)}>{unitOptions.map(option=><option key={option}>{option}</option>)}</select>
 </label>

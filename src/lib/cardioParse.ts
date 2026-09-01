@@ -50,13 +50,19 @@ const TIME = /(\d{1,2}:\d{2}(?::\d{2})?)|(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)\
 /* A pace expression: "10 minute pace", "at 8:30 pace", "8:30/mi", "10 min/mile",
    "5:00 per km". A pace is minutes-per-distance-unit — it is NOT the workout's
    duration, so it is read (and stripped) before the duration is. */
-const PACE = /(?:@|at\s+)?(\d{1,2}(?::\d{2})?)\s*(?:min(?:ute)?s?)?\s*(?:\/|per\s+)?\s*(mi|mile|km|kilometer|k)?\s*pace\b|(\d{1,2}(?::\d{2})?)\s*(?:min(?:ute)?s?)?\s*(?:\/|per\s+)(mi|mile|km|kilometer|k)\b/i;
+const PACE = /(?:@|at\s+)?(\d{1,2}(?::\d{2}|\.\d{1,2})?)\s*(?:min(?:ute)?s?)?\s*(?:\/|per\s+)?\s*(mi|mile|km|kilometer|k)?\s*pace\b|(\d{1,2}(?::\d{2}|\.\d{1,2})?)\s*(?:min(?:ute)?s?)?\s*(?:\/|per\s+)(mi|mile|km|kilometer|k)\b/i;
 const parsePace = (text: string): { minutesPerUnit: number; unit: string } | null => {
   const match = text.match(PACE);
   if (!match) return null;
   const clock = match[1] || match[3];
   if (!clock) return null;
-  const minutes = clock.includes(':') ? clockToMinutes(clock) : Number(clock);
+  /* "8:30" is minutes:seconds. A decimal is read the way runners write it:
+     one digit is a true fraction (8.5 → 8:30), while two digits under sixty
+     are seconds typed with a period (8.45 → 8:45, not 8:27). */
+  const dotted = clock.match(/^(\d{1,2})\.(\d{1,2})$/);
+  const minutes = clock.includes(':') ? clockToMinutes(clock)
+    : dotted && dotted[2].length === 2 && Number(dotted[2]) < 60 ? Number(dotted[1]) + Number(dotted[2]) / 60
+    : Number(clock);
   if (!minutes || minutes < 3 || minutes > 30) return null; /* outside human locomotion paces — likely not a pace */
   const rawUnit = (match[2] || match[4] || 'mile').toLowerCase();
   return { minutesPerUnit: minutes, unit: rawUnit.startsWith('k') ? 'km' : 'miles' };
