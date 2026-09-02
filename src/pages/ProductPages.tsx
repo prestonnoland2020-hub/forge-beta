@@ -263,7 +263,10 @@ function WorkoutEditor() {
        just logged. */
     const existingDay=records.find(record=>record.date===sessionIso);
     const title=editingRecord?.title||existingDay?.title||(usingSplit?(plannedDay?.name||'Planned Workout'):'Custom Workout');
-    const selectedLiftData=exercises.find(exercise=>exercise.name===lift);const savedTopSets=completedTopSets.length?completedTopSets:(lift&&weight&&reps?[{muscle:selectedLiftData?.muscles.find(muscle=>sourceMuscles.includes(muscle))||selectedLiftData?.muscles[0]||'Primary',lift,weight:Number(weight),reps:Number(reps),calculatedMax:calculatedMax??undefined,completed:true}]:[]);const firstSet=savedTopSets[0];
+    /* The sheet is the only way a set is entered, and it saves as completed —
+       so the day's sets ARE the completed ones. There is no half-typed manual
+       lift left on the screen to rescue at save time any more. */
+    const savedTopSets=completedTopSets;const firstSet=savedTopSets[0];
     /* MUSCLES WORKED HAVE ONE SOURCE OF TRUTH. Training the split: the split
        day's muscle list, exactly. Custom work: the primary movers of the
        exercises actually logged — pull ups log Back, bench logs Chest. No
