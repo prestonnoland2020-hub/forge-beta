@@ -13,7 +13,7 @@ export type AthleteSetup = {
   trainingDays:number; runningDays:number; weeklyMileage:number; longestRun:number; strengthSessionMinutes:number; cardioSessionMinutes:number; combinedSessionMinutes:number;
   minWeeklyMileage?:number; maxWeeklyMileage?:number;
   scheduleStyle:'Rolling cycle'|'Weekly schedule'; equipment:string; environment:'Road'|'Track'|'Trail'|'Treadmill'|'Mixed';
-  splitSource:'Recommended'|'Custom'; splitDays:Array<{name:string;type:'Strength'|'Cardio'|'Mixed'|'Rest';muscles?:string[]}>;
+  splitSource:'Recommended'|'Custom'; splitDays:Array<{name:string;type:'Strength'|'Cardio'|'Mixed'|'Rest';muscles?:string[];exercises?:string[]}>;
   injuryConstraint:boolean; limitationNotes:string; wearableIntent:'Connect now'|'Connect later'|'Manual only';
   profileVisibility:'Private'|'Friends only'; acceptedSafety:boolean; completedAt:string;
 };
@@ -21,7 +21,7 @@ export type AthleteSetup = {
 const legacyStorageKey='forge-athlete-setup-v1';
 const storageKey=(userId:string)=>`${legacyStorageKey}:${userId}`;
 const setupDefaults:AthleteSetup={displayName:'Athlete',username:'',birthDate:'',units:'Imperial',height:'',startingWeight:'',currentWeight:'',primaryFocus:'Hybrid',strengthExperience:'Intermediate',runningExperience:'Recreational',trainingDays:4,runningDays:3,weeklyMileage:0,longestRun:0,strengthSessionMinutes:60,cardioSessionMinutes:45,combinedSessionMinutes:75,scheduleStyle:'Rolling cycle',equipment:'',environment:'Mixed',splitSource:'Recommended',splitDays:[{name:'Upper Strength',type:'Strength',muscles:['Chest','Back','Shoulders','Biceps','Triceps']},{name:'Lower Strength',type:'Strength',muscles:['Quads','Hamstrings','Glutes']},{name:'Conditioning',type:'Cardio',muscles:[]},{name:'Recovery',type:'Rest',muscles:[]}],injuryConstraint:false,limitationNotes:'',wearableIntent:'Connect later',profileVisibility:'Private',acceptedSafety:false,completedAt:''};
-const normalizeSetup=(value:unknown):AthleteSetup|null=>{if(!value||typeof value!=='object')return null;const saved=value as Partial<AthleteSetup>;const splitDays=Array.isArray(saved.splitDays)&&saved.splitDays.length?saved.splitDays.map(day=>({...day,muscles:Array.isArray(day.muscles)?day.muscles:[]})):setupDefaults.splitDays;return{...setupDefaults,...saved,splitDays,units:saved.units==='Metric'?'Metric':'Imperial'}};
+const normalizeSetup=(value:unknown):AthleteSetup|null=>{if(!value||typeof value!=='object')return null;const saved=value as Partial<AthleteSetup>;const splitDays=Array.isArray(saved.splitDays)&&saved.splitDays.length?saved.splitDays.map(day=>({...day,muscles:Array.isArray(day.muscles)?day.muscles:[],exercises:Array.isArray(day.exercises)?day.exercises:[]})):setupDefaults.splitDays;return{...setupDefaults,...saved,splitDays,units:saved.units==='Metric'?'Metric':'Imperial'}};
 type Value={setup:AthleteSetup|null;completed:boolean;loading:boolean;saveSetup:(setup:AthleteSetup)=>void;clearSetup:()=>void};
 const Context=createContext<Value|null>(null);
 
@@ -44,7 +44,12 @@ export function ProfileSetupProvider({children}:{children:ReactNode}){
        bounds) is richer than this rebuild — only fill the local plan when the
        device has none, never clobber an existing or freshly hydrated copy. */
       const existingLocalPlan=(()=>{try{return JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:unknown[]}|null}catch{return null}})();
-      if(!existingLocalPlan?.days?.length)localStorage.setItem('forge-training-plan-v1',JSON.stringify({name:data.name,rhythm:current.scheduleStyle==='Weekly schedule'?'weekly':'rolling',days}));const next={...current,splitSource:'Custom' as const,trainingDays:days.filter(day=>day.dayType!=='rest').length,splitDays:days.map(day=>({name:day.name,type:(day.dayType[0].toUpperCase()+day.dayType.slice(1)) as 'Strength'|'Cardio'|'Mixed'|'Rest',muscles:day.muscles}))};localStorage.setItem(storageKey(user.id),JSON.stringify(next));return next})});return()=>{active=false}},[user,loading]);
+      if(!existingLocalPlan?.days?.length)localStorage.setItem('forge-training-plan-v1',JSON.stringify({name:data.name,rhythm:current.scheduleStyle==='Weekly schedule'?'weekly':'rolling',days}));const next={...current,splitSource:'Custom' as const,trainingDays:days.filter(day=>day.dayType!=='rest').length,/* THE MAPPING TRAVELS WITH THE DAY. The server split carries each day's
+       movements in goal_lifts, and this rebuild dropped them — so the setup copy
+       always looked unmapped no matter how completely the athlete had filled in
+       their split, and the gate that checks for unmapped days would send a
+       fully-mapped athlete back to setup forever. */
+      splitDays:days.map(day=>({name:day.name,type:(day.dayType[0].toUpperCase()+day.dayType.slice(1)) as 'Strength'|'Cardio'|'Mixed'|'Rest',muscles:day.muscles,exercises:day.exercises||[]}))};localStorage.setItem(storageKey(user.id),JSON.stringify(next));return next})});return()=>{active=false}},[user,loading]);
   return <Context.Provider value={{setup,completed:Boolean(setup?.completedAt),loading,saveSetup,clearSetup}}>{children}</Context.Provider>;
 }
 export function useProfileSetup(){const value=useContext(Context);if(!value)throw new Error('useProfileSetup must be used inside ProfileSetupProvider');return value}

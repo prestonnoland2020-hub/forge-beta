@@ -79,6 +79,7 @@ const AUDIT = `(() => {
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const seen = new Map();
+let redirected = 0;
 let checked = 0;
 
 for (const { accent, theme, route, ground } of PASSES) {
@@ -89,10 +90,18 @@ for (const { accent, theme, route, ground } of PASSES) {
     localStorage.setItem('forge-athlete-setup-v1:preview-user', JSON.stringify(s));
     localStorage.setItem('forge-goals', JSON.stringify(g));
     localStorage.setItem('forge-workout-history-v1', JSON.stringify(d));
+    /* A mapped split, or the setup gate sends every route to onboarding and the
+       audit silently measures the same setup screen 192 times. */
+    localStorage.setItem('forge-training-plan-v1', JSON.stringify({ name: 'Split', rhythm: 'rolling', days: [
+      { name: 'Chest & Back', weekday: 'MON', dayType: 'strength', muscles: ['Chest', 'Back'], exercises: ['Bench Press'], cardioPolicy: 'none', cardio: [], recoveryStyle: 'Full rest', strengthDuration: '60', maxDuration: '60' },
+      { name: 'Quality Cardio', weekday: 'TUE', dayType: 'cardio', muscles: [], exercises: [], cardioPolicy: 'forge', cardio: [], recoveryStyle: 'Full rest', strengthDuration: '45', maxDuration: '45' },
+    ] }));
     localStorage.setItem('forge-appearance-v5', JSON.stringify({ theme: t, ground: gr, accent: a, icon: 'match' }));
   }, [setup, goals, days, theme, accent, ground]);
   await page.goto(`${BASE}/#${route}${route.includes('?') ? '&' : '?'}t=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
+  /* An audit that silently got redirected is an audit of the wrong screen. */
+  if (!page.url().includes(route.split('?')[0])) { console.log(`REDIRECTED  ${route} -> ${page.url()}`); redirected += 1; }
   for (const hit of await page.evaluate(AUDIT)) {
     const key = `${hit.sel}|${hit.text}`;
     const prev = seen.get(key);
@@ -104,7 +113,7 @@ for (const { accent, theme, route, ground } of PASSES) {
 await browser.close();
 
 const rows = [...seen.values()].sort((a, b) => a.r - b.r);
-console.log(`${checked} page loads audited`);
+console.log(`${checked} page loads audited${redirected ? ` · ${redirected} REDIRECTED (audited the wrong screen)` : ""}`);
 if (!rows.length) { console.log('no text below its WCAG AA floor'); process.exit(0); }
 for (const r of rows) console.log(`  ${String(r.r).padStart(5)} < ${r.floor}  ${r.size}px/${r.weight}  ${r.sel.padEnd(34)} ${JSON.stringify(r.text)}  [${r.where}]`);
 process.exit(1);

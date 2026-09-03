@@ -76,7 +76,7 @@
 
 .compact-workout-source{gap:13px}.compact-workout-source .workout-date{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px}.compact-workout-source .workout-date strong{font-size:17px}.compact-workout-source .source-options button{min-height:64px;align-content:center;padding:10px 13px}.compact-workout-source .source-options small{display:none}.compact-workout-source .source-options b{font-size:14px}.compact-split-picker{padding-top:12px;border-top:1px solid var(--line)}.compact-split-picker summary{display:flex;align-items:center;justify-content:space-between;gap:14px;list-style:none;cursor:pointer}.compact-split-picker summary::-webkit-details-marker{display:none}.compact-split-picker summary>span{display:grid;gap:3px}.compact-split-picker summary small{color:var(--muted)}.compact-split-picker summary>strong{color:var(--accent-text);font-size:10px}.compact-split-picker .split-day-options{margin-top:14px}
 @media(max-width:700px){
-  .workout-editor{gap:12px}.workout-editor>.page-intro{align-items:flex-start}.workout-editor>.page-intro h2{font-size:34px;margin:4px 0}.workout-editor>.page-intro p{display:none}.workout-editor>.card{padding:16px}.compact-workout-source .source-options{grid-template-columns:repeat(3,1fr)}.compact-workout-source .source-options button{min-height:58px}.compact-workout-source .source-options span{font-size:10px}.compact-workout-source .source-options b{font-size:13px}.compact-split-picker .split-day-options{grid-template-columns:1fr}.top-set-entry{padding:16px}.top-set-entry-head{align-items:flex-start}.top-set-entry .field-grid{grid-template-columns:1fr 1fr;gap:10px}.top-set-entry input{font-size:16px}.session-details .muscle-picker{gap:5px}.session-details .muscle-chip{padding:7px 10px;font-size:10px}.save-workout{position:sticky;bottom:calc(67px + env(safe-area-inset-bottom));z-index:4;width:calc(100% - 68px)!important;box-shadow:0 -12px 28px var(--bg)}
+  .workout-editor{gap:12px}.workout-editor>.page-intro{align-items:flex-start}.workout-editor>.page-intro h2{font-size:34px;margin:4px 0}.workout-editor>.page-intro p{display:none}.workout-editor>.card{padding:16px}.compact-workout-source .source-options{grid-template-columns:repeat(3,1fr)}.compact-workout-source .source-options button{min-height:58px}.compact-workout-source .source-options span{font-size:10px}.compact-workout-source .source-options b{font-size:13px}.compact-split-picker .split-day-options{grid-template-columns:1fr}.top-set-entry{padding:16px}.top-set-entry-head{align-items:flex-start}.top-set-entry .field-grid{grid-template-columns:1fr 1fr;gap:10px}.top-set-entry input{font-size:16px}.session-details .muscle-picker{gap:5px}.session-details .muscle-chip{padding:7px 10px;font-size:10px}.save-workout{position:fixed;left:14px;right:14px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:20;width:auto!important;margin:0;box-shadow:0 10px 30px color-mix(in srgb,var(--bg) 82%,transparent)}
 }
 
 /* A rejected save must say so where the athlete is looking. This message used to
@@ -246,7 +246,17 @@
 .top-insights svg,.top-settings svg{width:19px;height:19px}
 .top-insights.active,.top-settings.active{color:var(--accent-text);border-color:var(--accent-dim)}
 .top-insights:active,.top-settings:active{transform:scale(.94)}
-/* A still-to-log set: gold rail, muted figures, an explicit invitation. */
-.top-set-entry.pending{border-left:3px solid var(--gold)}
+/* A still-to-log set: accent rail, muted figures, an explicit invitation.
+   The invitation is TEXT, so it takes --accent-text (solved for legibility on
+   every surface) and never the raw --accent fill. */
+.top-set-entry.pending{border-left:3px solid var(--accent)}
 .top-set-row-figures.pending{color:var(--ink-2)}
-.top-set-row-figures.pending small{color:var(--gold)}
+.top-set-row-figures.pending small{color:var(--accent-text)}
+
+/* FINISH DAY IS A BAR, NOT A CARD THAT DRIFTS. It was position:sticky, so it
+   rode down the page and parked ON TOP of Session Details — the athlete read
+   "Session effort" through a button. It is pinned above the tab bar now, and
+   the editor reserves the space it occupies so nothing ever hides beneath it. */
+@media(max-width:700px){
+  .workout-editor{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+}

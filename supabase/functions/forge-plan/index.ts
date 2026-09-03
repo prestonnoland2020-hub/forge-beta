@@ -69,9 +69,11 @@ TWO DIFFERENT NUMBERS — NEVER CONFLATE THEM
 
 STRENGTH RULES — THE 8/6/4/2/1 WAVE (Forge's fixed progression system)
 - Every strength or mixed split day that has mapped exercises gets exactly one top-set prescription per week, using ONLY exercises from that day's mapped list. Use the day's exact name in splitDay.
+- A DAY WITH TWO GOAL LIFTS PRESCRIBES BOTH. If a day's mapped list contains more than one lift named in context.goalLifts, emit one topSets entry per goal lift for that day, every week. Never drop one to make room.
 - THE GOAL LIFT OWNS ITS DAY. If a day's mapped list contains a lift named in context.goalLifts, THAT lift is the day's prescription every single week — not an accessory or machine variation of it. A Squat goal is trained and tested with squats; prescribing hack squat or smith machine squat on that day means the goal lift never gets waved and never gets tested on max week, which defeats the block. Only a day with NO goal lift mapped picks freely from its list.
 - Reps cycle in 5-WEEK waves: week 1 = 8 reps, week 2 = 6, week 3 = 4, week 4 = 2, week 5 = MAX WEEK.
 - Weeks 1-4: weight = the athlete's current CALCULATED max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded — the same calculated max expressed across 8s, 6s, 4s, and 2s.
+- WHERE THE BLOCK ENTERS THE WAVE IS GIVEN TO YOU. context.waveStartReps is the rep count of week 1 of THIS block, and context.waveStartWeek is its position in the 8/6/4/2/MAX wave. It is read from what the athlete has already logged, so an athlete who just finished a week of 8s gets a block that opens at 6. Write week 1 at waveStartReps and continue the wave from there, wrapping 8→6→4→2→MAX. Never restart at 8 when waveStartReps says otherwise, and never tell the athlete the wave prevents starting mid-wave — entering mid-wave is normal and is what these fields are for.
 - MAX WEEK IS TIED TO GOALS, WITH NO EXCEPTIONS. A tested single exists for exactly one reason: to move a Real 1RM goal forward. ONLY a lift named in context.goalLifts takes one. It gets a 1-rep attempt 5-10 lb above its real 1RM (context.realOneRepMaxes when present); with no real single on record the attempt sits just under the calculated max.
 - Every OTHER lift on max week stays at 2 reps — the heavy double it already earned. Do not offer it an optional single, a "if you're fresh" max, or any other 1-rep work. A day with no goal lift mapped to it simply prescribes one of that day's mapped exercises at the week's rep count. If context.goalLifts is empty, NOTHING is tested that block.
 - Every wave anchors to the athlete's CURRENT calculated max — a new wave only rises once a heavier set is actually logged. Never prescribe a set implying a max below the calculated max.\n- Use the athlete's unit system (context.units): pounds in 5 lb steps, or kilograms in 2.5 kg steps; running in miles and /mi pace, or kilometers and /km pace.
@@ -288,20 +290,42 @@ Deno.serve(async request => {
        the screen disagreed about the same day. Same fold as the client's
        `splitDayKey`. */
     const dayKey = (name: string) => String(name || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/\s*(?:#\s*)?\d+$/, '');
-    const dayGoalLift = new Map<string, string>();
+    /* A DAY CAN OWN MORE THAN ONE GOAL LIFT. This kept only the FIRST goal lift
+       mapped to a day and then rewrote every other set on that day to it — so a
+       Chest & Back day mapping both Bench and Pull Ups prescribed Pull Ups
+       twice and Bench never, while the block's header still claimed to be
+       training Bench. Every goal lift on a day is prescribed on that day. */
+    const dayGoalLifts = new Map<string, string[]>();
     (Array.isArray(context_.splitDays) ? context_.splitDays : []).forEach(day => {
       const entry = day as { name?: string; exercises?: string[] };
-      const match = (entry.exercises || []).find(name => goalLifts.has(liftKey(String(name))));
-      if (entry.name && match) {
-        dayGoalLift.set(String(entry.name), String(match));
-        if (!dayGoalLift.has(dayKey(String(entry.name)))) dayGoalLift.set(dayKey(String(entry.name)), String(match));
+      const matches = (entry.exercises || []).map(String).filter(name => goalLifts.has(liftKey(name)));
+      if (entry.name && matches.length) {
+        dayGoalLifts.set(String(entry.name), matches);
+        if (!dayGoalLifts.has(dayKey(String(entry.name)))) dayGoalLifts.set(dayKey(String(entry.name)), matches);
       }
     });
-    if (dayGoalLift.size) plan.weeks.forEach((week: { topSets?: Array<{ splitDay: string; exercise: string }> }) => {
-      for (const set of (week.topSets || [])) {
-        const owner = dayGoalLift.get(set.splitDay) || dayGoalLift.get(dayKey(set.splitDay));
-        if (owner && liftKey(set.exercise) !== liftKey(owner)) set.exercise = owner;
+    if (dayGoalLifts.size) plan.weeks.forEach((week: { topSets?: Array<{ splitDay: string; exercise: string; weight: number; reps: number }> }) => {
+      const sets = week.topSets || [];
+      for (const [dayName, owners] of dayGoalLifts) {
+        const onDay = sets.filter(set => set.splitDay === dayName || dayKey(set.splitDay) === dayKey(dayName));
+        if (!onDay.length) continue;
+        /* Any non-goal accessory on a day that owes goal lifts becomes one of
+           them; a goal lift already prescribed stays where it is. */
+        const present = new Set(onDay.map(set => liftKey(set.exercise)));
+        const missing = owners.filter(name => !present.has(liftKey(name)));
+        for (const set of onDay) {
+          if (goalLifts.has(liftKey(set.exercise))) continue;
+          const next = missing.shift();
+          if (next) { set.exercise = next; present.add(liftKey(next)); }
+        }
+        /* Still missing means the day had fewer sets than goal lifts — add one
+           per remaining lift so nothing the athlete is training for is absent. */
+        for (const name of missing) {
+          const template = onDay[0];
+          sets.push({ splitDay: template.splitDay, exercise: name, weight: template.weight, reps: template.reps });
+        }
       }
+      week.topSets = sets;
     });
     plan.weeks.forEach((week: { topSets?: Array<{ exercise: string; weight: number; reps: number }> }, index: number) => {
       const slot = index % 5;

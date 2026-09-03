@@ -21,3 +21,16 @@
 
 /* Editing an existing profile is escapable without saving. */
 .onboarding-brand .onboarding-cancel{margin-left:auto;border:0;background:none;color:var(--accent-text);font-weight:800;font-size:13px;cursor:pointer}
+
+/* Step 4: what each split day trains. */
+.setup-day{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:10px;background:var(--surface-1)}
+.setup-day-head{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;background:none;padding:0;cursor:pointer;text-align:left}
+.setup-day-head strong{display:block;font-size:15px;color:var(--ink)}
+.setup-day-head small{display:block;color:var(--ink-3);font-size:11px;margin-top:2px}
+.setup-day-count{font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.setup-day-count.set{color:var(--accent-text);border-color:var(--accent-dim)}
+.setup-day-chosen{display:flex;flex-wrap:wrap;gap:6px}
+.setup-day-chosen button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent-dim);background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent-text);border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.setup-day-options{max-height:210px;overflow:auto}
+.setup-goal-flag{font-style:normal;color:var(--accent-text)}
+.setup-goal-warning strong{color:var(--warn-text,var(--ink))}

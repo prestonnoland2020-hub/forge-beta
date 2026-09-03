@@ -261,8 +261,18 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   /* This was the last statement on the dead chart line and is the only
      thing on it anyone reads — it drives the status pill. */
   const trajectoryStatus=goalReached?'Goal reached':goal.type==='Endurance'?(calculated?(calculated<=target?'On track':'More progress needed'):enduranceProjection?(enduranceProjection<=target?'On track':'More progress needed'):'Assessment needed'):!predictedAtDeadline?'More data needed':lowerIsBetter?predictedAtDeadline<=target?'On track':'More progress needed':predictedAtDeadline>=target?'On track':strengthForecast&&strengthForecast.predicted>calculated?'Progressing':'More progress needed';
+  /* WHY THE NUMBER HAS NOT MOVED. This projection is not a trend — it is the
+     athlete's FASTEST qualifying effort in the last 180 days, converted to the
+     goal distance. So it holds still until that effort is beaten, which reads
+     as a broken estimate unless the screen names the run behind it and says
+     plainly what would change it. "Legacy race assessment" said neither. */
+  const projectionRun=legacyPrediction?.source;
   const projectedSource=goal.type==='Endurance'
-    ?`${aiEstimate?`Legacy race assessment · ${aiEstimate.confidence} confidence`:aiEstimateLoading?'Legacy assessment in progress':aiEstimateError||(enduranceProjection?`Trend across ${shownProgress.length} logged efforts`:'No legacy assessment available')}${aiEstimate?` · ${aiEstimate.reason}`:''}`
+    ?(aiEstimate&&projectionRun
+      ?`From your fastest qualifying run — ${projectionRun.miles} mi in ${formatClock(projectionRun.seconds)} on ${formatDate(projectionRun.date)} — converted to ${goal.exercise||'this'} distance. It holds until you beat that effort, so a steady number means nothing faster has been logged yet. ${aiEstimate.confidence} confidence from ${legacyPrediction?.supportingRuns||0} qualifying run${(legacyPrediction?.supportingRuns||0)===1?'':'s'}${aiEstimate.reason?` · ${aiEstimate.reason}`:''}`
+      :aiEstimate?`Best qualifying effort in the last 180 days, converted to the goal distance · ${aiEstimate.confidence} confidence${aiEstimate.reason?` · ${aiEstimate.reason}`:''}`
+      :aiEstimateLoading?'Reading your qualifying runs…'
+      :aiEstimateError||(enduranceProjection?`Trend across ${shownProgress.length} logged efforts`:`No qualifying run yet — log a continuous effort within 80–125% of the goal distance and this fills in`))
     :predictedAtDeadline
       ?`Trend across ${trendPointCount} check-in${trendPointCount===1?'':'s'}, carried to ${formatDate(goal.date)}`
       :`Not enough logged history to project yet — ${trendPointCount<2?'two check-ins':'a clearer trend'} would give one`;
@@ -289,7 +299,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     <header><div><span>{goal.type.toUpperCase()}{goal.type==='Body Composition'?(goal.metric?` · ${goal.metric}`:''):` · ${goal.exercise||goal.metric}`}</span><h3>{goal.title}</h3></div><div className="goal-head-side"><b className={goalReached ? 'on-track' : ''}>{goalReached ? 'Goal reached' : 'In progress'}</b><small>{roadmap.weeksRemaining} wks left · {formatDate(goal.date)}</small></div></header>
     <section className="goal-stat-tiles">
       <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{currentEvidence?.date?formatDate(currentEvidence.date):'Best logged evidence'}</small></div>
-      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?'Forge AI assessment':'At goal date'}</small></div>
+      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?(projectionRun?`From your ${projectionRun.miles} mi on ${formatDate(projectionRun.date)}`:'Best qualifying effort'):'At goal date'}</small></div>
       <div className="gst"><span>TARGET</span><strong>{formatGoalTarget(goal.target,goal.metric,goal.unit)}</strong><small>{formatDate(goal.date)}</small></div>
       <div className={`gst difference ${differenceStatus}`}><span>TO GO</span><strong>{differenceText}</strong><small>{roadmap.weeksRemaining} weeks remaining</small></div>
     </section>

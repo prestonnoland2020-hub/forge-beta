@@ -36,7 +36,13 @@ export type AiPlan = { summary: string; easyPace: string; weeks: AiPlanWeek[]; a
    own when the inputs move, and a rebuild that quietly dropped "no running on
    Mondays" would be Forge undoing what it was asked to do. It rides along
    until the athlete edits it or regenerates without it. */
-export type StoredAiPlan = { plan: AiPlan; generatedAt: string; startDate: string; fingerprint: string; blockWeeks: number; saved?: boolean; savedAt?: string; adjustments?: string };
+/* waveOffset: which rung of the 8/6/4/2/1 wave this block's FIRST week is.
+   A block always used to open at 8 reps, so an athlete who had just finished a
+   week of 8s and regenerated — for any reason at all — was handed another week
+   of 8s and told the wave is fixed. It is fixed; where you ENTER it is not.
+   The offset is read from what the athlete has actually logged, so a rebuild
+   continues the wave instead of restarting it. */
+export type StoredAiPlan = { plan: AiPlan; generatedAt: string; startDate: string; fingerprint: string; blockWeeks: number; saved?: boolean; savedAt?: string; adjustments?: string; waveOffset?: number };
 
 const localKey = 'forge-ai-plan-v1';
 
@@ -420,9 +426,43 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
   const lookup = (table: Map<string, number> | undefined, name: string) =>
     table?.get(name) ?? [...(table?.entries() || [])].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(name))?.[1];
   let adjusted = false;
-  const topSets = (resolved.topSets || []).map(raw => {
-    const owner = dayGoalLift.get(raw.splitDay) || dayGoalLift.get(splitDayKey(raw.splitDay));
-    const set = owner && canonicalLiftKey(owner) !== canonicalLiftKey(raw.exercise) ? { ...raw, exercise: owner } : raw;
+  /* A DAY THAT TRAINS TWO GOAL LIFTS PRESCRIBES BOTH ON THE SAME DAY, and a
+     day's other work keeps its own name. The rule "the goal lift owns its day"
+     was written when a day carried exactly ONE top set; applied per row it
+     rewrote every row on the day to the same lift, so a Chest & Back day read
+     "Bench 300×8 · Bench 300×8" and the second movement vanished. What the
+     rule actually means is that the day must PRESCRIBE its goal lifts — not
+     that every set on it is one. Each goal lift is placed once; every other
+     row is left exactly as the block wrote it. */
+  const rowsByDay = new Map<string, number[]>();
+  (resolved.topSets || []).forEach((row, index) => {
+    rowsByDay.set(row.splitDay, [...(rowsByDay.get(row.splitDay) || []), index]);
+  });
+  const forcedExercise = new Map<number, string>();
+  rowsByDay.forEach((indexes, dayName) => {
+    const key = splitDayKey(dayName);
+    const owners = goalLiftsOfDay.get(key) || [];
+    if (!owners.length) return;
+    /* One instance of a day owes one goal lift when the cycle visits it more
+       than once; a day with more rows than instances can carry more. */
+    const instanceOwner = dayGoalLift.get(dayName) || dayGoalLift.get(key);
+    const owed = owners.length > 1 ? owners : instanceOwner ? [instanceOwner] : [];
+    const present = new Set(indexes
+      .map(index => canonicalLiftKey((resolved.topSets || [])[index].exercise))
+      .filter(liftKey => owed.some(name => canonicalLiftKey(name) === liftKey)));
+    const missing = owed.filter(name => !present.has(canonicalLiftKey(name)));
+    if (!missing.length) return;
+    /* Only rows that are NOT already a goal lift give way. */
+    for (const index of indexes) {
+      if (!missing.length) break;
+      const rowKey = canonicalLiftKey((resolved.topSets || [])[index].exercise);
+      if (owners.some(name => canonicalLiftKey(name) === rowKey)) continue;
+      forcedExercise.set(index, missing.shift()!);
+    }
+  });
+  const topSets = (resolved.topSets || []).map((raw, index) => {
+    const forced = forcedExercise.get(index);
+    const set = forced && canonicalLiftKey(forced) !== canonicalLiftKey(raw.exercise) ? { ...raw, exercise: forced } : raw;
     if (set !== raw) adjusted = true;
     const best = lookup(strength.bests, set.exercise);
     if (!best) return set;
@@ -441,12 +481,42 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
 export const weeksRemaining = (stored: StoredAiPlan): number => {
   const start = new Date(`${stored.startDate}T12:00:00`).getTime();
   const elapsed = Math.floor((Date.now() - start) / 604800000);
-  return stored.plan.weeks.length - elapsed;
+  return stored.plan.weeks.length - elapsed - (stored.waveOffset || 0);
 };
 
-/* The plan week that covers today (clamped into the block). */
+/* The plan week that covers today (clamped into the block). The offset is
+   where the block ENTERS the wave — see StoredAiPlan.waveOffset. Every surface
+   reads the week through this one function, so shifting it here keeps the
+   schedule, the roadmap, max weeks and the deloads in step automatically. */
 export const currentWeekIndex = (stored: StoredAiPlan): number => {
   const start = new Date(`${stored.startDate}T12:00:00`).getTime();
   const elapsed = Math.floor((Date.now() - start) / 604800000);
-  return Math.max(0, Math.min(stored.plan.weeks.length - 1, elapsed));
+  return Math.max(0, Math.min(stored.plan.weeks.length - 1, elapsed + (stored.waveOffset || 0)));
 };
+
+/* WHERE THE ATHLETE IS IN THE WAVE, read from what they logged rather than
+   asked about. The most recent completed top set on a goal lift names the rung
+   they just finished (8/6/4/2/1); the next block opens on the one after it.
+   Nothing logged in the last three weeks means the wave starts at the top. */
+export function waveOffsetFromHistory(
+  records: Array<{ date: string; topSets?: Array<{ lift: string; reps: number; completed?: boolean }> }>,
+  goalLifts: Set<string> | string[],
+): number {
+  const wanted = new Set([...goalLifts].map(name => canonicalLiftKey(String(name))));
+  const cutoff = new Date(Date.now() - 21 * 86400000).toISOString().slice(0, 10);
+  let latestDate = '';
+  let latestReps = 0;
+  records.forEach(record => {
+    if (record.date < cutoff) return;
+    (record.topSets || []).forEach(set => {
+      if (set.completed === false || !set.lift || !(set.reps > 0)) return;
+      if (wanted.size && !wanted.has(canonicalLiftKey(set.lift))) return;
+      if (record.date >= latestDate) { latestDate = record.date; latestReps = set.reps; }
+    });
+  });
+  if (!latestReps) return 0;
+  /* Snap an honest rep count onto the nearest rung — a set of 7 is an 8 week. */
+  let slot = 0, best = Infinity;
+  WAVE_REPS.forEach((reps, index) => { const gap = Math.abs(reps - latestReps); if (gap < best) { best = gap; slot = index; } });
+  return (slot + 1) % WAVE_LENGTH;
+}

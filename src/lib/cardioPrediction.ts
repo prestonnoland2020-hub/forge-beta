@@ -8,6 +8,10 @@ export type RacePrediction = {
   supportingRuns: number;
   recentRunMiles: number;
   recentRunDays: number;
+  /* The single effort this projection was computed from. Without it the number
+     is unfalsifiable on screen: it sits there unchanged for weeks and the
+     athlete has no way to tell whether it is stale or simply un-beaten. */
+  source?: { date: string; miles: number; seconds: number };
 };
 
 type Run = { date: string; miles: number; seconds: number };
@@ -62,9 +66,10 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   return {
     seconds: Math.round(best.equivalentSeconds),
     confidence,
-    reason: `Legacy current-race method: best continuous run within 80–125% of goal distance in the last 180 days, Riegel-adjusted.`,
+    reason: `Best continuous run within 80–125% of the goal distance in the last 180 days, adjusted to the goal distance (Riegel).`,
     supportingRuns: qualifying.length,
     recentRunMiles: Math.round(recentMiles * 10) / 10,
     recentRunDays,
+    source: { date: best.date, miles: Math.round(best.miles * 100) / 100, seconds: Math.round(best.seconds) },
   };
 }

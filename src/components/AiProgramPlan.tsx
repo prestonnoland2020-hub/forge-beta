@@ -17,7 +17,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
-  bestsFromHistory, chooseMaxAttemptDays, type AiPlanWeek, type SplitDayRef, type StoredAiPlan,
+  bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, WAVE_REPS, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -47,9 +47,14 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
   const dayInfos = window.map((entry, index) => {
     const date = new Date(start); date.setDate(start.getDate() + index);
     const day = (entry as unknown as SplitDay);
-    const topSet = (week.topSets || []).find(set => set.splitDay === day.name)
-      || (week.topSets || []).find(set => splitDayKey(set.splitDay) === splitDayKey(day.name));
-    return { date, day, topSet, lower: isLowerBodyDay(day, topSet) };
+    /* EVERY GOAL LIFT ON THE DAY, NOT THE FIRST ONE. A Chest & Back day that
+       maps both Bench and Pull Ups — two goal lifts — showed only whichever
+       came first, so Bench was in the block's focus line and prescribed
+       nowhere. All of the day's sets are its prescription. */
+    const daySets = (week.topSets || []).filter(set => set.splitDay === day.name);
+    const topSets = daySets.length ? daySets : (week.topSets || []).filter(set => splitDayKey(set.splitDay) === splitDayKey(day.name));
+    const topSet = topSets[0];
+    return { date, day, topSet, topSets, lower: isLowerBodyDay(day, topSet) };
   });
   /* Pass 1 — decide placements. */
   const longIndex = week.longRunMiles > 0 ? dayInfos.findIndex(info => info.day.name === week.longRunDay) : -1;
@@ -81,9 +86,10 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     cost: (index === longIndex ? 2 : 0) + (index === qualityIndex ? 3 : 0) + (easySet.has(index) ? 1 : 0),
   })));
   /* Pass 2 — render sessions. */
-  return dayInfos.map(({ date, day, topSet: rawTopSet }, index) => {
+  return dayInfos.map(({ date, day, topSet: rawTopSet, topSets: rawTopSets }, index) => {
     const demoted = rawTopSet?.reps === 1 && rawTopSet.hold && !attemptDays.has(index);
     const topSet = demoted && rawTopSet?.hold ? { ...rawTopSet, ...rawTopSet.hold } : rawTopSet;
+    const extraSets = (rawTopSets || []).slice(1);
     const type = day.dayType.toLowerCase();
     let runText = ''; let runKind = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
     if (index === longIndex) { runKind = 'Long run'; runText = `${week.longRunMiles} ${distanceUnit} @ ${week.longRunPace}`; runStress = 'Moderate'; }
@@ -97,8 +103,9 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
       runText = miles ? `${miles} ${distanceUnit} @ ${week.easyPace}` : `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`;
       runStress = 'Low';
     }
+    const setText = (item: AiPlanTopSet) => `${item.exercise}: ${item.weight} × ${item.reps}`;
     const strengthText = topSet
-      ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${topSet.exercise}: ${topSet.weight} × ${topSet.reps}`
+      ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${[setText(topSet), ...extraSets.map(setText)].join(' · ')}`
       : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
     if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const };
     if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const };
@@ -196,6 +203,16 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     return items;
   }, [splitDays, bests, goals, recentRuns]);
   const baselineReady = baseline.length === 0 || baseline.every(item => item.done);
+  /* A GOAL LIFT NO DAY TRAINS IS A GOAL THE BLOCK CANNOT MOVE. Bench sat in
+     this block's focus line while no split day mapped it, so it was never
+     prescribed, never waved and never tested — and nothing on screen said why.
+     Named here, with the one place that fixes it. */
+  const untrainedGoalLifts = useMemo(() => goals
+    .filter(goal => goal.type === 'Strength' && goal.exercise)
+    .map(goal => String(goal.exercise))
+    .filter(name => !splitDays.some(day => (day.exercises || []).some(item => canonicalLiftKey(item) === canonicalLiftKey(name))))
+    .filter((name, index, all) => all.findIndex(other => canonicalLiftKey(other) === canonicalLiftKey(name)) === index),
+  [goals, splitDays]);
   const fingerprint = useMemo(() => planFingerprint({
     goals: goals.map(goal => ({ type: goal.type, exercise: goal.exercise, target: goal.target, date: goal.date })),
     split: splitDays.map(day => ({ name: day.name, type: day.dayType, muscles: day.muscles || [], exercises: day.exercises || [] })),
@@ -210,6 +227,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const regenerate = async (adjustments?: string): Promise<boolean> => {
     if (generating) return false;
     setGenerating(true); setError(''); generateStartedAt.current = Date.now();
+    /* A rebuild continues the wave from what has been logged rather than
+       restarting at 8 — see StoredAiPlan.waveOffset. */
+    const waveOffset = waveOffsetFromHistory(records, goalLifts);
     try {
       const context = {
         blockWeeks: 10,
@@ -225,6 +245,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         calcMaxes: Object.fromEntries(bests),
         realOneRepMaxes: Object.fromEntries(bestSingles),
         goalLifts: [...goalLifts],
+        /* Where this block enters the fixed wave, so the builder narrates the
+           block it is actually writing instead of assuming week 1 is 8 reps. */
+        waveStartReps: WAVE_REPS[waveOffset % WAVE_REPS.length],
+        waveStartWeek: waveOffset + 1,
         loggedBests: Object.fromEntries(bests),
         loggedSingles: Object.fromEntries(bestSingles),
         recentRuns,
@@ -235,7 +259,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       };
       const plan = await generateAiPlan(context);
       /* A newly generated block starts unsaved — it has not been approved. */
-      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate: new Date().toISOString().slice(0, 10), fingerprint, blockWeeks: plan.weeks.length, saved: false, ...(adjustments ? { adjustments } : {}) };
+      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate: new Date().toISOString().slice(0, 10), fingerprint, blockWeeks: plan.weeks.length, saved: false, waveOffset, ...(adjustments ? { adjustments } : {}) };
       await saveStoredAiPlan(next, Boolean(user));
       setStored(next);
       return true;
@@ -363,6 +387,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   };
 
   return <div className="simple-program ai-program">
+    {untrainedGoalLifts.length > 0 && <section className="card untrained-goal-banner">
+      <div>
+        <span className="eyebrow">NOT IN YOUR SPLIT</span>
+        <strong>{untrainedGoalLifts.join(' and ')} {untrainedGoalLifts.length === 1 ? 'is a goal, but no day trains it' : 'are goals, but no day trains them'}</strong>
+        <small>Forge only prescribes movements a split day names, so this lift is never waved and never tested on max week. Add it to the day you train it on and the next block picks it up.</small>
+      </div>
+      <a className="button" href="#/split">Add it to a day →</a>
+    </section>}
     <section className="simple-program-head"><div><span className="eyebrow">WEEK {week.week} OF {plan.weeks.length} · {weekIndex % 5 === 4 ? 'MAX WEEK' : week.phase.toUpperCase()}</span><h2>{weekIndex % 5 === 4 ? 'Max Week' : week.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{goalLiftEntries.length ? goalLiftEntries.map(entry => entry.name).join(' · ') : headline(week)?.exercise || 'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{week.mileage ? `${week.mileage} ${metric ? 'km' : 'mi'} this week` : 'Not scheduled'}</strong></div></div></section>
     {/* The block's numbers are stated by the ledgers and the schedule below;
         this card is the two actions and the stamp that says which block they
@@ -404,13 +436,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
          tick. */
       const iso = localDayIso(session.date);
       const todayIso = localDayIso();
+      const isToday = iso === todayIso;
       const logged = records.find(record => record.date === iso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0 || record.muscles.some(muscle => muscle !== 'Cardio')));
       const missed = !logged && iso < todayIso && session.stress !== 'Rest';
       const doneDetail = logged ? [
         ...(logged.topSets || []).filter(set => set.completed !== false).slice(0, 2).map(set => `${set.lift} ${set.weight}×${set.reps}`),
         ...(logged.cardioSessions || []).slice(0, 1).map(cardioSession => cardioSession.summary || cardioSession.activity),
       ].filter(Boolean).join(' · ') : '';
-      return <article className={`stress-${session.stress.toLowerCase()}${logged ? ' is-done' : ''}${missed ? ' is-missed' : ''}`} key={session.date.toISOString()}><time>{dateText(session.date)}</time><div><span className="session-tags">{[...session.kind.split(' + '), session.stress].filter(Boolean).map((tag, index) => <i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{logged ? (logged.title || session.title) : session.title}</strong><small>{logged ? (doneDetail || 'Logged') : missed ? `Missed — ${session.detail}` : session.detail}</small></div><b className={logged ? 'session-done-tick' : ''}>{logged ? '✓' : missed ? '·' : session.stress === 'Rest' ? 'Rest' : '›'}</b></article>;
+      return <article className={`stress-${session.stress.toLowerCase()}${logged ? ' is-done' : ''}${missed ? ' is-missed' : ''}${isToday ? ' is-today' : ''}`} key={session.date.toISOString()}><time>{isToday ? <b className="session-today-tag">TODAY</b> : null}{dateText(session.date)}</time><div><span className="session-tags">{[...session.kind.split(' + '), session.stress].filter(Boolean).map((tag, index) => <i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{logged ? (logged.title || session.title) : session.title}</strong><small>{logged ? (doneDetail || 'Logged') : missed ? `Missed — ${session.detail}` : session.detail}</small></div><b className={logged ? 'session-done-tick' : ''}>{logged ? '✓' : missed ? '·' : session.stress === 'Rest' ? 'Rest' : '›'}</b></article>;
     })}</div></section>
     <section className="card roadmap-card"><header className="roadmap-head"><div><span className="eyebrow">THIS BLOCK</span><h3>Where the block takes you</h3></div></header>
       <div className="roadmap-table" role="table"><div className="roadmap-row head" role="row"><span>Week</span><span>Miles</span><span>Long</span><span>Hard run</span><span>Top set · proj. max</span></div>
