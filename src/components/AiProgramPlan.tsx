@@ -17,7 +17,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
-  bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, WAVE_REPS, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
+  bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -358,7 +358,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length }, { bests, singles: bestSingles, goalLifts, metric }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index) }, { bests, singles: bestSingles, goalLifts, metric }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),
@@ -395,7 +395,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       </div>
       <a className="button" href="#/split">Add it to a day →</a>
     </section>}
-    <section className="simple-program-head"><div><span className="eyebrow">WEEK {week.week} OF {plan.weeks.length} · {weekIndex % 5 === 4 ? 'MAX WEEK' : week.phase.toUpperCase()}</span><h2>{weekIndex % 5 === 4 ? 'Max Week' : week.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{goalLiftEntries.length ? goalLiftEntries.map(entry => entry.name).join(' · ') : headline(week)?.exercise || 'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{week.mileage ? `${week.mileage} ${metric ? 'km' : 'mi'} this week` : 'Not scheduled'}</strong></div></div></section>
+    <section className="simple-program-head"><div><span className="eyebrow">WEEK {week.week} OF {plan.weeks.length} · {waveIndexOf(stored, weekIndex) % 5 === 4 ? 'MAX WEEK' : week.phase.toUpperCase()}</span><h2>{waveIndexOf(stored, weekIndex) % 5 === 4 ? 'Max Week' : week.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{goalLiftEntries.length ? goalLiftEntries.map(entry => entry.name).join(' · ') : headline(week)?.exercise || 'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{week.mileage ? `${week.mileage} ${metric ? 'km' : 'mi'} this week` : 'Not scheduled'}</strong></div></div></section>
     {/* The block's numbers are stated by the ledgers and the schedule below;
         this card is the two actions and the stamp that says which block they
         act on. The generated summary was an essay repeating what those cards
@@ -449,7 +449,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       <div className="roadmap-table" role="table"><div className="roadmap-row head" role="row"><span>Week</span><span>Miles</span><span>Long</span><span>Hard run</span><span>Top set · proj. max</span></div>
         {plan.weeks.map((item, index) => { const lead = headline(item); const startLabel = (() => { const date = new Date(`${stored.startDate}T12:00:00`); date.setDate(date.getDate() + index * 7); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })(); return <div key={item.week} className="roadmap-week-group">
           <button type="button" className={`roadmap-row phase-${item.phase.toLowerCase()}${openWeek === item.week ? ' open' : ''}`} onClick={() => setOpenWeek(current => current === item.week ? null : item.week)} aria-expanded={openWeek === item.week}>
-            <span className="roadmap-week"><b>{item.week}</b><small>{startLabel}{index % 5 === 4 ? <i className="max-week-tag">MAX WEEK</i> : ` · ${item.phase}`}</small></span>
+            <span className="roadmap-week"><b>{item.week}</b><small>{startLabel}{waveIndexOf(stored, index) % 5 === 4 ? <i className="max-week-tag">MAX WEEK</i> : ` · ${item.phase}`}</small></span>
             <span className="roadmap-miles">{item.mileage || '—'}</span>
             <span className="roadmap-long">{item.longRunMiles ? `${item.longRunMiles} ${metric ? 'km' : 'mi'}` : '—'}</span>
             <span className="roadmap-run">{item.quality}</span>

@@ -9,7 +9,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay } from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf} from './aiPlanService';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 
@@ -125,7 +125,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        called 3.5. One window, one answer. */
     const planRhythm=(()=>{try{return (JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null')?.rhythm==='weekly'?'weekly':'rolling') as 'weekly'|'rolling'}catch{return 'rolling' as const}})();
     const windowDays=weekCycleDays(storedPlan.startDate,currentWeekIndex(storedPlan),days,planRhythm,{position:generatedBase.splitDay.position});
-    const week=resolveWeekRunning(rawWeek,windowDays,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage},{weekIndex:currentWeekIndex(storedPlan),blockWeeks:storedPlan.plan.weeks.length});
+    const week=resolveWeekRunning(rawWeek,windowDays,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage},{weekIndex:currentWeekIndex(storedPlan),blockWeeks:storedPlan.plan.weeks.length,waveIndex:waveIndexOf(storedPlan,currentWeekIndex(storedPlan))});
     /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
        second opinion that could contradict the block — 4 × 200 m on a leg
        day the plan had given an easy run. With a stored plan, today's cardio
@@ -177,6 +177,9 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        history keeps the engine's baseline suggestion, since there is no max
        to wave off yet. */
     const weekIdx=currentWeekIndex(storedPlan);
+    /* Today's prescription follows the WAVE rung, which is not the calendar
+       week when the block entered the wave mid-way. */
+    const waveIdx=waveIndexOf(storedPlan,weekIdx);
     const metric=Boolean(setup?.units==='Metric');
     const goalLifts=goalLiftNames(goals);
     /* Shared builder. This was a fourth copy, and its bare Epley read a logged
@@ -193,7 +196,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       const set=(week.topSets||[]).find(entry=>entry.splitDay===day.name);
       const key=set?canonicalLiftKey(set.exercise):'';
       const best=key?liveBests.get(key)||0:0;
-      const live=best?wavePrescription(best,weekIdx,metric,liveSingles.get(key)||0,testsOneRepMax(set!.exercise,goalLifts)):null;
+      const live=best?wavePrescription(best,waveIdx,metric,liveSingles.get(key)||0,testsOneRepMax(set!.exercise,goalLifts)):null;
       return{
         exercise:set?.exercise,
         reps:live?.reps,
@@ -202,7 +205,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       };
     }));
     const todayHoldsTheAttempt=attemptDays.has(0);
-    const isMaxWeek=waveSlot(weekIdx).isMax;
+    const isMaxWeek=waveSlot(waveIdx).isMax;
     const waveFor=(exercise:string,fallback:{weight:number;reps:number})=>{
       const key=canonicalLiftKey(exercise);
       const live={best:liveBests.get(key)||0,single:liveSingles.get(key)||0};
@@ -212,7 +215,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
       /* A tested single the athlete is not taking today falls back to the
          double the lift already earned, rather than being offered twice. */
-      const prescription=wavePrescription(live.best,weekIdx,metric,live.single,tests&&todayHoldsTheAttempt);
+      const prescription=wavePrescription(live.best,waveIdx,metric,live.single,tests&&todayHoldsTheAttempt);
       const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':isMaxWeek?(tests?'MAX WEEK — the attempt is scheduled on another day this week':'MAX WEEK — heavy double, no goal on this lift'):`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
          weight when the set says so, and an unwaved 'baseline' flag was

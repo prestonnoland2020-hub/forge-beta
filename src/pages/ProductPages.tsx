@@ -240,6 +240,31 @@ function WorkoutEditor() {
     /* Saving a set keeps the session OPEN — only "Finish Day" completes the
        recommendation. The athlete keeps logging sets and cardio freely. */
     setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`${set.lift} · ${set.weight} ${weightUnit} ×${set.reps} saved — keep logging, then Finish Day when you’re done.`)};
+  /* DELETING A SAVED SET TAKES IT OUT OF THE DAY, not just off the screen.
+     A set could be corrected but never removed, so a lift logged on the wrong
+     day or mis-tapped from the sheet was permanent — and it kept counting
+     toward calculated maxes, PRs and the wave. The day keeps its identity: only
+     the set leaves, and a day left with nothing on it stays as the record of a
+     day that was opened, exactly as one logged with only a body weight would. */
+  const deleteLoggedTopSet=(index:number,set:LoggedTopSet)=>{
+    const key=topSetKey(set);
+    const sameDay=records.find(record=>record.date===sessionIso);
+    if(sameDay){
+      const remaining=(sameDay.topSets||[]).filter(saved=>{
+        if(set.id&&saved.id)return saved.id!==set.id;
+        if(set.recommendationTopSetId&&saved.recommendationTopSetId)return saved.recommendationTopSetId!==set.recommendationTopSetId;
+        return topSetKey(saved)!==key;
+      });
+      const {id,...savedDay}=sameDay;
+      const first=remaining[0];
+      const muscles=Array.from(new Set([...remaining.map(item=>item.muscle),...(sameDay.hasCardio?['Cardio']:[])]));
+      const result=updateRecord(id,{...savedDay,muscles:muscles.length?muscles:savedDay.muscles,topSets:remaining.length?remaining:undefined,lift:first?.lift,weight:first?.weight,reps:first?.reps,calculatedMax:first?.calculatedMax});
+      if(!result.ok){setQuickLogMessage('That set could not be deleted. Refresh and try again.');return}
+    }
+    setTopSets(current=>current.filter((_,setIndex)=>setIndex!==index));
+    setQuickLoggedKeys(current=>current.filter(item=>item!==key));
+    setQuickLogMessage(`${set.lift} removed from this day.`);
+  };
   const editLoggedTopSet=(index:number,original:LoggedTopSet,corrected:LoggedTopSet)=>{
     const sameDay=records.find(record=>record.date===sessionIso);if(!sameDay){setQuickLogMessage('The completed training day could not be found. Refresh and try again.');return false}
     const originalSignature=`${original.muscle}|${original.lift}|${original.weight}|${original.reps}`;let replaced=false;
@@ -346,7 +371,7 @@ function WorkoutEditor() {
         the popup holds the question. */}
     {!topSets.length&&!cardioOnlyDay&&<section className="card form-card top-set-launch"><div className="section-title compact-title"><span>01</span><div><h3>Top sets</h3><p>The one heaviest meaningful set per lift. Tap to log one in a popup — it saves as completed.</p></div></div><button type="button" className="button add-top-set-button" onClick={openTopSetSheet}>＋ Log a top set</button></section>}
     {addingTopSet&&<TopSetSheet unit={weightUnit} exercises={strengthCatalogue} suggested={allowedStrengthExercises.map(exercise=>exercise.name)} dayMuscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} existing={topSets.map(set=>set.lift).filter(Boolean)} onClose={()=>setAddingTopSet(false)} onSave={saveTopSetFromSheet} blockedReason={noDayReason}/>}
-    {topSets.length>0&&<TopSetCards planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={loggedTopSetKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={openTopSetSheet} onRemove={removeTopSet} onCreateExercise={createExerciseForTopSet} blockedReason={noDayReason}/>}
+    {topSets.length>0&&<TopSetCards planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={loggedTopSetKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={openTopSetSheet} onRemove={removeTopSet} onDeleteLogged={deleteLoggedTopSet} onCreateExercise={createExerciseForTopSet} blockedReason={noDayReason}/>}
     {quickLogMessage&&<div className="quick-log-flash" role="status"><small>{quickLogMessage}</small></div>}
     <CardioBuilder sectionNumber={cardioOnlyDay?"01":"02"} onEntriesChange={(hasEntries,entries)=>{setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions??todayRecord?.cardioSessions} plannedSummary={workoutSource==='plan'&&recommendation?.cardio?.selected?recommendation.cardio.summary:undefined}/>
     <section className="card form-card session-details"><div className="section-title compact-title"><span>03</span><div><h3>Session Details</h3><p>Review the context Forge will save with this workout.</p></div></div><div className="field-grid session-context"><DialField label="Today's body weight" kind="bodyweight" unit={weightUnit} value={bodyWeight} onChange={setBodyWeight} hint="Optional check-in used for body-weight trends" /><label>Session effort<select value={effort} onChange={e=>setEffort(e.target.value)}><option value="">Not recorded</option><option>Easy</option><option>Moderate</option><option>Hard</option><option>Max effort</option></select></label></div><label>Workout notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4} placeholder="How did the session feel? Add anything the numbers do not capture." /></label></section>

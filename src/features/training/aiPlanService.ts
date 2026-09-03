@@ -229,7 +229,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   week: T,
   splitDays: SplitDayRef[],
   athlete: RunningAthlete,
-  block?: { weekIndex?: number; blockWeeks?: number },
+  block?: { weekIndex?: number; blockWeeks?: number; waveIndex?: number },
 ): T {
   const runningDays = Math.max(0, Math.min(7, Math.round(Number(athlete.runningDays) || 0)));
   const floorMiles = Number(athlete.minWeeklyMileage) || 0;
@@ -257,6 +257,9 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      the ceiling they set, so a block finishes at the top of their range
      instead of hovering near the floor. Every wave's 2-rep week deloads. */
   const weekIndex = Math.max(0, Number(block?.weekIndex) || 0);
+  /* The running deload lands on the wave's 2-rep week, so it follows the wave
+     rather than the calendar when the block entered the wave mid-way. */
+  const deloadIndex = Math.max(0, Number(block?.waveIndex ?? block?.weekIndex) || 0);
   const blockWeeks = Math.max(1, Number(block?.blockWeeks) || 10);
   const clampMiles = (value: number) => {
     const high = ceilingMiles ? Math.min(value, ceilingMiles) : value;
@@ -279,7 +282,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
     && (!floorMiles || modelMiles >= Math.min(floorMiles, startMiles) - 1e-9)
     && modelMiles <= rampCap;
   const chosen = modelSane ? modelMiles : climb;
-  const target = clampMiles(round1(weekIndex % 5 === 3 ? Math.min(chosen, climb) * 0.8 : chosen));
+  const target = clampMiles(round1(deloadIndex % 5 === 3 ? Math.min(chosen, climb) * 0.8 : chosen));
 
   const pace = paceToMinutes(week.easyPace) || 9.5;
   /* The long run is a share of the week, not an independent number — and it is
@@ -382,7 +385,10 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
   week: T,
   splitDays: SplitDayRef[],
   athlete: RunningAthlete,
-  block: { weekIndex: number; blockWeeks: number },
+  /* weekIndex is the CALENDAR week; waveIndex is where that week sits in the
+     8/6/4/2/1 wave and defaults to it. They differ when the block entered the
+     wave mid-way — see StoredAiPlan.waveOffset. */
+  block: { weekIndex: number; blockWeeks: number; waveIndex?: number },
   strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean },
   /* The days this week actually contains — a rolling cycle longer than 7 days
      shows only some of itself per week, and the running has to be measured
@@ -467,11 +473,12 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
     const best = lookup(strength.bests, set.exercise);
     if (!best) return set;
     const tests = testsOneRepMax(set.exercise, strength.goalLifts);
-    const live = wavePrescription(best, block.weekIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, tests);
+    const waveIndex = block.waveIndex ?? block.weekIndex;
+    const live = wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, tests);
     if (live.weight !== set.weight || live.reps !== set.reps) adjusted = true;
     /* On a max week a tested lift also carries the double it falls back to
        when the split hits that day more than once in the same week. */
-    const hold = live.reps === 1 ? wavePrescription(best, block.weekIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, false) : undefined;
+    const hold = live.reps === 1 ? wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, false) : undefined;
     return { ...set, weight: live.weight, reps: live.reps, hold: hold && { weight: hold.weight, reps: hold.reps } };
   });
   return { ...resolved, topSets, adjusted };
@@ -481,18 +488,30 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
 export const weeksRemaining = (stored: StoredAiPlan): number => {
   const start = new Date(`${stored.startDate}T12:00:00`).getTime();
   const elapsed = Math.floor((Date.now() - start) / 604800000);
-  return stored.plan.weeks.length - elapsed - (stored.waveOffset || 0);
+  return stored.plan.weeks.length - elapsed;
 };
 
-/* The plan week that covers today (clamped into the block). The offset is
-   where the block ENTERS the wave — see StoredAiPlan.waveOffset. Every surface
-   reads the week through this one function, so shifting it here keeps the
-   schedule, the roadmap, max weeks and the deloads in step automatically. */
+/* The plan week that covers today (clamped into the block). This is a CALENDAR
+   position and nothing else: week 1 is the week of startDate, and today is
+   always inside the week this returns.
+
+   The wave offset deliberately does NOT belong here. Folding it in shifted the
+   week the schedule drew, so a block that entered the wave at 6 reps rendered
+   next week's dates and the athlete opened Plan to a week that was not the one
+   they were in. Where the block enters the wave is a question about REPS; which
+   week it is, is a question about the calendar. `waveIndexOf` answers the
+   first, this answers the second. */
 export const currentWeekIndex = (stored: StoredAiPlan): number => {
   const start = new Date(`${stored.startDate}T12:00:00`).getTime();
   const elapsed = Math.floor((Date.now() - start) / 604800000);
-  return Math.max(0, Math.min(stored.plan.weeks.length - 1, elapsed + (stored.waveOffset || 0)));
+  return Math.max(0, Math.min(stored.plan.weeks.length - 1, elapsed));
 };
+
+/* Which rung of the 8/6/4/2/1 wave a given block week sits on, once the
+   block's entry point is taken into account. Every surface that asks "is this
+   a max week / what rep count is this" asks here. */
+export const waveIndexOf = (stored: Pick<StoredAiPlan, 'waveOffset'>, weekIndex: number): number =>
+  weekIndex + (stored.waveOffset || 0);
 
 /* WHERE THE ATHLETE IS IN THE WAVE, read from what they logged rather than
    asked about. The most recent completed top set on a goal lift names the rung

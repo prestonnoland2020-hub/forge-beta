@@ -10,7 +10,7 @@ import { useProfileSetup,type AthleteSetup } from '../features/profile/ProfileSe
 import { exerciseCategory, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { cardioPlanSummary,type PlannedCardio,type CircuitStation } from '../components/CardioPlanBuilder';
 import { requestForgeCoach } from '../features/training/coachService';
-import { readLocalAiPlan, currentWeekIndex, resolvePlanWeek, goalLiftNames, weekCycleDays } from '../features/training/aiPlanService';
+import { readLocalAiPlan, currentWeekIndex, resolvePlanWeek, goalLiftNames, weekCycleDays, waveIndexOf} from '../features/training/aiPlanService';
 import { sameLift, canonicalLiftKey } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { normalizeMuscleGroups } from '../lib/muscleGroups';
@@ -52,7 +52,7 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     const cycleDays=splitDays.map(day=>({name:day.name,dayType:day.dayType,exercises:day.exercises||[]}));
     const planRhythm=(savedPlan as {rhythm?:string}|null)?.rhythm==='weekly'?'weekly':'rolling';
     const windowDays=weekCycleDays(stored.startDate,index,cycleDays,planRhythm,recommendation?{position:recommendation.splitDay.position}:undefined);
-    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles},{weekIndex:index,blockWeeks:stored.plan.weeks.length},{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric'},windowDays);
+    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles},{weekIndex:index,blockWeeks:stored.plan.weeks.length,waveIndex:waveIndexOf(stored,index)},{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric'},windowDays);
   },[records,goals,setup,profile,splitDays.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const dynamicAnswers:Record<string,string>={
     'What should I train today?':recommendation?`${recommendation.splitDay.name} is next because completed workout history placed the split at position ${recommendation.splitDay.position}. ${recommendation.topSets.filter(set=>set.selected).map(set=>set.source==='history'?`${set.exercise}: ${set.weight} ${weightUnit} × ${set.reps}`:`${set.exercise}: establish a baseline`).join(' · ')}${recommendation.cardio?.selected?` · ${recommendation.cardio.summary}`:''}`:`${dueDay?.name||fallbackDay?.name||'Your next split day'} is due. ${intelligence.reason}`,

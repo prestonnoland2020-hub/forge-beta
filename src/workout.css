@@ -260,3 +260,20 @@
 @media(max-width:700px){
   .workout-editor{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 }
+
+/* SWIPE A SAVED SET AWAY. The row slides to uncover Delete; the delete is a
+   second, deliberate tap, because this is training history and a thumb
+   brushing a list must not be able to erase a session. */
+.top-set-entry.swipeable{position:relative;overflow:hidden;padding:0}
+.top-set-entry.swipeable .top-set-swipe{position:relative;z-index:1;width:100%;background:var(--surface-1);transition:transform .18s ease}
+.top-set-entry.swipeable.swiped .top-set-swipe{transition:transform .06s linear}
+.top-set-entry.swipeable.logged .top-set-swipe{background:color-mix(in srgb,var(--good) 5%,var(--surface-1))}
+/* --bad is a light salmon in dark mode and a deep red in light mode, so white
+   text fails on one of them. The app already solves this pairing for
+   .button.danger: --bad ground, --bg ink. Same pairing here. */
+/* Hidden until the row is actually dragged: parked behind a rounded card it
+   showed as a red sliver down the edge of every set on the screen. */
+.top-set-delete{display:none;position:absolute;top:0;right:0;bottom:0;width:84px;border:0;z-index:0;background:var(--bad);color:var(--bg);font-weight:800;font-size:13px;letter-spacing:.04em;cursor:pointer}
+.top-set-entry.swiped .top-set-delete{display:block}
+.top-set-delete:active{filter:brightness(.92)}
+.logged-top-set-actions .text-button.danger{color:var(--bad)}

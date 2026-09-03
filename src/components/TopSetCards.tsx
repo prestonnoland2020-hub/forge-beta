@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { DialField } from './NumberDial';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import type { LoggedTopSet, WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
@@ -19,6 +19,10 @@ type Props = {
   unit: string;
   onAdd: () => void;
   onRemove: (index: number) => void;
+  /* Deleting a set that is already SAVED is a different act from dropping an
+     unfinished row: it has to come back out of the training day, History and
+     Insights. The parent owns that; this component only asks. */
+  onDeleteLogged: (index: number, set: LoggedTopSet) => void;
   onCreateExercise: (name: string, muscles: string[]) => void;
   planLabel?: string;
   /* Set when the day has no label yet: a top set has nothing to attach to. */
@@ -36,12 +40,39 @@ const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${s
    A set that is saved collapses to what it is — the lift, the load, the max —
    and opens on a tap when it needs correcting. A set still being entered is
    open, because it is the question on the screen. */
-export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onCreateExercise, planLabel, blockedReason = '' }: Props) {
+export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onDeleteLogged, onCreateExercise, planLabel, blockedReason = '' }: Props) {
   /* Keyed, not indexed: rows are added and removed under this state. */
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [closedKeys, setClosedKeys] = useState<string[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<LoggedTopSet | null>(null);
+  /* SWIPE TO DELETE. A logged set could be corrected but never removed — a
+     mis-tapped lift or a set logged on the wrong day was permanent. Dragging a
+     row left reveals Delete; the delete itself is a deliberate second tap,
+     because this is training history and a thumb brushing a list should not be
+     able to erase it. Everything here also has a plain button in the open card
+     for anyone not on a touchscreen. */
+  const [swipedKey, setSwipedKey] = useState<string | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const swipeStart = useRef<{ key: string; x: number; y: number } | null>(null);
+  const REVEAL = 84;
+  const beginSwipe = (key: string, touch: { clientX: number; clientY: number }) => { swipeStart.current = { key, x: touch.clientX, y: touch.clientY }; };
+  const moveSwipe = (key: string, touch: { clientX: number; clientY: number }) => {
+    const start = swipeStart.current;
+    if (!start || start.key !== key) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    /* A vertical scroll is not a swipe — let the page have it. */
+    if (Math.abs(dy) > Math.abs(dx)) { swipeStart.current = null; setSwipeOffset(0); return; }
+    setSwipedKey(key);
+    setSwipeOffset(Math.max(-REVEAL, Math.min(0, dx)));
+  };
+  const endSwipe = () => {
+    if (!swipeStart.current) return;
+    swipeStart.current = null;
+    setSwipeOffset(current => (current < -REVEAL / 2 ? -REVEAL : 0));
+  };
+  const closeSwipe = () => { setSwipedKey(null); setSwipeOffset(0); };
   const [creatingExercise, setCreatingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [newExerciseMuscles, setNewExerciseMuscles] = useState<string[]>([]);
@@ -125,22 +156,33 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
 
       /* Closed: the whole set is one line of text — saved sets read as their
          result, still-to-log sets read as the prescription with LOG waiting. */
-      if (!open && set.lift) return <article className={`card top-set-entry closed${logged ? ' logged' : ' pending'}`} key={set.id || `set-${index}`}>
-        <button type="button" className="top-set-row" aria-expanded="false" onClick={() => toggle(set)}>
-          <span className="top-set-row-name">{set.lift}</span>
-          {logged
-            ? <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
-            : <span className="top-set-row-figures pending">{set.weight > 0 ? `${set.weight} ${unit} ×${set.reps}` : 'Not logged'}<small>tap to log</small></span>}
-          <b aria-hidden="true">{logged ? '⌄' : '›'}</b>
-        </button>
-      </article>;
+      if (!open && set.lift) {
+        const key = setKey(set);
+        const offset = swipedKey === key ? swipeOffset : 0;
+        const deleteSet = () => { closeSwipe(); if (logged) onDeleteLogged(index, set); else onRemove(index); };
+        return <article className={`card top-set-entry closed swipeable${logged ? ' logged' : ' pending'}${offset ? ' swiped' : ''}`} key={set.id || `set-${index}`}>
+          <button type="button" className="top-set-delete" onClick={deleteSet} tabIndex={offset ? 0 : -1} aria-hidden={offset ? undefined : true}>Delete</button>
+          <div className="top-set-swipe" style={{ transform: `translateX(${offset}px)` }}
+            onTouchStart={event => beginSwipe(key, event.touches[0])}
+            onTouchMove={event => moveSwipe(key, event.touches[0])}
+            onTouchEnd={endSwipe}>
+            <button type="button" className="top-set-row" aria-expanded="false" onClick={() => (offset ? closeSwipe() : toggle(set))}>
+              <span className="top-set-row-name">{set.lift}</span>
+              {logged
+                ? <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
+                : <span className="top-set-row-figures pending">{set.weight > 0 ? `${set.weight} ${unit} ×${set.reps}` : 'Not logged'}<small>tap to log</small></span>}
+              <b aria-hidden="true">{logged ? '⌄' : '›'}</b>
+            </button>
+          </div>
+        </article>;
+      }
 
       return <article className={`card top-set-entry ${logged ? 'logged' : ''}`} key={set.id || `set-${index}`}>
         <div className="top-set-entry-head">
           {logged
             ? <button type="button" className="top-set-entry-toggle" aria-expanded="true" onClick={() => toggle(set)}><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></button>
             : <div><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></div>}
-          {logged && !isCorrecting ? <div className="logged-top-set-actions"><strong className="logged-badge">Saved ✓</strong><button type="button" className="text-button" onClick={() => startCorrection(set)}>Edit</button></div> : <button type="button" className="text-button" onClick={isCorrecting ? cancelCorrection : () => onRemove(index)}>{isCorrecting ? 'Cancel' : 'Remove'}</button>}
+          {logged && !isCorrecting ? <div className="logged-top-set-actions"><strong className="logged-badge">Saved ✓</strong><button type="button" className="text-button" onClick={() => startCorrection(set)}>Edit</button><button type="button" className="text-button danger" onClick={() => onDeleteLogged(index, set)}>Delete</button></div> : <button type="button" className="text-button" onClick={isCorrecting ? cancelCorrection : () => onRemove(index)}>{isCorrecting ? 'Cancel' : 'Remove'}</button>}
         </div>
         {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} ×{set.reps}</strong><small>Calculated max {max ?? '—'} {unit}</small></div> : <>
           <label className="top-set-exercise-field">Exercise<select value={displayedSet.lift} onChange={event => { if (event.target.value === '__new__') { setCreatingExercise(true); setCreateError(''); return; } chooseExercise(event.target.value); }}><option value="">Choose exercise</option>{options.map(exercise => <option key={exercise.id}>{exercise.name}</option>)}<option value="__new__">＋ Add a new exercise…</option></select></label>
