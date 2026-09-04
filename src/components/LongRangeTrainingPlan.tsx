@@ -5,7 +5,7 @@ import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 import { canonicalLiftKey } from '../lib/liftAliases';
-import { bestsFromHistory,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,type SplitDayRef } from '../features/training/aiPlanService';
+import { bestsFromHistory,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
 import { PlanProgress,TodayCard,WeekList,BlockList,waveSentence,type PlanSession,type PlanBlockWeek,type PlanLift,type PlanRun } from './PlanView';
 import { localDayIso } from '../lib/time';
 
@@ -22,7 +22,7 @@ function scaleCardio(plan:PlannedCardio,week:PlanWeek,profile:AdaptiveProfile){
   return{summary:cardioPlanSummary(next),reason:`Scaled for ${week.phase.toLowerCase()} phase${profile.readiness<75?' and current recovery':''}.`};
 }
 
-function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number}):CalendarSession[]{
+function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number},liftAnchors?:LiftAnchors):CalendarSession[]{
   const strengthGoal=goals.find(goal=>goal.type==='Strength');const enduranceGoal=goals.find(goal=>goal.type==='Endurance');const start=new Date(`${week.startDate}T12:00:00`);const cycle=splitDays.length?splitDays:[{name:'Strength',dayType:'strength'},{name:'Easy cardio',dayType:'cardio'},{name:'Rest',dayType:'rest'}];let strengthIndex=0;
   /* The same rotation the program uses, anchored to the live split cursor.
      Without the anchor this calendar drifted from the program on the same
@@ -76,7 +76,7 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
        nowhere else in Forge and disagreed with the program printed directly
        above it. */
     const lead=dayLifts[0];
-    const wave=lead?wavePrescription(bests.get(canonicalLiftKey(lead))||0,week.week-1,false,0,testsOneRepMax(lead,goalLifts)):null;
+    const wave=lead?wavePrescription(bests.get(canonicalLiftKey(lead))||0,week.week-1,false,0,testsOneRepMax(lead,goalLifts),liftAnchors?.get(canonicalLiftKey(lead))):null;
     const dayTopSet=lead&&wave?`${lead}: ${wave.weight} × ${wave.reps}${wave.isMax?' tested MAX':''}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
     const lifts:PlanLift[]=isPrimary&&week.strengthLoad?[{exercise:week.strengthExercise,weight:week.strengthLoad,reps:week.strengthReps}]:lead&&wave?[{exercise:lead,weight:wave.weight,reps:wave.reps}]:[];
     /* Every strength day carries a recommended top set from ITS mapped
@@ -90,10 +90,11 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
 export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}:{goals:CreatedGoal[];profile:AdaptiveProfile;splitDays:SplitDay[];rhythm?:'rolling'|'weekly'}){
   const {records}=useWorkoutHistory();
   const roadmap=useMemo(()=>buildLongRangePlan(goals,profile,12,records),[goals,profile,records]);
-  const bests=useMemo(()=>bestsFromHistory(records).bests,[records]);
+  const history=useMemo(()=>bestsFromHistory(records),[records]);
+  const bests=history.bests;
   const goalLifts=useMemo(()=>goalLiftNames(goals),[goals]);
   const active=roadmap[0];
-  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts]);
+  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,undefined,history.anchors):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts]);
   if(!active)return null;
   /* THE PRE-PROGRAM PLAN WEARS THE SAME CLOTHES AS THE PROGRAM. This screen
      had its own layout — a 12wk/6mo/1yr toggle, an export, a rules card — so
@@ -114,7 +115,7 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const blockWeeks:PlanBlockWeek[]=roadmap.map((week,index)=>({
     index,startDate:new Date(`${week.startDate}T12:00:00`),waveIndex:index,miles:week.mileage,
     lead:week.strengthLoad?{exercise:week.strengthExercise,weight:week.strengthLoad,reps:week.strengthReps}:undefined,
-    sessions:()=>weekCalendar(week,splitDays,goals,profile,rhythm,bests,goalLifts).map(toPlanSession),
+    sessions:()=>weekCalendar(week,splitDays,goals,profile,rhythm,bests,goalLifts,undefined,history.anchors).map(toPlanSession),
   }));
   const sentence=`${waveSentence(0)}${active.mileage?` ${active.mileage} mi of running.`:''} Numbers firm up as you log.`;
   return <div className="pv">

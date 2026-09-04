@@ -29,12 +29,13 @@ const scan = (test, exempt = []) => sources.flatMap(({ path, text }) =>
   exempt.includes(path) ? [] : text.split('\n').flatMap((line, index) =>
     test(line) ? [`${path}:${index + 1}  ${line.trim().slice(0, 90)}`] : []));
 
-/* 1. Epley. A bare `weight * (1 + reps / 30)` treats a logged 405x1 as a 419
-   max; the canonical version returns the single as itself. */
-check('Epley is written once', scan(
-  line => /\(\s*1\s*\+\s*\w+(\.\w+)*\s*\/\s*30\s*\)/.test(line) && !/loadFor|\/\s*\(1 \+ count/.test(line),
-  ['src/lib/strength.ts', 'src/features/training/aiPlanService.ts'],
-), 'src/lib/strength.ts (calculateEstimatedOneRepMax)');
+/* 1. The rep-max curve. A second copy is a second opinion about how strong
+   the athlete is: forward and inverse have to be the same curve, or a set
+   converted to a max and back is not itself. */
+check('the rep-max curve is written once', scan(
+  line => /36\s*\/\s*\(\s*37\s*-|\(\s*1\s*\+\s*\w+(\.\w+)*\s*\/\s*30\s*\)/.test(line),
+  ['src/lib/strength.ts'],
+), 'src/lib/strength.ts (repMaxCoefficient)');
 
 /* 2. The wave. Rep sequences and inverse-Epley loading belong to
    aiPlanService; a second sequence is a second training program. */

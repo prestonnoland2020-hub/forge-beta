@@ -63,7 +63,7 @@ const planSchema = {
 const planInstructions = `You are Forge's program builder. Build ONE coherent multi-week training program from the athlete's verified data: their goals, their split (with the exercises they mapped to each day), their maxes, and their actual logged running.
 
 TWO DIFFERENT NUMBERS — NEVER CONFLATE THEM
-- context.calcMaxes are CALCULATED maxes: Epley estimates (weight × (1 + reps/30)) derived from the athlete's best logged set at ANY rep count. A 380 calc max usually comes from something like 315 × 6. It is an ESTIMATE. The athlete has NOT held that weight for a single. Call it "calculated max" or "calc max". NEVER write "your logged 380 lb bench", "your 380 lb best", or anything else that claims they lifted it.
+- context.calcMaxes are CALCULATED maxes: Brzycki estimates (weight × 36/(37 − reps), reps capped at 10) derived from the athlete's best logged set at ANY rep count. A 380 calc max usually comes from something like 315 × 6. It is an ESTIMATE. The athlete has NOT held that weight for a single. Call it "calculated max" or "calc max". NEVER write "your logged 380 lb bench", "your 380 lb best", or anything else that claims they lifted it.
 - context.realOneRepMaxes are REAL one-rep maxes: weights actually logged for a set of exactly 1 rep. Only these are true PRs, and only these can register against a Real 1RM strength goal. A lift missing from this object has no real single on record yet.
 - THE WHOLE POINT OF THE BLOCK is to convert the calculated max into a real one. Weeks 1-4 train at loads the calc max says the athlete can already handle; MAX WEEK cashes that estimate in as an actual single. Once a single is logged it raises the calc max, and the next wave anchors higher. Say this plainly when you describe the block.
 
@@ -72,7 +72,7 @@ STRENGTH RULES — THE 8/6/4/2/1 WAVE (Forge's fixed progression system)
 - A DAY WITH TWO GOAL LIFTS PRESCRIBES BOTH. If a day's mapped list contains more than one lift named in context.goalLifts, emit one topSets entry per goal lift for that day, every week. Never drop one to make room.
 - THE GOAL LIFT OWNS ITS DAY. If a day's mapped list contains a lift named in context.goalLifts, THAT lift is the day's prescription every single week — not an accessory or machine variation of it. A Squat goal is trained and tested with squats; prescribing hack squat or smith machine squat on that day means the goal lift never gets waved and never gets tested on max week, which defeats the block. Only a day with NO goal lift mapped picks freely from its list.
 - Reps cycle in 5-WEEK waves: week 1 = 8 reps, week 2 = 6, week 3 = 4, week 4 = 2, week 5 = MAX WEEK.
-- Weeks 1-4: weight = the athlete's current CALCULATED max converted to that rep count by inverse Epley (weight = max / (1 + reps/30)), rounded — the same calculated max expressed across 8s, 6s, 4s, and 2s.
+- Weeks 1-4: weight = the athlete's current CALCULATED max converted to that rep count by the inverse of that curve (weight = max × (37 − reps)/36), rounded — the same calculated max expressed across 8s, 6s, 4s, and 2s.
 - WHERE THE BLOCK ENTERS THE WAVE IS GIVEN TO YOU. context.waveStartReps is the rep count of week 1 of THIS block, and context.waveStartWeek is its position in the 8/6/4/2/MAX wave. It is read from what the athlete has already logged, so an athlete who just finished a week of 8s gets a block that opens at 6. Write week 1 at waveStartReps and continue the wave from there, wrapping 8→6→4→2→MAX. Never restart at 8 when waveStartReps says otherwise, and never tell the athlete the wave prevents starting mid-wave — entering mid-wave is normal and is what these fields are for.
 - MAX WEEK IS TIED TO GOALS, WITH NO EXCEPTIONS. A tested single exists for exactly one reason: to move a Real 1RM goal forward. ONLY a lift named in context.goalLifts takes one. It gets a 1-rep attempt 5-10 lb above its real 1RM (context.realOneRepMaxes when present); with no real single on record the attempt sits just under the calculated max.
 - Every OTHER lift on max week stays at 2 reps — the heavy double it already earned. Do not offer it an optional single, a "if you're fresh" max, or any other 1-rep work. A day with no goal lift mapped to it simply prescribes one of that day's mapped exercises at the week's rep count. If context.goalLifts is empty, NOTHING is tested that block.
@@ -163,7 +163,7 @@ Deno.serve(async request => {
     const plan = JSON.parse(text);
     if (!Array.isArray(plan.weeks) || !plan.weeks.length) throw new Error('The plan service returned no weeks.');
     const context_ = (body.context || {}) as Record<string, unknown>;
-    /* CALCULATED maxes (Epley estimates from the best logged set at any rep
+    /* CALCULATED maxes (Brzycki estimates from the best logged set at any rep
        count) drive weeks 1-4; REAL one-rep maxes (actual logged singles)
        anchor the max-week attempt. The two are never interchangeable — the
        block exists to convert the first into the second. Older clients send
@@ -196,7 +196,11 @@ Deno.serve(async request => {
     const metric = String(context_.units || '').toLowerCase() === 'metric';
     const step = metric ? 2.5 : 5;
     const bump = metric ? 3.75 : 7.5;
-    const weightFor = (max: number, reps: number) => Math.max(step, Math.ceil(max / (1 + reps / 30) / step) * step);
+    /* The same curve the app uses (src/lib/strength.ts): Brzycki, capped at
+       ten reps. Forward and inverse must match on both sides or the block the
+       model writes and the block the app draws disagree by a plate. */
+    const repCoefficient = (reps: number) => { const capped = Math.min(Math.max(Math.round(reps), 1), 10); return capped === 1 ? 1 : 36 / (37 - capped); };
+    const weightFor = (max: number, reps: number) => Math.max(step, Math.ceil(max / repCoefficient(reps) / step) * step);
     const WAVE_REPS = [8, 6, 4, 2, 1];
 
     /* Block length is NOT left to the model. It has returned 8 weeks against a

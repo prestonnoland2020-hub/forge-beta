@@ -185,7 +185,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Shared builder. This was a fourth copy, and its bare Epley read a logged
        405x1 as a 419 max — inflating a true single by 3.3% and prescribing off
        the inflated number. */
-    const {bests:liveBests,singles:liveSingles}=bestsFromHistory(records);
+    const {bests:liveBests,singles:liveSingles,anchors:liveAnchors}=bestsFromHistory(records);
     /* ONE ATTEMPT PER LIFT PER WEEK, THE SAME ONE THE PLAN TAB PICKS. A
        rolling split shorter than seven days hits the same day twice inside a
        week; the Plan tab demoted the second exposure to the heavy double and
@@ -196,7 +196,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       const set=(week.topSets||[]).find(entry=>entry.splitDay===day.name);
       const key=set?canonicalLiftKey(set.exercise):'';
       const best=key?liveBests.get(key)||0:0;
-      const live=best?wavePrescription(best,waveIdx,metric,liveSingles.get(key)||0,testsOneRepMax(set!.exercise,goalLifts)):null;
+      const live=best?wavePrescription(best,waveIdx,metric,liveSingles.get(key)||0,testsOneRepMax(set!.exercise,goalLifts),liveAnchors.get(key)):null;
       return{
         exercise:set?.exercise,
         reps:live?.reps,
@@ -215,7 +215,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
       /* A tested single the athlete is not taking today falls back to the
          double the lift already earned, rather than being offered twice. */
-      const prescription=wavePrescription(live.best,waveIdx,metric,live.single,tests&&todayHoldsTheAttempt);
+      const prescription=wavePrescription(live.best,waveIdx,metric,live.single,tests&&todayHoldsTheAttempt,liveAnchors.get(key));
       const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':isMaxWeek?(tests?'MAX WEEK — the attempt is scheduled on another day this week':'MAX WEEK — heavy double, no goal on this lift'):`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
          weight when the set says so, and an unwaved 'baseline' flag was
