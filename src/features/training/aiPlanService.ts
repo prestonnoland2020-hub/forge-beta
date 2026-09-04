@@ -193,18 +193,33 @@ export type LiftAnchors = Map<string, Map<number, number>>;
    at N reps is a floor — evidence beats arithmetic — but never a ceiling, so
    an old light set at that rep count cannot hold back a lifter whose other
    work has moved on. With no anchors at all the calculated max stands in,
-   which is exactly the old behaviour. */
-export function loadFromAnchors(anchors: Map<number, number> | undefined, best: number, reps: number): number {
+   which is exactly the old behaviour.
+
+   AND IT ASKS FOR ONE STEP MORE. A plan built purely from evidence prescribes
+   exactly what the athlete has already done and waits to be beaten — it
+   mirrors them instead of moving them. Coming back to a rep count you have
+   trained, the bar carries one more plate step than last time. Hit it and the
+   floor rises with you; miss it and the set you did still stands, so the next
+   time asks for the same thing rather than running away. */
+export function loadFromAnchors(anchors: Map<number, number> | undefined, best: number, reps: number, step = 0): number {
   if (!anchors?.size) return weightForReps(best, reps);
+  /* A SET THAT PROVES NOTHING NEW IS NOT EVIDENCE. Anyone who has done
+     455 x 3 could have done 405 x 2, so an old 405 x 2 carries no information
+     about this athlete — but it sits one rep from the double and would
+     otherwise get the loudest vote in writing it. An anchor beaten outright
+     by another (at least as many reps, at least as much weight) is dropped. */
+  const live = [...anchors].filter(([at, weight]) =>
+    ![...anchors].some(([other, heavier]) => other >= at && heavier >= weight && (other > at || heavier > weight)));
   let numerator = 0; let denominator = 0;
-  anchors.forEach((weight, at) => {
+  live.forEach(([at, weight]) => {
     if (at === reps) return;
     const distance = Math.abs(at - reps);
     numerator += (weight * repMaxCoefficient(at) / repMaxCoefficient(reps)) / distance;
     denominator += 1 / distance;
   });
   const implied = denominator ? numerator / denominator : 0;
-  return Math.max(anchors.get(reps) || 0, implied);
+  const done = live.find(([at]) => at === reps)?.[1] || 0;
+  return Math.max(done ? done + step : 0, implied);
 }
 
 /* RUNNING VOLUME AND RUN DAYS BELONG TO THE ATHLETE, NOT THE MODEL. The
@@ -356,7 +371,7 @@ export function wavePrescription(best: number, weekIndex: number, metric = false
   const { reps, isMax } = waveSlot(weekIndex);
   /* "A rep higher than last PR by 5-10": a real logged single anchors the
      attempt directly; without one, the estimated max stands in. */
-  const loadFor = (count: number) => Math.max(step, Math.ceil(loadFromAnchors(anchors, best, count) / step) * step);
+  const loadFor = (count: number) => Math.max(step, Math.ceil(loadFromAnchors(anchors, best, count, step) / step) * step);
   /* THE ATTEMPT SITS ABOVE THE DOUBLE. The rep weeks are written from the
      calculated max (what the athlete's best rep work proves); the attempt was
      anchored to the last real single. When rep work had moved on and the
@@ -369,7 +384,18 @@ export function wavePrescription(best: number, weekIndex: number, metric = false
     /* Converted through the shared curve, so "the max plus a bump" means a
        single and not a single shrunk by whatever the curve says about 1 rep. */
     const anchored = bestSingle ? bestSingle + bump : weightForReps(best + bump, 1);
-    const attempt = Math.max(anchored, loadFor(2) + step);
+    /* AND THE REP WORK GETS A VOTE. A single is a moment; rep work is months.
+       An athlete whose last tested single is from the spring and who has since
+       put up heavy fours deserves an attempt written from the fours — asking
+       for ten pounds over a stale single is a max week that cannot find the
+       max. This is the same nearest-evidence blend the rep weeks use, read at
+       one rep, so it is bounded by the athlete's own sets. */
+    const fromRepWork = anchors?.size ? loadFromAnchors(anchors, best, 1, step) : 0;
+    /* A ceiling on the jump, not a target: however loudly the rep work
+       argues, one session does not add a tenth to a tested single. This binds
+       only when an estimate has run away; a normal max week never reaches it. */
+    const ceiling = bestSingle ? bestSingle * 1.1 : Infinity;
+    const attempt = Math.min(ceiling, Math.max(anchored, fromRepWork, loadFor(2) + step));
     return Math.max(step, Math.ceil(attempt / step) * step);
   };
   if (isMax) {
