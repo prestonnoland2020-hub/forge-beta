@@ -321,11 +321,20 @@ export function wavePrescription(best: number, weekIndex: number, metric = false
   const { reps, isMax } = waveSlot(weekIndex);
   /* "A rep higher than last PR by 5-10": a real logged single anchors the
      attempt directly; without one, the estimated max stands in. */
+  const loadFor = (count: number) => Math.max(step, Math.ceil(best / (1 + count / 30) / step) * step);
+  /* THE ATTEMPT SITS ABOVE THE DOUBLE. The rep weeks are written from the
+     calculated max (what the athlete's best rep work proves); the attempt was
+     anchored to the last real single. When rep work had moved on and the
+     single had not — 415 × 8 says 520-ish, the last single was 475 — the
+     block prescribed 490 × 2 one week and a 485 "max attempt" the next: a
+     single lighter than the double just done. A max attempt is never below
+     the heavy double plus one plate step; the single anchors it only when
+     that is the higher number. */
   const attemptWeight = () => {
-    const attempt = bestSingle ? bestSingle + bump : (best + bump) / (1 + 1 / 30);
+    const anchored = bestSingle ? bestSingle + bump : (best + bump) / (1 + 1 / 30);
+    const attempt = Math.max(anchored, loadFor(2) + step);
     return Math.max(step, Math.ceil(attempt / step) * step);
   };
-  const loadFor = (count: number) => Math.max(step, Math.ceil(best / (1 + count / 30) / step) * step);
   if (isMax) {
     if (tests) return { weight: attemptWeight(), reps: 1, isMax: true };
     /* No goal on this lift: it holds the double it earned. It is not offered

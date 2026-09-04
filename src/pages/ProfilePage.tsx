@@ -58,7 +58,7 @@ export function ProfilePage(){
       {[
         ['What is a top set?','The one heaviest meaningful set per lift. Warmups, back-offs and accessories are yours to train — the top set is what Forge measures progress from, and every saved one gets a calculated max.'],
         ['What is a calculated max?','An Epley estimate from any completed set: weight × (1 + reps ÷ 30). A single (1 rep) is a real 1RM, not an estimate — it is the only set a Real 1RM goal counts.'],
-        ['How does the plan pick my numbers?','A 10-week block of 8/6/4/2/1 waves built from your logged bests. Beat a set and the wave rises; miss one and it holds. Max week tests only lifts you hold a Real 1RM goal on.'],
+        ['How does the plan pick my numbers?','A 10-week block of 8/6/4/2/1 waves built from your logged bests. Beat a set and the wave rises; miss one and it holds. Max week tests only lifts you hold a Real 1RM goal on — the attempt is your last real single plus 5–10 lb, and never below the heavy double you just did.'],
         ['How is my weekly running planned?','It ramps from what you actually run toward the ceiling you set in your split, deloading on every 2-rep week. The long run is capped at a sane share of the week and near your longest logged run.'],
         ['What does recovery data change?','With a smartwatch synced through a supported bridge, sleep, HRV and resting heart rate shape the readiness score and can soften hard days. Without one, Forge ignores recovery entirely — it never guesses missing health data.'],
         ['What does Strava add?','Recorded runs, rides and rows import automatically into your training log and count toward mileage and endurance goals. Strava does not supply sleep or HRV.'],
