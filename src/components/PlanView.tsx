@@ -234,7 +234,7 @@ export function BlockList({ weeks, currentIndex, unit, distanceUnit, records }: 
           </div>}
         </div>;
       })}
-      <p className="pv-block-note">Every load comes from your best logged set through the 8 / 6 / 4 / 2 / max wave. Beat a set and the numbers rise; miss one and they hold. {records.length ? '' : 'Log a set and the first numbers appear.'}</p>
+      <p className="pv-block-note">Every load comes from your closest logged set through the 8 / 6 / 4 / 2 / max wave — your heavy weeks from your heavy sets, not from stretching an 8-rep set down to a double. Weeks past this one are a projection: each time a rep count comes round it asks for one more step. Beat a set and the numbers rise; miss one and they hold. {records.length ? '' : 'Log a set and the first numbers appear.'}</p>
     </div>}
   </section>;
 }

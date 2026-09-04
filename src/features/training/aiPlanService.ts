@@ -365,13 +365,22 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   return { ...week, mileage: scheduled, longRunMiles: longRunMiles || week.longRunMiles, easyDays, easyRuns, easyMinutes };
 }
 
-export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = false, anchors?: Map<number, number>): { weight: number; reps: number; isMax: boolean } {
+/* `projectSteps` is how many times this rep count comes round between now and
+   the week being drawn. The wave is written from what the athlete has logged,
+   so every week of a block resolves from TODAY's evidence — which made the
+   second half of a ten-week block a carbon copy of the first: the same 415 x 8
+   in week 4 and week 9, the same max attempt twice. Weeks further out are
+   drawn one step heavier per pass, which is exactly what will happen if the
+   athlete hits them. It is a projection and it says so; miss a week and the
+   weeks after it recompute from what was really done. */
+export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = false, anchors?: Map<number, number>, projectSteps = 0): { weight: number; reps: number; isMax: boolean } {
   const step = metric ? 2.5 : 5;
   const bump = metric ? 3.75 : 7.5;
   const { reps, isMax } = waveSlot(weekIndex);
   /* "A rep higher than last PR by 5-10": a real logged single anchors the
      attempt directly; without one, the estimated max stands in. */
-  const loadFor = (count: number) => Math.max(step, Math.ceil(loadFromAnchors(anchors, best, count, step) / step) * step);
+  const projection = Math.max(0, projectSteps) * step;
+  const loadFor = (count: number) => Math.max(step, Math.ceil((loadFromAnchors(anchors, best, count, step) + projection) / step) * step);
   /* THE ATTEMPT SITS ABOVE THE DOUBLE. The rep weeks are written from the
      calculated max (what the athlete's best rep work proves); the attempt was
      anchored to the last real single. When rep work had moved on and the
@@ -395,7 +404,7 @@ export function wavePrescription(best: number, weekIndex: number, metric = false
        argues, one session does not add a tenth to a tested single. This binds
        only when an estimate has run away; a normal max week never reaches it. */
     const ceiling = bestSingle ? bestSingle * 1.1 : Infinity;
-    const attempt = Math.min(ceiling, Math.max(anchored, fromRepWork, loadFor(2) + step));
+    const attempt = Math.min(ceiling, Math.max(anchored, fromRepWork, loadFor(2) + step)) + projection;
     return Math.max(step, Math.ceil(attempt / step) * step);
   };
   if (isMax) {
@@ -460,7 +469,7 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
   /* weekIndex is the CALENDAR week; waveIndex is where that week sits in the
      8/6/4/2/1 wave and defaults to it. They differ when the block entered the
      wave mid-way — see StoredAiPlan.waveOffset. */
-  block: { weekIndex: number; blockWeeks: number; waveIndex?: number },
+  block: { weekIndex: number; blockWeeks: number; waveIndex?: number; currentWaveIndex?: number },
   strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean; anchors?: LiftAnchors },
   /* The days this week actually contains — a rolling cycle longer than 7 days
      shows only some of itself per week, and the running has to be measured
@@ -547,11 +556,15 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
     if (!best) return set;
     const tests = testsOneRepMax(set.exercise, strength.goalLifts);
     const waveIndex = block.waveIndex ?? block.weekIndex;
-    const live = wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, tests, anchorsFor(set.exercise));
+    /* How many passes through the wave separate this week from the one the
+       athlete is actually in. Zero for the current pass and everything behind
+       it — those are drawn from evidence, not projected. */
+    const projectSteps = Math.max(0, Math.floor((waveIndex - (block.currentWaveIndex ?? waveIndex)) / WAVE_LENGTH));
+    const live = wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, tests, anchorsFor(set.exercise), projectSteps);
     if (live.weight !== set.weight || live.reps !== set.reps) adjusted = true;
     /* On a max week a tested lift also carries the double it falls back to
        when the split hits that day more than once in the same week. */
-    const hold = live.reps === 1 ? wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, false, anchorsFor(set.exercise)) : undefined;
+    const hold = live.reps === 1 ? wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, false, anchorsFor(set.exercise), projectSteps) : undefined;
     return { ...set, weight: live.weight, reps: live.reps, hold: hold && { weight: hold.weight, reps: hold.reps } };
   });
   return { ...resolved, topSets, adjusted };
