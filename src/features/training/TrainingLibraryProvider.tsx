@@ -58,7 +58,7 @@ export function TrainingLibraryProvider({children}:{children:ReactNode}){
   useEffect(()=>localStorage.setItem(key,JSON.stringify(state)),[state]);
   useEffect(()=>{if(isDemoMode||!user)return;let active=true;void supabase.from('exercise_library').select('*').eq('owner_id',user.id).order('name').then(({data,error})=>{
     if(!active||error||!data?.length)return;
-    const imported=data.map((row,index)=>normalizeExercise({id:-(index+1),name:row.name,kind:row.kind,muscles:row.muscle_groups,detail:row.detail||'Imported from legacy Google Sheets',enabled:row.enabled,custom:true,defaultTarget:row.default_target,defaultUnit:row.default_unit},-(index+1)));
+    const imported=data.map((row,index)=>normalizeExercise({id:-(index+1),name:row.name,kind:row.kind,muscles:row.muscle_groups,detail:row.detail||'Imported from your training history',enabled:row.enabled,custom:true,defaultTarget:row.default_target,defaultUnit:row.default_unit},-(index+1)));
     /* Alias-aware: an imported "Squat" makes the starter "Back Squat" a
        duplicate, not a different lift. Filtering by canonical key also heals
        libraries that already persisted both — the merge runs on every signed-in

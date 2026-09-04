@@ -23,6 +23,15 @@ export async function saveWorkoutDay(record:WorkoutRecord):Promise<string>{
   return String(data);
 }
 
+/* The server's id for a date — for days the client still knows by the id it
+   minted before the first save came back. */
+export async function findWorkoutDayId(date:string):Promise<string>{
+  const {data,error}=await supabase.from('workout_days').select('id').eq('workout_date',date).maybeSingle();
+  if(error)throw error;
+  if(!data?.id)throw new Error('This day has not reached the server yet — check the sync message and try again.');
+  return String(data.id);
+}
+
 export async function deleteWorkoutDay(id:string):Promise<void>{
   const {error}=await supabase.rpc('delete_my_training_day',{target_day_id:id});
   if(error)throw error;

@@ -195,7 +195,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
           <Link className={onSettings ? 'top-settings active' : 'top-settings'} to="/profile?view=settings" aria-label="Settings" aria-current={onSettings ? 'page' : undefined}><NavGlyph name="gear"/></Link>
         </div>
       </header>
-      {!isDemoMode && syncError && <div className="data-sync-error"><span>Your latest training data is still saved on this device, but Supabase could not sync it.</span><button onClick={retrySync}>Retry</button></div>}
+      {!isDemoMode && syncError && <div className="data-sync-error"><span>Your latest training is saved on this phone but hasn’t reached your account yet. It will retry, or tap Retry now.</span><button onClick={retrySync}>Retry</button></div>}
       <main className="page"><Outlet /></main>
     </div>
     <nav className="bottom-nav" aria-label="Mobile navigation">

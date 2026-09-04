@@ -217,7 +217,7 @@ export function OnboardingPage() {
         <div className="disclaimer-copy">
           <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
           <p>Strength and endurance training carry real risk. Check with a physician before starting or changing a program — especially with a heart condition, injury, chronic illness, or during pregnancy. Stop any exercise that causes pain, dizziness, or unusual shortness of breath.</p>
-          <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue on the Coach tab so training can work around it — and see a professional when something does not resolve.</p>
+          <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue in Ask Forge so training can work around it — and see a professional when something does not resolve.</p>
         </div>
         <label className="setup-check safety full"><input type="checkbox" checked={disclaimerChecked} onChange={event => setDisclaimerChecked(event.target.checked)} /><span><strong>I understand and accept this.</strong><small>Forge provides training guidance, not medical advice.</small></span></label>
         <footer className="setup-actions"><span /><button className="button" disabled={!disclaimerChecked} onClick={() => { setDisclaimerAccepted(true); window.scrollTo(0, 0); }}>Continue to setup →</button></footer>
@@ -226,13 +226,15 @@ export function OnboardingPage() {
   </main>;
 
   return <main className="onboarding-shell onboarding-simple">
-    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing && !needsGoal ? 'EDIT PROFILE' : `SETUP ${step + 1} OF ${steps.length}`}</span>
+    <header className="onboarding-brand"><span className="forge-mark">—</span><strong>FORGE</strong><span>{isEditing && !needsGoal && !needsExercises ? 'EDIT PROFILE' : `SETUP ${step + 1} OF ${steps.length}`}</span>
       {/* AN EDIT MUST BE ESCAPABLE. Opened from Profile, this screen had no
           way out but completing all three steps — Save was the only door. */}
-      {isEditing && !needsGoal && <button type="button" className="onboarding-cancel" onClick={() => navigate('/profile')}>Cancel</button>}
+      {/* …but not when the gate sent them here to finish something: Cancel
+          would bounce straight back and read as a broken button. */}
+      {isEditing && !needsGoal && !needsExercises && <button type="button" className="onboarding-cancel" onClick={() => navigate('/profile')}>Cancel</button>}
     </header>
     <div className="onboarding-grid">
-      <aside><span className="eyebrow">START SIMPLE</span><h1>Ready in three steps.</h1><p>Forge learns performance from completed workouts. You do not need to estimate maxes, pace, equipment, or recovery during setup.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
+      <aside><span className="eyebrow">START SIMPLE</span><h1>Ready in {steps.length === 4 ? 'four' : 'a few'} steps.</h1><p>Forge learns performance from completed workouts. You do not need to estimate maxes, pace, equipment, or recovery during setup.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
       <section className="onboarding-card">
         <div className="setup-heading"><span className="eyebrow">{steps[step][0]}</span><h2>{steps[step][1]}</h2></div>
         {step === 0 && <div className="setup-fields">

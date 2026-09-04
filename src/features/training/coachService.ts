@@ -36,7 +36,12 @@ export async function requestForgeCoach(request: ForgeCoachRequest, localFallbac
   // key belongs only in the `forge-coach` Edge Function secret store. See
   // FORGE_GO_LIVE.md before switching VITE_DEMO_MODE off.
   if (isDemoMode) return { answer: localFallback, source: 'local', error: 'Forge is running in preview mode.' };
-  const { data, error } = await supabase.functions.invoke('forge-coach', { body: request });
+  let data: { answer?: unknown; workout?: ForgeCoachResponse['workout'] } | null = null;
+  let error: unknown = null;
+  /* A dropped connection throws instead of returning an error object; it
+     must land on the same "couldn't reach the coach" path, not the caller. */
+  try { const result = await supabase.functions.invoke('forge-coach', { body: request }); data = result.data; error = result.error; }
+  catch (reason) { error = reason; }
   if (error || !data?.answer) {
     let detail='The AI service did not return a response.';
     let limited=false;

@@ -104,5 +104,7 @@ export async function deleteMyAccount(): Promise<void> {
   if (isDemoMode) return;
   const { error } = await supabase.rpc('delete_my_account');
   if (error) throw error;
+  /* The account is gone; nothing cached for it may outlive it on this device. */
+  try { Object.keys(localStorage).filter(key => key.startsWith('forge-') && !key.startsWith('forge-appearance')).forEach(key => localStorage.removeItem(key)); } catch { /* ignore */ }
   await supabase.auth.signOut();
 }

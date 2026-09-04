@@ -40,11 +40,15 @@ const COLUMNS: Record<DialKind, (unit?: string) => Column[]> = {
   reps: () => [{ values: range(1, 50, 1), suffix: 'reps' }],
   /* Miles to a hundredth: the whole part and the fraction are separate
      wheels, exactly as a distance is read aloud. */
-  distance: unit => [
-    { values: range(0, 100, 1) },
-    { values: range(0, 99, 1), label: 'decimal' },
-    { values: [], suffix: unit || 'mi' },
-  ],
+  distance: unit => isShortUnit(unit)
+    /* Metres and yards are counted in whole steps — a 2000 m row, a 400 m
+       rep — and never had a place on a 0–100 wheel with decimals. */
+    ? [{ values: range(0, 10000, 25) }, { values: [] }, { values: [], suffix: unit }]
+    : [
+      { values: range(0, 100, 1) },
+      { values: range(0, 99, 1), label: 'decimal' },
+      { values: [], suffix: unit || 'mi' },
+    ],
   minutes: () => [{ values: range(0, 300, 1), suffix: 'min' }],
   /* A duration is read as mm:ss, so it is picked as mm:ss. */
   clock: () => [{ values: range(0, 359, 1) }, { values: range(0, 59, 1), label: 'seconds' }],
@@ -53,6 +57,7 @@ const COLUMNS: Record<DialKind, (unit?: string) => Column[]> = {
   count: () => [{ values: range(0, 100, 1) }],
 };
 
+const isShortUnit = (unit?: string) => /^(m|meters|metres|yd|yards)$/i.test(String(unit || ''));
 function range(from: number, to: number, step: number): number[] {
   const out: number[] = [];
   for (let value = from; value <= to + 1e-9; value += step) out.push(Math.round(value * 100) / 100);
@@ -122,6 +127,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
   const numeric = Number(value) || 0;
   const weightLike = kind === 'weight' || kind === 'bodyweight';
   const [whole, setWhole] = useState(() => {
+    if (kind === 'distance' && isShortUnit(unit)) return Math.round(numeric / 25) * 25;
     if (kind === 'distance') return Math.floor(numeric);
     if (kind === 'clock') return Number(String(value || '').split(':')[0]) || 0;
     /* 315 opens as 300 on the hundreds wheel and 15 on the remainder. */
@@ -132,7 +138,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
     return values.reduce((closest, item) => Math.abs(item - numeric) < Math.abs(closest - numeric) ? item : closest, values[0]);
   });
   const [fraction, setFraction] = useState(() => {
-    if (kind === 'distance') return Math.round((numeric - Math.floor(numeric)) * 100);
+    if (kind === 'distance') return isShortUnit(unit) ? 0 : Math.round((numeric - Math.floor(numeric)) * 100);
     if (kind === 'clock') return Number(String(value || '').split(':')[1]) || 0;
     if (kind === 'bodyweight') return Math.round(numeric - Math.floor(numeric / 100) * 100);
     if (kind === 'weight') {
@@ -143,7 +149,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
     return 0;
   });
 
-  const shown = kind === 'distance' ? `${whole}.${String(fraction).padStart(2, '0')}`
+  const shown = kind === 'distance' ? (isShortUnit(unit) ? String(whole) : `${whole}.${String(fraction).padStart(2, '0')}`)
     : kind === 'clock' ? `${whole}:${String(fraction).padStart(2, '0')}`
     : weightLike ? String(Math.round((whole + fraction) * 10) / 10)
     : String(whole);
@@ -172,8 +178,8 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
           : kind === 'distance'
           ? <>
               <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />
-              <span className="dial-point">.</span>
-              <Wheel values={columns[1].values} selected={fraction} onSelect={setFraction} format={item => String(item).padStart(2, '0')} />
+              {columns[1].values.length > 0 && <><span className="dial-point">.</span>
+              <Wheel values={columns[1].values} selected={fraction} onSelect={setFraction} format={item => String(item).padStart(2, '0')} /></>}
               <span className="dial-suffix">{unit || 'mi'}</span>
             </>
           : <>

@@ -31,7 +31,7 @@ await p.goto('http://localhost:4191/#/plan', { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(2600);
 check('a launch on Plan lands on Today', p.url().endsWith('#/'), p.url());
 const text = await p.evaluate(() => document.body.innerText);
-check('and Today is what is showing', /Today’s training|Today's training/.test(text), text.slice(0, 90));
+check('and Today is what is showing', /NEXT IN YOUR SPLIT|Good (morning|afternoon|evening)/.test(text), text.slice(0, 90));
 
 /* Moving around inside the app is untouched. */
 await p.evaluate(() => { const el = [...document.querySelectorAll('.bottom-nav a')].find(a => /plan/i.test(a.getAttribute('href') || '')); el?.click(); });

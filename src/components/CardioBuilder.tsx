@@ -4,6 +4,7 @@ import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider
 import type { CardioLogDraft } from '../lib/cardioSession';
 import { parseCardioDescription } from '../lib/cardioParse';
 import { requestCardioParse } from '../features/training/coachService';
+import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 
 /* Cardio logging is manual, the way the original Apps Script CardioLog tab was:
    one row per line — type, distance, unit, time — and intervals are just more
@@ -32,11 +33,19 @@ const isDistanceUnit = (unit: string) => DISTANCE_UNITS.includes(String(unit || 
    units once a distance is typed. The athlete read three miles and the app
    stored none. `distanceUnitFor` never returns a time unit; `unitFor` keeps
    the sensible empty-line default. */
+/* THE ATHLETE'S UNIT. A metric runner typing "5" logged five MILES unless
+   they noticed the unit select, and every pace read /mi. The builder reads
+   the profile's unit system once per render and defaults from it. */
+let preferMetric = false;
 const distanceUnitFor = (type: string) => {
   const value = type.trim().toLowerCase();
   if (/row|ski|erg/.test(value)) return 'meters';
-  if (/swim/.test(value)) return 'yards';
-  return 'miles';
+  if (/swim/.test(value)) return preferMetric ? 'meters' : 'yards';
+  return preferMetric ? 'km' : 'miles';
+};
+const paceText = (miles: number, minutes: number) => {
+  if (!(miles > 0 && minutes > 0)) return '';
+  return preferMetric ? `${minutesToClock(minutes / (miles * 1.609344))}\u00a0/km` : `${minutesToClock(minutes / miles)}\u00a0/mi`;
 };
 const unitFor = (type: string) => {
   const value = type.trim().toLowerCase();
@@ -76,7 +85,7 @@ const minutesToClock = (minutes: number) => {
 const linePace = (line: CardioLine) => {
   const miles = toMiles(Number(line.distance) || 0, line.unit);
   const minutes = clockToMinutes(line.time);
-  return miles > 0 && minutes > 0 ? `${minutesToClock(minutes / miles)}\u00a0/mi` : '';
+  return paceText(miles, minutes);
 };
 
 const blankLine = (id: number, type = 'Run'): CardioLine => ({ id, cardioType: type, unit: unitFor(type), distance: '', time: '' });
@@ -105,7 +114,7 @@ const summarize = (lines: CardioLine[]) => {
   const types = Array.from(new Set(filled.map(line => line.cardioType.trim()).filter(Boolean)));
   const distanceText = [...distances].map(([unit, distance]) => `${Number(distance.toFixed(2))}\u00a0${Math.abs(distance) === 1 ? unit.replace(/s$/, '') : unit}`).join(' + ');
   const totalMiles = filled.reduce((total, line) => total + toMiles(Number(line.distance) || 0, line.unit), 0);
-  const pace = totalMiles > 0 && minutes > 0 ? `${minutesToClock(minutes / totalMiles)}\u00a0/mi` : '';
+  const pace = paceText(totalMiles, minutes);
   const count = filled.length > 1 ? `${filled.length} lines` : '';
   return [types.join(' + '), distanceText, minutes ? minutesToClock(minutes) : '', pace, count].filter(Boolean).join(' · ');
 };
@@ -117,6 +126,8 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
   initialEntries?: CardioLogDraft[];
   plannedSummary?: string;
 } = {}) {
+  const { setup: athleteSetup } = useProfileSetup();
+  preferMetric = athleteSetup?.units === 'Metric';
   const { exercises, workouts } = useTrainingLibrary();
   const [savedEntries, setSavedEntries] = useState<CardioLogDraft[]>(initialEntries);
   /* Circuits and saved cardio workouts log in one tap: the library template

@@ -133,7 +133,10 @@ check('and asks for none of it again', reopenedForms === 0, `${reopenedForms} fi
    was the one who could not reach it. */
 await p.goto('http://localhost:4191/#/workout?source=blank', { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(2600);
-check('an empty day has no set stack yet', !(await has('.top-set-card-stack')));
+/* The day already has sets saved above, and a fresh sheet on the SAME day
+   shows them as logged lines — that is the whole point of the log knowing
+   what today holds. */
+check('a fresh sheet on a logged day shows its saved lines', await p.evaluate(() => document.querySelectorAll('.top-set-entry.closed').length > 0));
 check('and still offers the sheet', await clickText('Add a top set'));
 await p.waitForTimeout(600);
 check('which opens the same takeover', await has('.top-set-sheet-backdrop') && await has('.top-set-sheet-search input'));

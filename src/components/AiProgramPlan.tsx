@@ -198,7 +198,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     splitDays.filter(day => ['strength', 'mixed'].includes(day.dayType.toLowerCase())).forEach(day => {
       const exercises = day.exercises || [];
       items.push(exercises.length
-        ? { key: day.name, label: `Log one honest top set from ${day.name} — ${exercises[0]} works`, done: exercises.some(name => bests.has(name)) }
+        ? { key: day.name, label: `Log one honest top set from ${day.name} — ${exercises[0]} works`, done: exercises.some(name => bests.has(canonicalLiftKey(name))) }
         : { key: `${day.name}-exercises`, label: `Choose the exercises for ${day.name} — Forge cannot program a day with none`, done: false });
     });
     if (goals.some(goal => goal.type === 'Endurance')) {
@@ -220,8 +220,13 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const fingerprint = useMemo(() => planFingerprint({
     goals: goals.map(goal => ({ type: goal.type, exercise: goal.exercise, target: goal.target, date: goal.date })),
     split: splitDays.map(day => ({ name: day.name, type: day.dayType, muscles: day.muscles || [], exercises: day.exercises || [] })),
-    runningDays: profile.runningDays, mileage: [minWeeklyMileage, maxWeeklyMileage],
-  }), [goals, splitDays, profile.runningDays, minWeeklyMileage, maxWeeklyMileage]);
+    /* The mileage bounds are NOT part of the fingerprint. Unedited, they
+       default from the trailing week's miles and moved with every run
+       logged — and a moved fingerprint means "rebuild", so an unsaved block
+       restarted at Week 1 on every visit. The bounds are applied live by the
+       resolver anyway; only goals and the split define a block. */
+    runningDays: profile.runningDays, mileage: [0, 0],
+  }), [goals, splitDays, profile.runningDays]);
 
   /* A rebuild carries the athlete's standing instruction. Passing it every
      time — including the silent rebuilds Forge starts on its own — is what
@@ -421,6 +426,15 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         <small>Forge only prescribes movements a split day names, so this lift is never waved and never tested on max week. Add it to the day you train it on and the next block picks it up.</small>
       </div>
       <a className="button" href="#/split">Add it to a day →</a>
+    </section>}
+    {/* AFTER THE LAST WEEK the tab used to freeze on "Week 10 of 10" with
+        every row marked Missed and no way forward. A finished block says so
+        and offers the next one. */}
+    {weeksRemaining(stored) <= 0 && <section className="card pv-state">
+      <span className="eyebrow">BLOCK COMPLETE</span>
+      <h3>Your {plan.weeks.length}-week block is done</h3>
+      <p>The next block starts from what you lifted and ran in this one. Build it when you are ready to keep going.</p>
+      {canGenerate && <button type="button" className="button" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Building…' : 'Build the next block'}</button>}
     </section>}
     <PlanProgress weekIndex={weekIndex} total={plan.weeks.length} waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence} />
     <PlanActions

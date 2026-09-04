@@ -29,7 +29,7 @@ const formatClock = (seconds: number, hoursFirst = false) => {
   }
   return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}`;
 };
-const formatDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const formatDate = (date: string) => { const value = new Date(`${date}T12:00:00`); return Number.isFinite(value.getTime()) ? value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'no date'; };
 const expectedRunMiles = (goal: CreatedGoal) => {
   if (goal.eventDistance) {
     const distance = Number(goal.eventDistance);
@@ -63,8 +63,9 @@ const buildStrengthForecast=(evidence:GoalEvidence[],currentEstimate:number,dead
   const confirmedDecline=lastThree.length===3&&lastThree.every((item,index)=>index===0||item.value<lastThree[index-1].value)&&lastThree.at(-1)!.value<Math.max(...recent.map(item=>item.value))*.95;
   const evidenceWeeklyRate=rawWeeklyRate<0&&!confirmedDecline?0:rawWeeklyRate;
   const cappedWeeklyRate=Math.max(-currentEstimate*.004,Math.min(currentEstimate*.006,evidenceWeeklyRate));
+  /* A goal without a date projects twelve weeks out instead of NaN. */
   const deadlineMs=new Date(`${deadline}T12:00:00`).getTime();
-  const weeksRemaining=Math.max(0,(deadlineMs-Date.now())/604800000);
+  const weeksRemaining=Number.isFinite(deadlineMs)?Math.max(0,(deadlineMs-Date.now())/604800000):12;
   const central=Math.max(0,currentEstimate+cappedWeeklyRate*weeksRemaining);
   const predicted=!confirmedDecline?Math.max(currentEstimate,central):central;
   const sampleConfidence:StrengthForecast['confidence']=recent.length>=6?'High':recent.length>=3?'Medium':'Low';

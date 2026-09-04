@@ -1,3 +1,4 @@
+import { isDemoMode } from '../lib/env';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../components/AppShell';
@@ -93,7 +94,13 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
        2021 — while the answer sat in the database. Recent days stay in full
        detail; everything else arrives as per-year totals and lifetime bests,
        labelled as aggregates so no session gets invented. */
-    careerSummary:career,deterministicRecommendation:recommendation||target,trainingSummary:intelligence,evidenceRules:{savedRecommendationIsAuthoritative:true,strengthUsesBestRecentComparableSet:true,strengthUsesEpley:true,goalPrioritizesWorkButCannotForceLoad:true,missingWearableDataMustBeIgnored:true,aiCannotRewriteFacts:true,coachMayOnlyUseAvailableLibrary:true,goalIsNotAPrescription:true}}},fallback);setConversation(turns=>[...turns,{role:'forge',text:response.answer}]);setAnswerSource(response.source);setLimitNotice(response.source==='limit'?{text:response.answer,upgrade:Boolean(response.upgrade)}:null);setCoachLoading(false)};
+    careerSummary:career,deterministicRecommendation:recommendation||target,trainingSummary:intelligence,evidenceRules:{savedRecommendationIsAuthoritative:true,strengthUsesBestRecentComparableSet:true,strengthUsesEpley:true,goalPrioritizesWorkButCannotForceLoad:true,missingWearableDataMustBeIgnored:true,aiCannotRewriteFacts:true,coachMayOnlyUseAvailableLibrary:true,goalIsNotAPrescription:true}}},fallback);
+    /* WHEN THE COACH DID NOT ANSWER, SAY SO. A failed call used to drop the
+       canned local fallback into the conversation as if Forge had spoken —
+       the product's crux, silently replaced by boilerplate. The fallback
+       still shows (it is honest, general guidance), under a line that says
+       the coach could not be reached. */
+    setConversation(turns=>[...turns,{role:'forge',text:response.source==='local'&&!isDemoMode?`I couldn’t reach the coach just now (${response.error||'no response'}). Here is the general guidance from your saved plan meanwhile:\n\n${response.answer}`:response.answer}]);setAnswerSource(response.source);setLimitNotice(response.source==='limit'?{text:response.answer,upgrade:Boolean(response.upgrade)}:null);setCoachLoading(false)};
   const requestLooksLikeChange=(value:string)=>/\b(change|adjust|update|rewrite|replace|increase|decrease|reduce|raise|lower|add|create|make|remove|delete)\b/i.test(value);
   const detectHealthMention=(value:string):{kind:AthleteNote['kind'];note:string}|null=>{
     if(/\b(hurt|hurts|pain|painful|sore|tweak|tweaked|injur\w*|strain\w*|sprain\w*|tight|pulled|aching|sharp)\b/i.test(value))return{kind:'injury',note:value};

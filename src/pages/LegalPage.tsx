@@ -56,7 +56,7 @@ function Privacy() {
     <p>Your training data is kept for as long as your account exists, because a training log with a retention limit is not a training log. Forge AI request counts are kept for the current and previous month for fair-use accounting. Deleted accounts are removed immediately, as described next.</p>
 
     <h2>Deleting your account</h2>
-    <p>Open <strong>Profile → Plan → Delete my account</strong> inside the app. This permanently removes your profile, every workout, top set, cardio session, goal, note and connection, along with any stored Strava tokens. It is immediate and it cannot be undone. Forge keeps no shadow copy.</p>
+    <p>Open <strong>Settings → Plan and billing → Delete my account</strong> inside the app. This permanently removes your profile, every workout, top set, cardio session, goal, note and connection, along with any stored Strava tokens. It is immediate and it cannot be undone. Forge keeps no shadow copy.</p>
     <p>Deleting your Forge account does not cancel an App Store subscription. Cancel that in your Apple ID subscription settings first, or Apple will keep billing you.</p>
     <p>You can withdraw consent for Strava at any time without deleting anything else, using <strong>Disconnect</strong> on the Connections tab.</p>
 
@@ -90,7 +90,7 @@ function Terms() {
     <p>Keep your sign-in secure; you are responsible for activity on your account. Do not use Forge to break the law, to attack the service, or to attempt to reach another athlete's data.</p>
 
     <h2>Forge AI fair use</h2>
-    <p>Coaching answers and program generation cost real money per request, so both are subject to daily and monthly limits that depend on your plan. Current limits are always visible on <strong>Profile → Plan</strong>. Automated or scripted use of these endpoints is not permitted and may end your access.</p>
+    <p>Coaching answers and program generation cost real money per request, so both are subject to daily and monthly limits that depend on your plan. Current limits are always visible on <strong>Settings → Plan and billing</strong>. Automated or scripted use of these endpoints is not permitted and may end your access.</p>
 
     <h2>Subscriptions</h2>
     <p>Forge Pro is billed monthly or annually and renews automatically until cancelled. On the web, billing is handled by Stripe and you can cancel from the billing portal. In the iOS app, billing is handled by Apple: manage or cancel it in your Apple ID subscription settings at least 24 hours before the period ends, since deleting the app does not cancel a subscription. Refunds for App Store purchases are handled by Apple under their policy.</p>
@@ -103,7 +103,7 @@ function Terms() {
     <p>Forge is provided without warranty of any kind. It may be unavailable, and features may change. To the fullest extent the law allows, liability is limited to the amount you paid in the twelve months before the claim. Nothing here limits liability that cannot lawfully be limited.</p>
 
     <h2>Ending it</h2>
-    <p>You can delete your account at any time from <strong>Profile → Plan</strong>. Access may be ended for a serious or repeated breach of these terms.</p>
+    <p>You can delete your account at any time from <strong>Settings → Plan and billing</strong>. Access may be ended for a serious or repeated breach of these terms.</p>
 
     <h2>Contact</h2>
     <p>{CONTACT}</p>

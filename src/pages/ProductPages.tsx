@@ -12,7 +12,7 @@ import { exerciseCategory, useTrainingLibrary } from '../features/training/Train
 import { TopSetCards } from '../components/TopSetCards';
 import { TopSetSheet, type TopSetDraft } from '../components/TopSetSheet';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
-import { sameLift, primaryMusclesFor } from '../lib/liftAliases';
+import { sameLift, primaryMusclesFor, canonicalLiftKey } from '../lib/liftAliases';
 import { DialField } from '../components/NumberDial';
 
 function CompletedDayReview({record,unit,records,metric}:{record:WorkoutRecord;unit:string;records:WorkoutRecord[];metric:boolean}) {
@@ -124,7 +124,17 @@ function WorkoutEditor() {
   /* Editing shows ONLY what the record actually holds — a day logged without
      top sets must never be back-filled with today's recommendation or the
      split day's template sets. */
-  const initialTopSets:LoggedTopSet[]=editingRecord?.topSets?.length?editingRecord.topSets:(queryTopSets.length?queryTopSets.map(set=>({muscle:set.muscle||'Primary',lift:set.lift,weight:Number(set.weight)||0,reps:Number(set.reps)||0,completed:true})):(editingRecord?.lift&&editingRecord.weight&&editingRecord.reps?[{muscle:editingRecord.muscles[0]||'Primary',lift:editingRecord.lift,weight:editingRecord.weight,reps:editingRecord.reps,calculatedMax:editingRecord.calculatedMax,completed:true}]:editingRecord?[]:workoutSource==='plan'&&recommendationTopSets.length?recommendationTopSets:usingSplit?splitDayTopSets:[]));
+  const initialTopSets:LoggedTopSet[]=editingRecord?.topSets?.length?editingRecord.topSets:(queryTopSets.length?queryTopSets.map(set=>({muscle:set.muscle||'Primary',lift:set.lift,weight:Number(set.weight)||0,reps:Number(set.reps)||0,completed:true})):(editingRecord?.lift&&editingRecord.weight&&editingRecord.reps?[{muscle:editingRecord.muscles[0]||'Primary',lift:editingRecord.lift,weight:editingRecord.weight,reps:editingRecord.reps,calculatedMax:editingRecord.calculatedMax,completed:true}]:editingRecord||requestedDate?[]:(()=>{
+    /* WHAT IS ALREADY LOGGED TODAY SHOWS AS LOGGED. Coming back to the log
+       later in the day used to show only the prescription — three saved sets
+       invisible, every row "tap to log" — which read as "it didn't save" and
+       invited logging the same lift twice. Saved sets lead; the plan's rows
+       follow for lifts not yet done. */
+    const savedToday=(records.find(record=>record.date===sessionIso)?.topSets||[]).filter(set=>set.completed!==false);
+    const doneLifts=new Set(savedToday.map(set=>canonicalLiftKey(set.lift)));
+    const planned=(workoutSource==='plan'&&recommendationTopSets.length?recommendationTopSets:usingSplit?splitDayTopSets:[]).filter(set=>!doneLifts.has(canonicalLiftKey(set.lift)));
+    return [...savedToday,...planned];
+  })()));
   const [topSets,setTopSets]=useState<LoggedTopSet[]>(initialTopSets);
   /* One way to add a top set: the sheet. */
   const [addingTopSet,setAddingTopSet]=useState(false);
@@ -132,7 +142,15 @@ function WorkoutEditor() {
   const [saved,setSaved]=useState(false);
   const [quickLoggedKeys,setQuickLoggedKeys]=useState<string[]>([]);const [quickLogMessage,setQuickLogMessage]=useState('');
   const [saveMessage,setSaveMessage]=useState('');
-  const [bodyWeight,setBodyWeight]=useState(editingRecord?.bodyWeight?String(editingRecord.bodyWeight):(setup?.currentWeight||''));
+  /* The profile weight is a STARTING POINT for the dial, not a check-in. It
+     used to be saved on every Finish Day untouched, so an athlete who never
+     weighed in had a "check-in" on every training day and a flat body-weight
+     trend made of one number. Only a weight the athlete set (or an edited
+     record's own) is written; a dial confirmed at 0 is not a weight either. */
+  const [bodyWeight,setBodyWeightState]=useState(editingRecord?.bodyWeight?String(editingRecord.bodyWeight):(setup?.currentWeight||''));
+  const bodyWeightTouched=useRef(Boolean(editingRecord?.bodyWeight));
+  const setBodyWeight=(value:string)=>{bodyWeightTouched.current=true;setBodyWeightState(value)};
+  const bodyWeightToSave=bodyWeightTouched.current&&Number(bodyWeight)>0?Number(bodyWeight):undefined;
   const [effort,setEffort]=useState(editingRecord?.effort||'');
   const [notes,setNotes]=useState(editingRecord?.notes||'');
   const liftMuscles:Record<string,string[]>={'Squat':['Quads','Hamstrings','Glutes'],'Hack Squat':['Quads','Glutes'],'Bench Press':['Chest'],'Smith Machine Shoulder Press':['Shoulders'],'Pull Ups':['Back'],'Lat Pulldown':['Back']};
@@ -152,12 +170,21 @@ function WorkoutEditor() {
   const otherStrengthExercises=strengthCatalogue.filter(exercise=>!dayExerciseNames.has(exercise.name));
   const cardioOnlyDay=usingSplit&&!editingRecord&&recommendation?.splitDay.type==='cardio';
   const topSetKey=(set:LoggedTopSet)=>set.id||`${set.muscle}::${set.lift}::${set.weight}::${set.reps}`;
+  const savedTopSetKeys=(records.find(record=>record.date===sessionIso)?.topSets||[]).filter(set=>set.completed!==false).map(topSetKey);
   /* WHAT IS SAVED IS WHAT THE RECORD SAYS IS SAVED. quickLoggedKeys only ever
      knew about sets saved in THIS visit, so reopening a finished day showed
      every completed set as a blank form waiting to be filled in — the work was
      done, the app was still asking for it. The saved day is the authority;
      this visit's keys are added because a set saved a moment ago may not have
-     come back with the same id. */const completedTopSets=topSets.filter(set=>set.lift&&set.weight>0&&set.reps>0&&!quickLoggedKeys.includes(topSetKey(set))).map(set=>({...set,completed:true,calculatedMax:calculateEstimatedOneRepMax(set.weight,set.reps)??undefined}));
+     come back with the same id. */const completedTopSets=topSets.filter(set=>set.lift&&set.weight>0&&set.reps>0&&!quickLoggedKeys.includes(topSetKey(set))
+    /* A PRESCRIPTION IS NOT A RESULT. On a fresh day the rows are the plan's
+       sets — weight and reps pre-filled, "tap to log" — and Finish Day used to
+       save every one of them as performed: an untouched day wrote a 300×8
+       bench the athlete never touched, a PR they never lifted, and the wave
+       built the next block on it. Outside edit mode a set reaches the record
+       only by being logged through the sheet — and the ones already saved
+       are on the day already, so Finish Day carries none. */
+    &&Boolean(editingRecord)).map(set=>({...set,completed:true,calculatedMax:calculateEstimatedOneRepMax(set.weight,set.reps)??undefined}));
   const updateTopSet=(index:number,patch:Partial<LoggedTopSet>)=>setTopSets(current=>current.map((set,setIndex)=>setIndex===index?{...set,...patch}:set));
   /* A TOP SET NEEDS A DAY TO BELONG TO. Which split day a lift "belongs" to is
      not something Forge can infer — a squat on a chest day is either a leg day
@@ -168,7 +195,6 @@ function WorkoutEditor() {
      set has nothing to attach to and saving is refused with the reason. */
   const dayLabel=usingSplit?(plannedDay?.name||''):freeMuscles.filter(muscle=>muscle!=='Cardio').join(' + ');
   const noDayReason=dayLabel?'':(usingSplit?'Choose which day of your split this is, at the top.':'Pick the muscle groups you trained, at the top — they name this workout.');
-  const savedTopSetKeys=(records.find(record=>record.date===sessionIso)?.topSets||[]).filter(set=>set.completed!==false).map(topSetKey);
   const loggedTopSetKeys=Array.from(new Set([...savedTopSetKeys,...quickLoggedKeys]));
   const addBlankTopSet=()=>setTopSets(current=>[...current,{id:`top-set-${Date.now()}`,muscle:'',lift:'',weight:0,reps:0,completed:true}]);const removeTopSet=(index:number)=>setTopSets(current=>current.filter((_,setIndex)=>setIndex!==index));
   const createExerciseForTopSet=(name:string,mappedMuscles:string[])=>{const created=addExercise({name,kind:'Strength',muscles:mappedMuscles,detail:'Added while logging · Weight + reps',enabled:true,custom:true});setTopSets(current=>{const blankIndex=current.findIndex(set=>!set.lift);if(blankIndex>=0)return current.map((set,index)=>index===blankIndex?{...set,lift:created.name,muscle:created.muscles.find(muscle=>sourceMuscles.includes(muscle))||created.muscles[0]||'Primary',weight:0,reps:0}:set);return[...current,{id:`top-set-${Date.now()}`,muscle:created.muscles.find(muscle=>sourceMuscles.includes(muscle))||created.muscles[0]||'Primary',lift:created.name,weight:0,reps:0,completed:true}]});setQuickLogMessage(`${created.name} was added to your exercise library.`)};
@@ -193,6 +219,12 @@ function WorkoutEditor() {
   const activeSplitId=recommendation?.splitDay.splitId;
   const recommendationMetadata=editingRecord
     ?(dayOverride?{splitId:editingRecord.splitId||activeSplitId,splitPosition:selectedPlanDay+1}:{recommendationId:editingRecord.recommendationId,splitId:editingRecord.splitId,splitDayId:editingRecord.splitDayId,splitPosition:editingRecord.splitPosition})
+    /* A PAST DATE IS NOT TODAY'S RECOMMENDATION. Adding yesterday's session
+       from the calendar used to stamp today's recommendation id onto it, so
+       the server marked today complete and advanced the cycle for a day that
+       was already behind you. A back-filled day carries the split day the
+       athlete chose, and nothing else. */
+    :requestedDate?(dayOverride?{splitId:activeSplitId,splitPosition:selectedPlanDay+1}:{})
     :usingSplit?(dayOverride?{splitId:activeSplitId,splitPosition:selectedPlanDay+1}:recommendation?{recommendationId:recommendation.id,splitId:recommendation.splitDay.splitId,splitDayId:recommendation.splitDay.id,splitPosition:recommendation.splitDay.position}:{}):{};
   /* Logging cardio writes it to the day immediately, exactly like saving a top
      set. It used to live only in component state until "Finish Day" — so a
@@ -281,7 +313,11 @@ function WorkoutEditor() {
     // note, an effort rating or an already quick-logged set are all real records.
     // This guard used to demand a set/lift/cardio while the message promised
     // otherwise, and it was stricter than the one that opens the review.
-    const planDayActive=(usingSplit||dayOverride)&&(plannedDay?.muscles||[]).some(muscle=>muscle!=='Cardio');if(!editingRecord&&!completedTopSets.length&&!hasCardio&&!quickLoggedKeys.length&&!bodyWeight&&!notes.trim()&&!effort&&!planDayActive){setSaveMessage('Add a top set or cardio entry before saving.');return}
+    /* A day with nothing on it is not a training day. `planDayActive` used to
+       pass this guard on any split day with muscles, so Finish Day with zero
+       sets wrote a strength session, lit the split day as done and advanced the
+       cycle — for a workout that never happened. */
+    if(!editingRecord&&!completedTopSets.length&&!savedTopSetKeys.length&&!hasCardio&&!quickLoggedKeys.length&&!bodyWeightToSave&&!notes.trim()&&!effort){setSaveMessage('Log a top set or a cardio session first — Finish Day saves what you did.');return}
     /* Once the day exists its title stands. Logging cardio creates the day up
        front, which advances the split cursor — recomputing the title here
        would then stamp the NEXT split day's name onto the session that was
@@ -291,7 +327,11 @@ function WorkoutEditor() {
     /* The sheet is the only way a set is entered, and it saves as completed —
        so the day's sets ARE the completed ones. There is no half-typed manual
        lift left on the screen to rescue at save time any more. */
-    const savedTopSets=completedTopSets;const firstSet=savedTopSets[0];
+    /* EDITING REPLACES THE DAY WHOLESALE, so a set saved through the sheet
+       during this visit — on the live record but excluded from the editor's
+       rows on purpose — has to ride along, or Finish Day deletes it. */
+    const quickLoggedLive=editingRecord?(editingRecord.topSets||[]).filter(set=>quickLoggedKeys.includes(topSetKey(set))):[];
+    const savedTopSets=[...completedTopSets,...quickLoggedLive];const firstSet=savedTopSets[0];
     /* MUSCLES WORKED HAVE ONE SOURCE OF TRUTH. Training the split: the split
        day's muscle list, exactly. Custom work: the primary movers of the
        exercises actually logged — pull ups log Back, bench logs Chest. No
@@ -301,7 +341,7 @@ function WorkoutEditor() {
       ?(dayOverride?savedDays[selectedPlanDay]?.muscles:editingRecord.splitPosition?savedDays[editingRecord.splitPosition-1]?.muscles:undefined)
       :((usingSplit||dayOverride)?plannedDay?.muscles:undefined))?.filter(muscle=>muscle!=='Cardio');
     const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:exerciseDriven.length?exerciseDriven:(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
-    const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeight?Number(bodyWeight):undefined,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id))};
+    const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id))};
     /* A second session added to an already-saved day keeps THAT DAY's identity.
        Without this, the split cursor has advanced by the time the athlete comes
        back, and the add stamps the NEXT day's muscles and slot onto a finished
@@ -345,7 +385,7 @@ function WorkoutEditor() {
     if(!result.ok){setSaveMessage(editingRecord?'This workout could not be found. Return to History and try again.':'This exact workout is already in your history. Nothing was saved twice.');return}
     // Only real training closes out the day's recommendation. A body-weight
     // check-in or a note must not consume the workout you still owe.
-    if(!editingRecord&&workoutSource==='plan'&&!contentMismatch&&(savedTopSets.length>0||hasCardio||planDayActive))markCompleted();setSaved(true);navigate(editingRecord?'/history':'/');
+    if(!editingRecord&&!requestedDate&&workoutSource==='plan'&&!contentMismatch&&(savedTopSets.length>0||savedTopSetKeys.length>0||hasCardio||quickLoggedKeys.length>0))markCompleted();setSaved(true);navigate(editingRecord?'/history':'/');
   };
   const removeWorkout=async()=>{if(!editingRecord||!window.confirm(`Delete the workout record for ${todayShort}? This permanently removes it from History and Insights.`))return;setSaveMessage('');const removed=await deleteRecord(editingRecord.id);if(removed)navigate('/history');else setSaveMessage('The workout could not be deleted. Check the sync message and try again.')};
   if(editId&&!editingRecord)return <div className="narrow stack-xl"><PageIntro eyebrow="WORKOUT HISTORY" title="Workout not found" copy="This workout may have been removed from this device."/><section className="card"><Link className="button" to="/history">Return to History</Link></section></div>;
@@ -359,7 +399,7 @@ function WorkoutEditor() {
       <small className="second-session-hint">Two-a-day? “Add a session” opens today’s log so an evening run or extra lift lands on the same training day.</small>
     </section>
   </div>;
-  return <div className="narrow stack-xl workout-editor"><PageIntro copy={editingRecord?'Update the saved results for this day. History and insights will refresh automatically.':requestedDate?'Log anything you completed on this date. It will be saved as one editable training day.':'Start with the plan, repeat a previous session, or record only what you performed.'} />
+  return <div className="narrow stack-xl workout-editor"><PageIntro copy={editingRecord?'Update the saved results for this day. History and insights will refresh automatically.':requestedDate?'Log anything you completed on this date. It will be saved as one editable training day.':'Start from today’s plan, pick a day from your split, or record only what you did.'} />
     {editingRecord&&<section className="coach-loaded"><div><span>EDITING COMPLETED SESSION</span><strong>{editingRecord.title}</strong><small>Saving replaces this session on {todayShort}; it will not create a duplicate.</small></div><div className="button-row"><Link to="/history">Cancel</Link><button type="button" className="text-button danger" onClick={removeWorkout}>Delete workout</button></div></section>}
     {editingRecord&&savedDays.length>0&&<section className="card form-card edit-split-assign"><label className="plan-day-picker">Split day for this workout<select value={dayOverride?String(selectedPlanDay):(editingRecord.splitPosition?String(editingRecord.splitPosition-1):'')} onChange={event=>{if(event.target.value===''){setDayOverride(false);return}const index=Number(event.target.value);setSelectedPlanDay(index);setDayOverride(true)}}><option value="">Not assigned</option>{savedDays.map((day,index)=><option key={`${day.name}-${index}`} value={index}>{day.name}{editingRecord.splitPosition===index+1?' · currently assigned':''}</option>)}</select></label><small>Assigning a split day counts this session toward it and the cycle continues from there.</small></section>}
     {searchParams.get('source')==='recommendation'&&recommendation&&<section className="coach-loaded"><div><span>SAVED DAILY RECOMMENDATION</span><strong>{recommendation.splitDay.name} · {topSets.length} selected top {topSets.length===1?'set':'sets'}</strong><small>Today, Log, and Coach are using recommendation {recommendation.id?.slice(0,8)||recommendation.date}. Record actual results; only completed items advance progression.</small></div><button className="text-button" onClick={()=>openCoachBubble('Why is this my saved workout today?')}>Why this workout?</button></section>}

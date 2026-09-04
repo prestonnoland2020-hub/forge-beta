@@ -1,7 +1,11 @@
 export function calculateEstimatedOneRepMax(weight: number, reps: number) {
   if (!Number.isFinite(weight) || !Number.isFinite(reps) || weight <= 0 || reps <= 0) return null;
   if (reps === 1) return Math.round(weight);
-  return Math.round(weight * (1 + reps / 30));
+  /* Epley is honest to about a dozen reps and fiction past that: 135 × 50
+     "estimated" 360 and out-ranked a real 315 single as the athlete's best,
+     then became the base the whole wave was written from. A high-rep set
+     counts as the strongest thing it can prove — a twelve-rep set. */
+  return Math.round(weight * (1 + Math.min(reps, 12) / 30));
 }
 
 /* Chart axes were labelled straight off the data range, which produced ticks

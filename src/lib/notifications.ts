@@ -26,7 +26,7 @@ const markSent = (tag: string) => {
 
 const show = (tag: string, title: string, body: string) => {
   if (!notificationsSupported() || Notification.permission !== 'granted' || alreadySent(tag)) return;
-  try { new Notification(title, { body, tag: `forge-${tag}`, icon: '/forge-icon-192.png' }); markSent(tag); } catch { /* some platforms need a service worker; the in-app card still shows */ }
+  try { new Notification(title, { body, tag: `forge-${tag}`, icon: './forge-icon-192.png' }); markSent(tag); } catch { /* some platforms need a service worker; the in-app card still shows */ }
 };
 
 /* Morning brief: once per day, in the morning, when the day isn't logged yet. */
