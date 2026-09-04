@@ -4,6 +4,7 @@ import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvi
 import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { PlanRebuildModal } from './PlanRebuildModal';
+import { PlanProgress, PlanActions, TodayCard, WeekList, BlockList, waveSentence, type PlanSession, type PlanBlockWeek } from './PlanView';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -16,13 +17,15 @@ import { runShapedActivity } from '../features/training/stravaImportService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, wavePrescription, waveSlot, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
-  bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
+  weeksRemaining, currentWeekIndex, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
+  bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
-type Session = { date: Date; kind: string; title: string; detail: string; stress: 'High' | 'Moderate' | 'Low' | 'Rest' };
-const dateText = (date: Date) => date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+/* The prose `detail` stays for the coach and the roadmap; `lifts` and `run`
+   are the same facts as data, so the screen can draw a lift on one line and a
+   run on the next instead of one long sentence with middots in it. */
+export type Session = { date: Date; kind: string; title: string; detail: string; stress: 'High' | 'Moderate' | 'Low' | 'Rest'; lifts: AiPlanTopSet[]; run?: { kind: 'Long run' | 'Hard run' | 'Easy run'; text: string } };
 
 /* Lower-body is a property of the MUSCLES a day trains (or a squat-pattern
    top set), never of the day's name — users name days anything. */
@@ -91,9 +94,9 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     const topSet = demoted && rawTopSet?.hold ? { ...rawTopSet, ...rawTopSet.hold } : rawTopSet;
     const extraSets = (rawTopSets || []).slice(1);
     const type = day.dayType.toLowerCase();
-    let runText = ''; let runKind = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
+    let runText = ''; let runKind: '' | 'Long run' | 'Hard run' | 'Easy run' = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
     if (index === longIndex) { runKind = 'Long run'; runText = `${week.longRunMiles} ${distanceUnit} @ ${week.longRunPace}`; runStress = 'Moderate'; }
-    else if (index === qualityIndex) { runKind = 'Quality'; runText = `${week.quality}${week.qualityPace ? ` @ ${week.qualityPace}` : ''}`; runStress = 'High'; }
+    else if (index === qualityIndex) { runKind = 'Hard run'; runText = `${week.quality}${week.qualityPace ? ` @ ${week.qualityPace}` : ''}`; runStress = 'High'; }
     else if (easySet.has(index)) {
       runKind = 'Easy run';
       /* Each easy day carries its own distance — the same number the week's
@@ -107,11 +110,13 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     const strengthText = topSet
       ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${[setText(topSet), ...extraSets.map(setText)].join(' · ')}`
       : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
-    if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const };
-    if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const };
-    if (strengthText) return { date, kind: type === 'mixed' ? 'Mixed' : 'Strength', title: day.name, detail: strengthText, stress: 'Moderate' as const };
-    if (runText) return { date, kind: runKind, title: day.name, detail: runText, stress: runStress || 'Low' };
-    return { date, kind: 'Flexible', title: day.name, detail: 'Nothing required today — the week’s running is already covered.', stress: 'Low' as const };
+    const lifts = topSet ? [topSet, ...extraSets] : [];
+    const run = runKind && runText ? { kind: runKind, text: runText } : undefined;
+    if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const, lifts, run };
+    if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const, lifts, run };
+    if (strengthText) return { date, kind: type === 'mixed' ? 'Mixed' : 'Strength', title: day.name, detail: strengthText, stress: 'Moderate' as const, lifts, run };
+    if (runText) return { date, kind: runKind, title: day.name, detail: runText, stress: runStress || 'Low', lifts, run };
+    return { date, kind: 'Flexible', title: day.name, detail: 'Nothing required today — the week’s running is already covered.', stress: 'Low' as const, lifts, run };
   });
 }
 
@@ -127,7 +132,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [refreshAsk, setRefreshAsk] = useState(false);
-  const [openWeek, setOpenWeek] = useState<number | null>(null);
   const autoAttempted = useRef(false);
   /* Generation UX: ~44s of API time gets staged narration instead of a dead
      spinner, and a generation orphaned by backgrounding the phone retries
@@ -319,28 +323,31 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
 
   /* A stored block renders even offline/demo; only GENERATION needs a user. */
   const canGenerate = !isDemoMode && Boolean(user);
-  if (storeLoading) return <section className="card plan-generating"><span className="eyebrow">AI PROGRAM</span><h3>Loading your program…</h3></section>;
+  if (storeLoading) return <div className="pv"><section className="card pv-state"><span className="eyebrow">YOUR PLAN</span><h3>Loading your plan…</h3></section></div>;
   if (!stored && !canGenerate) return <LongRangeTrainingPlan goals={goals} profile={profile} splitDays={splitDays} rhythm={rhythm} />;
-  if (!stored && !baselineReady) return <div className="simple-program">
-    <section className="card baseline-kickoff">
-      <span className="eyebrow">BEFORE YOUR PROGRAM</span>
+  /* Before the block exists the tab is still useful: it says the one thing
+     that is missing, in the athlete's terms, and shows the pre-program plan
+     below it so there is always a week to train from. */
+  if (!stored && !baselineReady) return <div className="pv">
+    <section className="card pv-state">
+      <span className="eyebrow">BEFORE YOUR PLAN</span>
       <h3>Forge builds from what you log</h3>
-      <p>Your program prescribes every top set and run from your own numbers. It needs a baseline first — {baseline.filter(item => item.done).length} of {baseline.length} done, and the moment the last one lands your 8-week block builds itself.</p>
-      <div className="baseline-items">{baseline.map(item => <div key={item.key} className={item.done ? 'done' : ''}><b>{item.done ? '✓' : '○'}</b><span>{item.label}</span></div>)}</div>
+      <p>Every set and run in your plan comes from your own numbers, so it needs a few first. {baseline.filter(item => item.done).length} of {baseline.length} done — when the last one lands, the block builds itself.</p>
+      <div className="pv-checklist">{baseline.map(item => <div key={item.key} className={item.done ? 'done' : ''}><b>{item.done ? '✓' : '○'}</b><span>{item.label}</span></div>)}</div>
       <a className="button" href="#/workout">Log today’s session →</a>
-    </section>
-  </div>;
-  if (!stored) return <div className="simple-program">
-    <section className={`card plan-generating${generating ? ' busy' : ''}`}>
-      <span className="eyebrow">AI PROGRAM</span>
-      <h3>{generating ? 'Building your program…' : 'Your program isn’t built yet'}</h3>
-      <p>{generating ? generatingStage : error || 'Forge builds a 10-week block — two full 8/6/4/2/1 waves — from your goals, split, and logged training.'}</p>
-      {generating && <small className="plan-generating-eta">Takes about a minute — it’s reading everything you’ve logged.</small>}
-      {!generating && <button type="button" className="button" onClick={() => void regenerate()}>Generate program</button>}
     </section>
     <LongRangeTrainingPlan goals={goals} profile={profile} splitDays={splitDays} rhythm={rhythm} />
   </div>;
-
+  if (!stored) return <div className="pv">
+    <section className={`card pv-state${generating ? ' busy' : ''}`}>
+      <span className="eyebrow">YOUR PLAN</span>
+      <h3>{generating ? 'Building your plan…' : 'Your plan isn’t built yet'}</h3>
+      <p>{generating ? generatingStage : error || 'A 10-week block — two full 8 / 6 / 4 / 2 / max waves — built from your goals, your split, and what you have logged.'}</p>
+      {generating && <small className="pv-eta">About a minute — it’s reading everything you’ve logged.</small>}
+      {!generating && <button type="button" className="button" onClick={() => void regenerate()}>Build my plan</button>}
+    </section>
+    <LongRangeTrainingPlan goals={goals} profile={profile} splitDays={splitDays} rhythm={rhythm} />
+  </div>;
   const { plan: storedPlanData } = stored;
   /* LIVE prescriptions: every displayed top set is recomputed from the
      athlete's CURRENT logged best through the 8/6/4/2 wave. Beat a set and
@@ -366,18 +373,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const weekIndex = currentWeekIndex(stored);
   const week = plan.weeks[weekIndex];
   const sessions = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi');
-  /* EVERY goal lift is live in the block — each one owns its day and each one
-     is tested on max week — so the block's framing names them all. Picking
-     goals[0] made the header read "LIFT FOCUS · Pull Ups" purely because that
-     goal was created first, hiding Squat and Bench from a plan that trains
-     them just as hard. */
-  const foldedLookup = <T,>(table: Map<string, T>, name: string): T | undefined =>
-    table.get(name) ?? [...table.entries()].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(name))?.[1];
-  const goalLiftEntries = goals
-    .filter(goal => goal.type === 'Strength' && goal.exercise)
-    .map(goal => ({ name: String(goal.exercise), best: foldedLookup(bests, String(goal.exercise)) }))
-    .filter((entry, index, all) => all.findIndex(other => canonicalLiftKey(other.name) === canonicalLiftKey(entry.name)) === index);
-  const generatedLabel = new Date(stored.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
      of them, not whichever goal happened to be created first — falling back to
      the heaviest set of the week when no goal lift is on the calendar. */
@@ -386,7 +381,39 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     return sets.find(set => testsOneRepMax(set.exercise, goalLifts)) || sets[0];
   };
 
-  return <div className="simple-program ai-program">
+  /* ── The screen ──────────────────────────────────────────────────────── */
+  const unit = metric ? 'kg' : 'lb';
+  const distanceUnit = metric ? 'km' : 'mi';
+  const todayIso = localDayIso();
+  const toPlanSession = (session: Session): PlanSession => ({
+    date: session.date,
+    title: session.title,
+    lifts: session.lifts,
+    run: session.run,
+    empty: session.stress === 'Rest' ? 'rest' : session.kind === 'Flexible' ? 'open' : undefined,
+  });
+  const weekSessions = sessions.map(toPlanSession);
+  const todaySession = weekSessions.find(session => localDayIso(session.date) === todayIso);
+  const loggedToday = records.find(record => record.date === todayIso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0));
+  const waveNow = waveIndexOf(stored, weekIndex);
+  /* One sentence that says what this week IS, in the athlete's words. */
+  const sentence = (() => {
+    const lift = waveSentence(waveNow);
+    const miles = week.mileage ? ` ${week.mileage} ${distanceUnit} of running.` : '';
+    return `${lift}${miles}`;
+  })();
+  const blockWeeks: PlanBlockWeek[] = plan.weeks.map((item, index) => {
+    const startDate = new Date(`${stored.startDate}T12:00:00`); startDate.setDate(startDate.getDate() + index * 7);
+    const lead = headline(item);
+    return {
+      index, startDate, waveIndex: waveIndexOf(stored, index), miles: item.mileage,
+      lead: lead ? { exercise: lead.exercise, weight: lead.weight, reps: lead.reps } : undefined,
+      sessions: () => aiWeekSessions(item, stored.startDate, index, splitDays, rhythm, anchor, distanceUnit).map(toPlanSession),
+    };
+  });
+  const workoutHref = recommendation ? `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}` : '/workout';
+
+  return <div className="pv">
     {untrainedGoalLifts.length > 0 && <section className="card untrained-goal-banner">
       <div>
         <span className="eyebrow">NOT IN YOUR SPLIT</span>
@@ -395,23 +422,12 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       </div>
       <a className="button" href="#/split">Add it to a day →</a>
     </section>}
-    <section className="simple-program-head"><div><span className="eyebrow">WEEK {week.week} OF {plan.weeks.length} · {waveIndexOf(stored, weekIndex) % 5 === 4 ? 'MAX WEEK' : week.phase.toUpperCase()}</span><h2>{waveIndexOf(stored, weekIndex) % 5 === 4 ? 'Max Week' : week.phase}</h2></div><div className="simple-week-metrics"><div><span>LIFT FOCUS</span><strong>{goalLiftEntries.length ? goalLiftEntries.map(entry => entry.name).join(' · ') : headline(week)?.exercise || 'Build baseline'}</strong></div><div><span>CARDIO FOCUS</span><strong>{week.mileage ? `${week.mileage} ${metric ? 'km' : 'mi'} this week` : 'Not scheduled'}</strong></div></div></section>
-    {/* The block's numbers are stated by the ledgers and the schedule below;
-        this card is the two actions and the stamp that says which block they
-        act on. The generated summary was an essay repeating what those cards
-        already show. */}
-    <section className="card ai-program-meta compact"><div><span className="eyebrow">AI PROGRAM · GENERATED {generatedLabel.toUpperCase()}</span>{generating ? <small className="ai-program-progress">{generatingStage}</small> : null}{stored.adjustments && !generating ? <small className="plan-adjustment"><b>You asked:</b> “{stored.adjustments}”{plan.adjustmentNote ? ` — ${plan.adjustmentNote}` : ''}</small> : null}</div><div className="plan-actions">
-      {/* Saving is a local pin — it needs no backend, so it is offered
-          wherever a block exists. Refreshing calls the plan service. */}
-      {stored.saved
-        ? <span className="plan-saved-badge" title={stored.savedAt ? `Saved ${new Date(stored.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : undefined}>✓ Plan saved</span>
-        : <button type="button" className="button" disabled={generating} onClick={() => void savePlan()}>Save plan</button>}
-      {/* The block already exists, so the honest verb is REGENERATE. "Generate
-          plan" read as though it might build the plan that was missing, when
-          what it does is throw this one away and build another. */}
-      {canGenerate ? <button type="button" className="button secondary" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Regenerating…' : 'Regenerate plan'}</button> : null}
-    </div>{error && !refreshAsk ? <small className="ai-program-error">{error} — showing the stored block.</small> : null}
-    </section>
+    <PlanProgress weekIndex={weekIndex} total={plan.weeks.length} waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence} />
+    <PlanActions
+      saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
+      onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}
+      request={stored.adjustments} requestNote={plan.adjustmentNote} generatedAt={stored.generatedAt}
+      error={error && !refreshAsk ? `${error} — showing the stored block.` : undefined} />
     {refreshAsk ? <PlanRebuildModal
       saved={Boolean(stored.saved)}
       standing={stored.adjustments}
@@ -421,42 +437,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       onCancel={() => { setRefreshAsk(false); setError(''); }}
       onRebuild={adjustments => void rebuild(adjustments)}
     /> : null}
-    <section className="card simple-week-schedule"><header><div><span className="eyebrow">YOUR SCHEDULE</span><h3>What to do this week</h3></div></header><div>{sessions.map(session => {
-      /* The week reflects what actually happened: a day with logged training
-         gets its tick and shows what was done; a past day with nothing is
-         marked missed rather than pretending it is still coming. Future days
-         stay prescriptive. */
-      /* BOTH SIDES OF THIS COMPARISON MUST BE THE SAME CALENDAR. session.date
-         is built at local noon, so toISOString() gave the LOCAL day, while
-         todayIso gave the UTC day — and after about 5 pm Pacific the UTC clock
-         has already rolled over, so `iso < todayIso` was true for today and
-         the athlete watched the session they were about to do get marked
-         "Missed" while the evening was still in front of them. East of
-         UTC+12 it failed the other way and completed days never got their
-         tick. */
-      const iso = localDayIso(session.date);
-      const todayIso = localDayIso();
-      const isToday = iso === todayIso;
-      const logged = records.find(record => record.date === iso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0 || record.muscles.some(muscle => muscle !== 'Cardio')));
-      const missed = !logged && iso < todayIso && session.stress !== 'Rest';
-      const doneDetail = logged ? [
-        ...(logged.topSets || []).filter(set => set.completed !== false).slice(0, 2).map(set => `${set.lift} ${set.weight}×${set.reps}`),
-        ...(logged.cardioSessions || []).slice(0, 1).map(cardioSession => cardioSession.summary || cardioSession.activity),
-      ].filter(Boolean).join(' · ') : '';
-      return <article className={`stress-${session.stress.toLowerCase()}${logged ? ' is-done' : ''}${missed ? ' is-missed' : ''}${isToday ? ' is-today' : ''}`} key={session.date.toISOString()}><time>{isToday ? <b className="session-today-tag">TODAY</b> : null}{dateText(session.date)}</time><div><span className="session-tags">{[...session.kind.split(' + '), session.stress].filter(Boolean).map((tag, index) => <i key={`${tag}-${index}`}>{tag}</i>)}</span><strong>{logged ? (logged.title || session.title) : session.title}</strong><small>{logged ? (doneDetail || 'Logged') : missed ? `Missed — ${session.detail}` : session.detail}</small></div><b className={logged ? 'session-done-tick' : ''}>{logged ? '✓' : missed ? '·' : session.stress === 'Rest' ? 'Rest' : '›'}</b></article>;
-    })}</div></section>
-    <section className="card roadmap-card"><header className="roadmap-head"><div><span className="eyebrow">THIS BLOCK</span><h3>Where the block takes you</h3></div></header>
-      <div className="roadmap-table" role="table"><div className="roadmap-row head" role="row"><span>Week</span><span>Miles</span><span>Long</span><span>Hard run</span><span>Top set · proj. max</span></div>
-        {plan.weeks.map((item, index) => { const lead = headline(item); const startLabel = (() => { const date = new Date(`${stored.startDate}T12:00:00`); date.setDate(date.getDate() + index * 7); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); })(); return <div key={item.week} className="roadmap-week-group">
-          <button type="button" className={`roadmap-row phase-${item.phase.toLowerCase()}${openWeek === item.week ? ' open' : ''}`} onClick={() => setOpenWeek(current => current === item.week ? null : item.week)} aria-expanded={openWeek === item.week}>
-            <span className="roadmap-week"><b>{item.week}</b><small>{startLabel}{waveIndexOf(stored, index) % 5 === 4 ? <i className="max-week-tag">MAX WEEK</i> : ` · ${item.phase}`}</small></span>
-            <span className="roadmap-miles">{item.mileage || '—'}</span>
-            <span className="roadmap-long">{item.longRunMiles ? `${item.longRunMiles} ${metric ? 'km' : 'mi'}` : '—'}</span>
-            <span className="roadmap-run">{item.quality}</span>
-            <span className="roadmap-set">{lead ? <><b>{calculateEstimatedOneRepMax(lead.weight, lead.reps)} max</b><small>{lead.exercise} {lead.weight}×{lead.reps}</small></> : '—'}</span>
-          </button>
-          {openWeek === item.week && <div className="roadmap-days">{aiWeekSessions(item, stored.startDate, index, splitDays, rhythm, anchor, metric ? 'km' : 'mi').map(session => <div className={`roadmap-day stress-${session.stress.toLowerCase()}`} key={session.date.toISOString()}><time>{session.date.toLocaleDateString('en-US', { weekday: 'short' })}</time><div><strong>{session.title}</strong><small>{session.detail}</small></div></div>)}</div>}
-        </div>; })}</div>
-      <small className="roadmap-note">Built from your goals, split, calculated maxes, and real paces. The next block generates itself from what you actually log.</small></section>
+    <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />
+    <WeekList sessions={weekSessions} unit={unit} records={records} />
+    <BlockList weeks={blockWeeks} currentIndex={weekIndex} unit={unit} distanceUnit={distanceUnit} records={records} />
+    {liveAdjusted ? <p className="pv-footnote">Loads on this screen follow your latest logged bests, so they can differ from the block as first written.</p> : null}
   </div>;
 }

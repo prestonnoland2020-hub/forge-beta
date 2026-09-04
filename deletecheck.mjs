@@ -91,7 +91,7 @@ for (const waveOffset of [0, 1, 3]) {
   const page = await open({ 'forge-ai-plan-v1': plan });
   await page.goto(`${BASE}/#/plan?t=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2600);
-  const todayRows = await page.locator('.simple-week-schedule article.is-today').count();
+  const todayRows = await page.locator('.pv-row.today').count();
   check(`offset ${waveOffset}: the week on screen contains today`, todayRows === 1, `${todayRows} rows marked today`);
   if (waveOffset === 1) await page.screenshot({ path: '/tmp/tour/plan-offset.png', fullPage: true });
   await page.close();

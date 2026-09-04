@@ -1,0 +1,139 @@
+/* THE PLAN TAB, SIMPLIFIED. See PlanView.tsx for the reasoning. Everything
+   here reads the token ladder — no literal colours — so it holds in every tone,
+   ground and accent, and the contrast audit can vouch for it.
+
+   Type does the hierarchy. There is one big number (the week), one large card
+   (today), and everything else is a quiet row. Chips are gone; the only
+   colour on the screen is the accent marking what is yours right now. */
+
+.pv{display:grid;gap:14px}
+
+/* ── Where am I ─────────────────────────────────────────────────────────── */
+.pv-progress{display:grid;gap:10px;padding:4px 2px 2px}
+.pv-progress-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.pv-progress-week{font:800 30px/1 var(--display);letter-spacing:-.01em;color:var(--ink)}
+.pv-progress-week small{font:700 14px var(--body);color:var(--ink-3);margin-left:4px;letter-spacing:0}
+.pv-progress-name{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text)}
+.pv-dots{display:flex;gap:6px;align-items:center}
+.pv-dots i{flex:1;height:6px;border-radius:999px;background:var(--surface-3);min-width:10px}
+.pv-dots i.done{background:color-mix(in srgb,var(--accent) 45%,var(--surface-3))}
+.pv-dots i.now{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.pv-dots i.max{border:1px solid var(--accent-dim)}
+.pv-dots i.max.now{border-color:transparent}
+.pv-dots i.light{opacity:.6}
+.pv-progress-sentence{margin:0;color:var(--ink-2);font-size:14px;line-height:1.45}
+
+/* ── Save / Regenerate ──────────────────────────────────────────────────── */
+.pv-actions{display:grid;gap:8px}
+.pv-actions-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pv-saved{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--good);padding:8px 12px;border:1px solid color-mix(in srgb,var(--good) 40%,var(--line));border-radius:999px}
+.pv-stamp{color:var(--ink-3);font-size:12px;margin-left:auto}
+.pv-request .text-button{font-size:13px;color:var(--ink-2)}
+.pv-request blockquote{margin:6px 0 0;padding:10px 14px;border-left:2px solid var(--line);color:var(--ink-2);font-size:13px;line-height:1.5}
+.pv-request blockquote span{display:block;margin-top:6px;color:var(--ink-3)}
+.pv-error{color:var(--bad);font-size:12px}
+
+/* ── Today ──────────────────────────────────────────────────────────────── */
+.pv-today{display:grid;gap:14px;padding:20px;border-left:4px solid var(--accent)}
+.pv-today header{display:grid;gap:2px}
+.pv-today h2{margin:2px 0 0;font:800 26px/1.1 var(--display);letter-spacing:-.01em;color:var(--ink);text-transform:none}
+.pv-today header small{color:var(--ink-3);font-size:13px}
+.pv-today.done{border-left-color:var(--good)}
+.pv-today.done h2{color:var(--good)}
+.pv-today.rest{border-left-color:var(--line)}
+.pv-today-note{margin:0;color:var(--ink-2);line-height:1.5}
+.pv-today footer{display:flex;gap:10px}
+.pv-today footer .button{flex:1;text-align:center;text-decoration:none}
+
+/* A lift or a run, as a row: name left, number right. Shared by every card. */
+.pv-lines{display:grid}
+.pv-line{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid var(--line)}
+.pv-line:first-child{border-top:0;padding-top:0}
+.pv-line-name{color:var(--ink);font-weight:700}
+.pv-line-value{color:var(--ink);font:800 17px var(--display);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.pv-line-value small{font:700 11px var(--body);color:var(--ink-3);margin:0 1px}
+.pv-today .pv-line-value{font-size:19px;white-space:normal}
+
+/* ── This week ──────────────────────────────────────────────────────────── */
+.pv-week{padding:0;overflow:hidden}
+.pv-week>header{padding:16px 18px 10px}
+.pv-week h3{margin:0;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.pv-week-rows{display:grid}
+.pv-row{border-top:1px solid var(--line)}
+.pv-row-main{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 18px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
+.pv-row-main:disabled{cursor:default}
+.pv-row-date{display:grid;line-height:1.1;text-align:center}
+.pv-row-date b{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.pv-row-date small{font:800 17px var(--display);color:var(--ink-2)}
+.pv-row-body{display:grid;gap:2px;min-width:0}
+.pv-row-body strong{font-size:15px;color:var(--ink)}
+.pv-row-body small{color:var(--ink-2);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-row-state{font-size:12px;font-weight:800;color:var(--ink-3);min-width:16px;text-align:right;white-space:nowrap}
+.pv-row.today{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.pv-row.today .pv-row-date b,.pv-row.today .pv-row-date small,.pv-row.today .pv-row-state{color:var(--accent-text)}
+.pv-row.done .pv-row-state{color:var(--good)}
+.pv-row.done .pv-row-body strong{color:var(--ink-2)}
+.pv-row.missed .pv-row-body strong,.pv-row.missed .pv-row-body small{color:var(--ink-3)}
+.pv-row.rest .pv-row-body strong{color:var(--ink-3);font-weight:600}
+.pv-row.rest .pv-row-body small{color:var(--ink-3)}
+.pv-row.open .pv-row-main{padding-bottom:6px}
+.pv-row-detail{padding:0 18px 14px 74px}
+.pv-row-detail .pv-line{padding:8px 0}
+.pv-row-detail .pv-line-value{font-size:15px}
+.pv-row-detail p{margin:0;color:var(--ink-2);font-size:13px;line-height:1.5}
+
+/* ── The whole block ────────────────────────────────────────────────────── */
+.pv-block{padding:0;overflow:hidden}
+.pv-block-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:16px 18px;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
+.pv-block-toggle span{display:grid;gap:2px}
+.pv-block-toggle strong{font-size:15px;color:var(--ink)}
+.pv-block-toggle small{color:var(--ink-3);font-size:12px}
+.pv-block-toggle b{font-size:20px;color:var(--ink-3);font-weight:400}
+.pv-block-weeks{display:grid;border-top:1px solid var(--line)}
+.pv-block-week{border-bottom:1px solid var(--line)}
+.pv-block-week:last-of-type{border-bottom:0}
+.pv-block-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 18px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
+.pv-block-num{display:grid;text-align:center;line-height:1.1}
+.pv-block-num b{font:800 17px var(--display);color:var(--ink-2)}
+.pv-block-num small{font-size:10px;color:var(--ink-3);white-space:nowrap}
+.pv-block-body{display:grid;gap:2px;min-width:0}
+.pv-block-body strong{font-size:14px;color:var(--ink)}
+.pv-block-body strong em{font-style:normal;color:var(--accent-text)}
+.pv-block-body small{color:var(--ink-2);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-block-state{font-size:12px;font-weight:800;color:var(--ink-3)}
+.pv-block-week.past .pv-block-body strong,.pv-block-week.past .pv-block-num b{color:var(--ink-3)}
+.pv-block-week.past .pv-block-state{color:var(--good)}
+.pv-block-week.now{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.pv-block-week.now .pv-block-num b{color:var(--accent-text)}
+.pv-block-week.max .pv-block-body strong{color:var(--accent-text)}
+.pv-block-week.light .pv-block-body strong{color:var(--ink-2)}
+.pv-block-days{display:grid;gap:12px;padding:4px 18px 16px}
+.pv-block-day{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start}
+.pv-block-day>div{display:grid;min-width:0}
+.pv-block-day>div>strong{font-size:14px;color:var(--ink);margin-bottom:2px}
+.pv-block-day>div>small{color:var(--ink-3);font-size:12.5px}
+.pv-block-day .pv-line{padding:5px 0;border-top:0}
+.pv-block-day .pv-line-value{font-size:14px}
+.pv-block-day.rest>div>strong{color:var(--ink-3);font-weight:600}
+.pv-block-note{margin:0;padding:12px 18px 16px;color:var(--ink-3);font-size:12.5px;line-height:1.5;border-top:1px solid var(--line)}
+
+/* ── Pre-plan states ────────────────────────────────────────────────────── */
+.pv-state{display:grid;gap:12px;padding:20px}
+.pv-state h3{margin:0;font:800 22px/1.15 var(--display);color:var(--ink)}
+.pv-state p{margin:0;color:var(--ink-2);line-height:1.5}
+.pv-state .button{justify-self:start;text-decoration:none}
+.pv-state.busy h3{color:var(--accent-text)}
+.pv-eta{color:var(--ink-3);font-size:12px}
+.pv-checklist{display:grid;gap:8px}
+.pv-checklist>div{display:flex;align-items:flex-start;gap:10px;color:var(--ink-2);font-size:14px;line-height:1.4}
+.pv-checklist>div b{color:var(--ink-3);font-weight:700}
+.pv-checklist>div.done{color:var(--ink-3)}
+.pv-checklist>div.done b{color:var(--good)}
+.pv-footnote{margin:0;color:var(--ink-3);font-size:12px;line-height:1.5;padding:0 4px}
+
+/* ── Wider screens: today and the week side by side ─────────────────────── */
+@media(min-width:960px){
+  .pv{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);align-items:start;column-gap:18px}
+  .pv>.untrained-goal-banner,.pv>.pv-progress,.pv>.pv-actions,.pv>.pv-block,.pv>.pv-footnote,.pv>.pv-state,.pv>.pv{grid-column:1/-1}
+  .pv-today{position:sticky;top:12px}
+}
