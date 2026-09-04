@@ -71,6 +71,7 @@ import './forge-system.css';
 /* The simplified Plan tab. Loaded last on purpose: it replaces the old
    schedule/roadmap treatment wherever the two would otherwise compete. */
 import './plan-simple.css';
+import './header.css';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.

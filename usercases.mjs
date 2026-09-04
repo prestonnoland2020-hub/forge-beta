@@ -189,14 +189,12 @@ for (const route of ['/legal/privacy', '/legal/terms']) {
 console.log('\nThe billing screen');
 {
   const { page, errors, text } = await visit('/profile?view=billing', world({ history: days }));
-  const opened = await page.evaluate(() => {
-    const tab = [...document.querySelectorAll('.profile-tabs button')].find(b => b.textContent.trim() === 'Plan');
-    if (tab) tab.click();
-    return Boolean(tab);
-  });
+  /* Billing is a Settings screen now: the header names it and the gear's
+     list links to it, so the URL alone has to open it. */
+  const opened = await page.evaluate(() => /Plan & billing/i.test(document.querySelector('.topbar h1')?.textContent || ''));
   await page.waitForTimeout(900);
   const billing = await page.evaluate(() => document.body.innerText);
-  check('  a Plan tab exists in Profile', opened, 'no billing tab rendered');
+  check('  the billing screen opens under Settings', opened, 'header did not name it');
   /* Which copy is correct depends on the tier. The preview build runs as the
      unmetered owner account, where the upgrade offer is deliberately absent —
      asserting the free-tier wording there would be asserting a bug. */

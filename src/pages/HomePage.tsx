@@ -36,7 +36,9 @@ export function HomePage() {
   const startUrl = `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}`;
 
   return <div className="forge-feed">
-    <header className="feed-welcome"><div><span>{greeting}, {firstName}</span><h2>Today’s training</h2></div><Link to="/history">See activity</Link></header>
+    {/* The header already says TODAY; the big line is the greeting and the
+        small one is the date, so nothing on the screen names it twice. */}
+    <header className="feed-welcome"><div><span>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</span><h2>{greeting}, {firstName}</h2></div><Link to="/history">See activity</Link></header>
     {syncError && <div className="save-confirmation save-warning">Your workout is ready here. Account sync will retry automatically.</div>}
     <StravaReviewModal />
     {bufferedNotes.length > 0 && <Link className="buffer-banner" to="/coach">

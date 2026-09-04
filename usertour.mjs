@@ -82,13 +82,13 @@ for (const [route, name] of [['/', 'today'], ['/plan', 'plan'], ['/goals', 'goal
 // 3. Profile subviews: devices + faq + back arrow
 {
   const page = await newPage();
-  await page.goto(`${BASE}/#/profile?t=1`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/#/profile?view=settings&t=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1800);
   await page.locator('button:has-text("Recovery & smartwatch")').click();
   await page.waitForTimeout(400);
   await shot(page, 'profile-devices');
-  console.log('back arrow present:', await page.locator('.profile-back').count());
-  await page.locator('.profile-back').click();
+  console.log('back arrow present:', await page.locator('.top-back').count());
+  await page.locator('.top-back').click();
   await page.waitForTimeout(300);
   await page.locator('button:has-text("FAQ")').click();
   await page.waitForTimeout(300);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
@@ -108,10 +108,34 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachExpanded, setCoachExpanded] = useState(false);
   const initials = (setup?.displayName || 'Forge Athlete').split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
-  const titles: Record<string, string> = {
-    '/': 'Today', '/workout': 'Log workout', '/history': 'Activities', '/insights': 'Progress',
-    '/coach': 'Coach', '/goals': 'Goals', '/plan': 'Plan', '/split': 'Split', '/exercises': 'Exercises', '/profile': 'Profile',
-  };
+  /* ONE HEADER FOR THE WHOLE APP. Five places are destinations — the tabs —
+     and the header names them. Everything else is a step INTO one of those,
+     and a step in gets a back arrow to the place it belongs to, so nothing
+     under Profile has to draw its own breadcrumb and no screen is a dead end.
+     Sub-screens inside Profile are named by the header too, which is what
+     lets the page below stop repeating its own name in 26px type. */
+  const chrome = ((): { title: string; back?: string } => {
+    const params = new URLSearchParams(location.search);
+    switch (location.pathname) {
+      case '/': return { title: 'Today' };
+      case '/plan': return { title: 'Plan' };
+      case '/goals': return { title: 'Goals' };
+      case '/history': return { title: 'Activities' };
+      case '/workout': return { title: params.get('edit') ? 'Edit day' : params.get('date') ? 'Add a day' : 'Log workout', back: '/' };
+      case '/insights': return { title: 'Progress', back: '/' };
+      case '/coach': return { title: 'Ask Forge', back: '/' };
+      case '/split': return { title: 'Your split', back: '/profile' };
+      case '/exercises': return { title: 'Exercise library', back: '/profile' };
+      case '/profile': {
+        const view = params.get('view');
+        const names: Record<string, string> = { settings: 'Settings', appearance: 'Appearance', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Recovery', faq: 'FAQ' };
+        if (view && names[view]) return { title: names[view], back: view === 'settings' ? '/profile' : '/profile?view=settings' };
+        return { title: 'Profile' };
+      }
+      default: return { title: 'Forge' };
+    }
+  })();
+  const onSettings = location.pathname === '/profile' && Boolean(new URLSearchParams(location.search).get('view'));
   const hasRecoveryData = recovery.confidence !== 'Low';
 
   /* Best-effort system notifications: morning brief and body-log check-ins.
@@ -150,23 +174,25 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       <nav className="side-nav" aria-label="Primary navigation">
         {primaryNav.map(([to, label, icon]) => <NavLink key={to} to={to} end={to === '/'}><NavGlyph name={icon}/>{label}</NavLink>)}
       </nav>
-      <NavLink className="sidebar-foot" to="/profile"><div className="avatar small">{initials}</div><div><strong>{setup?.displayName || 'Athlete'}</strong><span>Profile & recovery</span></div><b>›</b></NavLink>
+      <NavLink className="sidebar-foot" to="/profile"><div className="avatar small">{initials}</div><div><strong>{setup?.displayName || 'Athlete'}</strong><span>Profile</span></div><b>›</b></NavLink>
     </aside>
     <div className="app-main">
       <header className="topbar">
-        <div><span className="eyebrow">FORGE</span><h1>{titles[location.pathname] ?? 'Forge'}</h1></div>
+        <div className="top-title">
+          {chrome.back && <Link className="top-back" to={chrome.back} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
+          <div><span className="eyebrow">FORGE</span><h1>{chrome.title}</h1></div>
+        </div>
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
-          {hasRecoveryData && <NavLink className="top-readiness" to="/profile"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
-          {/* PROGRESS IS A BUBBLE BESIDE THE LOG BUTTON. Insights left the tab
-              bar; the chart icon up here is its one home. */}
-          <NavLink className="top-insights" to="/insights" aria-label="Progress and insights"><NavGlyph name="chart"/></NavLink>
-          {/* LOGGING IS A HEADER ACTION, NOT A DESTINATION. Top right, beside
-              the athlete's own avatar, is where every app that expects you to
-              ADD something puts it. */}
-          <NavLink className="top-log" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></NavLink>
-          <NavLink className="top-settings" to="/profile" aria-label="Settings"><NavGlyph name="gear"/></NavLink>
-          <NavLink className="avatar" to="/profile">{initials}</NavLink>
+          {hasRecoveryData && <NavLink className="top-readiness" to="/profile?view=devices"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
+          {/* Three actions, the same three on every screen, each with one
+              home: Progress (the chart), Log (the plus), Settings (the gear).
+              Profile itself is a tab — in the bottom bar on a phone, at the
+              foot of the sidebar on a desktop — so the header no longer
+              carries an avatar that opened the same screen as the gear. */}
+          <NavLink className="top-insights" to="/insights" aria-label="Progress"><NavGlyph name="chart"/></NavLink>
+          {location.pathname !== '/workout' && <NavLink className="top-log" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></NavLink>}
+          <Link className={onSettings ? 'top-settings active' : 'top-settings'} to="/profile?view=settings" aria-label="Settings" aria-current={onSettings ? 'page' : undefined}><NavGlyph name="gear"/></Link>
         </div>
       </header>
       {!isDemoMode && syncError && <div className="data-sync-error"><span>Your latest training data is still saved on this device, but Supabase could not sync it.</span><button onClick={retrySync}>Retry</button></div>}
@@ -192,8 +218,12 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   </div>;
 }
 
-export function PageIntro({ eyebrow, title, copy, action }: { eyebrow: string; title: string; copy?: string; action?: ReactNode }) {
-  return <div className="page-intro"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2>{copy && <p>{copy}</p>}</div>{action}</div>;
+/* The header already names the screen. A page that repeated that name in
+   26px type underneath it read as two titles, so `title` is now optional:
+   without one the intro is a quiet lead — an eyebrow, a line of guidance, an
+   action — and pages whose name is the whole story pass nothing. */
+export function PageIntro({ eyebrow, title, copy, action }: { eyebrow?: string; title?: string; copy?: string; action?: ReactNode }) {
+  return <div className={title ? 'page-intro' : 'page-intro lead'}><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}{title && <h2>{title}</h2>}{copy && <p>{copy}</p>}</div>{action}</div>;
 }
 
 export function Metric({ value, label, delta }: { value: string; label: string; delta?: string }) {

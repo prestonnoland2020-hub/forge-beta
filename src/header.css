@@ -1,0 +1,29 @@
+/* THE APP HEADER, ONE WAY EVERYWHERE. Loaded last so it settles the layers
+   below it: a title on the left (with a back arrow when the screen is a step
+   into one of the five tabs), and the same three round actions on the right —
+   Progress, Log, Settings. Every colour is a token; the contrast audit covers
+   every accent, ground and tone. */
+
+.topbar{gap:12px}
+.topbar .top-title{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.topbar .top-title>div{min-width:0}
+.topbar h1{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-back{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);margin-left:-4px;text-decoration:none}
+.top-back svg{width:20px;height:20px}
+.top-back:active{transform:scale(.94)}
+.top-actions{gap:8px}
+
+/* A lead under the header: a line of guidance and, at most, one action. It
+   never carries the screen's name — the header already has it. */
+.page-intro.lead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0}
+.page-intro.lead>div{display:grid;gap:4px;min-width:0}
+.page-intro.lead .eyebrow{display:inline-block}
+.page-intro.lead p{display:block;margin:0;color:var(--ink-2);font-size:13px;line-height:1.5;max-width:62ch}
+.page-intro.lead:empty{display:none}
+
+/* The settings list reads the same on the profile hub and on Settings. */
+.simple-settings-list>button{font:inherit;text-align:left}
+
+/* The greeting is the Today screen's big line; at phone width it has to hold
+   "Good afternoon, <name>" on one line for most names. */
+@media(max-width:640px){.feed-welcome h2{font-size:30px}}
