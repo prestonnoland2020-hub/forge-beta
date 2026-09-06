@@ -13,6 +13,7 @@ export function NotificationSettings() {
     <header><span className="eyebrow">NOTIFICATIONS</span><h3>Check-ins from Forge</h3></header>
     <div className="toggle-row"><div><strong>Morning workout</strong><span>Your day's training, each morning you open Forge.</span></div><input type="checkbox" aria-label="Morning workout notifications" checked={prefs.morningWorkout} onChange={() => void toggle('morningWorkout')} /></div>
     <div className="toggle-row"><div><strong>Injury follow-ups</strong><span>A daily check-in while a body-log entry is active.</span></div><input type="checkbox" aria-label="Injury follow-up notifications" checked={prefs.injuryFollowUp} onChange={() => void toggle('injuryFollowUp')} /></div>
+    <div className="toggle-row"><div><strong>A partner trained</strong><span>Once a day, when a training partner has logged and you haven't.</span></div><input type="checkbox" aria-label="Training partner notifications" checked={prefs.partnerTrained} onChange={() => void toggle('partnerTrained')} /></div>
     {!notificationsSupported() && <small className="notification-note">This browser does not support system notifications; Ask Forge still shows every check-in.</small>}
     {notificationsSupported() && permission === 'denied' && (prefs.morningWorkout || prefs.injuryFollowUp) && <small className="notification-note">Notifications are blocked in your browser settings — the check-ins will appear here on the Coach tab instead.</small>}
   </section>;

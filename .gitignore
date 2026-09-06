@@ -25,3 +25,4 @@ shot.mjs
 supabase/.temp/
 tools/__pycache__/
 forge-updates.bundle
+dist-auth/

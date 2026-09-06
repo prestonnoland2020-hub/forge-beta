@@ -16,6 +16,7 @@ import { CoachPage } from '../pages/CoachPage';
 
 
 import { ExerciseLibraryPage } from '../pages/ExerciseLibraryPage';
+import { PartnersPage } from '../pages/PartnersPage';
 
 export function App() {
   return (
@@ -43,6 +44,7 @@ export function App() {
           <Route path="/plan" element={<TrainingPlanPage />} />
           <Route path="/split" element={<TrainingPlanPage mode="split" />} />
           <Route path="/exercises" element={<ExerciseLibraryPage />} />
+          <Route path="/partners" element={<PartnersPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>

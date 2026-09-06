@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { PartnersCard } from '../components/PartnersCard';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { openCoachBubble } from '../features/training/coachService';
@@ -31,7 +32,11 @@ export function HomePage() {
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">TODAY</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
   if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">ONE QUICK SETUP</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split">Set up my split →</Link></section></div>;
 
-  const selectedSets = recommendation.topSets.filter(set => set.selected);
+  /* A stored recommendation written by an older build — or one that arrived
+     half-formed — has no top sets, and reading through it turned Today into
+     the crash screen. The day is still worth showing without them. */
+  const recommendedSets = recommendation.topSets || [];
+  const selectedSets = recommendedSets.filter(set => set.selected);
   const selectedCount = selectedSets.length + (recommendation.cardio?.selected ? 1 : 0);
   const startUrl = `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}`;
 
@@ -68,19 +73,22 @@ export function HomePage() {
       <section className="feed-card today-focus-card">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || 'Cardio and recovery'}</em></div></div><Link to="/workout?source=split">Change day</Link></header>
       <div className="today-workout-items">
-        {recommendation.topSets.map(set => <label className={set.selected ? 'selected' : ''} key={set.id}><input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} /><span><small>{set.muscle}{set.optional ? ' · OPTIONAL' : ''}</small><strong>{set.exercise}</strong><em>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : 'Log a baseline set'}</em></span></label>)}
+        {recommendedSets.map(set => <label className={set.selected ? 'selected' : ''} key={set.id}><input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} /><span><small>{set.muscle}{set.optional ? ' · OPTIONAL' : ''}</small><strong>{set.exercise}</strong><em>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : 'Log a baseline set'}</em></span></label>)}
         {/* A CARDIO DAY IS NOT MISSING ITS LIFT. The engine deliberately
             prescribes no top sets on a cardio-only split day, but this row
             excluded only rest days — so the Hybrid starter split's "Quality
             Cardio" day showed a red "Fix →" demanding a strength exercise for
             a day that is not meant to have one, and following it to the
             library fixed nothing. */}
-        {!recommendation.topSets.length && recommendation.splitDay.type !== 'rest' && recommendation.splitDay.type !== 'cardio' && <Link className="feed-empty-row" to="/exercises"><span><small>STRENGTH</small><strong>Choose exercises for this split day</strong><em>Forge needs a strength exercise mapped to this day.</em></span><b>Fix →</b></Link>}
+        {!recommendedSets.length && recommendation.splitDay.type !== 'rest' && recommendation.splitDay.type !== 'cardio' && <Link className="feed-empty-row" to="/exercises"><span><small>STRENGTH</small><strong>Choose exercises for this split day</strong><em>Forge needs a strength exercise mapped to this day.</em></span><b>Fix →</b></Link>}
         {recommendation.cardio && <label className={recommendation.cardio.selected ? 'selected' : ''}><input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} /><span><small>CARDIO</small><strong>{recommendation.cardio.title}</strong><em>{cardioPlanSummary(recommendation.cardio.session.plan)}</em></span></label>}
       </div>
       <footer><Link className="button" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} →</Link><button className="feed-coach-button" onClick={() => openCoachBubble('Explain today’s workout briefly and tell me the one thing that matters most.')}>Ask Forge</button></footer>
     </section>}
 
-
+    {/* Under the workout, because this is the screen where you decide whether
+        to train and a partner who has already trained is the one thing that
+        changes that decision. */}
+    <PartnersCard unit={weightUnit} />
   </div>;
 }

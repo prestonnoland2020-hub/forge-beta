@@ -72,9 +72,20 @@ import './forge-system.css';
    schedule/roadmap treatment wherever the two would otherwise compete. */
 import './plan-simple.css';
 import './header.css';
+import './partners.css';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.
+/* AN INVITE HAS TO SURVIVE SIGNING UP. The link carries the sender's
+   username in the hash query, and a brand new athlete goes straight from it to
+   login and then through onboarding — which is exactly the person the link was
+   for. It is stashed here, on the way past, and picked up on the partner
+   screen once they are through the door. */
+try {
+  const invite = new URLSearchParams((window.location.hash.split('?')[1] || '')).get('add');
+  if (invite) localStorage.setItem('forge-partner-invite', invite);
+} catch { /* storage unavailable */ }
+
 const callbackQuery = new URLSearchParams(window.location.search);
 if (callbackQuery.get('strava') === 'callback' && !window.location.hash) {
   window.location.hash = '/profile';

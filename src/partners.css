@@ -1,0 +1,48 @@
+/* TRAINING PARTNERS. One line per person: who, where they are in their block,
+   what they did today. Tokens only, so it holds in every tone and accent and
+   the contrast audit can vouch for it. */
+
+.partners-card{display:grid;gap:2px;padding:0;overflow:hidden}
+.partners-card>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 18px 8px}
+.partners-card h3,.partners-list h3,.partner-add h3,.partner-requests h3{margin:0;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.partners-card>header a{color:var(--accent-text);font-size:12px;font-weight:800;text-decoration:none}
+.partner-rows{display:grid}
+
+.partner-row,.partner-full-main{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+.partner-rows .partner-row:first-child{border-top:0}
+.partner-row>div,.partner-full-main>div{display:grid;gap:2px;min-width:0}
+.partner-row strong,.partner-full-main strong{font-size:15px;color:var(--ink)}
+.partner-row small,.partner-full-main small{font-size:12px;color:var(--ink-3)}
+.partner-row>b,.partner-full-main>b{color:var(--good);font-size:15px}
+.partner-mark{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);color:var(--ink-2);font:800 13px var(--display)}
+.partner-row.trained .partner-mark,.partner-full.done .partner-mark{background:color-mix(in srgb,var(--good) 22%,var(--surface-3));color:var(--ink)}
+.partner-did{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partner-quiet{font-size:13px;color:var(--ink-3)}
+
+/* ── The partner screen ─────────────────────────────────────────────────── */
+.partners-page{display:grid;gap:14px}
+.partner-add,.partner-requests{display:grid;gap:12px;padding:18px}
+.partner-add label{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--ink-3)}
+.partner-add-row{display:flex;gap:8px;margin-top:6px}
+.partner-add-row input{flex:1;min-width:0}
+.partner-message{margin:0;color:var(--ink-2);font-size:13px;line-height:1.5}
+.partner-invite{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line)}
+.partner-invite>div{display:grid;gap:2px;min-width:0}
+.partner-invite strong{font-size:14px;color:var(--ink)}
+.partner-invite small{font-size:12px;color:var(--ink-3);line-height:1.4}
+.partner-request{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.partner-request>div:first-child{display:grid;gap:2px}
+.partner-request strong{font-size:15px;color:var(--ink)}
+.partner-request small{font-size:12px;color:var(--ink-3)}
+.partner-request-actions{display:flex;align-items:center;gap:10px}
+.partners-list{padding:0;overflow:hidden}
+.partners-list>header{padding:16px 18px 8px}
+.partner-full{display:grid}
+.partner-full .partner-full-main{border-top:0}
+.partner-remove{justify-self:start;margin:0 18px 12px 68px;font-size:12px;color:var(--ink-3)}
+.partner-empty{margin:0;padding:0 18px 18px;color:var(--ink-2);font-size:14px;line-height:1.5}
+.partner-invite-prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px 16px;text-decoration:none;color:inherit}
+.partner-invite-prompt>div{display:grid;gap:2px;min-width:0}
+.partner-invite-prompt strong{font-size:15px;color:var(--ink)}
+.partner-invite-prompt small{font-size:12.5px;color:var(--ink-3);line-height:1.4}
+.partner-invite-prompt b{color:var(--ink-3);font-weight:400;font-size:18px}

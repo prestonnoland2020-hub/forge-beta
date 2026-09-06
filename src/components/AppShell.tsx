@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { useAuth } from '../features/auth/AuthProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { isDemoMode } from '../lib/env';
+import { localDayIso } from '../lib/time';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { needsFollowUp } from '../features/training/athleteNotesService';
-import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyMorningWorkout } from '../lib/notifications';
+import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyMorningWorkout, maybeNotifyPartnerTrained } from '../lib/notifications';
+import { loadPartners } from '../features/friends/partnerService';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
 
@@ -69,6 +72,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const location = useLocation();
   const { recovery } = useAdaptiveTraining();
   const { setup } = useProfileSetup();
+  const { user } = useAuth();
   const { loading: historyLoading, syncing, syncError, retrySync, records: stravaRecords, addRecord: stravaAddRecord } = useWorkoutHistory();
   /* STRAVA SYNC RUNS WHEN THE ATHLETE LOOKS. A six-hour throttle meant a run
      recorded on the watch could sit unseen for most of a day: post it, open
@@ -126,6 +130,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       case '/coach': return { title: 'Ask Forge', back: '/' };
       case '/split': return { title: 'Your split', back: '/profile' };
       case '/exercises': return { title: 'Exercise library', back: '/profile' };
+      case '/partners': return { title: 'Partners', back: '/profile' };
       case '/profile': {
         const view = params.get('view');
         const names: Record<string, string> = { settings: 'Settings', appearance: 'Appearance', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Recovery', faq: 'FAQ' };
@@ -150,6 +155,24 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     }
     if (prefs.injuryFollowUp) notes.filter(needsFollowUp).forEach(note => maybeNotifyFollowUp(note.area || note.kind));
   }, [recommendation, notes]);
+
+  /* THE PARTNER NUDGE. Checked when the app opens and when it comes back to
+     the foreground, which is when it can still change the day. It asks the
+     server only for people who have trained, and only if the athlete has not
+     logged yet — a nudge that arrives after you have trained is noise. */
+  useEffect(() => {
+    if (isDemoMode || !user || historyLoading) return;
+    if (!loadNotificationPrefs().partnerTrained) return;
+    const todayIso = localDayIso();
+    const trainedToday = stravaRecords.some(record => record.date === todayIso
+      && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0));
+    if (trainedToday) return;
+    let active = true;
+    void loadPartners()
+      .then(partners => { if (active) maybeNotifyPartnerTrained(partners.filter(partner => partner.trainedToday).map(partner => partner.displayName)); })
+      .catch(() => { /* the nudge is best effort */ });
+    return () => { active = false; };
+  }, [user, historyLoading, stravaRecords]);
 
   useEffect(() => {
     const open = () => setCoachOpen(true);
