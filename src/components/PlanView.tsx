@@ -148,34 +148,66 @@ export function WeekList({ sessions, unit, records, title = 'This week' }: {
       {sessions.map(session => {
         const iso = localDayIso(session.date);
         const isToday = iso === todayIso;
+        const past = iso < todayIso;
         const logged = records.find(record => record.date === iso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0 || record.muscles.some(muscle => muscle !== 'Cardio')));
-        const missed = !logged && iso < todayIso && session.empty !== 'rest' && (session.lifts.length > 0 || Boolean(session.run) || Boolean(session.summary));
         const isRest = session.empty === 'rest' && !session.lifts.length && !session.run;
         const isOpenDay = session.empty === 'open' && !session.lifts.length && !session.run;
+        /* THE PAST IS HISTORY, NOT A PROJECTION. A rolling split rotates around
+           where the athlete's cursor is TODAY, so the days behind today are
+           drawn by winding that rotation backwards — which is fiction the
+           moment a day is trained early or skipped. Preston squatted on the
+           Friday, rested Saturday and pressed on Sunday; the week showed
+           "Sat — Legs 2 — Squat 475x2 — Missed", naming a session he had
+           already done and calling it missed on a day he had rested.
+
+           Behind today the app knows exactly what happened, so that is what it
+           shows: the day the athlete logged, under the name they gave it, or
+           an honest blank. It never asserts what was owed on a day already
+           gone. */
         const expanded = open === iso;
+        /* A ROLLING SPLIT CANNOT MISS A DAY. It advances on what you log, so
+           a day with no training is a rest day you chose, not a session you
+           owe — branding every one of them "Missed" would put three verdicts a
+           week on anyone training four days. The row goes quiet instead: muted,
+           and it says what is true, which is that nothing was logged. */
+        const missed = past && !logged && !isRest;
+        const heading = logged ? logged.title : past ? (isRest ? 'Rest' : 'Nothing logged') : isRest ? 'Rest' : session.title;
         /* One line, in words the athlete would use. */
         const summary = logged
           ? [...(logged.topSets || []).filter(set => set.completed !== false).slice(0, 2).map(set => `${set.lift} ${set.weight}×${set.reps}`), ...(logged.cardioSessions || []).slice(0, 1).map(cardio => cardio.summary?.replace(`${cardio.activity} · `, '') || cardio.activity)].filter(Boolean).join(' · ') || 'Logged'
+          : past ? (isRest ? 'Rest day' : 'No training on this day')
           : isRest ? 'Nothing scheduled'
           : isOpenDay ? 'Open — nothing required'
           : [
               ...session.lifts.slice(0, 2).map(lift => lift.weight ? `${lift.exercise} ${lift.weight}×${lift.reps}` : lift.exercise),
               session.run ? (() => { const text = session.run.text.split(/ @ | · /)[0]; return /\beasy\b/i.test(text) && session.run.kind === 'Easy run' ? text : `${session.run.kind} ${text}`; })() : '',
             ].filter(Boolean).join(' · ') || session.summary || session.title;
-        const canExpand = !isRest && !isOpenDay && (session.lifts.length + (session.run ? 1 : 0) > 0 || Boolean(session.summary));
+        /* A logged day opens on what was logged; a day gone by with nothing on
+           it has nothing to open. */
+        const loggedLifts = (logged?.topSets || []).filter(set => set.completed !== false);
+        const canExpand = logged
+          ? loggedLifts.length + (logged.cardioSessions || []).length > 0
+          : !past && !isRest && !isOpenDay && (session.lifts.length + (session.run ? 1 : 0) > 0 || Boolean(session.summary));
         return <div className={`pv-row${isToday ? ' today' : ''}${logged ? ' done' : ''}${missed ? ' missed' : ''}${isRest ? ' rest' : ''}${expanded ? ' open' : ''}`} key={iso}>
           <button type="button" className="pv-row-main" onClick={() => canExpand && setOpen(current => current === iso ? null : iso)} aria-expanded={canExpand ? expanded : undefined} disabled={!canExpand}>
             <span className="pv-row-date"><b>{weekdayShort(session.date)}</b><small>{dayNumber(session.date)}</small></span>
             <span className="pv-row-body">
-              <strong>{isRest ? 'Rest' : session.title}</strong>
+              <strong>{heading}</strong>
               <small>{summary}</small>
             </span>
-            <span className="pv-row-state" aria-hidden="true">{logged ? '✓' : missed ? 'Missed' : isToday ? 'Today' : canExpand ? '›' : ''}</span>
+            <span className="pv-row-state" aria-hidden="true">{logged ? '✓' : isToday ? 'Today' : canExpand ? '›' : ''}</span>
           </button>
           {expanded && <div className="pv-row-detail">
-            {session.lifts.map((lift, index) => <LiftLine key={`${lift.exercise}-${index}`} lift={lift} unit={unit} />)}
-            {session.run && <RunLine run={session.run} />}
-            {!session.lifts.length && !session.run && session.summary && <p>{session.summary}</p>}
+            {logged
+              ? <>
+                  {loggedLifts.map((set, index) => <LiftLine key={set.id || `${set.lift}-${index}`} lift={{ exercise: set.lift, weight: set.weight, reps: set.reps }} unit={unit} />)}
+                  {(logged.cardioSessions || []).map(cardio => <div className="pv-line" key={cardio.id}><span className="pv-line-name">{cardio.activity}</span><span className="pv-line-value">{cardio.summary?.replace(`${cardio.activity} · `, '')}</span></div>)}
+                </>
+              : <>
+                  {session.lifts.map((lift, index) => <LiftLine key={`${lift.exercise}-${index}`} lift={lift} unit={unit} />)}
+                  {session.run && <RunLine run={session.run} />}
+                  {!session.lifts.length && !session.run && session.summary && <p>{session.summary}</p>}
+                </>}
           </div>}
         </div>;
       })}
