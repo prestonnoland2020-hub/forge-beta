@@ -13,7 +13,7 @@ const FEED = [
   { friend_id: 'c1', username: 'coltoneilers', display_name: 'Colton Eilers', block_week: 1, block_weeks: 10, wave_slot: 0,
     trained_today: false, last_trained: new Date(Date.now() - 2*86400000).toISOString().slice(0,10), top_lift: null, top_weight: null, top_reps: null, cardio_summary: null },
 ];
-async function shot(route, theme, name, width = 430) {
+async function shot(route, theme, name, width = 430, typed = '') {
   const page = await browser.newPage({ viewport: { width, height: 950 }, deviceScaleFactor: 2 });
   /* Playwright matches the most recently registered route first, so this is
      one handler rather than a stack of them: the app's own files pass through,
@@ -27,6 +27,11 @@ async function shot(route, theme, name, width = 430) {
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (url.includes('/rpc/forge_partner_feed')) return json(FEED);
     if (url.includes('/rpc/forge_partner_requests')) return json([]);
+    if (url.includes('/rpc/forge_search_athletes')) return json([
+      { id: 'a1', username: 'adamgomez', display_name: 'Adam Gomez', relation: 'partner' },
+      { id: 'g1', username: 'andrewgomez', display_name: 'Andrew Gomez', relation: 'none' },
+      { id: 'r1', username: 'rileywells', display_name: 'Riley Wells', relation: 'requested' },
+    ]);
     if (url.includes('/rest/v1/profiles')) return json(PROFILE);
     /* PostgREST answers a maybeSingle with an object or nothing at all, so a
        harness that returns [] everywhere invents shapes the app never sees. */
@@ -55,6 +60,7 @@ async function shot(route, theme, name, width = 430) {
   
   await page.goto(`${BASE}/#${route}${route.includes('?') ? '&' : '?'}t=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2400);
+  if (typed) { await page.fill('#partner-username', typed); await page.waitForTimeout(900); }
   writeFileSync(`/tmp/tour/${name}.png`, await page.screenshot({ fullPage: true }));
   const text = await page.evaluate(() => document.body.innerText);
   await page.close();
@@ -63,8 +69,8 @@ async function shot(route, theme, name, width = 430) {
 const home = await shot('/', 'dark', 'partners-home');
 console.log('--- TODAY CARD ---');
 console.log((home.match(/TRAINING PARTNERS[\s\S]{0,320}/i) || ['(card not on Today)'])[0]);
-const page = await shot('/partners', 'dark', 'partners-page');
+const page = await shot('/partners', 'dark', 'partners-page', 430, 'adm gomez');
 console.log('\n--- PARTNER SCREEN ---');
 console.log(page.slice(0, 700));
-await shot('/partners', 'light', 'partners-page-light');
+await shot('/partners', 'light', 'partners-page-light', 430, 'adm gomez');
 await browser.close();

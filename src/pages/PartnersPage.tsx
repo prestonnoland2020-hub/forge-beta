@@ -9,6 +9,7 @@ import { isDemoMode } from '../lib/env';
 import {
   loadPartners, loadPartnerRequests, addPartner, declinePartner, removePartner,
   inviteLink, lastTrainedLabel, pendingInvite, clearPendingInvite, didToday,
+  searchAthletes, addPartnerById, loadDiscoverable, setDiscoverable, type AthleteResult,
   type Partner, type PartnerRequest, type AddResult,
 } from '../features/friends/partnerService';
 
@@ -32,6 +33,9 @@ export function PartnersPage() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [myUsername, setMyUsername] = useState('');
+  const [results, setResults] = useState<AthleteResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [discoverable, setDiscoverableState] = useState(true);
   const unit = setup?.units === 'Metric' ? 'kg' : 'lb';
 
   const refresh = useCallback(async () => {
@@ -45,7 +49,34 @@ export function PartnersPage() {
     if (isDemoMode || !user) return;
     void supabase.from('profiles').select('username').eq('id', user.id).maybeSingle()
       .then(({ data }) => setMyUsername(String(data?.username || '')));
+    void loadDiscoverable().then(setDiscoverableState).catch(() => undefined);
   }, [user]);
+
+  /* Search as they type, a beat behind the keyboard so a name is not eight
+     round trips. */
+  useEffect(() => {
+    const value = username.trim();
+    if (value.length < 2) { setResults([]); return; }
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      void searchAthletes(value)
+        .then(setResults).catch(() => setResults([]))
+        .finally(() => setSearching(false));
+    }, 250);
+    return () => { window.clearTimeout(timer); setSearching(false); };
+  }, [username]);
+
+  const pick = async (result: AthleteResult) => {
+    setBusy(true); setMessage('');
+    try {
+      const outcome = await addPartnerById(result.id);
+      setMessage(MESSAGES[outcome] || 'That did not work.');
+      if (outcome === 'accepted' || outcome === 'requested') { setUsername(''); setResults([]); clearPendingInvite(); }
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : 'That did not work.');
+    } finally { setBusy(false); }
+  };
 
   const submit = async (name: string) => {
     const value = name.trim();
@@ -86,19 +117,40 @@ export function PartnersPage() {
 
     <section className="card partner-add">
       <h3>Add a partner</h3>
-      <form onSubmit={event => { event.preventDefault(); void submit(username); }}>
-        <label htmlFor="partner-username">Their username</label>
+      <form onSubmit={event => { event.preventDefault(); if (results[0]?.relation === 'none') void pick(results[0]); }}>
+        <label htmlFor="partner-username">Search by name or username</label>
         <div className="partner-add-row">
           <input id="partner-username" value={username} autoCapitalize="none" autoCorrect="off" spellCheck={false}
-            placeholder="username" onChange={event => setUsername(event.target.value)} />
-          <button className="button" disabled={busy || !username.trim()}>Add</button>
+            placeholder="Adam, or adamgomez" onChange={event => setUsername(event.target.value)} />
         </div>
       </form>
+      {/* Results, or the honest reason there are none. */}
+      {username.trim().length >= 2 && <div className="partner-results">
+        {results.map(result => <button type="button" className="partner-result" key={result.id}
+          disabled={busy || result.relation !== 'none'} onClick={() => void pick(result)}>
+          <span className="partner-mark" aria-hidden="true">{result.displayName.slice(0, 2).toUpperCase()}</span>
+          <span><strong>{result.displayName}</strong><small>@{result.username}</small></span>
+          <b>{result.relation === 'partner' ? 'Partner'
+            : result.relation === 'requested' ? 'Requested'
+            : result.relation === 'waiting' ? 'Asked you'
+            : 'Add'}</b>
+        </button>)}
+        {!results.length && <p className="partner-message">{searching ? 'Searching…' : 'Nobody by that name. Their exact username always works.'}</p>}
+      </div>}
       {message && <p className="partner-message">{message}</p>}
       {myUsername && <div className="partner-invite">
         <div><strong>Your username is @{myUsername}</strong><small>Send someone the link and they arrive already connected to you.</small></div>
         <button type="button" className="button ghost small-button" onClick={() => void share()}>Invite a friend</button>
       </div>}
+      {/* Being findable is its own choice, and it is not the same as being
+          invitable — a username always works. */}
+      <div className="partner-discoverable">
+        <div><strong>Let people find me by name</strong><small>Off, and only someone with your exact username can add you.</small></div>
+        <input type="checkbox" aria-label="Let people find me by name" checked={discoverable} onChange={event => {
+          const next = event.target.checked; setDiscoverableState(next);
+          void setDiscoverable(next).catch(() => setDiscoverableState(!next));
+        }} />
+      </div>
     </section>
 
     <section className="card pv-week partners-list">

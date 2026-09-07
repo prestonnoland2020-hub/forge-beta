@@ -46,3 +46,24 @@
 .partner-invite-prompt strong{font-size:15px;color:var(--ink)}
 .partner-invite-prompt small{font-size:12.5px;color:var(--ink-3);line-height:1.4}
 .partner-invite-prompt b{color:var(--ink-3);font-weight:400;font-size:18px}
+
+/* ── Search results ─────────────────────────────────────────────────────── */
+.partner-results{display:grid;border-top:1px solid var(--line);margin-top:2px}
+.partner-result{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:11px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;color:inherit;cursor:pointer;font:inherit}
+.partner-result:last-child{border-bottom:0}
+.partner-result:disabled{cursor:default}
+.partner-result>span:nth-child(2){display:grid;gap:1px;min-width:0}
+.partner-result strong{font-size:15px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partner-result small{font-size:12px;color:var(--ink-3)}
+.partner-result>b{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--accent-text);white-space:nowrap}
+.partner-result:disabled>b{color:var(--ink-3)}
+.partner-result:active:not(:disabled){opacity:.7}
+
+/* Laid out like every other toggle in Forge — text left, switch right — and
+   not as a <label>, whose global form styling stacks and centres its own
+   children and threw this one off the side of the card. */
+.partner-discoverable{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:14px;border-top:1px solid var(--line)}
+.partner-discoverable>div{display:grid;gap:2px;min-width:0}
+.partner-discoverable strong{font-size:14px;color:var(--ink)}
+.partner-discoverable small{font-size:12px;color:var(--ink-3);line-height:1.4}
+.partner-discoverable input{flex:none;width:20px;height:20px}

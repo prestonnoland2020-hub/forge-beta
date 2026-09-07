@@ -91,6 +91,42 @@ export function inviteLink(username: string): string {
   return `${base}#/partners?add=${encodeURIComponent(username)}`;
 }
 
+/* SEARCH, NOT SPELLING. Adding someone used to require their username typed
+   exactly; nobody knows their gym partner as "coltoneilers". The search reads
+   name and username together and tolerates a missed letter, and it says what
+   the relationship already is so the screen never offers to add the same
+   person twice. */
+export type AthleteResult = { id: string; username: string; displayName: string; relation: 'none' | 'requested' | 'waiting' | 'partner' };
+
+export async function searchAthletes(query: string): Promise<AthleteResult[]> {
+  if (isDemoMode || query.trim().length < 2) return [];
+  const { data, error } = await supabase.rpc('forge_search_athletes', { query });
+  if (error) throw error;
+  return ((data || []) as Array<{ id: string; username: string; display_name: string; relation: string }>)
+    .map(row => ({ id: row.id, username: row.username, displayName: row.display_name || row.username, relation: row.relation as AthleteResult['relation'] }));
+}
+
+export async function addPartnerById(id: string): Promise<AddResult> {
+  const { data, error } = await supabase.rpc('forge_partner_add_id', { partner_id: id });
+  if (error) throw error;
+  return String(data) as AddResult;
+}
+
+/* Whether other athletes can find you by name. An exact username always
+   works — that is the handle you hand out — so this governs browsing, not
+   invitations. */
+export async function setDiscoverable(value: boolean): Promise<void> {
+  const { error } = await supabase.rpc('forge_set_discoverable', { p_value: value });
+  if (error) throw error;
+}
+export async function loadDiscoverable(): Promise<boolean> {
+  if (isDemoMode) return true;
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return true;
+  const { data } = await supabase.from('profiles').select('discoverable').eq('id', userData.user.id).maybeSingle();
+  return data?.discoverable !== false;
+}
+
 const inviteKey = 'forge-partner-invite';
 export const pendingInvite = (): string => { try { return localStorage.getItem(inviteKey) || ''; } catch { return ''; } };
 export const clearPendingInvite = () => { try { localStorage.removeItem(inviteKey); } catch { /* ignore */ } };
