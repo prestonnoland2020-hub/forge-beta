@@ -99,8 +99,8 @@ async function trainedDays(pairs: Array<[string, string]>): Promise<Set<string>>
 
 /* THE MORNING CRON WAKES TWELVE TIMES PER ATHLETE PER DAY AND MUST SPEAK ONCE.
 
-   It runs hourly and each run asks, per subscription, "is it 7am where they
-   are". A retry, a daylight-saving shift, or two workers on the same tick can
+   It runs hourly and each run asks, per subscription, "is it the morning hour
+   where they are". A retry, a daylight-saving shift, or two workers on the same tick can
    all put two runs inside one local 7 o'clock. The log is the memory: if this
    athlete has already been told about this local day, they are not told
    again. */
@@ -115,6 +115,22 @@ async function sentDays(kind: string, pairs: Array<[string, string]>): Promise<S
 }
 
 const COLUMNS = 'endpoint,owner_id,p256dh,auth,timezone,wants_morning,wants_partner';
+
+/* THE TWO HOURS THAT DECIDE WHEN A PHONE IS ALLOWED TO BUZZ, in the athlete's
+   own timezone — never the server's.
+
+   MORNING_HOUR is when the day's training arrives. It is a single hour rather
+   than a window because the cron wakes hourly and the brief must land once.
+
+   QUIET_START and QUIET_END bound the partner notification, which is not
+   scheduled — it fires the moment a partner's session is saved, so it can land
+   at any hour at all. Outside these bounds it is dropped rather than held: a
+   nudge delivered hours late is worse than none. The lower bound tracks
+   MORNING_HOUR so an early riser is not woken by their own brief and then
+   silenced for their partner two hours later. */
+const MORNING_HOUR = 6;
+const QUIET_START = MORNING_HOUR;
+const QUIET_END = 21;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -162,9 +178,9 @@ Deno.serve(async request => {
     /* The filter is on the query, not in the loop: an athlete who turned the
        morning brief off should not even be considered. */
     const { data } = await admin.from('push_subscriptions').select(COLUMNS).eq('wants_morning', true);
-    /* Whose 7 o'clock it is, decided before anything is asked of the database. */
+    /* Whose morning it is, decided before anything is asked of the database. */
     const due = ((data || []) as Row[])
-      .filter(row => localHour(row.timezone) === 7)
+      .filter(row => localHour(row.timezone) === MORNING_HOUR)
       .map(row => ({ row, date: localDate(row.timezone) }));
     const pairs = due.map(({ row, date }) => [row.owner_id, date] as [string, string]);
     const trained = await trainedDays(pairs);
@@ -178,8 +194,9 @@ Deno.serve(async request => {
   }
 
   if (kind === 'partner') {
-    /* One athlete just logged; their partners hear about it, unless they have
-       already trained themselves — a nudge after the fact is noise. */
+    /* One athlete just logged; their partners hear about it now. This is
+       trigger-driven, not scheduled: it runs on the INSERT, so the phone buzzes
+       within a second or two of the session being saved. */
     const actor = String(body.owner_id || '');
     if (!actor) return json({ sent: 0 });
     const { data: actorProfile } = await admin.from('profiles').select('display_name,username').eq('id', actor).maybeSingle();
@@ -194,7 +211,7 @@ Deno.serve(async request => {
     for (const row of (data || []) as Row[]) {
       const hour = localHour(row.timezone);
       const date = localDate(row.timezone);
-      if (hour < 8 || hour >= 21) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: `quiet hours (local ${hour})` }); continue; }
+      if (hour < QUIET_START || hour >= QUIET_END) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: `quiet hours (local ${hour})` }); continue; }
       awake.push({ row, date });
     }
     const pairs = awake.map(({ row, date }) => [row.owner_id, date] as [string, string]);

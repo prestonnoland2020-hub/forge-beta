@@ -93,8 +93,8 @@ const zoneWhereItIs = hour => {
   /* Etc/GMT signs are inverted: Etc/GMT+6 is UTC-6. */
   return offset === 0 ? 'UTC' : offset <= 12 ? `Etc/GMT-${offset}` : `Etc/GMT+${24 - offset}`;
 };
-const MORNING = zoneWhereItIs(7);
-const MIDNIGHT = zoneWhereItIs(0);
+const MORNING = zoneWhereItIs(6);   /* MORNING_HOUR in the sender */
+const MIDNIGHT = zoneWhereItIs(0);  /* inside quiet hours either way */
 const AFTERNOON = zoneWhereItIs(14);
 const dayIn = tz => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
 
@@ -104,10 +104,15 @@ const sub = (owner, tz, extra = {}) => ({
 });
 
 console.log('\nThe morning brief');
+/* The hours are read out of the sender rather than restated here, so a change
+   to MORNING_HOUR cannot leave this suite quietly asserting the old one. */
+const hourOf = name => Number(readFileSync('supabase/functions/forge-push/index.ts', 'utf8').match(new RegExp(`const ${name} = (\\d+)`))?.[1]);
+check('the suite is testing the sender\'s own morning hour', hourOf('MORNING_HOUR') === 6, `MORNING_HOUR=${hourOf('MORNING_HOUR')}`);
+check('and its own quiet-hours end', hourOf('QUIET_END') === 21, `QUIET_END=${hourOf('QUIET_END')}`);
 state.subs = [sub('early', MORNING), sub('asleep', MIDNIGHT)];
 state.workouts = []; state.sentLog = [];
 let out = await call({ kind: 'morning' });
-check('reaches the athlete for whom it is 7am', state.pushed.length === 1 && state.pushed[0].endpoint === 'https://push/early');
+check('reaches the athlete for whom it is 6am', state.pushed.length === 1 && state.pushed[0].endpoint === 'https://push/early');
 check('and leaves the one for whom it is midnight alone', !state.pushed.some(p => p.endpoint.includes('asleep')));
 
 state.sentLog = [{ owner: 'early', kind: 'morning', date: dayIn(MORNING) }];
