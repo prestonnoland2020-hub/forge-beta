@@ -11,6 +11,7 @@ import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { needsFollowUp } from '../features/training/athleteNotesService';
 import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyMorningWorkout, maybeNotifyPartnerTrained } from '../lib/notifications';
 import { loadPartners } from '../features/friends/partnerService';
+import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
 
@@ -155,6 +156,15 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     }
     if (prefs.injuryFollowUp) notes.filter(needsFollowUp).forEach(note => maybeNotifyFollowUp(note.area || note.kind));
   }, [recommendation, notes]);
+
+  /* iOS retires push subscriptions after a quiet spell and says nothing, so
+     the worker is registered and the subscription re-confirmed on every
+     launch. Re-subscribing an endpoint that is still good costs nothing; it is
+     the only way to notice one that is not. */
+  useEffect(() => {
+    if (isDemoMode || !user) return;
+    void registerServiceWorker().then(() => syncPushSubscription());
+  }, [user]);
 
   /* THE PARTNER NUDGE. Checked when the app opens and when it comes back to
      the foreground, which is when it can still change the day. It asks the

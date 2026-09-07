@@ -6,10 +6,24 @@ import type { WorkoutRecord } from './WorkoutHistoryProvider';
 
 type DayRow={id:string;workout_date:string;title:string;muscle_groups:string[];notes:string;body_weight:number|null;effort:string|null;recommendation_id:string|null;split_id:string|null;split_day_id:string|null;split_position:number|null;top_sets:Array<{id:string;recommendation_top_set_id:string|null;muscle_group:string;lift_name:string;weight:number;reps:number;calculated_max:number|null;position:number}>;cardio_sessions:Array<{id:string;structure:string;activity:string;summary:string;prescription_snapshot:CardioLogDraft|null}>};
 
+/* EVERY DAY, NOT THE FIRST THOUSAND. PostgREST answers an unbounded select
+   with at most 1000 rows and says nothing about the ones it left behind, so an
+   athlete with years of training silently lost their oldest days — and then
+   the truncated list was written over the local copy, which is how a history
+   shrinks without anyone touching it. Preston is at 1,409 days. Pages are
+   pulled until one comes back short. */
+const PAGE = 1000;
 export async function loadWorkoutHistory():Promise<WorkoutRecord[]>{
-  const {data,error}=await supabase.from('workout_days').select('id,workout_date,title,muscle_groups,notes,body_weight,effort,recommendation_id,split_id,split_day_id,split_position,top_sets(id,recommendation_top_set_id,muscle_group,lift_name,weight,reps,calculated_max,position),cardio_sessions(id,structure,activity,summary,prescription_snapshot)').order('workout_date',{ascending:false});
-  if(error)throw error;
-  return ((data||[]) as DayRow[]).map(day=>{const seen=new Set<string>();const topSets=[...(day.top_sets||[])].sort((a,b)=>a.position-b.position).filter(set=>{const key=`${set.muscle_group.trim().toLowerCase()}|${set.lift_name.trim().toLowerCase()}|${Number(set.weight)}|${Number(set.reps)}`;if(seen.has(key))return false;seen.add(key);return true}).map(set=>({id:set.id,recommendationTopSetId:set.recommendation_top_set_id||undefined,muscle:resolveTopSetMuscle(set.muscle_group,set.lift_name,day.muscle_groups||[]),lift:set.lift_name,weight:Number(set.weight),reps:Number(set.reps),
+  const columns='id,workout_date,title,muscle_groups,notes,body_weight,effort,recommendation_id,split_id,split_day_id,split_position,top_sets(id,recommendation_top_set_id,muscle_group,lift_name,weight,reps,calculated_max,position),cardio_sessions(id,structure,activity,summary,prescription_snapshot)';
+  const rows:DayRow[]=[];
+  for(let from=0;;from+=PAGE){
+    const {data,error}=await supabase.from('workout_days').select(columns).order('workout_date',{ascending:false}).range(from,from+PAGE-1);
+    if(error)throw error;
+    const page=(data||[]) as DayRow[];
+    rows.push(...page);
+    if(page.length<PAGE)break;
+  }
+  return rows.map(day=>{const seen=new Set<string>();const topSets=[...(day.top_sets||[])].sort((a,b)=>a.position-b.position).filter(set=>{const key=`${set.muscle_group.trim().toLowerCase()}|${set.lift_name.trim().toLowerCase()}|${Number(set.weight)}|${Number(set.reps)}`;if(seen.has(key))return false;seen.add(key);return true}).map(set=>({id:set.id,recommendationTopSetId:set.recommendation_top_set_id||undefined,muscle:resolveTopSetMuscle(set.muscle_group,set.lift_name,day.muscle_groups||[]),lift:set.lift_name,weight:Number(set.weight),reps:Number(set.reps),
     /* THE FORMULA OF THE DAY, APPLIED TO EVERY SET. Stored calculated maxes
        were written by whatever formula was current when the set was saved, so
        a history spanning a formula change plots two curves at once and the
