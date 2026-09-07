@@ -887,11 +887,29 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 /* Floating pill tab bar (Instagram's current shape): a detached capsule with
    the active tab highlighted by its own circular chip. */
 @media(max-width:900px){
-  .bottom-nav{position:fixed;inset:auto 14px calc(10px + env(safe-area-inset-bottom));border:1px solid var(--hairline);border-radius:999px;background:color-mix(in srgb,var(--surface-1) 94%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:6px;box-shadow:var(--shadow-2);grid-template-columns:repeat(6,1fr)}
+  /* A BAR ON THE EDGE OF THE SCREEN, NOT A PILL FLOATING OVER THE PAGE.
+
+     The floating version was inset from the sides and lifted off the bottom,
+     over a translucent blur. Three things went wrong with that on a real
+     iPhone. Content showed in the gap underneath it, which reads as a
+     rendering fault rather than a layer. Anything that drifted — and on iOS a
+     fixed, backdrop-filtered layer does drift during momentum scroll — left
+     the pill sitting in the middle of a card with rows unreachable behind it.
+     And a translucent bar over a scrolling list is busy in exactly the place
+     the eye needs to be calm.
+
+     Full-bleed to the bottom edge, opaque, one hairline on top. There is no
+     gap for content to appear in, nothing to composite against the page
+     beneath it, and the safe-area inset is padding inside the bar rather than
+     a hole below it. */
+  .bottom-nav{position:fixed;inset:auto 0 0;z-index:20;border:0;border-top:1px solid var(--hairline);border-radius:0;background:var(--surface-1);padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 var(--shadow-color);grid-template-columns:repeat(6,1fr)}
   .bottom-nav a{min-height:44px}
   .bottom-nav .nav-icon{width:42px;height:42px;border-radius:50%;transition:background var(--dur) var(--ease)}
   .bottom-nav a.active .nav-icon{background:color-mix(in srgb,var(--ink) 13%,transparent)}
-  .coach-bubble-shell{bottom:calc(92px + env(safe-area-inset-bottom))}
+  /* Clear of the bar, measured from it rather than from a guess: the bar is
+     56px of controls plus 12px of padding, and the safe-area inset now lives
+     inside it. */
+  .coach-bubble-shell{bottom:calc(80px + env(safe-area-inset-bottom))}
 }
 
 /* No glow on the log flow: the editor cards lose the accent gradient stripe,
