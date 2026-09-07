@@ -154,6 +154,29 @@ export async function loadPartnerSeries(partnerId: string, metric: string, weeks
     .map(row => ({ bucket: row.bucket, mine: row.mine === null ? null : Number(row.mine), theirs: row.theirs === null ? null : Number(row.theirs) }));
 }
 
+/* THIS WEEK, BOTH OF YOU.
+
+   The comparison people actually make with a training partner is about the
+   week they are in, not a six-month average: who has trained more days, run
+   further, lifted more, and who is on the longer streak. It is one row-trip
+   because it is one question. */
+export type PartnerWeek = { daysTrained: number; miles: number; topSets: number; streak: number };
+const emptyWeek: PartnerWeek = { daysTrained: 0, miles: 0, topSets: 0, streak: 0 };
+
+export async function loadPartnerWeek(partnerId: string): Promise<{ mine: PartnerWeek; theirs: PartnerWeek }> {
+  if (isDemoMode) return { mine: emptyWeek, theirs: emptyWeek };
+  const { data, error } = await supabase.rpc('forge_partner_week', { partner_id: partnerId, p_today: localDayIso() });
+  if (error) throw error;
+  const rows = (data || []) as Array<{ side: string; days_trained: number; miles: string | number; top_sets: number; streak: number }>;
+  const read = (side: string): PartnerWeek => {
+    const row = rows.find(item => item.side === side);
+    return row
+      ? { daysTrained: Number(row.days_trained) || 0, miles: Number(row.miles) || 0, topSets: Number(row.top_sets) || 0, streak: Number(row.streak) || 0 }
+      : emptyWeek;
+  };
+  return { mine: read('mine'), theirs: read('theirs') };
+}
+
 /* Pace is the one metric where less is better, which changes what "best"
    means and which way the chart should point. */
 export const lowerIsBetter = (metric: string) => metric === 'run:pace';

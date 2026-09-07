@@ -104,14 +104,24 @@
    accents, one of them a slate grey, and a series colour drawn from that would
    collide with the axes in one theme and the other line in another. Validated
    on Forge's own card surface in both tones. */
-.partner-chart{--s-mine:#2a78d6;--s-theirs:#d95926;padding:0 12px}
-:root:not([data-theme="light"]) .partner-chart{--s-mine:#3987e5}
-@media(prefers-color-scheme: light){:root:not([data-theme="dark"]) .partner-chart{--s-mine:#2a78d6}}
-:root[data-theme="dark"] .partner-chart{--s-mine:#3987e5}
+/* ONE PAIR OF HUES FOR THE WHOLE SCREEN. The head-to-head bar and the chart
+   below it name the same two people, so they cannot be allowed to drift apart
+   into two different blues. Slot 1 and slot 2 of the validated categorical
+   order, each at the step meant for its own surface — both were previously
+   pinned to the light step, which is what the dark check exists to catch. */
+.partner-detail{--s-mine:#2a78d6;--s-theirs:#eb6834}
+:root:not([data-theme="light"]) .partner-detail{--s-mine:#3987e5;--s-theirs:#d95926}
+@media(prefers-color-scheme: light){:root:not([data-theme="dark"]) .partner-detail{--s-mine:#2a78d6;--s-theirs:#eb6834}}
+:root[data-theme="dark"] .partner-detail{--s-mine:#3987e5;--s-theirs:#d95926}
+.partner-chart{padding:0 12px}
 .partner-chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
 .pchart-grid{stroke:var(--line);stroke-width:1}
 .pchart-axis{fill:var(--ink-3);font-size:8px;font-weight:700}
 .pchart-crosshair{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:2 3;opacity:.7}
+/* Where both athletes started. It is the one line on the chart that carries a
+   meaning rather than a value, so it is drawn a touch stronger than the grid
+   and still well under the series. */
+.pchart-baseline{stroke:var(--ink-3);stroke-width:1.5;opacity:.55}
 .pchart-line{stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .pchart-line.pchart-mine{stroke:var(--s-mine)}
 /* Dashed is the second encoding, so the pair reads without colour at all. */
@@ -135,3 +145,66 @@
 .pchart-key.pchart-theirs i{background:repeating-linear-gradient(90deg,var(--s-theirs) 0 6px,transparent 6px 10px)}
 .pchart-key.off{color:var(--ink-3)}
 .pchart-key.off i{opacity:.3}
+
+/* ---------------------------------------------------------- this week, both
+
+   Four rows, each carrying two numbers and the split between them. The bar is
+   the quick read; the numbers either side are the actual answer, and the
+   leader is named in the footer so nothing here depends on comparing two bar
+   lengths by eye. The two fills use the same pair of series hues as the chart
+   below — you blue, them orange — so identity survives across both. */
+.partner-week{display:grid;gap:2px;padding:16px 16px 12px}
+.partner-week>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px}
+.partner-week h3{margin:0;font:800 17px/1.2 var(--display);color:var(--ink)}
+.partner-week>header small{font-size:11px;color:var(--ink-3);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+
+/* Flex, not grid, and every bar then starts and ends on the same two vertical
+   lines. Sized with `auto` columns each row's bar took its own width from its
+   own numbers, which quietly broke the one comparison the bars exist to make;
+   pinning the columns to 58px did not fix it either — the middle track came
+   back 18px wider than the space left for it on three rows out of four. A row
+   of two fixed ends and one `flex:1 1 0` middle has no such argument with
+   itself. */
+.h2h{display:flex;align-items:center;gap:10px;padding:9px 0}
+.h2h>.h2h-mine,.h2h>.h2h-theirs{flex:0 0 58px}
+.h2h>.h2h-track{flex:1 1 0}
+.h2h+.h2h{border-top:1px solid var(--line)}
+.h2h-mine,.h2h-theirs{display:grid;justify-items:center;gap:1px;min-width:0}
+.h2h b{font:800 20px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.h2h small{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-3);
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The leader's own number is the one that darkens — never both, and never by
+   colour alone: the footer says who is ahead in words. */
+.h2h-mine b{color:var(--ink-3)}
+.h2h-theirs b{color:var(--ink-3)}
+/* The leader modifier is `h2h-lead-*`, not `h2h-*`: the row carries it, and
+   `.h2h-mine` is already the name of the element INSIDE the row. A row marked
+   `h2h-mine` was matching the element rule and taking `display:grid` from it,
+   which is what made three rows out of four lay their bars out differently. */
+.h2h.h2h-lead-mine>.h2h-mine b,.h2h.h2h-lead-theirs>.h2h-theirs b{color:var(--ink)}
+.h2h.h2h-lead-level b{color:var(--ink-2)}
+
+/* The track fills its column: `width:100%` on the bar rather than relying on
+   the grid to stretch it, because the label above it is nowrap and was sizing
+   the column to itself — which made every row's bar a different length and the
+   comparison between rows meaningless. */
+.h2h-track{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0;width:100%}
+.h2h-label{font-size:11px;font-weight:700;color:var(--ink-3);text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A 2px gap of the card's own surface between the two fills, so they read as
+   two quantities rather than one bar with a colour change in it. */
+.h2h-bar{display:flex;gap:2px;height:7px;width:100%;border-radius:999px;background:var(--surface-3)}
+/* flex-basis 0 so the two fills divide the whole track by their share alone;
+   with the default `auto` basis an empty element keeps its own width out of
+   the split and the bar never fills. A zero gets no sliver — nought miles
+   should look like nought, not like a rounding error. */
+.h2h-bar i{display:block;border-radius:999px;flex-basis:0;min-width:0}
+.h2h-bar i.none{display:none}
+.h2h-fill-mine{background:var(--s-mine)}
+.h2h-fill-theirs{background:var(--s-theirs)}
+
+.partner-week-note{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+  font-size:12px;line-height:1.45;color:var(--ink-2)}
+/* The zero line is named rather than numbered — "start" says what it is; "0%"
+   makes the reader work out that it is where the six months began. */
+.pchart-zero{fill:var(--ink-2);font-weight:800}
