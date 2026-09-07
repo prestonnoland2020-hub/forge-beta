@@ -9,6 +9,7 @@ import { sameLift } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { requestForgeCoach } from '../features/training/coachService';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
+import { localDayIso } from '../lib/time';
 
 type GoalEvidence = { date: string; value: number; label: string };
 type GoalCoachTurn = { question: string; answer: string; source: 'ai' | 'local' | 'limit' };
@@ -116,7 +117,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const target = timeGoal ? clockToSeconds(goal.target, hoursFirst) : paceGoal ? clockToSeconds(goal.target) / 60 : numeric(goal.target);
   const entered = timeGoal ? clockToSeconds(goal.current || '', hoursFirst) : paceGoal ? clockToSeconds(goal.current || '') / 60 : numeric(goal.current);
   const lowerIsBetter = timeGoal || paceGoal || (goal.type === 'Body Composition' && target < entered);
-  const recentCutoff=new Date();recentCutoff.setDate(recentCutoff.getDate()-120);const recentCutoffIso=recentCutoff.toISOString().slice(0,10);
+  const recentCutoff=new Date();recentCutoff.setDate(recentCutoff.getDate()-120);const recentCutoffIso=localDayIso(recentCutoff);
   useEffect(()=>{setQuestion('');setAnswer('');setCoachSource(null);setCoachTurns(loadGoalCoachTurns(coachKey))},[coachKey]);
 
   let currentEvidence: GoalEvidence | undefined;
@@ -245,7 +246,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   /* chartStartMs and deadlineMs feed the regression and the endurance
      projection, which are real. The chartSpan/chartX pair beside them fed
      only the trajectory SVG that was never written. */
-  const chartStart=shownProgress[0]?.date||datedTrajectory[0]?.date||new Date().toISOString().slice(0,10);const chartStartMs=new Date(`${chartStart}T12:00:00`).getTime();const deadlineMs=new Date(`${goal.date}T12:00:00`).getTime();
+  const chartStart=shownProgress[0]?.date||datedTrajectory[0]?.date||localDayIso();const chartStartMs=new Date(`${chartStart}T12:00:00`).getTime();const deadlineMs=new Date(`${goal.date}T12:00:00`).getTime();
   const regression=goal.type==='Body Composition'&&datedTrajectory.length>=2?(()=>{const points=datedTrajectory.map(item=>({x:(new Date(`${item.date}T12:00:00`).getTime()-chartStartMs)/86400000,y:item.value}));const meanX=points.reduce((sum,item)=>sum+item.x,0)/points.length,meanY=points.reduce((sum,item)=>sum+item.y,0)/points.length;const denominator=points.reduce((sum,item)=>sum+(item.x-meanX)**2,0);const slope=denominator?points.reduce((sum,item)=>sum+(item.x-meanX)*(item.y-meanY),0)/denominator:0;const intercept=meanY-slope*meanX;const deadlineX=(deadlineMs-chartStartMs)/86400000;return{slope,intercept,predicted:intercept+slope*deadlineX}})():null;
   const strengthForecast=goal.type==='Strength'?buildStrengthForecast(datedTrajectory,calculated,goal.date):null;
   const predictedAtDeadline=strengthForecast?.predicted??regression?.predicted;

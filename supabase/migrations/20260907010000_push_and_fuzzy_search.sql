@@ -169,3 +169,20 @@ commit;
 
    Plus the partner comparison surface: forge_lift_key, forge_to_miles,
    forge_is_partner, forge_partner_metrics, forge_partner_series. */
+
+/* Applied 2026-09-07, same reason one layer deeper: forge_partner_series
+   opened its six-month window at Postgres's current_date, so the chart's
+   last bucket belonged to the server's day, not the athlete's. The window
+   now starts from the device's day like the feed does. The old three-argument
+   signature is dropped first — leaving it in place makes the call ambiguous
+   ("function is not unique") the moment the client sends p_today.
+
+     drop function if exists public.forge_partner_series(uuid, text, integer);
+     create or replace function public.forge_partner_series(
+       partner_id uuid, metric text, weeks integer default 26,
+       p_today date default null)
+     ... with day as (select coalesce(p_today, current_date) as value),
+         span as (select (date_trunc('week', (select value from day))
+                  - ((greatest(least(weeks,104),4) - 1) || ' weeks')::interval)::date
+                  as first_week)
+*/

@@ -148,7 +148,7 @@ export async function loadPartnerMetrics(partnerId: string): Promise<PartnerMetr
 
 export async function loadPartnerSeries(partnerId: string, metric: string, weeks = 26): Promise<SeriesPoint[]> {
   if (isDemoMode) return [];
-  const { data, error } = await supabase.rpc('forge_partner_series', { partner_id: partnerId, metric, weeks });
+  const { data, error } = await supabase.rpc('forge_partner_series', { partner_id: partnerId, metric, weeks, p_today: localDayIso() });
   if (error) throw error;
   return ((data || []) as Array<{ bucket: string; mine: string | null; theirs: string | null }>)
     .map(row => ({ bucket: row.bucket, mine: row.mine === null ? null : Number(row.mine), theirs: row.theirs === null ? null : Number(row.theirs) }));

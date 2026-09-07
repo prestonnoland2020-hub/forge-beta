@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { isDemoMode } from '../../lib/env';
+import { localDayIso } from '../../lib/time';
 
 /* Coach learnings: things the athlete tells Forge about their body — an
    injury, unusual fatigue, a limitation. Each note carries a buffer window
@@ -20,7 +21,7 @@ export type AthleteNote = {
 };
 
 const storageKey = 'forge-athlete-notes-v1';
-const todayIso = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const todayIso = () => localDayIso();
 export const addDaysIso = (iso: string, days: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
 
 /* Default buffers, in days, when the athlete doesn't set one: an injury gets a

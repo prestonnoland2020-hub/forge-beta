@@ -244,7 +244,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       const context = {
         blockWeeks: 10,
         units: metric ? 'metric' : 'imperial',
-        today: new Date().toISOString().slice(0, 10),
+        today: localDayIso(),
         goals: goals.map(goal => ({ type: goal.type, title: goal.title, exercise: goal.exercise, metric: goal.metric, target: goal.target, current: goal.current, deadline: goal.date })),
         profile: { weeklyMileage: profile.weeklyMileage, minWeeklyMileage, maxWeeklyMileage, runningDays: profile.runningDays, longestRunMiles: profile.longestRunMiles, readiness: profile.readiness },
         splitDays: splitDays.map((day, index) => ({ position: index + 1, name: day.name, type: day.dayType, muscles: day.muscles || [], exercises: day.exercises || [] })),
@@ -269,7 +269,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       };
       const plan = await generateAiPlan(context);
       /* A newly generated block starts unsaved — it has not been approved. */
-      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate: new Date().toISOString().slice(0, 10), fingerprint, blockWeeks: plan.weeks.length, saved: false, waveOffset, ...(adjustments ? { adjustments } : {}) };
+      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate: localDayIso(), fingerprint, blockWeeks: plan.weeks.length, saved: false, waveOffset, ...(adjustments ? { adjustments } : {}) };
       await saveStoredAiPlan(next, Boolean(user));
       setStored(next);
       return true;

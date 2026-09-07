@@ -1,3 +1,4 @@
+import { localDayIso } from './time';
 /* Notification preferences and best-effort delivery. System notifications on
    the web fire while Forge is open (or installed) and permission is granted;
    the Coach tab is the always-reliable in-app surface for the same messages. */
@@ -16,7 +17,7 @@ export const notificationsSupported = () => typeof Notification !== 'undefined';
 export const notificationPermission = () => notificationsSupported() ? Notification.permission : 'denied';
 export const requestNotificationPermission = async () => notificationsSupported() ? Notification.requestPermission() : 'denied';
 
-const todayIso = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const todayIso = () => localDayIso();
 const alreadySent = (tag: string) => {
   try { const sent = JSON.parse(localStorage.getItem(sentKey) || '{}'); return sent[tag] === todayIso(); } catch { return false; }
 };

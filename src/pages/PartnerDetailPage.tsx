@@ -61,17 +61,21 @@ export function PartnerDetailPage() {
   const kpis = useMemo(() => {
     const pick = (which: 'mine' | 'theirs') => points.map(point => point[which]).filter((value): value is number => value !== null);
     const best = (values: number[]) => values.length ? (lowerIsBetter(metric) ? Math.min(...values) : Math.max(...values)) : null;
+    const trend = (values: number[]) => values.length >= 2 ? values[values.length - 1] - values[0] : null;
     const mine = pick('mine'); const theirs = pick('theirs');
-    const change = mine.length >= 2 ? mine[mine.length - 1] - mine[0] : null;
-    return { myBest: best(mine), theirBest: best(theirs), change };
+    return { myBest: best(mine), theirBest: best(theirs), myChange: trend(mine), theirChange: trend(theirs) };
   }, [points, metric]);
 
   const theirName = (partner?.displayName || 'Partner').split(' ')[0];
   const unit = metricUnit(metric, weightUnit);
   const label = metrics.find(item => item.key === metric)?.label || '';
-  const better = kpis.change === null ? '' : lowerIsBetter(metric)
-    ? (kpis.change < 0 ? 'up' : kpis.change > 0 ? 'down' : '')
-    : (kpis.change > 0 ? 'up' : kpis.change < 0 ? 'down' : '');
+  /* "Better" is not "bigger": on pace a smaller number is the good direction,
+     so the tone of a trend is decided by the metric, not by the sign. */
+  const direction = (change: number | null) => change === null || change === 0 ? ''
+    : lowerIsBetter(metric) ? (change < 0 ? 'up' : 'down') : (change > 0 ? 'up' : 'down');
+  /* A signed number reads as a change; the sign is written, never implied. */
+  const signed = (change: number | null) =>
+    change === null ? '—' : `${change > 0 ? '+' : change < 0 ? '−' : ''}${formatMetric(metric, Math.abs(change))}`;
 
   if (loading) return <div className="stack-xl"><section className="card"><p>Loading…</p></section></div>;
   if (!partner) return <div className="stack-xl"><section className="card"><p>This partner is no longer on your list.</p></section></div>;
@@ -93,10 +97,13 @@ export function PartnerDetailPage() {
     {!metrics.length
       ? <section className="card"><p className="partner-empty">Nothing to compare yet. Once you have both logged the same lift, it appears here.</p></section>
       : <>
+        {/* Both athletes, both numbers: a best and a six-month trend each, so
+            the comparison reads across as well as down. */}
         <section className="partner-kpis">
           <div><span>Your best</span><strong>{formatMetric(metric, kpis.myBest)}</strong><small>{kpis.myBest === null ? '' : unit}</small></div>
           <div><span>{theirName} best</span><strong>{formatMetric(metric, kpis.theirBest)}</strong><small>{kpis.theirBest === null ? '' : unit}</small></div>
-          <div className={better}><span>Your trend</span><strong>{kpis.change === null ? '—' : `${kpis.change > 0 ? '+' : ''}${formatMetric(metric, Math.abs(kpis.change) * (kpis.change < 0 ? -1 : 1))}`}</strong><small>{kpis.change === null ? 'need 2 weeks' : `${unit} · 6 months`}</small></div>
+          <div className={direction(kpis.myChange)}><span>Your trend</span><strong>{signed(kpis.myChange)}</strong><small>{kpis.myChange === null ? 'needs 2 weeks' : `${unit} · 6 months`}</small></div>
+          <div className={direction(kpis.theirChange)}><span>{theirName} trend</span><strong>{signed(kpis.theirChange)}</strong><small>{kpis.theirChange === null ? 'needs 2 weeks' : `${unit} · 6 months`}</small></div>
         </section>
 
         {/* Every measure the two of you have between you, the shared ones first. */}

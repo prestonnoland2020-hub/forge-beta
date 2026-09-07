@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { cardioMiles, type CardioLogDraft } from '../../lib/cardioSession';
 import type { WorkoutRecord } from './WorkoutHistoryProvider';
+import { localDayIso } from '../../lib/time';
 
 /* Bridge: synced Strava activities (external_activities) become real training
    days in the log — merged into existing days, deduped by external id, so a
@@ -246,7 +247,7 @@ export async function importStravaActivities(
   }
   let imported = 0; const importedRowIds: string[] = []; const reviewIds: ReviewEntry[] = [];
   const reviewCutoff = new Date(); reviewCutoff.setDate(reviewCutoff.getDate() - 3);
-  const reviewCutoffIso = reviewCutoff.toISOString().slice(0, 10);
+  const reviewCutoffIso = localDayIso(reviewCutoff);
   for (const [date, entry] of byDate) {
     const hasCardio = entry.sessions.length > 0;
     const result = addRecord({

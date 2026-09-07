@@ -1,5 +1,6 @@
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
+import { localDayIso } from './time';
 
 export type RacePrediction = {
   seconds: number;
@@ -17,7 +18,7 @@ export type RacePrediction = {
 type Run = { date: string; miles: number; seconds: number };
 
 const DAY = 86_400_000;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDayIso();
 const dateMs = (date: string) => new Date(`${date}T12:00:00`).getTime();
 const nonRunning = (value: string) => /row|ski|bike|cycl|wall ball|assault|hyrox|circuit|swim|elliptical|erg/i.test(value);
 const daysAgo = (date: string) => Math.max(0, Math.floor((dateMs(today()) - dateMs(date)) / DAY));
