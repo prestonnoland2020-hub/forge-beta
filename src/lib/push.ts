@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
 import { env, isDemoMode } from './env';
-import { loadNotificationPrefs } from './notifications';
 
 /* REAL PUSH, THE ONE WAY IOS ALLOWS IT.
 
@@ -73,7 +72,13 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 
 /* Called on every launch once the athlete has said yes. Returns true while a
    live subscription is on file, so the settings toggle can tell the truth. */
-export async function syncPushSubscription(): Promise<boolean> {
+/* `prefs` is sent ONLY when the athlete just changed a switch. The launch
+   sync omits it, so the choice stored on their account survives a cleared
+   localStorage — see forge_save_push_subscription, where null means "leave it
+   as it is". Sending the local copy on every launch turned both notifications
+   off for anyone whose device cache had been wiped, silently, while the app
+   still drew the switches as on. */
+export async function syncPushSubscription(prefs?: { morningWorkout: boolean; partnerTrained: boolean }): Promise<boolean> {
   if (isDemoMode || !pushSupported()) return false;
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
   const vapidPublic = await applicationServerKey();
@@ -103,17 +108,14 @@ export async function syncPushSubscription(): Promise<boolean> {
     const p256dh = keyToBase64(subscription.getKey('p256dh'));
     const auth = keyToBase64(subscription.getKey('auth'));
     if (!p256dh || !auth) return false;
-    /* The settings toggles travel with the subscription. They were saved to
-       localStorage and read by nothing, so the sender pushed both kinds to
-       everyone regardless of what the athlete had chosen; the switch that
-       turned nothing off is now the switch the server obeys. Every launch
-       re-sends them, which is also how a change made offline eventually
-       lands. */
-    const prefs = loadNotificationPrefs();
+    /* The toggles the server obeys. Passing null leaves the stored choice
+       alone, which is what a launch does; only a deliberate change carries
+       new values. */
     const { error } = await supabase.rpc('forge_save_push_subscription', {
       p_endpoint: subscription.endpoint, p_p256dh: p256dh, p_auth: auth,
       p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      p_wants_morning: prefs.morningWorkout, p_wants_partner: prefs.partnerTrained,
+      p_wants_morning: prefs ? prefs.morningWorkout : null,
+      p_wants_partner: prefs ? prefs.partnerTrained : null,
     });
     return !error;
   } catch { return false; }

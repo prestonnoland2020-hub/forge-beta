@@ -31,7 +31,9 @@ export function NotificationSettings() {
     /* Every change re-syncs, not just the ones that switch something on: the
        server reads these preferences off the subscription now, so turning the
        morning brief OFF is a message the server has to receive too. */
-    if (granted === 'granted') setRegistered(await syncPushSubscription());
+    /* An explicit change, so the new values travel — this is the only call
+       that may alter what the server has stored. */
+    if (granted === 'granted') setRegistered(await syncPushSubscription({ morningWorkout: next.morningWorkout, partnerTrained: next.partnerTrained }));
   };
   return <section className="card notification-settings">
     <header><span className="eyebrow">NOTIFICATIONS</span><h3>Check-ins from Forge</h3></header>
