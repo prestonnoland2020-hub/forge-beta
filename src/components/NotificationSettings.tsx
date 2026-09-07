@@ -9,6 +9,12 @@ const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.
 export function NotificationSettings() {
   const [prefs, setPrefs] = useState<NotificationPrefs>(() => loadNotificationPrefs());
   const [permission, setPermission] = useState(notificationPermission());
+  /* WHETHER THE DEVICE IS ACTUALLY REGISTERED, WHICH IS NOT THE SAME QUESTION
+     AS WHETHER THE SWITCH IS ON. syncPushSubscription already returned this
+     and the answer was thrown away, so a device that accepted the iOS prompt
+     but failed to reach the server looked identical to one that worked, and
+     the athlete found out weeks later by never being notified. */
+  const [registered, setRegistered] = useState<boolean | null>(null);
   /* THE TAP IS THE POINT. iOS only raises the permission prompt from a real
      user gesture, and only subscribes to push after that — so the toggle both
      asks and subscribes, here, rather than anything happening on page load.
@@ -16,13 +22,16 @@ export function NotificationSettings() {
   const toggle = async (key: keyof NotificationPrefs) => {
     const next = { ...prefs, [key]: !prefs[key] };
     setPrefs(next); saveNotificationPrefs(next);
-    if (next[key]) {
-      const granted = permission === 'granted' ? 'granted' : await requestNotificationPermission();
-      setPermission(granted);
-      if (granted === 'granted') await syncPushSubscription();
-    } else if (!next.morningWorkout && !next.injuryFollowUp && !next.partnerTrained) {
+    if (!next.morningWorkout && !next.injuryFollowUp && !next.partnerTrained) {
       await disablePush();
+      return;
     }
+    const granted = next[key] && permission !== 'granted' ? await requestNotificationPermission() : permission;
+    setPermission(granted);
+    /* Every change re-syncs, not just the ones that switch something on: the
+       server reads these preferences off the subscription now, so turning the
+       morning brief OFF is a message the server has to receive too. */
+    if (granted === 'granted') setRegistered(await syncPushSubscription());
   };
   return <section className="card notification-settings">
     <header><span className="eyebrow">NOTIFICATIONS</span><h3>Check-ins from Forge</h3></header>
@@ -37,6 +46,8 @@ export function NotificationSettings() {
     {notificationsSupported() && !installedToHomeScreen() && isIos() && <small className="notification-note">
       On iPhone, notifications only arrive when Forge is on your Home Screen. Tap Share, then <strong>Add to Home Screen</strong>, and open it from there.
     </small>}
+    {registered === false && permission === 'granted' && <small className="notification-note">This device could not be registered for notifications — check your connection and tap a switch again.</small>}
+    {registered === true && <small className="notification-note">This device is registered. Notifications will arrive with Forge closed.</small>}
     {notificationsSupported() && permission === 'denied' && (prefs.morningWorkout || prefs.injuryFollowUp) && <small className="notification-note">Notifications are blocked in your browser settings — the check-ins will appear here on the Coach tab instead.</small>}
   </section>;
 }
