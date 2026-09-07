@@ -191,3 +191,30 @@ commit;
 
    VAPID_PRIVATE_KEY is set as an edge-function environment secret and
    deliberately appears nowhere in this repository or this database. */
+
+/* ---- 7. asked once for everyone (applied the same night) ------------- */
+begin;
+
+/* forge_push_already_sent answered for one athlete on one day, and the sender
+   called it inside its loop — one round trip per subscription, on top of one
+   more for "have they trained". At one subscriber that is two queries; at two
+   hundred it is four hundred, run one after another inside the eight-second
+   budget pg_net allows the call, and the first thing to break would be the
+   morning brief for whoever sorted last. This answers for the whole candidate
+   set at once. The single-athlete form above is kept: it is useful from the
+   SQL editor and costs nothing. */
+create or replace function public.forge_push_sent_days(p_kind text, p_owners uuid[], p_dates date[])
+returns table (owner_id uuid, local_date date)
+language sql stable security definer set search_path = '' as $$
+  select distinct l.owner_id, l.local_date
+  from private.push_log l
+  where l.kind = p_kind and l.outcome = 'sent'
+    and l.owner_id = any(p_owners) and l.local_date = any(p_dates);
+$$;
+revoke all on function public.forge_push_sent_days(text, uuid[], date[]) from public, anon, authenticated;
+grant execute on function public.forge_push_sent_days(text, uuid[], date[]) to service_role;
+
+commit;
+
+/* The prune function existed and nothing called it. Weekly, off-peak: */
+-- select cron.schedule('forge-prune-push-log', '17 4 * * 0', $$ select private.forge_prune_push_log() $$);

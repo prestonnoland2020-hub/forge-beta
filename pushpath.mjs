@@ -17,7 +17,7 @@ const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL
 /* ---- the world the function runs in ---------------------------------- */
 const CHICAGO = 'America/Chicago';
 const state = {
-  subs: [], workouts: [], sentLog: [], profiles: [], friendships: [],
+  subs: [], workouts: [], sentLog: [], profiles: [], friendships: [], workoutQueries: 0,
   vapid: { pub: 'PUB', priv: 'PRIV' }, written: [], pushed: [], deleted: [],
 };
 
@@ -37,7 +37,10 @@ function run(q) {
     if (q.isDelete) { state.deleted.push(...q.filters); return { data: [] }; }
     return { data: state.subs.filter(row => matches(row, q.filters)) };
   }
-  if (q.name === 'workout_days') return { data: state.workouts.filter(row => matches(row, q.filters)) };
+  if (q.name === 'workout_days') {
+    state.workoutQueries += 1;
+    return { data: state.workouts.filter(row => matches(row, q.filters)) };
+  }
   if (q.name === 'profiles') return { data: state.profiles.filter(row => matches(row, q.filters)) };
   if (q.name === 'friendships') {
     const actor = (q.orExpr.match(/requester_id\.eq\.([^,]+)/) || [])[1];
@@ -50,8 +53,10 @@ const admin = {
   rpc: async (fn, args) => {
     if (fn === 'forge_push_settings') return { data: { push_secret: 'shhh', vapid_public: state.vapid.pub, vapid_private: state.vapid.priv, vapid_subject: 'mailto:a@b.c' } };
     if (fn === 'forge_push_record') { state.written.push(...args.p_rows); return { data: null }; }
-    if (fn === 'forge_push_already_sent') {
-      return { data: state.sentLog.some(r => r.owner === args.p_owner && r.kind === args.p_kind && r.date === args.p_date) };
+    if (fn === 'forge_push_sent_days') {
+      return { data: state.sentLog
+        .filter(r => r.kind === args.p_kind && args.p_owners.includes(r.owner) && args.p_dates.includes(r.date))
+        .map(r => ({ owner_id: r.owner, local_date: r.date })) };
     }
     return { data: null };
   },
@@ -72,7 +77,7 @@ globalThis.sendPush = async (target, payload) => { state.pushed.push({ endpoint:
 await import(`data:text/javascript,${encodeURIComponent(
   code.replace(/\bconst admin\b/, 'const _unusedAdmin').replace(/^/, 'const admin = globalThis.admin; const sendPush = globalThis.sendPush;\n'))}`);
 const call = async body => {
-  state.pushed = []; state.written = []; state.deleted = [];
+  state.pushed = []; state.written = []; state.deleted = []; state.workoutQueries = 0;
   const response = await globalThis.__handler(new Request('https://x/', {
     method: 'POST', headers: { 'x-forge-push': 'shhh', 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }));
@@ -171,6 +176,14 @@ skew += 61_000;
 out = await call({ kind: 'morning' });
 check('and is picked up once the window passes, without a redeploy', state.pushed.length === 1);
 Date.now = realNow;
+
+console.log('\nAt more than one subscriber');
+state.vapid = { pub: 'PUB', priv: 'PRIV' };
+state.sentLog = []; state.workouts = [];
+state.subs = Array.from({ length: 25 }, (_, index) => sub(`athlete-${index}`, MORNING));
+out = await call({ kind: 'morning' });
+check('twenty-five athletes all get their brief', state.pushed.length === 25, `${state.pushed.length}`);
+check('and the gates cost one query, not one each', state.workoutQueries === 1, `${state.workoutQueries} workout queries`);
 
 console.log('\nAuthorisation');
 const forbidden = await globalThis.__handler(new Request('https://x/', {

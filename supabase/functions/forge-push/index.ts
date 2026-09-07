@@ -74,9 +74,27 @@ const localDate = (timezone: string) => {
   catch { return new Date().toISOString().slice(0, 10); }
 };
 
-async function trainedToday(ownerId: string, date: string) {
-  const { data } = await admin.from('workout_days').select('id').eq('owner_id', ownerId).eq('workout_date', date).limit(1);
-  return Boolean(data?.length);
+/* TWO QUESTIONS, ASKED ONCE FOR EVERYONE RATHER THAN TWICE PER PERSON.
+
+   Both gates below — has this athlete trained today, have they already been
+   told today — used to be a round trip each, inside the loop. At one
+   subscriber that is two queries; at two hundred it is four hundred, run one
+   after another inside the eight-second budget the database gives this call,
+   and the first thing to break would have been the morning brief for whoever
+   sorted last. Each is now a single query over the whole candidate set,
+   answered from a Set.
+
+   The pairs are (owner, their own local day), which differ across timezones,
+   so the key is both. */
+const pairKey = (ownerId: string, date: string) => `${ownerId}|${date}`;
+
+async function trainedDays(pairs: Array<[string, string]>): Promise<Set<string>> {
+  if (!pairs.length) return new Set();
+  const owners = [...new Set(pairs.map(pair => pair[0]))];
+  const dates = [...new Set(pairs.map(pair => pair[1]))];
+  const { data } = await admin.from('workout_days').select('owner_id,workout_date')
+    .in('owner_id', owners).in('workout_date', dates);
+  return new Set((data || []).map(row => pairKey(row.owner_id as string, String(row.workout_date))));
 }
 
 /* THE MORNING CRON WAKES TWELVE TIMES PER ATHLETE PER DAY AND MUST SPEAK ONCE.
@@ -86,9 +104,14 @@ async function trainedToday(ownerId: string, date: string) {
    all put two runs inside one local 7 o'clock. The log is the memory: if this
    athlete has already been told about this local day, they are not told
    again. */
-async function alreadySent(ownerId: string, kind: string, date: string) {
-  const { data } = await admin.rpc('forge_push_already_sent', { p_owner: ownerId, p_kind: kind, p_date: date });
-  return data === true;
+async function sentDays(kind: string, pairs: Array<[string, string]>): Promise<Set<string>> {
+  if (!pairs.length) return new Set();
+  const { data } = await admin.rpc('forge_push_sent_days', {
+    p_kind: kind,
+    p_owners: [...new Set(pairs.map(pair => pair[0]))],
+    p_dates: [...new Set(pairs.map(pair => pair[1]))],
+  }) as { data: Array<{ owner_id: string; local_date: string }> | null };
+  return new Set((data || []).map(row => pairKey(row.owner_id, String(row.local_date))));
 }
 
 const COLUMNS = 'endpoint,owner_id,p256dh,auth,timezone,wants_morning,wants_partner';
@@ -139,11 +162,17 @@ Deno.serve(async request => {
     /* The filter is on the query, not in the loop: an athlete who turned the
        morning brief off should not even be considered. */
     const { data } = await admin.from('push_subscriptions').select(COLUMNS).eq('wants_morning', true);
-    for (const row of (data || []) as Row[]) {
-      const date = localDate(row.timezone);
-      if (localHour(row.timezone) !== 7) continue;
-      if (await trainedToday(row.owner_id, date)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already trained' }); continue; }
-      if (await alreadySent(row.owner_id, kind, date)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already sent today' }); continue; }
+    /* Whose 7 o'clock it is, decided before anything is asked of the database. */
+    const due = ((data || []) as Row[])
+      .filter(row => localHour(row.timezone) === 7)
+      .map(row => ({ row, date: localDate(row.timezone) }));
+    const pairs = due.map(({ row, date }) => [row.owner_id, date] as [string, string]);
+    const trained = await trainedDays(pairs);
+    const told = await sentDays(kind, pairs);
+    for (const { row, date } of due) {
+      const key = pairKey(row.owner_id, date);
+      if (trained.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already trained' }); continue; }
+      if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already sent today' }); continue; }
       messages.push({ row, date, payload: { title: 'Today’s training', body: 'Open Forge to see what is next in your split.', tag: `morning-${date}`, url: './#/' } });
     }
   }
@@ -161,12 +190,20 @@ Deno.serve(async request => {
     const partnerIds = (links || []).map(link => link.requester_id === actor ? link.addressee_id : link.requester_id);
     if (!partnerIds.length) return json({ sent: 0 });
     const { data } = await admin.from('push_subscriptions').select(COLUMNS).eq('wants_partner', true).in('owner_id', partnerIds);
+    const awake: Array<{ row: Row; date: string }> = [];
     for (const row of (data || []) as Row[]) {
       const hour = localHour(row.timezone);
       const date = localDate(row.timezone);
       if (hour < 8 || hour >= 21) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: `quiet hours (local ${hour})` }); continue; }
-      if (await trainedToday(row.owner_id, date)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already trained' }); continue; }
-      if (await alreadySent(row.owner_id, kind, date)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already nudged today' }); continue; }
+      awake.push({ row, date });
+    }
+    const pairs = awake.map(({ row, date }) => [row.owner_id, date] as [string, string]);
+    const trained = await trainedDays(pairs);
+    const told = await sentDays(kind, pairs);
+    for (const { row, date } of awake) {
+      const key = pairKey(row.owner_id, date);
+      if (trained.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already trained' }); continue; }
+      if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already nudged today' }); continue; }
       messages.push({ row, date, payload: { title: 'Your turn', body: `${name} trained today. You haven’t logged yet.`, tag: `partner-${date}`, url: './#/' } });
     }
   }
