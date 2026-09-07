@@ -135,7 +135,16 @@ export async function loadDiscoverable(): Promise<boolean> {
 
 /* WHAT TWO ATHLETES CAN COMPARE. One weekly number per metric, per person —
    a lift's calculated max, weekly running, or pace. Never a session. */
-export type PartnerMetric = { key: string; label: string; kind: 'strength' | 'endurance'; mine: boolean; theirs: boolean };
+/* Three kinds, because a phone cannot hold one flat list of them. Strength and
+   endurance are what the two of you are comparing; body is what the training
+   is doing to you, and it is the one kind with no better direction. */
+export type MetricKind = 'endurance' | 'strength' | 'body';
+export type PartnerMetric = { key: string; label: string; kind: MetricKind; mine: boolean; theirs: boolean };
+export const METRIC_KINDS: Array<{ kind: MetricKind; label: string }> = [
+  { kind: 'endurance', label: 'Endurance' },
+  { kind: 'strength', label: 'Strength' },
+  { kind: 'body', label: 'Body' },
+];
 export type SeriesPoint = { bucket: string; mine: number | null; theirs: number | null };
 
 export async function loadPartnerMetrics(partnerId: string): Promise<PartnerMetric[]> {
@@ -180,6 +189,12 @@ export async function loadPartnerWeek(partnerId: string): Promise<{ mine: Partne
 /* Pace is the one metric where less is better, which changes what "best"
    means and which way the chart should point. */
 export const lowerIsBetter = (metric: string) => metric === 'run:pace';
+/* SOME NUMBERS HAVE NO GOOD DIRECTION. A partner gaining eight pounds and a
+   partner losing eight pounds may both be doing exactly what they set out to
+   do, and Forge does not know which. Body weight is therefore reported as
+   change, never as progress: no green, no red, no "trend" that implies one of
+   them is winning. */
+export const hasVerdict = (metric: string) => !metric.startsWith('body:');
 export const metricUnit = (metric: string, weightUnit: string) =>
   metric === 'run:pace' ? '/mi' : metric === 'run:miles' ? 'mi' : weightUnit;
 export const formatMetric = (metric: string, value: number | null | undefined): string => {
@@ -188,7 +203,7 @@ export const formatMetric = (metric: string, value: number | null | undefined): 
     const minutes = Math.floor(value); const seconds = Math.round((value - minutes) * 60);
     return `${minutes}:${String(seconds === 60 ? 0 : seconds).padStart(2, '0')}`;
   }
-  return metric === 'run:miles' ? String(Math.round(value * 10) / 10) : String(Math.round(value));
+  return metric === 'run:miles' || metric === 'body:weight' ? String(Math.round(value * 10) / 10) : String(Math.round(value));
 };
 
 const inviteKey = 'forge-partner-invite';

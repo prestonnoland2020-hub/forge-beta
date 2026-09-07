@@ -91,11 +91,18 @@
 .partner-compare{padding:0;overflow:hidden}
 .partner-compare>header{padding:16px 18px 4px}
 .partner-compare h3{margin:0;font:800 17px/1.2 var(--display);color:var(--ink)}
-/* The filter is one row above the chart, and it scrolls rather than wraps. */
-.partner-metric-filter{display:flex;gap:7px;overflow-x:auto;padding:10px 18px 12px;scrollbar-width:none}
-.partner-metric-filter::-webkit-scrollbar{display:none}
-.partner-metric{flex:0 0 auto;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);border-radius:999px;padding:7px 13px;font:700 12.5px var(--body);white-space:nowrap;cursor:pointer}
-.partner-metric.shared{color:var(--ink)}
+/* TWO ROWS, NEITHER OF WHICH SCROLLS.
+
+   The old filter was one horizontal strip of every shared measure, and on a
+   390px phone its last pill was cut in half by the edge of the card. A
+   segmented control of at most three kinds always fits; the measures inside a
+   kind wrap onto a second line instead of running off the screen. Nothing here
+   is reachable only by dragging sideways. */
+.partner-kinds{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;margin:10px 18px 0;padding:4px;border-radius:12px;background:var(--surface-sunken)}
+.partner-kind{border:0;background:none;border-radius:9px;padding:9px 6px;color:var(--ink-2);font:800 13px var(--body);cursor:pointer}
+.partner-kind.active{background:var(--surface-1);color:var(--ink);box-shadow:0 1px 2px var(--shadow-color)}
+.partner-metrics{display:flex;flex-wrap:wrap;gap:7px;padding:10px 18px 2px}
+.partner-metric{border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);border-radius:999px;padding:7px 13px;font:700 12.5px var(--body);cursor:pointer}
 .partner-metric.active{background:var(--accent-strong);color:var(--accent-ink);border-color:transparent}
 .partner-compare-note{margin:0;padding:0 18px 16px;color:var(--ink-3);font-size:12px;line-height:1.5}
 .partner-chart-empty{margin:0;padding:6px 18px 18px;color:var(--ink-2);font-size:13.5px;line-height:1.5}
@@ -115,8 +122,15 @@
 :root[data-theme="dark"] .partner-detail{--s-mine:#3987e5;--s-theirs:#d95926}
 .partner-chart{padding:0 12px}
 .partner-chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
-.pchart-grid{stroke:var(--line);stroke-width:1}
-.pchart-axis{fill:var(--ink-3);font-size:8px;font-weight:700}
+/* The baseline label sits inside the plot, where a series line can cross it.
+   A halo in the card's own colour keeps it readable without a filled box. */
+.pchart-axis{fill:var(--ink-3);font-size:8px;font-weight:700;paint-order:stroke;stroke:var(--panel);stroke-width:3px;stroke-linejoin:round}
+/* The name rides at the end of its own line, which is where identity belongs
+   on a two-series chart — closer to the data than any legend, and colour is
+   never the only thing carrying it. */
+.pchart-name{font-size:10px;font-weight:800}
+.pchart-name.pchart-mine{fill:var(--s-mine)}
+.pchart-name.pchart-theirs{fill:var(--s-theirs)}
 .pchart-crosshair{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:2 3;opacity:.7}
 /* Where both athletes started. It is the one line on the chart that carries a
    meaning rather than a value, so it is drawn a touch stronger than the grid
@@ -136,15 +150,7 @@
 .pchart-readout .pchart-mine{color:var(--s-mine)}
 .pchart-readout .pchart-theirs{color:var(--s-theirs)}
 .pchart-hint{color:var(--ink-3)}
-.pchart-legend{display:flex;gap:14px;padding:6px 6px 14px}
-.pchart-key{display:inline-flex;align-items:center;gap:7px;border:0;background:none;padding:2px 0;color:var(--ink-2);font:700 12.5px var(--body);cursor:pointer}
-.pchart-key i{width:16px;height:3px;border-radius:2px;flex:none}
-.pchart-key.pchart-mine i{background:var(--s-mine)}
-/* The legend swatch carries the same dash the line does, so the key and the
-   chart agree without anyone having to match two oranges. */
-.pchart-key.pchart-theirs i{background:repeating-linear-gradient(90deg,var(--s-theirs) 0 6px,transparent 6px 10px)}
-.pchart-key.off{color:var(--ink-3)}
-.pchart-key.off i{opacity:.3}
+.pchart-readout{padding-bottom:12px}
 
 /* ---------------------------------------------------------- this week, both
 

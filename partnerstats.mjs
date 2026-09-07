@@ -32,6 +32,18 @@ check('and it still points the right way for Adam', fittedChange(ADAM) !== null,
 check('a flat series has no trend', slopePerWeek([5, 5, 5, 5]) === 0);
 check('two weeks is not enough to fit anything', fittedChange([7, 8]) === null);
 check('a clean improvement is measured, not guessed', round(fittedChange([10, 9, 8, 7])) === -3, `${round(fittedChange([10, 9, 8, 7]))}`);
+/* THE GAPS ARE REAL WEEKS. The series only carries the weeks somebody logged,
+   so four readings taken a month apart used to be measured as four weeks of
+   change — every per-week figure on the screen came out steeper than it was.
+   Given the real week offsets, the same four readings span thirteen weeks. */
+check('a gap in the logging is counted as the weeks it was',
+  round(fittedChange([10, 9, 8, 7], [0, 4, 9, 13])) === -2.9,
+  `${round(fittedChange([10, 9, 8, 7], [0, 4, 9, 13]))} over 13 weeks`);
+check('and the slope is per real week, not per reading — a quarter of what counting readings claimed',
+  Math.abs(slopePerWeek([10, 9, 8, 7], [0, 4, 9, 13]) + 0.2265) < 0.001,
+  String(slopePerWeek([10, 9, 8, 7], [0, 4, 9, 13])));
+check('without offsets it still reads positions, as it always did',
+  slopePerWeek([10, 9, 8, 7]) === -1);
 
 console.log('\nA best that is repeatable');
 check('one fluke week does not become his best pace', repeatableBest(PRESTON, true) === 5.8, `${repeatableBest(PRESTON, true)} min/mi (the 5.3 is dropped)`);

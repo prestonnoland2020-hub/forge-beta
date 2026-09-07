@@ -29,8 +29,16 @@ export type Series = Array<number | null>;
    walk, a downhill mile, a missed lift — any single week can only move the
    median by one place, so the estimate follows what the athlete usually does.
    It costs O(n squared) on at most 104 weeks, which is nothing. */
-export function slopePerWeek(values: Series): number | null {
-  const points = values.map((value, index) => ({ index, value })).filter((p): p is { index: number; value: number } => p.value !== null);
+/* `at` is where each value sits on the week axis. It matters because the
+   series only carries the weeks SOMEBODY logged: Adam weighed in twelve times
+   across six months, so his twelve readings sat at positions 0..11 and a
+   change measured over them came out over "eleven weeks" rather than the
+   twenty-five he actually lived. Any gap in either athlete's logging inflated
+   every per-week number on the screen. Given real week offsets the slope is
+   per real week; without them it falls back to position, which is right only
+   when nothing is missing. */
+export function slopePerWeek(values: Series, at?: number[]): number | null {
+  const points = values.map((value, index) => ({ index: at?.[index] ?? index, value })).filter((p): p is { index: number; value: number } => p.value !== null);
   if (points.length < 3) return null;
   const slopes: number[] = [];
   for (let a = 0; a < points.length; a += 1) {
@@ -47,10 +55,10 @@ export function slopePerWeek(values: Series): number | null {
 
 /* The fitted change from the first logged week to the last, which is what the
    athlete actually lived through — not the slope of one week. */
-export function fittedChange(values: Series): number | null {
-  const slope = slopePerWeek(values);
+export function fittedChange(values: Series, at?: number[]): number | null {
+  const slope = slopePerWeek(values, at);
   if (slope === null) return null;
-  const logged = values.map((value, index) => ({ index, value })).filter(p => p.value !== null);
+  const logged = values.map((value, index) => ({ index: at?.[index] ?? index, value })).filter(p => p.value !== null);
   const span = logged[logged.length - 1].index - logged[0].index;
   return span > 0 ? slope * span : null;
 }
