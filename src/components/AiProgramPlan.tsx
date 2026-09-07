@@ -126,7 +126,11 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const { recommendation } = useDailyRecommendation();
   const { setup } = useProfileSetup();
   const metric = setup?.units === 'Metric';
-  const anchor = recommendation ? { position: recommendation.splitDay.position } : undefined;
+  /* A recommendation restored from an older cache can arrive without its split
+     day. Reading through it blanked the entire Plan tab behind "Forge hit a
+     snag" — the block itself was fine. The anchor is an optimisation; the plan
+     renders without it. */
+  const anchor = recommendation?.splitDay ? { position: recommendation.splitDay.position } : undefined;
   const [stored, setStored] = useState<StoredAiPlan | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -312,13 +316,30 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   useEffect(() => {
     if (storeLoading || autoAttempted.current || generating) return;
     if (isDemoMode || !user || !goals.length || !splitDays.length) return;
-    /* A block also goes stale when the athlete has meaningfully out-lifted
-       its baseline — a mid-block PR more than ~5% past what the block was
-       built on deserves a fresh program, not just a scaled overlay. */
-    const outgrown = Boolean(stored?.plan.weeks[0]?.topSets?.some(set => {
-      const best = bests.get(canonicalLiftKey(set.exercise));
-      return best && best > (calculateEstimatedOneRepMax(set.weight, set.reps) || 0) * 1.05;
-    }));
+    /* A block goes stale when the athlete has out-lifted what it can ever ask
+       of them — a PR past the block's own ceiling deserves a fresh program.
+
+       This compared against WEEK ONE, which is the opposite of a ceiling: week
+       one of a wave is deliberately submaximal, and the block Preston was
+       looking at opens on heavy doubles. His best calculated max sat more than
+       5% above a working double, as it should, so the block read as outgrown
+       from the moment it was written — and the Plan page silently rebuilt it
+       on every single visit. That is what "Building…" over a disabled Save
+       button was: a block being replaced before he could pin it.
+
+       The ceiling is the heaviest thing the block prescribes anywhere, which
+       on a 8/6/4/2/max wave is the max week. Passing THAT by 5% means the
+       block genuinely has nothing left to ask. */
+    const ceiling = (stored?.plan.weeks || []).flatMap(week => week.topSets || []).reduce<Map<string, number>>((peak, set) => {
+      const key = canonicalLiftKey(set.exercise);
+      const estimate = calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
+      if (estimate > (peak.get(key) || 0)) peak.set(key, estimate);
+      return peak;
+    }, new Map());
+    const outgrown = [...ceiling].some(([key, top]) => {
+      const best = bests.get(key);
+      return Boolean(best && top && best > top * 1.05);
+    });
     /* A SAVED PLAN IS PINNED. Forge may notice the block is stale, but it
        does not get to replace a block the athlete approved — only an explicit
        confirmed refresh does. */

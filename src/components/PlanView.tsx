@@ -98,6 +98,11 @@ export function PlanProgress({ weekIndex, total, waveIndexFor, sentence }: {
   </section>;
 }
 
+/* Two names for the same day — "Chest & Back" against "Chest and Back" — are
+   not a swap worth reporting. */
+const sameDayName = (a: string, b: string) =>
+  a.toLowerCase().replace(/[^a-z0-9]/g, '') === b.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 /* ── 2. Today ────────────────────────────────────────────────────────────── */
 export function TodayCard({ session, unit, logged, workoutHref }: {
   session: PlanSession | undefined; unit: string; logged?: WorkoutRecord; workoutHref: string;
@@ -110,7 +115,16 @@ export function TodayCard({ session, unit, logged, workoutHref }: {
     <header>
       <span className="eyebrow">TODAY · {longDate(session.date).toUpperCase()}</span>
       <h2>{done ? 'Logged' : isRest ? 'Rest day' : session.title}</h2>
-      {done && <small>{session.title}</small>}
+      {/* WHAT WAS DONE, NOT WHAT WAS PLANNED. This printed the planned day's
+          name under "Logged", so a day the athlete trained off-plan read
+          "Logged · Legs" above a list of bench sets — and the week list below
+          it, which reads from history, said Chest & Back on the same screen.
+          Completed work is authoritative everywhere else in Forge; it is here
+          too. The plan's intention is still worth knowing when the two differ,
+          so it is said once, quietly, rather than replacing the truth. */}
+      {done && <small>{logged?.title || session.title}</small>}
+      {done && logged?.title && !isRest && !sameDayName(logged.title, session.title)
+        && <span className="pv-today-swap">Planned {session.title}</span>}
     </header>
     {done && logged
       ? <div className="pv-lines">
@@ -181,7 +195,12 @@ export function WeekList({ sessions, unit, records, title = 'This week' }: {
           : [
               ...session.lifts.slice(0, 2).map(lift => lift.weight ? `${lift.exercise} ${lift.weight}×${lift.reps}` : lift.exercise),
               session.run ? (() => { const text = session.run.text.split(/ @ | · /)[0]; return /\beasy\b/i.test(text) && session.run.kind === 'Easy run' ? text : `${session.run.kind} ${text}`; })() : '',
-            ].filter(Boolean).join(' · ') || session.summary || session.title;
+            /* NEVER THE DAY'S OWN NAME AGAIN. The last resort used to be
+               session.title, so a split day the block prescribes nothing for
+               rendered as "Chest & Back" over "Chest & Back" — a repetition
+               that read as a rendering bug and, worse, hid the real problem:
+               that day has no top set waiting for it. Say that instead. */
+            ].filter(Boolean).join(' · ') || session.summary || 'No top set prescribed';
         /* A logged day opens on what was logged; a day gone by with nothing on
            it has nothing to open. */
         const loggedLifts = (logged?.topSets || []).filter(set => set.completed !== false);

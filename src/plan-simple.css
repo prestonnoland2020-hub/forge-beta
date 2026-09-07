@@ -41,6 +41,7 @@
 .pv-today.done{border-left-color:var(--good)}
 .pv-today.done h2{color:var(--good)}
 .pv-today.rest{border-left-color:var(--line)}
+.pv-today-swap{justify-self:start;margin-top:6px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:var(--ink-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
 .pv-today-note{margin:0;color:var(--ink-2);line-height:1.5}
 .pv-today footer{display:flex;gap:10px}
 .pv-today footer .button{flex:1;text-align:center;text-decoration:none}

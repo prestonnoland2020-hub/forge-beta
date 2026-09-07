@@ -81,10 +81,10 @@ const summary = p => p.evaluate(() => JSON.parse(localStorage.getItem('forge-ai-
 {
   const p = await open(storedPlan);
   const buttons = await p.evaluate(() => [...document.querySelectorAll('button')].map(x => x.textContent.trim()).filter(Boolean));
-  check('the button says regenerate, not generate', buttons.some(t => /^Regenerate plan$/i.test(t)) && !buttons.some(t => /^Generate plan$/i.test(t)), JSON.stringify(buttons.slice(0, 6)));
+  check('the button says regenerate, not generate', buttons.some(t => /^Regenerate$/i.test(t)) && !buttons.some(t => /^Generate plan$/i.test(t)), JSON.stringify(buttons.slice(0, 6)));
   check('nothing takes over the screen before it is pressed', !(await has(p, '.plan-rebuild-backdrop')));
 
-  await click(p, 'Regenerate plan'); await p.waitForTimeout(500);
+  await click(p, 'Regenerate'); await p.waitForTimeout(500);
   check('pressing it takes over the screen', await has(p, '.plan-rebuild-backdrop') && await has(p, '.plan-rebuild-sheet'));
   const sheet = await p.evaluate(() => document.querySelector('.plan-rebuild-sheet')?.innerText.replace(/\n/g, ' ') || '');
   check('it asks what should change', /What would you like to change\?/i.test(sheet), sheet.slice(0, 120));
@@ -105,7 +105,7 @@ const summary = p => p.evaluate(() => JSON.parse(localStorage.getItem('forge-ai-
 /* A typed change reaches the service and stays on the block. */
 {
   const p = await open(storedPlan);
-  await click(p, 'Regenerate plan'); await p.waitForTimeout(500);
+  await click(p, 'Regenerate'); await p.waitForTimeout(500);
   await p.evaluate(() => {
     const box = document.querySelector('.plan-rebuild-sheet textarea');
     const setter = Object.getOwnPropertyDescriptor(box.constructor.prototype, 'value').set;
@@ -128,7 +128,7 @@ const summary = p => p.evaluate(() => JSON.parse(localStorage.getItem('forge-ai-
 /* A standing request is prefilled next time, and "just regenerate" drops it. */
 {
   const p = await open({ ...storedPlan, adjustments: 'Less running overall' });
-  await click(p, 'Regenerate plan'); await p.waitForTimeout(500);
+  await click(p, 'Regenerate'); await p.waitForTimeout(500);
   check('a standing request comes back prefilled',
     await p.evaluate(() => document.querySelector('.plan-rebuild-sheet textarea')?.value) === 'Less running overall');
   const sheet = await p.evaluate(() => document.querySelector('.plan-rebuild-sheet')?.innerText || '');
@@ -143,7 +143,7 @@ const summary = p => p.evaluate(() => JSON.parse(localStorage.getItem('forge-ai-
 {
   const p = await open(storedPlan);
   await p.route('**/functions/v1/forge-plan', route => route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'Your program was just generated. Wait a couple of minutes before refreshing again.' }) }));
-  await click(p, 'Regenerate plan'); await p.waitForTimeout(500);
+  await click(p, 'Regenerate'); await p.waitForTimeout(500);
   await p.evaluate(() => {
     const box = document.querySelector('.plan-rebuild-sheet textarea');
     const setter = Object.getOwnPropertyDescriptor(box.constructor.prototype, 'value').set;
