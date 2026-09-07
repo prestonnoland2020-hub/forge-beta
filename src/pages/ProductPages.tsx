@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageIntro, Metric } from '../components/AppShell';
 import { openCoachBubble } from '../features/training/coachService';
@@ -83,7 +83,7 @@ function WorkoutEditor() {
   const {addRecord,updateRecord,deleteRecord,records}=useWorkoutHistory();
   const {exercises,addExercise}=useTrainingLibrary();
   const {setup}=useProfileSetup();
-  const {recommendation,markCompleted}=useDailyRecommendation();
+  const {recommendation,markCompleted,recommendationFor}=useDailyRecommendation();
   const weightUnit=setup?.units==='Metric'?'kg':'lb';
   const [searchParams]=useSearchParams();
   const editId=searchParams.get('edit');const editingRecord=editId?records.find(record=>record.id===editId):undefined;
@@ -119,7 +119,21 @@ function WorkoutEditor() {
   const [hasCardio,setHasCardio]=useState(Boolean(editingRecord?.hasCardio));
   const [cardioSessions,setCardioSessions]=useState<CardioLogDraft[]>(editingRecord?.cardioSessions??[]);
   const queryTopSets=(()=>{try{const parsed=JSON.parse(searchParams.get('topSets')||'[]');return Array.isArray(parsed)?parsed:[]}catch{return []}})() as Array<{muscle:string;lift:string;weight:number|string;reps:number|string}>;
-  const splitDayTopSets:LoggedTopSet[]=(savedDay?.muscles||[]).flatMap(muscle=>{const assigned=(savedDay?.exercises||[]).map(name=>exercises.find(exercise=>exercise.name===name)).find(exercise=>exercise?.enabled&&exercise.kind==='Strength'&&exerciseCategory(exercise)==='Strength'&&exercise.muscles.includes(muscle));return assigned?[{muscle,lift:assigned.name,weight:0,reps:0,completed:true}]:[]});
+  /* CHOOSING A SPLIT DAY GETS THE REAL PRESCRIPTION, NOT A BLANK ONE.
+
+     This built its own list: one exercise per muscle, `weight:0, reps:0`. So
+     picking "Chest & Back" gave two empty rows out of the five lifts the day
+     maps, no weight, no rep target, no calculated max — and, when the local
+     copy of the split had no exercises on the day, nothing at all, which is
+     what put up the "map an exercise" prompt for a day whose lifts were
+     already saved.
+
+     It now asks the recommendation engine for that day, which is the same
+     call Today makes. The numbers therefore match what the day will prescribe
+     when the cycle reaches it, instead of being a second opinion that happened
+     to be empty. */
+  const chosenDayRecommendation=useMemo(()=>recommendationFor(selectedPlanDay+1,savedDay?.name),[recommendationFor,selectedPlanDay,savedDay?.name]);
+  const splitDayTopSets:LoggedTopSet[]=(chosenDayRecommendation?.topSets||[]).filter(set=>set.selected).map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true}));
   const recommendationTopSets:LoggedTopSet[]=(recommendation?.topSets||[]).filter(set=>set.selected).map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true}));
   /* Editing shows ONLY what the record actually holds — a day logged without
      top sets must never be back-filled with today's recommendation or the

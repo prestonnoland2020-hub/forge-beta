@@ -12,8 +12,13 @@ import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type 
 import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf} from './aiPlanService';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
+import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 
-type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void};
+type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void;
+  /* The full prescription for ANY split position, built by the same pipeline
+     as today's. The workout logger uses it when the athlete chooses a day the
+     cycle does not currently owe. */
+  recommendationFor:(position:number,name?:string)=>DailyRecommendation|null};
 const Context=createContext<Value|null>(null);
 const isoToday=()=>{const date=new Date();return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`};
 
@@ -105,12 +110,25 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      never revisits it. */
   const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
-  const generatedBase=useMemo(()=>buildDailyRecommendation({date,splitDay,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,inputFingerprint}),[date,splitDay,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,inputFingerprint]);
+  /* ONE PIPELINE, ANY DAY OF THE SPLIT.
+
+     This used to build the due day and nothing else, so the workout logger —
+     which lets the athlete pick a different split day — had no prescription to
+     show and fell back to a hand-rolled list with weight 0 and reps 0. Picking
+     "Chest & Back" on a day the cycle owed rest produced a blank logger and a
+     prompt to map exercises the split had already named.
+     
+     Building a chosen day through a SEPARATE path would have been worse than
+     the blank: two prescriptions for the same day, differing by whatever the
+     shortcut left out. So the whole thing is a function of the day now, the due
+     day is simply the argument Today passes, and the logger passes whichever
+     day the athlete picked. */
+  const buildBase=useCallback((day:RecommendationSplitDay)=>buildDailyRecommendation({date,splitDay:day,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,inputFingerprint:recommendationFingerprint({date,splitDay:day,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp})}),[date,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,cycle.revision,aiPlanStamp,planInputsStamp]);
   /* The stored AI program is authoritative for today's numbers: when its
      current week prescribes a top set for this split day, that exercise,
      weight, and reps replace the engine's guess — so Today, Plan, and the
      coach all quote the same prescription. */
-  const generated=useMemo(()=>{
+  const applyPlan=useCallback((generatedBase:DailyRecommendation)=>{
     const storedPlan=readLocalAiPlan();
     if(!generatedBase||!storedPlan)return generatedBase;
     const rawWeek=storedPlan.plan.weeks[currentWeekIndex(storedPlan)];
@@ -143,11 +161,28 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
         plan:{id:Date.now(),targetSource:'Goal generated',...plan} as never,
         rationale,placement:dayName,stress:role==='Quality'?'High':role==='Long'?'Moderate':'Low',progression:'',scaleNotes:[],status:'Scheduled'},
     });
+    let doneQuality:ReturnType<typeof findCompletedRepeats>=null;
     const planCardio=(()=>{
       if(week.longRunMiles>0&&week.longRunDay===dayName)
         return planSession('Long','Long run',`Long Run · ${week.longRunMiles} mi @ ${week.longRunPace}`,`Week ${week.week} long run from your program.`,{structure:'Steady',activity:'Long Run',distance:String(week.longRunMiles),distanceUnit:'miles',pace:week.longRunPace});
-      if(week.quality&&!/no goal/i.test(week.quality)&&week.qualityDay===dayName&&!lowerBody)
-        return planSession('Quality',week.quality,`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`,`Week ${week.week} quality session from your program.`,{structure:'Custom',activity:'Quality Run',customTarget:`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`});
+      if(week.quality&&!/no goal/i.test(week.quality)&&week.qualityDay===dayName&&!lowerBody){
+        /* ALREADY RUN IT? THEN DO NOT ASK FOR IT AGAIN. The quality session is
+           pinned to a split day, and an athlete with a track available on the
+           Sunday runs it on the Sunday. Prescribing the same six 400s the next
+           morning, with the six of them sitting one day back in the log, reads
+           as an app that does not look at what it was given. Only the exact
+           prescribed repeat distance counts as evidence — see
+           sessionAlreadyDone for why a generic interval detector would misfire
+           on device auto-laps. */
+        const shape=repeatShape({title:week.quality,summary:`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`});
+        const done=shape?findCompletedRepeats(records,shape,generatedBase.date):null;
+        if(!done)
+          return planSession('Quality',week.quality,`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`,`Week ${week.week} quality session from your program.`,{structure:'Custom',activity:'Quality Run',customTarget:`${week.quality}${week.qualityPace?` @ ${week.qualityPace}`:''}`});
+        /* The session is spent for the week; what is left on this day is easy
+           volume, if the week had any to give. Falling through to the easy
+           branch below does exactly that. */
+        doneQuality=done;
+      }
       if((week.easyDays||[]).includes(dayName)){
         /* Today's easy run is the distance this day was allotted, at the
            athlete's easy pace — the same number the week's mileage sums. */
@@ -158,7 +193,11 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       };
       return undefined;
     })();
-    const cardioBase={...generatedBase,cardio:planCardio};
+    /* Say why, rather than silently dropping the session. An athlete who
+       cannot see that Forge noticed assumes it forgot. */
+    const cardioBase={...generatedBase,cardio:planCardio&&doneQuality
+      ?{...planCardio,rationale:`${planCardio.rationale} Your ${week.quality} is already done — ${doneQuality.matched} × ${Math.round(doneQuality.meters)} m logged ${doneQuality.date===generatedBase.date?'today':`on ${doneQuality.date}`} — so today stays easy.`}
+      :planCardio};
     const rawMatch=week?.topSets?.find(set=>set.splitDay===generatedBase.splitDay.name)||week?.topSets?.find(set=>splitDayKey(set.splitDay)===splitDayKey(generatedBase.splitDay.name));
     if(!rawMatch)return cardioBase;
     /* THE GOAL LIFT OWNS ITS DAY — same repair the Plan page applies, so
@@ -233,11 +272,28 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:calculateEstimatedOneRepMax(wave.weight,wave.reps)||0,rationale:wave.rationale};
     });
     return{...cardioBase,topSets};
-  },[generatedBase,aiPlanStamp,goalStamp,planInputsStamp]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[records,goals,setup,days,profile,aiPlanStamp,goalStamp,planInputsStamp]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* The due day, and the same pipeline for any other. `buildFor` is what the
+     logger calls when the athlete overrides the day; nothing about it is a
+     preview or an approximation — it is the identical prescription that day
+     will carry when the cycle reaches it. */
+  const buildFor=useCallback((day:RecommendationSplitDay)=>applyPlan(buildBase(day)),[applyPlan,buildBase]);
+  const generated=useMemo(()=>buildFor(splitDay),[buildFor,splitDay]);
+  /* NAME FIRST, POSITION SECOND. The logger numbers the days from the local
+     copy of the split; this list comes from the server's. They normally agree,
+     but they are two lists, and one omitted rest day shifts every index after
+     it — which would silently prescribe the wrong day's lifts. The name is the
+     part both copies actually share. */
+  const recommendationFor=useCallback((position:number,name?:string)=>{
+    const byName=name?days.find(item=>splitDayKey(item.name)===splitDayKey(name)):undefined;
+    const day=byName||days.find(item=>item.position===position);
+    return day?buildFor(day):null;
+  },[days,buildFor]);
   useEffect(()=>{if(isDemoMode||!user){setStored(current=>current?.status==='completed'||current?.inputFingerprint===inputFingerprint?current:generated);return}let active=true;setLoading(true);void loadDailyRecommendation(user.id,date).then(async existing=>{if(!active)return;if(forceRegenerate.current&&existing?.status!=='completed'){forceRegenerate.current=false;const saved=await saveDailyRecommendation(user.id,generated);if(active)setStored(saved);return}forceRegenerate.current=false;if(existing?.status==='completed'||(existing?.algorithmVersion===DAILY_RECOMMENDATION_VERSION&&existing?.inputFingerprint===inputFingerprint)){setStored(existing);return}const saved=await saveDailyRecommendation(user.id,generated);if(active)setStored(saved)}).then(()=>{if(active)setSyncError(null)}).catch(error=>{if(active){setStored(generated);setSyncError(error instanceof Error?error.message:'Could not save today’s recommendation.')}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user,date,inputFingerprint,generated]);
   const persist=useCallback((next:DailyRecommendation)=>{setStored(next);if(!isDemoMode&&user)void saveDailyRecommendation(user.id,next).then(setStored).catch(error=>setSyncError(error instanceof Error?error.message:'Could not save recommendation choices.'))},[user]);
   const recommendation=stored||generated;
-  const value=useMemo<Value>(()=>({recommendation,loading,syncError,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist]);
+  const value=useMemo<Value>(()=>({recommendation,loading,syncError,recommendationFor,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist,recommendationFor]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
