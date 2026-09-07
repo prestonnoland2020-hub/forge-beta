@@ -8,7 +8,7 @@ import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { useWorkoutHistory, type LoggedTopSet, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioMiles, formatCardioSummary, summarizeCardioDraft, type CardioLogDraft } from '../lib/cardioSession';
-import { exerciseCategory, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
+import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { TopSetCards } from '../components/TopSetCards';
 import { TopSetSheet, type TopSetDraft } from '../components/TopSetSheet';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -174,7 +174,7 @@ function WorkoutEditor() {
   const liftPrimary=(name:string)=>primaryMusclesFor(name,exercises.find(exercise=>exercise.name===name)?.muscles??liftMuscles[name]??[]).filter(muscle=>muscle!=='Cardio');
   const plannedExerciseNames=new Set((((plannedDay as {exercises?:string[]}|undefined)?.exercises)||[]).map((name:string)=>String(name).trim().toLowerCase()));
   const restrictToPlannedExercises=usingSplit&&plannedExerciseNames.size>0;
-  const strengthCatalogue=exercises.filter(exercise=>exercise.enabled&&exercise.kind==='Strength'&&exerciseCategory(exercise)==='Strength');
+  const strengthCatalogue=exercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));
   const allowedStrengthExercises=strengthCatalogue.filter(exercise=>restrictToPlannedExercises
     ?plannedExerciseNames.has(exercise.name.trim().toLowerCase())
     :(!usingSplit||!plannedExerciseNames.size)&&(!usingSplit||!sourceMuscles.length||exercise.muscles.some(muscle=>sourceMuscles.includes(muscle)))||plannedExerciseNames.has(exercise.name.trim().toLowerCase()));
@@ -320,7 +320,7 @@ function WorkoutEditor() {
     const result=updateRecord(id,{...savedDay,muscles:musclesForDay,topSets:nextSets,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax});if(!result.ok){setQuickLogMessage('The correction could not be saved. Refresh and try again.');return false}
     const localCorrected={...original,...corrected,completed:true,calculatedMax:calculateEstimatedOneRepMax(corrected.weight,corrected.reps)??undefined};setTopSets(current=>current.map((set,setIndex)=>setIndex===index?localCorrected:set));const oldKey=topSetKey(original);const newKey=topSetKey(localCorrected);setQuickLoggedKeys(current=>[...current.filter(key=>key!==oldKey),newKey]);setQuickLogMessage(`${corrected.lift} corrected to ${corrected.weight} ${weightUnit} ×${corrected.reps}.`);return true;
   };
-  const choosePlanDay=(index:number)=>{const day=savedDays[index];const next:LoggedTopSet[]=(day?.muscles||[]).flatMap(muscle=>{const assigned=(day.exercises||[]).map(name=>exercises.find(exercise=>exercise.name===name)).find(exercise=>exercise?.enabled&&exercise.kind==='Strength'&&exerciseCategory(exercise)==='Strength'&&exercise.muscles.includes(muscle));return assigned?[{muscle,lift:assigned.name,weight:0,reps:0,completed:true}]:[]});setSelectedPlanDay(index);setTopSets(next);};
+  const choosePlanDay=(index:number)=>{const day=savedDays[index];const next:LoggedTopSet[]=(day?.muscles||[]).flatMap(muscle=>{const assigned=(day.exercises||[]).map(name=>exercises.find(exercise=>exercise.name===name)).find(exercise=>exercise?.enabled&&isProgrammableStrength(exercise)&&exercise.muscles.includes(muscle));return assigned?[{muscle,lift:assigned.name,weight:0,reps:0,completed:true}]:[]});setSelectedPlanDay(index);setTopSets(next);};
   const saveWorkout=async()=>{
     setSaved(false);
     // A training day is worth saving without a top set: a body-weight check-in, a

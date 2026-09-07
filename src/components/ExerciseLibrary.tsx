@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { openCoachBubble } from '../features/training/coachService';
-import { exerciseCategory, useTrainingLibrary, type ExerciseCategory, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
+import { exerciseCategories, exerciseCategory, useTrainingLibrary, type ExerciseCategory, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 
 const filters = ['All', 'Strength', 'Cardio', 'HYROX', 'CrossFit'] as const;
 const muscles = ['Chest', 'Back', 'Shoulders', 'Quads', 'Glutes', 'Hamstrings', 'Biceps', 'Triceps', 'Forearms', 'Abs', 'Cardio'];
@@ -14,12 +14,16 @@ export function ExerciseLibrary() {
   const [selectedMuscles, setSelectedMuscles] = useState<string[]>([]);
   const [defaultUnit, setDefaultUnit] = useState('reps');
   const { exercises, addExercise, updateExercise, removeExercise, toggleExercise } = useTrainingLibrary();
+  /* Where it sorts (its first claim) versus everything it belongs to. The
+     deadlift is a barbell lift and a CrossFit movement, so it sorts with the
+     lifts and appears under both filters. */
   const section = (item: LibraryExercise) => exerciseCategory(item);
+  const belongsTo = (item: LibraryExercise, bucket: ExerciseCategory) => exerciseCategories(item).includes(bucket);
   const canSave = Boolean(name.trim() && selectedMuscles.length);
   const shown = useMemo(() => {
     const term = query.trim().toLowerCase();
     return exercises
-      .filter(item => (filter === 'All' || section(item) === filter) && (!term || `${item.name} ${item.kind} ${item.muscles.join(' ')}`.toLowerCase().includes(term)))
+      .filter(item => (filter === 'All' || belongsTo(item, filter)) && (!term || `${item.name} ${item.kind} ${item.muscles.join(' ')}`.toLowerCase().includes(term)))
       .sort((a, b) => section(a).localeCompare(section(b)) || a.name.localeCompare(b.name));
   }, [exercises, filter, query]);
   const editingExercise = editing ? exercises.find(item => item.id === editing) : undefined;
@@ -42,7 +46,10 @@ export function ExerciseLibrary() {
   const toggleMuscle = (muscle: string) => setSelectedMuscles(items => items.includes(muscle) ? items.filter(item => item !== muscle) : [...items, muscle]);
   const save = () => {
     if (!canSave) return;
-    const value = { name: name.trim(), kind: isCardio ? 'Cardio' as const : 'Strength' as const, muscles: selectedMuscles, detail: `${category} · ${isCardio ? 'Cardio measurement' : 'Weight + reps'}`, enabled: true, custom: true, ...(isCardio ? { defaultUnit } : {}) };
+    /* Choosing a category in the editor makes that the movement's only one —
+       an explicit choice replaces a multi-category tag rather than silently
+       keeping it. */
+    const value = { name: name.trim(), kind: isCardio ? 'Cardio' as const : 'Strength' as const, muscles: selectedMuscles, detail: `${category} · ${isCardio ? 'Cardio measurement' : 'Weight + reps'}`, categories: [category], enabled: true, custom: true, ...(isCardio ? { defaultUnit } : {}) };
     if (editing) updateExercise(editing, value); else addExercise(value);
     close();
   };

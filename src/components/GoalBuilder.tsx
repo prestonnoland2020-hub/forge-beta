@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { exerciseCategory, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
+import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
 
@@ -28,7 +28,7 @@ export function GoalBuilder({ onClose, onSave, initialGoal, splitDays }: { onClo
      goals never silently re-point at a different lift. */
   const {exercises:libraryExercises}=useTrainingLibrary();
   const goalExerciseOptions=useMemo(()=>{
-    const names=libraryExercises.filter(item=>item.enabled&&item.kind==='Strength'&&exerciseCategory(item)==='Strength').map(item=>item.name).sort((a,b)=>a.localeCompare(b));
+    const names=libraryExercises.filter(item=>item.enabled&&isProgrammableStrength(item)).map(item=>item.name).sort((a,b)=>a.localeCompare(b));
     const current=initialGoal?.exercise;
     return current&&!names.includes(current)?[current,...names]:names;
   },[libraryExercises,initialGoal?.exercise]);

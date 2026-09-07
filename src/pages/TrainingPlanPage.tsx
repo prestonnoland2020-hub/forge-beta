@@ -9,7 +9,7 @@ import { AiProgramPlan } from '../components/AiProgramPlan';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { buildLongRangePlan } from '../lib/longRangePlanEngine';
 import { useCoachingStrategy } from '../features/training/CoachingStrategyProvider';
-import { exerciseCategory,useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
+import { isProgrammableStrength,useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { requestForgeCoach } from '../features/training/coachService';
 import { useAuth } from '../features/auth/AuthProvider';
 import { saveTrainingSplit } from '../features/splits/splitService';
@@ -33,7 +33,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const {user}=useAuth();
   const {goals}=useGoals();const {records}=useWorkoutHistory();const {profile}=useAdaptiveTraining();
   const {strategy}=useCoachingStrategy();
-  const {exercises:libraryExercises,workouts:libraryWorkouts}=useTrainingLibrary();const strengthExercises=libraryExercises.filter(exercise=>exercise.enabled&&exercise.kind==='Strength'&&exerciseCategory(exercise)==='Strength');const exercises=strengthExercises.map(exercise=>exercise.name);const cardioWorkouts=libraryWorkouts.filter(workout=>Boolean(workout.plan));
+  const {exercises:libraryExercises,workouts:libraryWorkouts}=useTrainingLibrary();const strengthExercises=libraryExercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));const exercises=strengthExercises.map(exercise=>exercise.name);const cardioWorkouts=libraryWorkouts.filter(workout=>Boolean(workout.plan));
   const {setup,saveSetup}=useProfileSetup();
   const savedPlan=useMemo(loadSavedPlan,[]);
   const tab:'split'|'program'=mode==='split'?'split':'program';

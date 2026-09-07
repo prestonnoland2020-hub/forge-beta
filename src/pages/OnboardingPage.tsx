@@ -8,7 +8,7 @@ import { saveTrainingSplit } from '../features/splits/splitService';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { DialField } from '../components/NumberDial';
 import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
-import { exerciseCategory, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
+import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { canonicalLiftKey } from '../lib/liftAliases';
 
 /* THREE STEPS, AND THE GOAL IS ONE OF THEM. Forge programs toward a goal —
@@ -77,7 +77,7 @@ export function OnboardingPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const { exercises: libraryExercises } = useTrainingLibrary();
-  const strengthLibrary = libraryExercises.filter(exercise => exercise.enabled && exercise.kind === 'Strength' && exerciseCategory(exercise) === 'Strength');
+  const strengthLibrary = libraryExercises.filter(exercise => exercise.enabled && isProgrammableStrength(exercise));
   /* The days this step is about: the ones Forge prescribes lifting on. */
   const plannedDays = (data.splitDays?.length ? data.splitDays : starterSplit(data.primaryFocus, data.trainingDays));
   const strengthDayIndexes = plannedDays.map((day, index) => ({ day, index })).filter(item => item.day.type === 'Strength' || item.day.type === 'Mixed');

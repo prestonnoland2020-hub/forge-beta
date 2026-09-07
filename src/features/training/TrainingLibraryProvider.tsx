@@ -6,13 +6,33 @@ import { normalizeMuscleGroups } from '../../lib/muscleGroups';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
 
-export type LibraryExercise={id:number;name:string;kind:'Strength'|'Cardio';muscles:string[];detail:string;enabled:boolean;custom?:boolean;defaultTarget?:string;defaultUnit?:string};
+export type LibraryExercise={id:number;name:string;kind:'Strength'|'Cardio';muscles:string[];detail:string;enabled:boolean;custom?:boolean;defaultTarget?:string;defaultUnit?:string;categories?:ExerciseCategory[]};
 export type LibraryWorkout={id:number;name:string;kind:'Strength'|'Cardio'|'Circuit';source:'User'|'Forge';summary:string;exercises?:string[];plan?:PlannedCardio};
 export type ExerciseCategory='Strength'|'Cardio'|'HYROX'|'CrossFit';
-/* The category is the programme bucket a movement belongs to. It was derived
-   from `detail` alone, which named HYROX and CrossFit but nothing for plain
-   conditioning — so Run and Rowing were labelled "Strength" in the library. */
-export const exerciseCategory=(exercise:Pick<LibraryExercise,'detail'|'kind'>):ExerciseCategory=>/HYROX/i.test(exercise.detail)?'HYROX':/CrossFit/i.test(exercise.detail)?'CrossFit':exercise.kind==='Cardio'?'Cardio':'Strength';
+
+/* A MOVEMENT CAN BELONG TO MORE THAN ONE PROGRAMME.
+
+   The category was one value derived from `detail`, and every "can Forge
+   program this as a lift" check compared it to 'Strength'. The deadlift was
+   the case that broke it: it is a barbell strength lift AND a CrossFit
+   movement, but naming CrossFit in its detail put it in that bucket alone, so
+   it vanished from split mapping, goal building and the workout logger — a
+   main lift that could not be programmed.
+
+   Categories are a set now. `categories` on the exercise wins when present;
+   otherwise it is derived from `detail` exactly as before, so every saved
+   library keeps the behaviour it had. */
+export const exerciseCategories=(exercise:Pick<LibraryExercise,'detail'|'kind'|'categories'>):ExerciseCategory[]=>{
+  if(exercise.categories?.length)return exercise.categories;
+  if(/HYROX/i.test(exercise.detail))return['HYROX'];
+  if(/CrossFit/i.test(exercise.detail))return['CrossFit'];
+  return[exercise.kind==='Cardio'?'Cardio':'Strength'];
+};
+/* The bucket it sorts under — the first it claims. */
+export const exerciseCategory=(exercise:Pick<LibraryExercise,'detail'|'kind'|'categories'>):ExerciseCategory=>exerciseCategories(exercise)[0];
+/* The question nearly every caller was really asking: may Forge prescribe this
+   as a strength lift? A movement that also belongs to CrossFit still can. */
+export const isProgrammableStrength=(exercise:Pick<LibraryExercise,'detail'|'kind'|'categories'>):boolean=>exercise.kind==='Strength'&&exerciseCategories(exercise).includes('Strength');
 const starterExercises:LibraryExercise[]=[
   {id:1,name:'Back Squat',kind:'Strength',muscles:['Quads','Glutes','Hamstrings'],detail:'Barbell · Weight + reps · Primary lift',enabled:true},{id:2,name:'Bench Press',kind:'Strength',muscles:['Chest'],detail:'Barbell · Weight + reps · Primary lift',enabled:true},{id:3,name:'Hack Squat',kind:'Strength',muscles:['Quads','Glutes'],detail:'Machine · Weight + reps · Accessory',enabled:true},{id:4,name:'Lat Pulldown',kind:'Strength',muscles:['Back'],detail:'Cable · Weight + reps · Accessory',enabled:true},
   {id:5,name:'Run',kind:'Cardio',muscles:['Quads','Hamstrings','Glutes','Cardio'],detail:'Run · distance',enabled:true,defaultTarget:'400',defaultUnit:'meters'},{id:6,name:'Rowing',kind:'Cardio',muscles:['Back','Quads','Hamstrings','Glutes','Cardio'],detail:'Rower · distance',enabled:true,defaultTarget:'500',defaultUnit:'meters'},
@@ -34,7 +54,7 @@ const starterExercises:LibraryExercise[]=[
   {id:27,name:'Overhead Press',kind:'Strength',muscles:['Shoulders'],detail:'Barbell · Weight + reps · Primary lift',enabled:true},{id:28,name:'Barbell Row',kind:'Strength',muscles:['Back'],detail:'Barbell · Weight + reps · Primary lift',enabled:true},{id:29,name:'Romanian Deadlift',kind:'Strength',muscles:['Hamstrings'],detail:'Barbell · Weight + reps · Primary lift',enabled:true},
   {id:30,name:'Barbell Curl',kind:'Strength',muscles:['Biceps'],detail:'Barbell · Weight + reps · Accessory',enabled:true},{id:31,name:'Triceps Pushdown',kind:'Strength',muscles:['Triceps'],detail:'Cable · Weight + reps · Accessory',enabled:true},{id:32,name:'Standing Calf Raise',kind:'Strength',muscles:['Calves'],detail:'Machine · Weight + reps · Accessory',enabled:true},
   {id:33,name:'Hanging Leg Raise',kind:'Strength',muscles:['Abs'],detail:'Bodyweight · repetitions · Accessory',enabled:true,defaultTarget:'12',defaultUnit:'reps'},{id:34,name:'Incline Dumbbell Press',kind:'Strength',muscles:['Chest'],detail:'Dumbbell · Weight + reps · Accessory',enabled:true},{id:35,name:'Lateral Raise',kind:'Strength',muscles:['Shoulders'],detail:'Dumbbell · Weight + reps · Accessory',enabled:true},{id:36,name:'Hammer Curl',kind:'Strength',muscles:['Biceps'],detail:'Dumbbell · Weight + reps · Accessory',enabled:true},{id:37,name:'Wrist Curl',kind:'Strength',muscles:['Forearms'],detail:'Dumbbell · Weight + reps · Accessory',enabled:true},
-  {id:14,name:'Assault Bike',kind:'Cardio',muscles:['Quads','Glutes','Hamstrings','Cardio'],detail:'CrossFit · calories',enabled:true,defaultTarget:'20',defaultUnit:'calories'},{id:15,name:'Box Jumps',kind:'Strength',muscles:['Quads','Glutes','Hamstrings'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'15',defaultUnit:'reps'},{id:16,name:'Kettlebell Swings',kind:'Strength',muscles:['Glutes','Hamstrings','Back','Shoulders'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'20',defaultUnit:'reps'},{id:17,name:'Deadlift',kind:'Strength',muscles:['Back','Glutes','Hamstrings'],detail:'CrossFit · weight + reps',enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:18,name:'Thrusters',kind:'Strength',muscles:['Quads','Glutes','Shoulders','Triceps'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'12',defaultUnit:'reps'},{id:19,name:'Pull Ups',kind:'Strength',muscles:['Back'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:20,name:'Toes to Bar',kind:'Strength',muscles:['Abs','Forearms','Shoulders'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:21,name:'Handstand Push Ups',kind:'Strength',muscles:['Shoulders'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:22,name:'Double Unders',kind:'Cardio',muscles:['Quads','Glutes','Calves','Cardio'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'50',defaultUnit:'reps'},{id:23,name:'Rope Climbs',kind:'Strength',muscles:['Back','Biceps','Forearms','Abs'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'3',defaultUnit:'reps'},{id:24,name:'Clean and Jerk',kind:'Strength',muscles:['Quads','Glutes','Hamstrings','Shoulders','Triceps'],detail:'CrossFit · weight + reps',enabled:true,defaultTarget:'8',defaultUnit:'reps'},{id:25,name:'Snatch',kind:'Strength',muscles:['Quads','Glutes','Hamstrings','Shoulders','Back'],detail:'CrossFit · weight + reps',enabled:true,defaultTarget:'8',defaultUnit:'reps'},{id:26,name:'Push Ups',kind:'Strength',muscles:['Chest'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'15',defaultUnit:'reps'}
+  {id:14,name:'Assault Bike',kind:'Cardio',muscles:['Quads','Glutes','Hamstrings','Cardio'],detail:'CrossFit · calories',enabled:true,defaultTarget:'20',defaultUnit:'calories'},{id:15,name:'Box Jumps',kind:'Strength',muscles:['Quads','Glutes','Hamstrings'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'15',defaultUnit:'reps'},{id:16,name:'Kettlebell Swings',kind:'Strength',muscles:['Glutes','Hamstrings','Back','Shoulders'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'20',defaultUnit:'reps'},{id:17,name:'Deadlift',kind:'Strength',muscles:['Back','Glutes','Hamstrings'],detail:'Barbell · Weight + reps · Primary lift · CrossFit',categories:['Strength','CrossFit'],enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:18,name:'Thrusters',kind:'Strength',muscles:['Quads','Glutes','Shoulders','Triceps'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'12',defaultUnit:'reps'},{id:19,name:'Pull Ups',kind:'Strength',muscles:['Back'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:20,name:'Toes to Bar',kind:'Strength',muscles:['Abs','Forearms','Shoulders'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:21,name:'Handstand Push Ups',kind:'Strength',muscles:['Shoulders'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'10',defaultUnit:'reps'},{id:22,name:'Double Unders',kind:'Cardio',muscles:['Quads','Glutes','Calves','Cardio'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'50',defaultUnit:'reps'},{id:23,name:'Rope Climbs',kind:'Strength',muscles:['Back','Biceps','Forearms','Abs'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'3',defaultUnit:'reps'},{id:24,name:'Clean and Jerk',kind:'Strength',muscles:['Quads','Glutes','Hamstrings','Shoulders','Triceps'],detail:'CrossFit · weight + reps',enabled:true,defaultTarget:'8',defaultUnit:'reps'},{id:25,name:'Snatch',kind:'Strength',muscles:['Quads','Glutes','Hamstrings','Shoulders','Back'],detail:'CrossFit · weight + reps',enabled:true,defaultTarget:'8',defaultUnit:'reps'},{id:26,name:'Push Ups',kind:'Strength',muscles:['Chest'],detail:'CrossFit · repetitions',enabled:true,defaultTarget:'15',defaultUnit:'reps'}
 ];
 const starterWorkouts:LibraryWorkout[]=[];
 type Value={exercises:LibraryExercise[];workouts:LibraryWorkout[];addExercise:(exercise:Omit<LibraryExercise,'id'>)=>LibraryExercise;updateExercise:(id:number,change:Partial<LibraryExercise>)=>void;removeExercise:(id:number)=>void;addWorkout:(workout:Omit<LibraryWorkout,'id'>)=>LibraryWorkout;updateWorkout:(id:number,change:Partial<LibraryWorkout>)=>void;removeWorkout:(id:number)=>void;toggleExercise:(id:number)=>void};
@@ -57,6 +77,9 @@ const normalizeExercise=(item:Partial<LibraryExercise>,id:number):LibraryExercis
   custom:item.custom,
   defaultTarget:item.defaultTarget?String(item.defaultTarget):undefined,
   defaultUnit:item.defaultUnit?String(item.defaultUnit):undefined,
+  /* Kept when the exercise declares them; otherwise left off so the detail
+     string keeps deriving it, which is what every existing saved row does. */
+  categories:item.categories?.length?item.categories:undefined,
 });
 
 export function TrainingLibraryProvider({children}:{children:ReactNode}){

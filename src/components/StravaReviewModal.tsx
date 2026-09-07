@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
-import { useTrainingLibrary, exerciseCategory } from '../features/training/TrainingLibraryProvider';
+import { useTrainingLibrary, isProgrammableStrength } from '../features/training/TrainingLibraryProvider';
 import { requestCardioParse } from '../features/training/coachService';
 import { parseCardioDescription } from '../lib/cardioParse';
 import { formatCardioSummary, type CardioLogDraft } from '../lib/cardioSession';
@@ -119,7 +119,7 @@ export function StravaReviewModal() {
   }, [pending, suggestedDayIndex]);
 
   const strengthLibrary = useMemo(
-    () => exercises.filter(item => item.enabled && exerciseCategory(item) === 'Strength'),
+    () => exercises.filter(item => item.enabled && isProgrammableStrength(item)),
     [exercises],
   );
   const chosenDay = dayIndex === '' ? undefined : planDays[Number(dayIndex)];
