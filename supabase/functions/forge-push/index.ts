@@ -198,13 +198,23 @@ Deno.serve(async request => {
       awake.push({ row, date });
     }
     const pairs = awake.map(({ row, date }) => [row.owner_id, date] as [string, string]);
+    /* TRAINING TOGETHER IS THE POINT, SO THIS IS NOT ONLY A NUDGE.
+
+       This used to skip anyone who had already trained, on the theory that a
+       reminder after the fact is noise. That was the wrong read: knowing your
+       partner got theirs in is the thing people actually want from this, and
+       it is worth hearing whether or not you have already been. So everyone
+       hears, and what they hear differs — a nudge for the one who has not
+       lifted yet, and news for the one who has. */
     const trained = await trainedDays(pairs);
     const told = await sentDays(kind, pairs);
     for (const { row, date } of awake) {
       const key = pairKey(row.owner_id, date);
-      if (trained.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already trained' }); continue; }
-      if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already nudged today' }); continue; }
-      messages.push({ row, date, payload: { title: 'Your turn', body: `${name} trained today. You haven’t logged yet.`, tag: `partner-${date}`, url: './#/' } });
+      if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already told today' }); continue; }
+      const payload = trained.has(key)
+        ? { title: `${name} trained`, body: 'Both of you are in today.', tag: `partner-${date}`, url: './#/' }
+        : { title: 'Your turn', body: `${name} trained today. You haven’t logged yet.`, tag: `partner-${date}`, url: './#/' };
+      messages.push({ row, date, payload });
     }
   }
 

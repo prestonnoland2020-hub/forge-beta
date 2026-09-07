@@ -145,9 +145,16 @@ out = await call({ kind: 'partner', owner_id: 'actor' });
 check('the partner toggle, off, is obeyed', state.pushed.length === 0);
 
 state.subs = [sub('friend', AFTERNOON)];
+state.workouts = [{ owner_id: 'friend', workout_date: dayIn(AFTERNOON), id: 9 }];
+state.sentLog = [];
+out = await call({ kind: 'partner', owner_id: 'actor' });
+check('someone who already trained still hears about it', state.pushed.length === 1);
+check('and is told they both got it in, not told to go', state.pushed[0]?.payload.body === 'Both of you are in today.', state.pushed[0]?.payload.body);
+
+state.workouts = [];
 state.sentLog = [{ owner: 'friend', kind: 'partner', date: dayIn(AFTERNOON) }];
 out = await call({ kind: 'partner', owner_id: 'actor' });
-check('and a partner is nudged once a day, not once a session', state.pushed.length === 0);
+check('and a partner is told once a day, not once a session', state.pushed.length === 0);
 
 console.log('\nWhen it cannot send');
 state.sentLog = [];
