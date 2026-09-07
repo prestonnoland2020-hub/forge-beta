@@ -6,10 +6,15 @@
   margin: var(--s5) 0 var(--s4);
 }
 
-/* Apple's button is required to be at least as prominent as any third-party
-   sign-in (Guideline 4.8 and the Human Interface Guidelines), so it matches
-   the Google button's weight exactly rather than sitting under it as a
-   secondary option. */
+/* Sign in with Apple is not offered at the moment (see LoginPage), so Google
+   is the only route and has to read as the page's primary action. Google's
+   brand terms fix the surface — white or Google blue, with the G mark — so it
+   cannot simply be given the app's accent. What it CAN have is the stroke
+   Google specifies for its own light button (#747775): without it, a white
+   button on the white sign-in card had no edge at all and read as a caption.
+
+   The Apple rules are kept alongside so restoring the button is a matter of
+   rendering it again. */
 .apple-button,
 .google-button {
   display: flex;
@@ -29,6 +34,10 @@
   background: var(--ink);
   color: var(--bg);
   border: 1px solid var(--ink);
+}
+.google-button {
+  border: 1px solid #747775;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 .apple-button:active:not(:disabled),
 .google-button:active:not(:disabled) { transform: translateY(1px); }
