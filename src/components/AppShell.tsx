@@ -121,6 +121,8 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      lets the page below stop repeating its own name in 26px type. */
   const chrome = ((): { title: string; back?: string } => {
     const params = new URLSearchParams(location.search);
+    /* A partner's own screen is a step in from the list. */
+    if (/^\/partners\/.+/.test(location.pathname)) return { title: 'Partner', back: '/partners' };
     switch (location.pathname) {
       case '/': return { title: 'Today' };
       case '/plan': return { title: 'Plan' };

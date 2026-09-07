@@ -156,3 +156,16 @@ revoke all on function public.forge_set_discoverable(boolean) from public, anon;
 grant execute on function public.forge_set_discoverable(boolean) to authenticated;
 
 commit;
+
+/* Applied 2026-09-07, after Preston opened Forge at 8:57pm and Colton's
+   215 x 5 was missing: the feed asked Postgres for current_date, which is UTC,
+   so from early evening westward the server had already rolled into tomorrow.
+   Whether a partner trained TODAY is asked from the viewer's day, so the
+   viewer's device supplies it. Recorded here as it stands on the project.
+
+     drop function if exists public.forge_partner_feed();
+     create or replace function public.forge_partner_feed(p_today date default null) ...
+       with day as (select coalesce(p_today, current_date) as value)
+
+   Plus the partner comparison surface: forge_lift_key, forge_to_miles,
+   forge_is_partner, forge_partner_metrics, forge_partner_series. */

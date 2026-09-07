@@ -67,3 +67,68 @@
 .partner-discoverable strong{font-size:14px;color:var(--ink)}
 .partner-discoverable small{font-size:12px;color:var(--ink-3);line-height:1.4}
 .partner-discoverable input{flex:none;width:20px;height:20px}
+
+/* ── One partner, one chart ─────────────────────────────────────────────── */
+.partner-detail{display:grid;gap:14px}
+.partner-detail-head{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;padding:16px 18px}
+.partner-detail-head .partner-mark{width:44px;height:44px;font-size:15px}
+.partner-detail-head>div{display:grid;gap:2px;min-width:0}
+.partner-detail-head strong{font:800 20px/1.15 var(--display);color:var(--ink)}
+.partner-detail-head small{font-size:12.5px;color:var(--ink-3)}
+
+/* Three numbers, and they belong to the metric on screen. */
+.partner-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.partner-kpis>div{display:grid;gap:2px;padding:12px 12px 13px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius,14px);min-width:0}
+.partner-kpis span{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partner-kpis strong{font:800 22px/1.05 var(--display);color:var(--ink);font-variant-numeric:tabular-nums}
+.partner-kpis small{font-size:11px;color:var(--ink-3)}
+.partner-kpis>div.up strong{color:var(--good)}
+.partner-kpis>div.down strong{color:var(--ink-2)}
+
+.partner-compare{padding:0;overflow:hidden}
+.partner-compare>header{padding:16px 18px 4px}
+.partner-compare h3{margin:0;font:800 17px/1.2 var(--display);color:var(--ink)}
+/* The filter is one row above the chart, and it scrolls rather than wraps. */
+.partner-metric-filter{display:flex;gap:7px;overflow-x:auto;padding:10px 18px 12px;scrollbar-width:none}
+.partner-metric-filter::-webkit-scrollbar{display:none}
+.partner-metric{flex:0 0 auto;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);border-radius:999px;padding:7px 13px;font:700 12.5px var(--body);white-space:nowrap;cursor:pointer}
+.partner-metric.shared{color:var(--ink)}
+.partner-metric.active{background:var(--accent-strong);color:var(--accent-ink);border-color:transparent}
+.partner-compare-note{margin:0;padding:0 18px 16px;color:var(--ink-3);font-size:12px;line-height:1.5}
+.partner-chart-empty{margin:0;padding:6px 18px 18px;color:var(--ink-2);font-size:13.5px;line-height:1.5}
+
+/* THE TWO SERIES. Fixed hues, not the athlete's accent — Forge offers six
+   accents, one of them a slate grey, and a series colour drawn from that would
+   collide with the axes in one theme and the other line in another. Validated
+   on Forge's own card surface in both tones. */
+.partner-chart{--s-mine:#2a78d6;--s-theirs:#d95926;padding:0 12px}
+:root:not([data-theme="light"]) .partner-chart{--s-mine:#3987e5}
+@media(prefers-color-scheme: light){:root:not([data-theme="dark"]) .partner-chart{--s-mine:#2a78d6}}
+:root[data-theme="dark"] .partner-chart{--s-mine:#3987e5}
+.partner-chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.pchart-grid{stroke:var(--line);stroke-width:1}
+.pchart-axis{fill:var(--ink-3);font-size:8px;font-weight:700}
+.pchart-crosshair{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:2 3;opacity:.7}
+.pchart-line{stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pchart-line.pchart-mine{stroke:var(--s-mine)}
+/* Dashed is the second encoding, so the pair reads without colour at all. */
+.pchart-line.pchart-theirs{stroke:var(--s-theirs);stroke-dasharray:5 4}
+.pchart-dot.pchart-mine{fill:var(--s-mine)}
+.pchart-dot.pchart-theirs{fill:var(--s-theirs)}
+.pchart-dot{stroke:var(--panel);stroke-width:2}
+.pchart-hit{fill:transparent}
+.pchart-readout{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:8px 6px 2px;min-height:20px;font-size:12.5px}
+.pchart-readout>span{color:var(--ink-3)}
+.pchart-readout b{font-weight:800;font-variant-numeric:tabular-nums}
+.pchart-readout .pchart-mine{color:var(--s-mine)}
+.pchart-readout .pchart-theirs{color:var(--s-theirs)}
+.pchart-hint{color:var(--ink-3)}
+.pchart-legend{display:flex;gap:14px;padding:6px 6px 14px}
+.pchart-key{display:inline-flex;align-items:center;gap:7px;border:0;background:none;padding:2px 0;color:var(--ink-2);font:700 12.5px var(--body);cursor:pointer}
+.pchart-key i{width:16px;height:3px;border-radius:2px;flex:none}
+.pchart-key.pchart-mine i{background:var(--s-mine)}
+/* The legend swatch carries the same dash the line does, so the key and the
+   chart agree without anyone having to match two oranges. */
+.pchart-key.pchart-theirs i{background:repeating-linear-gradient(90deg,var(--s-theirs) 0 6px,transparent 6px 10px)}
+.pchart-key.off{color:var(--ink-3)}
+.pchart-key.off i{opacity:.3}

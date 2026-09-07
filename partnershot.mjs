@@ -27,6 +27,23 @@ async function shot(route, theme, name, width = 430, typed = '') {
     const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (url.includes('/rpc/forge_partner_feed')) return json(FEED);
     if (url.includes('/rpc/forge_partner_requests')) return json([]);
+    if (url.includes('/rpc/forge_partner_metrics')) return json([
+      { key: 'lift:bench', label: 'Bench', kind: 'strength', mine: true, theirs: true },
+      { key: 'lift:squat', label: 'Squat', kind: 'strength', mine: true, theirs: true },
+      { key: 'lift:hack squat', label: 'Hack Squat', kind: 'strength', mine: true, theirs: true },
+      { key: 'run:miles', label: 'Weekly miles', kind: 'endurance', mine: true, theirs: false },
+      { key: 'run:pace', label: 'Average pace', kind: 'endurance', mine: true, theirs: false },
+    ]);
+    if (url.includes('/rpc/forge_partner_series')) return json([
+      { bucket: '2026-07-06', mine: '360.0', theirs: null },
+      { bucket: '2026-07-20', mine: '365.8', theirs: null },
+      { bucket: '2026-07-27', mine: null, theirs: '280.6' },
+      { bucket: '2026-08-03', mine: '372.4', theirs: '272.0' },
+      { bucket: '2026-08-10', mine: '365.8', theirs: '280.6' },
+      { bucket: '2026-08-17', mine: '369.0', theirs: '270.0' },
+      { bucket: '2026-08-24', mine: '365.8', theirs: '291.7' },
+      { bucket: '2026-08-31', mine: '380.1', theirs: '290.3' },
+    ]);
     if (url.includes('/rpc/forge_search_athletes')) return json([
       { id: 'a1', username: 'adamgomez', display_name: 'Adam Gomez', relation: 'partner' },
       { id: 'g1', username: 'andrewgomez', display_name: 'Andrew Gomez', relation: 'none' },
@@ -73,4 +90,8 @@ const page = await shot('/partners', 'dark', 'partners-page', 430, 'adm gomez');
 console.log('\n--- PARTNER SCREEN ---');
 console.log(page.slice(0, 700));
 await shot('/partners', 'light', 'partners-page-light', 430, 'adm gomez');
+const detail = await shot('/partners/a1', 'dark', 'partner-detail');
+console.log('\n--- PARTNER DETAIL ---');
+console.log(detail.split('AI')[0].slice(0, 700));
+await shot('/partners/a1', 'light', 'partner-detail-light');
 await browser.close();

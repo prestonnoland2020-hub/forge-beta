@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageIntro } from '../components/AppShell';
 import { waveLabel } from '../components/PlanView';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -163,7 +163,7 @@ export function PartnersPage() {
                 ? `Week ${partner.blockWeek} of ${partner.blockWeeks} · ${waveLabel(partner.waveSlot ?? 0)}`
                 : 'No block yet';
               return <div className={`pv-row partner-full${partner.trainedToday ? ' done' : ''}`} key={partner.friendId}>
-                <div className="partner-full-main">
+                <Link className="partner-full-main" to={`/partners/${partner.friendId}`}>
                   <span className="partner-mark" aria-hidden="true">{(partner.displayName || partner.username).slice(0, 2).toUpperCase()}</span>
                   <div>
                     <strong>{partner.displayName}</strong>
@@ -173,7 +173,7 @@ export function PartnersPage() {
                     </span>
                   </div>
                   {partner.trainedToday && <b aria-label="Trained today">✓</b>}
-                </div>
+                </Link>
                 <button type="button" className="text-button partner-remove"
                   onClick={() => { if (window.confirm(`Remove ${partner.displayName} as a training partner?`)) void removePartner(partner.friendId).then(refresh); }}>Remove</button>
               </div>;

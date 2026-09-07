@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { isDemoMode } from '../../lib/env';
+import { localDayIso } from '../../lib/time';
 
 /* TRAINING PARTNERS. Up to five people, mutual, and no feed — see the
    migration for why. Everything that crosses between two athletes is a
@@ -33,7 +34,12 @@ type FeedRow = {
 
 export async function loadPartners(): Promise<Partner[]> {
   if (isDemoMode) return [];
-  const { data, error } = await supabase.rpc('forge_partner_feed');
+  /* THE DEVICE SAYS WHAT DAY IT IS. Postgres reckons in UTC, so from early
+     evening onwards everywhere west of Greenwich the server had already rolled
+     into tomorrow and every partner's set vanished — "Trained today" with
+     nothing beside it, at 9pm. Whether a partner has trained today is a
+     question asked from the viewer's day, so the viewer supplies it. */
+  const { data, error } = await supabase.rpc('forge_partner_feed', { p_today: localDayIso() });
   if (error) throw error;
   return ((data || []) as FeedRow[]).map(row => ({
     friendId: row.friend_id,
@@ -126,6 +132,41 @@ export async function loadDiscoverable(): Promise<boolean> {
   const { data } = await supabase.from('profiles').select('discoverable').eq('id', userData.user.id).maybeSingle();
   return data?.discoverable !== false;
 }
+
+/* WHAT TWO ATHLETES CAN COMPARE. One weekly number per metric, per person —
+   a lift's calculated max, weekly running, or pace. Never a session. */
+export type PartnerMetric = { key: string; label: string; kind: 'strength' | 'endurance'; mine: boolean; theirs: boolean };
+export type SeriesPoint = { bucket: string; mine: number | null; theirs: number | null };
+
+export async function loadPartnerMetrics(partnerId: string): Promise<PartnerMetric[]> {
+  if (isDemoMode) return [];
+  const { data, error } = await supabase.rpc('forge_partner_metrics', { partner_id: partnerId });
+  if (error) throw error;
+  return ((data || []) as Array<{ key: string; label: string; kind: string; mine: boolean; theirs: boolean }>)
+    .map(row => ({ key: row.key, label: row.label, kind: row.kind as PartnerMetric['kind'], mine: row.mine, theirs: row.theirs }));
+}
+
+export async function loadPartnerSeries(partnerId: string, metric: string, weeks = 26): Promise<SeriesPoint[]> {
+  if (isDemoMode) return [];
+  const { data, error } = await supabase.rpc('forge_partner_series', { partner_id: partnerId, metric, weeks });
+  if (error) throw error;
+  return ((data || []) as Array<{ bucket: string; mine: string | null; theirs: string | null }>)
+    .map(row => ({ bucket: row.bucket, mine: row.mine === null ? null : Number(row.mine), theirs: row.theirs === null ? null : Number(row.theirs) }));
+}
+
+/* Pace is the one metric where less is better, which changes what "best"
+   means and which way the chart should point. */
+export const lowerIsBetter = (metric: string) => metric === 'run:pace';
+export const metricUnit = (metric: string, weightUnit: string) =>
+  metric === 'run:pace' ? '/mi' : metric === 'run:miles' ? 'mi' : weightUnit;
+export const formatMetric = (metric: string, value: number | null | undefined): string => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  if (metric === 'run:pace') {
+    const minutes = Math.floor(value); const seconds = Math.round((value - minutes) * 60);
+    return `${minutes}:${String(seconds === 60 ? 0 : seconds).padStart(2, '0')}`;
+  }
+  return metric === 'run:miles' ? String(Math.round(value * 10) / 10) : String(Math.round(value));
+};
 
 const inviteKey = 'forge-partner-invite';
 export const pendingInvite = (): string => { try { return localStorage.getItem(inviteKey) || ''; } catch { return ''; } };

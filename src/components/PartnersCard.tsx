@@ -44,7 +44,7 @@ export function PartnersCard({ unit = 'lb' }: { unit?: string }) {
         const block = partner.blockWeek && partner.blockWeeks
           ? `Week ${partner.blockWeek} of ${partner.blockWeeks} · ${waveLabel((partner.waveSlot ?? 0))}`
           : 'No block yet';
-        return <div className={`partner-row${partner.trainedToday ? ' trained' : ''}`} key={partner.friendId}>
+        return <Link className={`partner-row${partner.trainedToday ? ' trained' : ''}`} to={`/partners/${partner.friendId}`} key={partner.friendId}>
           <span className="partner-mark" aria-hidden="true">{(partner.displayName || partner.username).slice(0, 2).toUpperCase()}</span>
           <div>
             <strong>{partner.displayName}</strong>
@@ -55,7 +55,7 @@ export function PartnersCard({ unit = 'lb' }: { unit?: string }) {
               : <span className="partner-quiet">{lastTrainedLabel(partner.lastTrained)}</span>}
           </div>
           {partner.trainedToday && <b aria-label="Trained today">✓</b>}
-        </div>;
+        </Link>;
       })}
     </div>
   </section>;
