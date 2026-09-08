@@ -12,7 +12,15 @@ import { canonicalLiftKey } from './liftAliases';
    card is snapshotted to Supabase, and a stale snapshot with a matching
    fingerprint outlives any code fix. plan-authoritative-v3: cardio comes from
    the stored block, and rows saved by older engines must regenerate. */
-export const DAILY_RECOMMENDATION_VERSION='plan-authoritative-v4';
+/* BUMP THIS WHENEVER THE ARITHMETIC CHANGES. A stored recommendation is
+   reused as long as its version and its input fingerprint both still match,
+   and the fingerprint is over the athlete's data — not over Forge's code. So a
+   load-writing fix reaches nobody who already has today's row: Adam's 295 x 2
+   would have sat on his screen all day beside a build that no longer produces
+   it. v5 is the anchored loader — the logger writing its bar from the same
+   evidence the Plan tab does. Completed rows are left alone; they are history,
+   not a prescription. */
+export const DAILY_RECOMMENDATION_VERSION='anchored-loads-v5';
 
 export type RecommendationSplitDay={
   id?:string;
