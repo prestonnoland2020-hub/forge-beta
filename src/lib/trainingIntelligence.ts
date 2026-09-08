@@ -3,6 +3,7 @@ import type { RecoveryState } from './recoveryEngine';
 import { prescribeTopSet } from './strengthPrescription';
 import { calculateEstimatedOneRepMax } from './strength';
 import { canonicalLiftKey, sameLift } from './liftAliases';
+import { bestsFromHistory } from '../features/training/aiPlanService';
 /* One Epley, and it treats a logged single as itself rather than inflating
    405x1 into a 419 max. */
 const epleyMax=(weight:number,reps:number)=>calculateEstimatedOneRepMax(weight,reps)||0;
@@ -48,6 +49,10 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
   else if(daysSinceTraining===1){headline='Train around recent fatigue';reason='You trained yesterday. Use a different movement pattern or keep today’s work submaximal.'}
   else if(daysSinceTraining!==null){headline='Productive training is available';reason=recovery.confidence==='Low'?`It has been ${daysSinceTraining} days since your last logged session. No smartwatch recovery data was used.`:`It has been ${daysSinceTraining} days since your last logged session and readiness is ${recovery.readiness}%.`}
 
+  /* Every lift's heaviest set at each rep count. The Plan tab has always
+     written its loads from these; the logger did not, and the two screens
+     disagreed by forty pounds on the same lift on the same morning. */
+  const {anchors:liftAnchors}=bestsFromHistory(records);
   const topSets=templates.map(template=>{
     const history=strengthResults(records).filter(record=>sameLift(record.lift,template.exercise)&&record.weight&&record.reps).sort((a,b)=>b.date.localeCompare(a.date)||(b.calculatedMax??epleyMax(b.weight,b.reps))-(a.calculatedMax??epleyMax(a.weight,a.reps)));
     const latest=history[0];
@@ -63,10 +68,26 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
     const evidenceStep=supportsProgress?baselineMax*.006:0;
     const evidenceProgress=Math.max(0,Math.min(1,(destination-baselineMax)>0?evidenceStep/(destination-baselineMax):0));
     const completedProgrammedExposures=template.exposureIndex??Math.max(0,history.length-1);
-    const stage=prescribeTopSet({baselineMax,goalMax:goalMaxByLift[canonicalLiftKey(template.exercise)],weekIndex:completedProgrammedExposures,progress:evidenceProgress,readiness:recovery.confidence==='Low'?100:recovery.readiness,highFatigue:recovery.strengthFatigue==='High'});
+    const anchors=liftAnchors.get(canonicalLiftKey(template.exercise));
+    const stage=prescribeTopSet({baselineMax,goalMax:goalMaxByLift[canonicalLiftKey(template.exercise)],weekIndex:completedProgrammedExposures,progress:evidenceProgress,readiness:recovery.confidence==='Low'?100:recovery.readiness,highFatigue:recovery.strengthFatigue==='High',anchors});
     const safeBias=Math.max(-10,Math.min(10,loadBiasPercent));const adjustedWeight=Math.max(0,Math.round(stage.weight*(1+safeBias/100)/5)*5);const adjustedMax=epleyMax(adjustedWeight,stage.reps);
     const source='history' as const;
-    const rationale=`${stage.rationale} Best recent comparable estimate came from ${strongestRecent.weight} lb ×${strongestRecent.reps}; latest was ${latest.weight} lb ×${latest.reps} on ${latest.date}.${supportsProgress?' Recent performance supports one small progression step.':' Forge is holding the demonstrated level until another comparable result confirms progress.'}`;
+    /* SAY WHAT ACTUALLY DECIDED THE LOAD. This named the athlete's highest
+       estimate — "best recent comparable estimate came from 225 lb ×10" —
+       which was true of the old arithmetic and is no longer what writes the
+       bar. The load comes from the sets nearest this rep count, so that is
+       what the sentence names: their own set at these reps when they have
+       one, and otherwise the nearest evidence there is. */
+    const atReps=anchors?.get(stage.reps);
+    const nearest=anchors?.size
+      ?[...anchors].sort((a,b)=>Math.abs(a[0]-stage.reps)-Math.abs(b[0]-stage.reps))[0]
+      :undefined;
+    const evidence=atReps
+      ?`Your best ${stage.reps === 1 ? 'single' : `set of ${stage.reps}`} is ${atReps} lb; latest was ${latest.weight} lb ×${latest.reps} on ${latest.date}.`
+      :nearest
+        ?`Nearest evidence is ${nearest[1]} lb ×${nearest[0]}; latest was ${latest.weight} lb ×${latest.reps} on ${latest.date}.`
+        :`Best recent comparable estimate came from ${strongestRecent.weight} lb ×${strongestRecent.reps}; latest was ${latest.weight} lb ×${latest.reps} on ${latest.date}.`;
+    const rationale=`${stage.rationale} ${evidence}${supportsProgress?' Recent performance supports one small progression step.':' Forge is holding the demonstrated level until another comparable result confirms progress.'}`;
     const backoffSets=stage.isTest?2:3;const backoffReps=stage.reps<=2?Math.max(3,stage.reps+2):stage.reps;const backoffWeight=Math.max(5,Math.round(adjustedWeight*(stage.isTest?.85:.9)/5)*5);
     return {...template,weight:adjustedWeight,reps:stage.reps,backoffSets,backoffReps,backoffWeight,calculatedMax:adjustedMax,stage:stage.label,rationale:`${rationale}${goalMaxByLift[canonicalLiftKey(template.exercise)]?` This load is progressing toward the ${goalMaxByLift[canonicalLiftKey(template.exercise)]} lb goal.`:' No movement-specific goal is set, so Forge targets a conservative improvement over demonstrated strength.'}${safeBias?` Coach load adjustment: ${safeBias>0?'+':''}${safeBias}%.`:''}`,source};
   });
