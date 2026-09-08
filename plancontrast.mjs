@@ -49,6 +49,8 @@ const AUDIT = `(() => {
     const box = el.getBoundingClientRect();
     if (box.width < 2 || box.height < 2) continue;
     const size = parseFloat(style.fontSize);
+    /* A 0px glyph is a decorative mark, not text anyone reads. */
+    if (!(size >= 1)) continue;
     const weight = parseInt(style.fontWeight, 10) || 400;
     /* WCAG: 18.66px bold or 24px counts as large text and needs only 3:1. */
     const large = size >= 24 || (size >= 18.66 && weight >= 700);
@@ -113,8 +115,10 @@ for (const { accent, theme, ground } of PASSES) {
     await page.goto(`${BASE}/#/plan?t=1`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
     if (!page.url().includes('/plan')) console.log(`REDIRECTED -> ${page.url()}`);
-    await page.locator('.pv-block-toggle').click(); await page.waitForTimeout(200);
-    await page.locator('.pv-block-row').nth(4).click(); await page.waitForTimeout(200);
+    /* The block used to live in an accordion at the bottom; a week is reached
+       from the pips at the top now, so the surfaces to audit are a week ahead
+       (with its projection note) and the way back. */
+    await page.locator('.pv-dot').nth(7).click().catch(() => {}); await page.waitForTimeout(300);
     await page.locator('.pv-row-main').first().click().catch(() => {}); await page.waitForTimeout(200);
     await page.locator('.pv-request .text-button').click().catch(() => {}); await page.waitForTimeout(200);
     for (const hit of await page.evaluate(AUDIT)) {

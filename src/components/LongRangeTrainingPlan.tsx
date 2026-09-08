@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
@@ -6,7 +6,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { bestsFromHistory,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
-import { PlanProgress,TodayCard,WeekList,BlockList,waveSentence,type PlanSession,type PlanBlockWeek,type PlanLift,type PlanRun } from './PlanView';
+import { PlanProgress,TodayCard,WeekList,waveSentence,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
 import { localDayIso } from '../lib/time';
 
 type SplitDay={name:string;dayType:string;muscles?:string[];exercises?:string[];cardioPolicy?:'none'|'forge'|'planned';cardio?:PlannedCardio[]};
@@ -93,7 +93,11 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const history=useMemo(()=>bestsFromHistory(records),[records]);
   const bests=history.bests;
   const goalLifts=useMemo(()=>goalLiftNames(goals),[goals]);
-  const active=roadmap[0];
+  /* Same shape as the program: the dots pick the week, the week swipes, and
+     the screen opens on the one you are in — which here is always the first,
+     because the pre-program plan starts today. */
+  const [viewWeek,setViewWeek]=useState(0);
+  const active=roadmap[Math.max(0,Math.min(viewWeek,roadmap.length-1))];
   const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,undefined,history.anchors):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts]);
   if(!active)return null;
   /* THE PRE-PROGRAM PLAN WEARS THE SAME CLOTHES AS THE PROGRAM. This screen
@@ -112,16 +116,15 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const todaySession=weekSessions.find(session=>localDayIso(session.date)===todayIso);
   const loggedToday=records.find(record=>record.date===todayIso&&((record.topSets||[]).some(set=>set.completed!==false)||(record.cardioSessions||[]).length>0));
   const unit='lb';
-  const blockWeeks:PlanBlockWeek[]=roadmap.map((week,index)=>({
-    index,startDate:new Date(`${week.startDate}T12:00:00`),waveIndex:index,miles:week.mileage,
-    lead:week.strengthLoad?{exercise:week.strengthExercise,weight:week.strengthLoad,reps:week.strengthReps}:undefined,
-    sessions:()=>weekCalendar(week,splitDays,goals,profile,rhythm,bests,goalLifts,undefined,history.anchors).map(toPlanSession),
-  }));
   const sentence=`${waveSentence(0)}${active.mileage?` ${active.mileage} mi of running.`:''} Numbers firm up as you log.`;
+  const short=(date:Date)=>date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const range=weekSessions.length?`${short(weekSessions[0].date)} – ${short(weekSessions[weekSessions.length-1].date)}`:'';
   return <div className="pv">
-    <PlanProgress weekIndex={0} total={roadmap.length} waveIndexFor={index=>index} sentence={sentence}/>
-    <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout"/>
-    <WeekList sessions={weekSessions} unit={unit} records={records}/>
-    <BlockList weeks={blockWeeks} currentIndex={0} unit={unit} distanceUnit="mi" records={records}/>
+    <PlanProgress weekIndex={viewWeek} current={0} total={roadmap.length} waveIndexFor={index=>index} sentence={sentence} onPick={setViewWeek}/>
+    {viewWeek===0&&<TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout"/>}
+    <WeekList sessions={weekSessions} unit={unit} records={records}
+      title={viewWeek===0?'This week':`Week ${viewWeek+1} · ${range}`}
+      note={viewWeek>0?'Weeks past this one are a projection. Numbers firm up as you log.':undefined}
+      onSwipe={direction=>setViewWeek(current=>Math.max(0,Math.min(current+direction,roadmap.length-1)))}/>
   </div>;
 }

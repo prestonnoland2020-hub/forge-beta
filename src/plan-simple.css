@@ -14,13 +14,23 @@
 .pv-progress-week{font:800 30px/1 var(--display);letter-spacing:-.01em;color:var(--ink)}
 .pv-progress-week small{font:700 14px var(--body);color:var(--ink-3);margin-left:4px;letter-spacing:0}
 .pv-progress-name{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text)}
-.pv-dots{display:flex;gap:6px;align-items:center}
-.pv-dots i{flex:1;height:6px;border-radius:999px;background:var(--surface-3);min-width:10px}
-.pv-dots i.done{background:color-mix(in srgb,var(--accent) 45%,var(--surface-3))}
-.pv-dots i.now{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
-.pv-dots i.max{border:1px solid var(--accent-dim)}
-.pv-dots i.max.now{border-color:transparent}
-.pv-dots i.light{opacity:.6}
+/* THE PIPS ARE THE WEEK PICKER. They were 6px tall and untouchable; a control
+   a thumb has to hit needs a target, so each is a button 34px tall whose visible
+   bar is still 6px — the padding does the catching. */
+.pv-dots{display:flex;gap:6px;align-items:stretch;margin:-8px 0}
+.pv-dot{flex:1;min-width:12px;border:0;background:none;padding:14px 0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pv-dot::before{content:"";display:block;height:6px;border-radius:999px;background:var(--surface-3)}
+.pv-dot.done::before{background:color-mix(in srgb,var(--accent) 45%,var(--surface-3))}
+.pv-dot.now::before{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.pv-dot.max::before{border:1px solid var(--accent-dim)}
+.pv-dot.max.now::before{border-color:transparent}
+.pv-dot.light::before{opacity:.6}
+/* The week you are actually in keeps a mark of its own even while you look at
+   another one, so "where am I" survives browsing. */
+.pv-dot.here:not(.now)::before{background:color-mix(in srgb,var(--accent) 65%,var(--surface-3))}
+.pv-dot:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.pv-progress-back{justify-self:start;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);border-radius:999px;padding:6px 12px;font:700 12px var(--body);cursor:pointer}
+.pv-week-note{margin:0;padding:12px 18px 16px;border-top:1px solid var(--hairline);color:var(--ink-3);font-size:12.5px;line-height:1.5}
 .pv-progress-sentence{margin:0;color:var(--ink-2);font-size:14px;line-height:1.45}
 
 /* ── Save / Regenerate ──────────────────────────────────────────────────── */

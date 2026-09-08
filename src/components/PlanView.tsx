@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { WAVE_REPS, WAVE_LENGTH } from '../features/training/aiPlanService';
 import { localDayIso } from '../lib/time';
@@ -79,22 +79,49 @@ export function RunLine({ run }: { run: PlanRun }) {
 }
 
 /* ── 1. Where am I ──────────────────────────────────────────────────────── */
-export function PlanProgress({ weekIndex, total, waveIndexFor, sentence }: {
-  weekIndex: number; total: number; waveIndexFor: (index: number) => number; sentence: ReactNode;
+/* THE SQUARES LOOK LIKE TABS, SO THEY ARE TABS NOW.
+
+   Ten pips across the top of a screen read as a control on every phone anyone
+   owns, and these were a picture: they showed which week you were in and did
+   nothing when pressed, while the only way to see week four was a "The whole
+   block" accordion at the far bottom of the page. Two ways to reach the same
+   ten weeks, one of them invisible and the other inert.
+
+   So the pips drive the screen. Tap one, or swipe the week itself, and the
+   week below changes; the tab always opens on the week you are actually in.
+   A week is a real tab stop, keyboard arrows included, because that is what it
+   looks like. */
+export function PlanProgress({ weekIndex, current, total, waveIndexFor, sentence, onPick }: {
+  weekIndex: number; current: number; total: number;
+  waveIndexFor: (index: number) => number; sentence: ReactNode; onPick: (index: number) => void;
 }) {
+  const away = weekIndex - current;
   return <section className="pv-progress">
     <div className="pv-progress-head">
       <span className="pv-progress-week">Week {weekIndex + 1} <small>of {total}</small></span>
       <span className="pv-progress-name">{waveLabel(waveIndexFor(weekIndex))}</span>
     </div>
-    <div className="pv-dots" role="img" aria-label={`Week ${weekIndex + 1} of ${total}`}>
+    <div className="pv-dots" role="tablist" aria-label="Week">
       {Array.from({ length: total }, (_, index) => {
         const wave = waveIndexFor(index);
         const kind = isMaxWeek(wave) ? ' max' : isLighterWeek(wave) ? ' light' : '';
-        return <i key={index} className={`${index < weekIndex ? 'done' : index === weekIndex ? 'now' : ''}${kind}`} />;
+        const state = index === weekIndex ? ' now' : index < current ? ' done' : '';
+        return <button type="button" key={index} role="tab" aria-selected={index === weekIndex}
+          className={`pv-dot${state}${kind}${index === current ? ' here' : ''}`}
+          aria-label={`Week ${index + 1}, ${waveLabel(wave).toLowerCase()}${index === current ? ', the week you are in' : ''}`}
+          onKeyDown={event => {
+            if (event.key === 'ArrowRight' && weekIndex < total - 1) { event.preventDefault(); onPick(weekIndex + 1); }
+            if (event.key === 'ArrowLeft' && weekIndex > 0) { event.preventDefault(); onPick(weekIndex - 1); }
+          }}
+          onClick={() => onPick(index)} />;
       })}
     </div>
     <p className="pv-progress-sentence">{sentence}</p>
+    {/* Looking somewhere other than now is a state worth naming, with the way
+        back one tap away rather than a scroll and a guess. */}
+    {away !== 0 && <button type="button" className="pv-progress-back" onClick={() => onPick(current)}>
+      {away > 0 ? `${away} week${away === 1 ? '' : 's'} ahead` : `${-away} week${away === -1 ? '' : 's'} back`} · return to this week
+    </button>}
   </section>;
 }
 
@@ -151,12 +178,33 @@ export function TodayCard({ session, unit, logged, workoutHref }: {
 }
 
 /* ── 3. This week ────────────────────────────────────────────────────────── */
-export function WeekList({ sessions, unit, records, title = 'This week' }: {
+export function WeekList({ sessions, unit, records, title = 'This week', note, onSwipe }: {
   sessions: PlanSession[]; unit: string; records: WorkoutRecord[]; title?: string;
+  note?: ReactNode;
+  /* A horizontal drag across the week moves to the next or previous one. It is
+     the gesture the dots above promise, and a phone will otherwise scroll the
+     page vertically underneath it — so only a clearly sideways drag counts. */
+  onSwipe?: (direction: 1 | -1) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  /* A REF, NOT STATE. Where the finger went down is not something the screen
+     draws, and holding it in state means the touchend handler can run against a
+     render that has not flushed yet — a fast flick then does nothing at all. */
+  const from = useRef<{ x: number; y: number } | null>(null);
   const todayIso = localDayIso();
-  return <section className="card pv-week">
+  const swipe = onSwipe ? {
+    onTouchStart: (event: TouchEvent<HTMLElement>) => { from.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }; },
+    onTouchEnd: (event: TouchEvent<HTMLElement>) => {
+      const start = from.current;
+      from.current = null;
+      if (!start) return;
+      const dx = event.changedTouches[0].clientX - start.x;
+      const dy = event.changedTouches[0].clientY - start.y;
+      /* A drag that is mostly vertical is the page scrolling, not a swipe. */
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.6) onSwipe(dx < 0 ? 1 : -1);
+    },
+  } : {};
+  return <section className="card pv-week" {...swipe}>
     <header><h3>{title}</h3></header>
     <div className="pv-week-rows">
       {sessions.map(session => {
@@ -231,64 +279,18 @@ export function WeekList({ sessions, unit, records, title = 'This week' }: {
         </div>;
       })}
     </div>
+    {note && <p className="pv-week-note">{note}</p>}
   </section>;
 }
 
-/* ── 4. The whole block, folded ─────────────────────────────────────────── */
-export type PlanBlockWeek = {
-  index: number;
-  startDate: Date;
-  waveIndex: number;
-  miles: number;
-  /* The week's headline set, if it has one. */
-  lead?: PlanLift;
-  sessions?: () => PlanSession[];
-};
-export function BlockList({ weeks, currentIndex, unit, distanceUnit, records }: {
-  weeks: PlanBlockWeek[]; currentIndex: number; unit: string; distanceUnit: string; records: WorkoutRecord[];
-}) {
-  const [shown, setShown] = useState(false);
-  const [openWeek, setOpenWeek] = useState<number | null>(null);
-  const short = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return <section className="card pv-block">
-    <button type="button" className="pv-block-toggle" onClick={() => setShown(value => !value)} aria-expanded={shown}>
-      <span><strong>The whole block</strong><small>{weeks.length} weeks · {weeks.filter(week => isMaxWeek(week.waveIndex)).length === 1 ? 'one max week' : `${weeks.filter(week => isMaxWeek(week.waveIndex)).length} max weeks`}</small></span>
-      <b aria-hidden="true">{shown ? '−' : '+'}</b>
-    </button>
-    {shown && <div className="pv-block-weeks">
-      {weeks.map(week => {
-        const label = waveLabel(week.waveIndex);
-        const state = week.index < currentIndex ? 'past' : week.index === currentIndex ? 'now' : 'ahead';
-        const opened = openWeek === week.index;
-        return <div className={`pv-block-week ${state}${isMaxWeek(week.waveIndex) ? ' max' : ''}${isLighterWeek(week.waveIndex) ? ' light' : ''}${opened ? ' open' : ''}`} key={week.index}>
-          <button type="button" className="pv-block-row" onClick={() => setOpenWeek(current => current === week.index ? null : week.index)} aria-expanded={opened}>
-            <span className="pv-block-num"><b>{week.index + 1}</b><small>{short(week.startDate)}</small></span>
-            <span className="pv-block-body">
-              <strong>{label}{state === 'now' ? <em> · now</em> : null}</strong>
-              <small>{[week.lead ? (week.lead.weight ? `${week.lead.exercise} ${week.lead.weight}×${week.lead.reps}` : week.lead.exercise) : '', week.miles ? `${week.miles} ${distanceUnit} running` : ''].filter(Boolean).join(' · ') || 'Built from what you log'}</small>
-            </span>
-            <span className="pv-block-state" aria-hidden="true">{state === 'past' ? '✓' : '›'}</span>
-          </button>
-          {opened && week.sessions && <div className="pv-block-days">
-            {week.sessions().map(session => {
-              const isRest = session.empty === 'rest' && !session.lifts.length && !session.run;
-              return <div className={`pv-block-day${isRest ? ' rest' : ''}`} key={session.date.toISOString()}>
-                <span className="pv-row-date"><b>{weekdayShort(session.date)}</b><small>{dayNumber(session.date)}</small></span>
-                <div>
-                  <strong>{isRest ? 'Rest' : session.title}</strong>
-                  {session.lifts.map((lift, index) => <LiftLine key={`${lift.exercise}-${index}`} lift={lift} unit={unit} />)}
-                  {session.run && <RunLine run={session.run} />}
-                  {!session.lifts.length && !session.run && !isRest && <small>{session.summary || 'Open — nothing required'}</small>}
-                </div>
-              </div>;
-            })}
-          </div>}
-        </div>;
-      })}
-      <p className="pv-block-note">Every load comes from your closest logged set through the 8 / 6 / 4 / 2 / max wave — your heavy weeks from your heavy sets, not from stretching an 8-rep set down to a double. Weeks past this one are a projection: each time a rep count comes round it asks for one more step. Beat a set and the numbers rise; miss one and they hold. {records.length ? '' : 'Log a set and the first numbers appear.'}</p>
-    </div>}
-  </section>;
-}
+/* THE WHOLE BLOCK, UNFOLDED. There used to be a fourth section here: a "The
+   whole block" accordion at the bottom of the page listing all ten weeks, each
+   expanding to its own days. It was the only way to see week four, and it sat
+   below everything, while ten pips at the top of the screen showed the same
+   ten weeks and did nothing when pressed. The pips are the control now and the
+   week list draws whichever week they pick, so the accordion has nothing left
+   to say — one way to reach a week, at the top, where it looked like it was
+   all along. */
 
 /* ── Save / Regenerate ───────────────────────────────────────────────────── */
 export function PlanActions({ saved, savedAt, generating, canGenerate, onSave, onRegenerate, request, requestNote, generatedAt, error }: {

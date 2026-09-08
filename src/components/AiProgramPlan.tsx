@@ -4,7 +4,7 @@ import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvi
 import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { PlanRebuildModal } from './PlanRebuildModal';
-import { PlanProgress, PlanActions, TodayCard, WeekList, BlockList, waveSentence, type PlanSession, type PlanBlockWeek } from './PlanView';
+import { PlanProgress, PlanActions, TodayCard, WeekList, waveSentence, type PlanSession } from './PlanView';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -136,6 +136,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [refreshAsk, setRefreshAsk] = useState(false);
+  /* Which week the tab is SHOWING. Null means "the one I am in", which is what
+     it opens on and what it falls back to when a new block is built — so this
+     never strands the screen on week 9 of a block that no longer has one. */
+  const [viewWeek, setViewWeek] = useState<number | null>(null);
   const autoAttempted = useRef(false);
   /* Generation UX: ~44s of API time gets staged narration instead of a dead
      spinner, and a generation orphaned by backgrounding the phone retries
@@ -397,7 +401,8 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       return item;
     }),
   };
-  const weekIndex = currentWeekIndex(stored);
+  const currentIndex = currentWeekIndex(stored);
+  const weekIndex = Math.max(0, Math.min(viewWeek ?? currentIndex, plan.weeks.length - 1));
   const week = plan.weeks[weekIndex];
   const sessions = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi');
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
@@ -429,15 +434,18 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     const miles = week.mileage ? ` ${week.mileage} ${distanceUnit} of running.` : '';
     return `${lift}${miles}`;
   })();
-  const blockWeeks: PlanBlockWeek[] = plan.weeks.map((item, index) => {
-    const startDate = new Date(`${stored.startDate}T12:00:00`); startDate.setDate(startDate.getDate() + index * 7);
-    const lead = headline(item);
-    return {
-      index, startDate, waveIndex: waveIndexOf(stored, index), miles: item.mileage,
-      lead: lead ? { exercise: lead.exercise, weight: lead.weight, reps: lead.reps } : undefined,
-      sessions: () => aiWeekSessions(item, stored.startDate, index, splitDays, rhythm, anchor, distanceUnit).map(toPlanSession),
-    };
-  });
+  /* "Week 4 · Sep 28 – Oct 4" — a week away from now needs its dates, because
+     the weekday rows below carry a number but not a month. */
+  const weekRange = (list: PlanSession[]) => {
+    const first = list[0]?.date; const last = list[list.length - 1]?.date;
+    if (!first || !last) return '';
+    const short = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${short(first)} – ${short(last)}`;
+  };
+  /* A week that has not happened is a projection, and the screen says so where
+     the week is rather than in a note at the bottom of the page. This is the
+     sentence the folded "whole block" panel used to carry. */
+  const projection = `Weeks past this one are a projection: each time a rep count comes round it asks for one more step. Beat a set and the numbers rise; miss one and they hold.${records.length ? '' : ' Log a set and the first numbers appear.'}`;
   const workoutHref = recommendation ? `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}` : '/workout';
 
   return <div className="pv">
@@ -458,7 +466,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       <p>The next block starts from what you lifted and ran in this one. Build it when you are ready to keep going.</p>
       {canGenerate && <button type="button" className="button" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Building…' : 'Build the next block'}</button>}
     </section>}
-    <PlanProgress weekIndex={weekIndex} total={plan.weeks.length} waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence} />
+    <PlanProgress weekIndex={weekIndex} current={currentIndex} total={plan.weeks.length}
+      waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence}
+      onPick={index => setViewWeek(index === currentIndex ? null : index)} />
     <PlanActions
       saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
       onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}
@@ -473,9 +483,16 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       onCancel={() => { setRefreshAsk(false); setError(''); }}
       onRebuild={adjustments => void rebuild(adjustments)}
     /> : null}
-    <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />
-    <WeekList sessions={weekSessions} unit={unit} records={records} />
-    <BlockList weeks={blockWeeks} currentIndex={weekIndex} unit={unit} distanceUnit={distanceUnit} records={records} />
+    {/* Today belongs to today. Looking at week six, there is no "today" in it,
+        and a card headed TODAY over a week in October would be a lie. */}
+    {weekIndex === currentIndex && <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />}
+    <WeekList sessions={weekSessions} unit={unit} records={records}
+      title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
+      note={weekIndex > currentIndex ? projection : undefined}
+      onSwipe={direction => {
+        const next = weekIndex + direction;
+        if (next >= 0 && next < plan.weeks.length) setViewWeek(next === currentIndex ? null : next);
+      }} />
     {liveAdjusted ? <p className="pv-footnote">Loads on this screen follow your latest logged bests, so they can differ from the block as first written.</p> : null}
   </div>;
 }
