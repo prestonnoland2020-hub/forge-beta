@@ -13,6 +13,7 @@ import { cardioPlanSummary,type PlannedCardio,type CircuitStation } from '../com
 import { requestForgeCoach } from '../features/training/coachService';
 import { readLocalAiPlan, currentWeekIndex, resolvePlanWeek, goalLiftNames, weekCycleDays, waveIndexOf} from '../features/training/aiPlanService';
 import { sameLift, canonicalLiftKey } from '../lib/liftAliases';
+import { goalTrajectories, weeklyRunning, bodyWeightSeries } from '../lib/goalTrajectory';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { normalizeMuscleGroups } from '../lib/muscleGroups';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -87,7 +88,22 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
        claim that 'the goal lift is trained once this week, other strength days
        are accessory'. Both are false under the current design and the coach was
        being handed them alongside the real block. */
-    wearableRecovery,wearableRecoveryAvailable:Boolean(wearableRecovery),profile:{weeklyMileage:profile.weeklyMileage,runningDays:profile.runningDays,experience:profile.experience,strengthFatigue:profile.strengthFatigue},goals:goals.map(goal=>({title:goal.title,type:goal.type,target:goal.target,date:goal.date,exercise:goal.exercise})),availableLibrary:{exercises:exercises.filter(exercise=>exercise.enabled).map(exercise=>({name:exercise.name,kind:exercise.kind,muscles:exercise.muscles})),workouts:workouts.map(workout=>({name:workout.name,kind:workout.kind,summary:workout.summary}))},establishedSplit:setup?.splitDays.map(day=>({name:day.name,type:day.type,muscles:day.muscles}))||[],savedDailyRecommendation:recommendation,dueSplitDay:recommendation?.splitDay||{name:dueDay?.name||fallbackDay?.name,type:dueDay?.dayType||fallbackDay?.type,muscles:dueMuscles,mappedExercises:eligible.map(exercise=>exercise.name)},recentTrainingHistory:coachingHistory,
+    wearableRecovery,wearableRecoveryAvailable:Boolean(wearableRecovery),profile:{weeklyMileage:profile.weeklyMileage,runningDays:profile.runningDays,experience:profile.experience,strengthFatigue:profile.strengthFatigue},goals:goals.map(goal=>({title:goal.title,type:goal.type,target:goal.target,date:goal.date,exercise:goal.exercise})),
+      /* WHAT THE COACH WAS NEVER TOLD, AND SO REPORTED AS MISSING.
+
+         "Am I on track?" used to return a list of gaps and two complaints —
+         that the running goals were unverified and that body weight could not
+         be assessed without a current logged weight. Preston had weighed in
+         that morning, and had run 13.9 miles the week before against a 14-mile
+         target. Both complaints were true of this context object and false of
+         the athlete.
+
+         A gap is not an answer. These three are the arithmetic that makes one:
+         where each goal is heading at the athlete's own rate, what they have
+         actually run week by week, and what they weigh. */
+      goalTrajectory:goalTrajectories(goals,records),
+      weeklyRunning:weeklyRunning(records),
+      bodyWeight:bodyWeightSeries(records),availableLibrary:{exercises:exercises.filter(exercise=>exercise.enabled).map(exercise=>({name:exercise.name,kind:exercise.kind,muscles:exercise.muscles})),workouts:workouts.map(workout=>({name:workout.name,kind:workout.kind,summary:workout.summary}))},establishedSplit:setup?.splitDays.map(day=>({name:day.name,type:day.type,muscles:day.muscles}))||[],savedDailyRecommendation:recommendation,dueSplitDay:recommendation?.splitDay||{name:dueDay?.name||fallbackDay?.name,type:dueDay?.dayType||fallbackDay?.type,muscles:dueMuscles,mappedExercises:eligible.map(exercise=>exercise.name)},recentTrainingHistory:coachingHistory,
     /* THE ATHLETE'S WHOLE TRAINING LIFE, at a resolution that fits. The coach
        used to receive the newest 180 days and nothing else, so it truthfully
        but uselessly answered "the history starts in 2026" to a question about
