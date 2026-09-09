@@ -131,3 +131,41 @@ export async function disablePush(): Promise<void> {
     await subscription.unsubscribe();
   } catch { /* best effort */ }
 }
+
+/* SEND ME ONE NOW, AND TELL ME WHAT BECAME OF IT.
+
+   Four different failures look the same from the athlete's side: the switch is
+   off in the database, the install is gone and the push service has not
+   noticed, the permission was revoked in iOS Settings, or the send genuinely
+   failed. Every one of them reads as "I'm not getting notifications", and
+   until now the only way to tell them apart was someone with the SQL editor
+   open.
+
+   The receipt is what makes this worth anything. The service worker stamps the
+   log row when it puts a notification on the screen, so "accepted by Apple"
+   and "shown on your phone" are different answers and the athlete is told
+   which one they got. */
+export async function sendTestPush(): Promise<string> {
+  if (isDemoMode) return 'Notifications are off in the demo.';
+  if (!pushSupported()) return 'This browser cannot receive notifications.';
+  const { data, error } = await supabase.rpc('forge_send_test_push');
+  if (error) return 'Forge could not send a test just now. Try again in a moment.';
+  const result = (data || {}) as { ok?: boolean; reason?: string };
+  if (!result.ok) {
+    if (result.reason === 'no subscription') return 'This device is not registered yet. Turn a switch off and on again to register it.';
+    if (result.reason === 'too many') return 'That is a few tests in a row — give it a minute.';
+    return 'Forge could not send a test just now. Try again in a moment.';
+  }
+  /* A push crosses Apple and wakes a worker; it is not instant, and the answer
+     is worth waiting a few seconds for. */
+  for (const wait of [1500, 2000, 2500, 3000]) {
+    await new Promise(resolve => setTimeout(resolve, wait));
+    const { data: rows } = await supabase.rpc('forge_push_last');
+    const last = (Array.isArray(rows) ? rows[0] : rows) as { outcome?: string; status?: number; delivered?: boolean; note?: string } | undefined;
+    if (!last) continue;
+    if (last.delivered) return 'Delivered — that one reached your phone.';
+    if (last.outcome === 'retired') return 'Your install is no longer registered with Apple. Delete Forge from your Home Screen, add it again, and allow notifications.';
+    if (last.outcome === 'failed') return `Forge could not send it${last.status ? ` (${last.status})` : ''}. ${last.note || ''}`.trim();
+  }
+  return 'Apple accepted it but your phone has not shown it. Check Notifications for Forge in iOS Settings — and if that looks right, delete Forge from your Home Screen and add it again.';
+}

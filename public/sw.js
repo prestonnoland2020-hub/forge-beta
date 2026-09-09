@@ -11,18 +11,51 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
 
+/* Where the worker was handed the project's public URL and key at
+   registration time. Both values already ship inside the client bundle. */
+const config = () => {
+  const params = new URLSearchParams(self.location.search);
+  return { url: params.get('u'), key: params.get('k') };
+};
+
+/* "APPLE ACCEPTED IT" IS NOT "IT ARRIVED". The server log said sent/201 for
+   every push nobody ever saw, because 201 means a push service took the
+   message. This stamps the row at the moment a notification is actually put on
+   the screen, so a delivery that died between Apple and the phone looks
+   different from one that worked. */
+const receipt = async tag => {
+  const { url, key } = config();
+  if (!url || !key) return;
+  const subscription = await self.registration.pushManager.getSubscription().catch(() => null);
+  if (!subscription?.endpoint) return;
+  await fetch(`${url}/rest/v1/rpc/forge_push_delivered`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ p_endpoint: subscription.endpoint, p_tag: tag || null }),
+  }).catch(() => undefined);
+};
+
 self.addEventListener('push', event => {
   let payload = {};
   try { payload = event.data ? event.data.json() : {}; } catch { payload = {}; }
   const title = payload.title || 'Forge';
+  const tag = payload.tag || 'forge';
   const options = {
     body: payload.body || 'Open Forge to see today’s training.',
     icon: './forge-icon-192.png',
     badge: './forge-icon-192.png',
-    tag: payload.tag || 'forge',
+    tag,
+    /* A tag makes a second notification REPLACE the first, and replacing is
+       silent by default — two partner pushes on one day meant one buzz. This
+       says to alert again. */
+    renotify: true,
     data: { url: payload.url || './#/' },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  /* The notification first and the receipt after, never the other way round:
+     iOS cancels the subscription outright if a push resolves without something
+     visible, so nothing is allowed to run ahead of showNotification. */
+  event.waitUntil(
+    self.registration.showNotification(title, options).then(() => receipt(tag)).catch(() => undefined));
 });
 
 /* Tapping the notification raises the app if it is already running, rather
@@ -67,11 +100,7 @@ self.addEventListener('pushsubscriptionchange', event => {
     const b64 = key => key
       ? btoa(String.fromCharCode(...new Uint8Array(key))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
       : '';
-    /* Handed to the worker at registration time; both values are public and
-       already ship inside the client bundle. */
-    const params = new URLSearchParams(self.location.search);
-    const url = params.get('u');
-    const key = params.get('k');
+    const { url, key } = config();
     if (!url || !key) return;
 
     await fetch(`${url}/rest/v1/rpc/forge_rotate_push_subscription`, {

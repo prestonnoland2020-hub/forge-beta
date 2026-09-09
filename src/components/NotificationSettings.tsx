@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { loadNotificationPrefs, notificationPermission, notificationsSupported, requestNotificationPermission, saveNotificationPrefs, type NotificationPrefs } from '../lib/notifications';
-import { installedToHomeScreen, syncPushSubscription, disablePush } from '../lib/push';
+import { installedToHomeScreen, syncPushSubscription, disablePush, sendTestPush } from '../lib/push';
 
 /* iOS is the only platform where an install is the difference between a
    notification and nothing, so it is the only one told to install. */
@@ -15,6 +15,22 @@ export function NotificationSettings() {
      but failed to reach the server looked identical to one that worked, and
      the athlete found out weeks later by never being notified. */
   const [registered, setRegistered] = useState<boolean | null>(null);
+  /* "I'm not getting notifications" has four causes that look identical from
+     the outside. This asks the server to send one and then asks what became of
+     it, so the athlete finds out which one they have instead of guessing. */
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState('');
+  const runTest = async () => {
+    setTesting(true); setTestResult('Sending…');
+    try {
+      const outcome = await sendTestPush();
+      setTestResult(outcome);
+    } catch {
+      setTestResult('Could not reach Forge to send a test. Check your connection and try again.');
+    } finally {
+      setTesting(false);
+    }
+  };
   /* THE TAP IS THE POINT. iOS only raises the permission prompt from a real
      user gesture, and only subscribes to push after that — so the toggle both
      asks and subscribes, here, rather than anything happening on page load.
@@ -50,6 +66,12 @@ export function NotificationSettings() {
     </small>}
     {registered === false && permission === 'granted' && <small className="notification-note">This device could not be registered for notifications — check your connection and tap a switch again.</small>}
     {registered === true && <small className="notification-note">This device is registered. Notifications will arrive with Forge closed.</small>}
+    {notificationsSupported() && permission === 'granted' && <div className="notification-test">
+      <button type="button" className="button ghost small-button" disabled={testing} onClick={() => void runTest()}>
+        {testing ? 'Sending…' : 'Send me a test notification'}
+      </button>
+      {testResult && <small className="notification-note">{testResult}</small>}
+    </div>}
     {notificationsSupported() && permission === 'denied' && (prefs.morningWorkout || prefs.injuryFollowUp) && <small className="notification-note">Notifications are blocked in your browser settings — the check-ins will appear here on the Coach tab instead.</small>}
   </section>;
 }
