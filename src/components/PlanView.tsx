@@ -178,21 +178,24 @@ export function TodayCard({ session, unit, logged, workoutHref }: {
 }
 
 /* ── 3. This week ────────────────────────────────────────────────────────── */
-export function WeekList({ sessions, unit, records, title = 'This week', note, onSwipe }: {
-  sessions: PlanSession[]; unit: string; records: WorkoutRecord[]; title?: string;
-  note?: ReactNode;
-  /* A horizontal drag across the week moves to the next or previous one. It is
-     the gesture the dots above promise, and a phone will otherwise scroll the
-     page vertically underneath it — so only a clearly sideways drag counts. */
-  onSwipe?: (direction: 1 | -1) => void;
-}) {
-  const [open, setOpen] = useState<string | null>(null);
-  /* A REF, NOT STATE. Where the finger went down is not something the screen
-     draws, and holding it in state means the touchend handler can run against a
-     render that has not flushed yet — a fast flick then does nothing at all. */
+/* SWIPE ANYWHERE ON THE TAB, NOT JUST ON THE WEEK CARD.
+
+   This started life on the week list alone, and it worked — except on the week
+   you are actually in, which is the one everybody opens. That week has a TODAY
+   card above the list, so the list is pushed most of the way off the screen and
+   the part of the page under your thumb is the card, which was not listening.
+   Preston: "it doesn't work from week 1 but works from the others". The gesture
+   belongs to the whole tab.
+
+   A REF, NOT STATE, TWICE OVER. Where the finger went down is not something
+   the screen draws, and holding it in state means the touchend handler can run
+   against a render that has not flushed yet — a fast flick then does nothing at
+   all. The handler itself is a ref for a duller reason: the page's own early
+   returns sit above the point where it can be written, and a hook cannot be
+   called from below one. */
+export function useWeekSwipe(onSwipe: { current: (direction: 1 | -1) => void }) {
   const from = useRef<{ x: number; y: number } | null>(null);
-  const todayIso = localDayIso();
-  const swipe = onSwipe ? {
+  return {
     onTouchStart: (event: TouchEvent<HTMLElement>) => { from.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }; },
     onTouchEnd: (event: TouchEvent<HTMLElement>) => {
       const start = from.current;
@@ -201,10 +204,18 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, o
       const dx = event.changedTouches[0].clientX - start.x;
       const dy = event.changedTouches[0].clientY - start.y;
       /* A drag that is mostly vertical is the page scrolling, not a swipe. */
-      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.6) onSwipe(dx < 0 ? 1 : -1);
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.6) onSwipe.current(dx < 0 ? 1 : -1);
     },
-  } : {};
-  return <section className="card pv-week" {...swipe}>
+  };
+}
+
+export function WeekList({ sessions, unit, records, title = 'This week', note }: {
+  sessions: PlanSession[]; unit: string; records: WorkoutRecord[]; title?: string;
+  note?: ReactNode;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const todayIso = localDayIso();
+  return <section className="card pv-week">
     <header><h3>{title}</h3></header>
     <div className="pv-week-rows">
       {sessions.map(session => {

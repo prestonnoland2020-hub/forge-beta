@@ -66,6 +66,40 @@ check('the week list is headed as this week', open.weekTitle === 'This week', op
 check('today has a card', open.today);
 check('and nothing is telling you to come back', open.back === '', open.back);
 
+/* A sideways drag is the same control, and it has to work where the thumb
+   actually lands. The gesture used to live on the week list, which worked on
+   every week except the one everybody opens: the week you are in has a TODAY
+   card above the list, so on a phone the list is most of the way off the
+   bottom and the thing under your thumb is the card. These drags start on
+   whatever is directly below the pips — the card when there is one. */
+const drag = (from, to) => page.evaluate(([x1, x2, y1, y2]) => {
+  const el = document.querySelector('.pv-today') || document.querySelector('.pv-week');
+  const touch = (x, y) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: y })];
+  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: touch(x1, y1), changedTouches: touch(x1, y1) }));
+  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: touch(x2, y2) }));
+}, [from.x, to.x, from.y, to.y]);
+const surface = async () => page.evaluate(() => {
+  const el = document.querySelector('.pv-today') || document.querySelector('.pv-week');
+  const box = el.getBoundingClientRect();
+  return { x: box.x, y: box.y, width: box.width, height: box.height };
+});
+
+/* THE WEEK YOU ARE IN IS THE ONE EVERYBODY OPENS, and it was the one week the
+   swipe did not work — Preston: "it doesn't work from week 1 but works from
+   the others". Its TODAY card sits between the pips and the week list, so the
+   thing under a thumb is the card, and the gesture was listening on the list. */
+{
+  const box = await surface();
+  check('the today card is what a thumb lands on here', open.today && box.height > 100, `${Math.round(box.height)}px tall`);
+  await drag({ x: box.x + box.width - 20, y: box.y + 40 }, { x: box.x + 20, y: box.y + 40 });
+  await page.waitForTimeout(500);
+  const swiped = await read();
+  check('swiping across it still moves the week', swiped.selected === 6, `week ${swiped.selected}`);
+  await drag({ x: box.x + 20, y: box.y + 40 }, { x: box.x + box.width - 20, y: box.y + 40 });
+  await page.waitForTimeout(500);
+  check('and back', (await read()).selected === 5, `week ${(await read()).selected}`);
+}
+
 /* The pips are the control the whole thing looked like. */
 await page.evaluate(() => document.querySelectorAll('.pv-dot')[7].click());
 await page.waitForTimeout(500);
@@ -81,34 +115,18 @@ check('there is no TODAY card on a week today is not in', !ahead.today);
 check('the week you are in keeps its own mark', ahead.here === 5, `week ${ahead.here}`);
 check('and the way back is one tap', /3 weeks ahead · return to this week/.test(ahead.back), ahead.back);
 
-/* A sideways drag across the week is the same control. */
-const box = await page.locator('.pv-week').boundingBox();
-const y = box.y + 60;
-await page.touchscreen.tap(box.x + box.width / 2, y).catch(() => {});
-await page.evaluate(([x1, x2, yy]) => {
-  const el = document.querySelector('.pv-week');
-  const touch = (x) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: yy })];
-  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: touch(x1), changedTouches: touch(x1) }));
-  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: touch(x2) }));
-}, [box.x + box.width - 20, box.x + 20, y]);
+let box = await surface();
+await drag({ x: box.x + box.width - 20, y: box.y + 40 }, { x: box.x + 20, y: box.y + 40 });
 await page.waitForTimeout(500);
 check('swiping left goes forward a week', (await read()).selected === 9, `week ${(await read()).selected}`);
-await page.evaluate(([x1, x2, yy]) => {
-  const el = document.querySelector('.pv-week');
-  const touch = (x) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: yy })];
-  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: touch(x1), changedTouches: touch(x1) }));
-  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: touch(x2) }));
-}, [box.x + 20, box.x + box.width - 20, y]);
+box = await surface();
+await drag({ x: box.x + 20, y: box.y + 40 }, { x: box.x + box.width - 20, y: box.y + 40 });
 await page.waitForTimeout(500);
 check('and swiping right goes back', (await read()).selected === 8, `week ${(await read()).selected}`);
 
 /* A near-vertical drag is a scroll, not a swipe. */
-await page.evaluate(([x, yy]) => {
-  const el = document.querySelector('.pv-week');
-  const touch = (cx, cy) => [new Touch({ identifier: 1, target: el, clientX: cx, clientY: cy })];
-  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: touch(x, yy), changedTouches: touch(x, yy) }));
-  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: touch(x - 60, yy + 200) }));
-}, [box.x + box.width / 2, y]);
+box = await surface();
+await drag({ x: box.x + box.width / 2, y: box.y + 40 }, { x: box.x + box.width / 2 - 60, y: box.y + 240 });
 await page.waitForTimeout(400);
 check('scrolling down the page is not a swipe', (await read()).selected === 8, `week ${(await read()).selected}`);
 
@@ -125,12 +143,8 @@ check('the whole-block accordion is gone',
 /* Nothing above week ten, nothing below week one. */
 await page.evaluate(() => document.querySelectorAll('.pv-dot')[9].click());
 await page.waitForTimeout(400);
-await page.evaluate(([x1, x2, yy]) => {
-  const el = document.querySelector('.pv-week');
-  const touch = (x) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: yy })];
-  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: touch(x1), changedTouches: touch(x1) }));
-  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: touch(x2) }));
-}, [box.x + box.width - 20, box.x + 20, y]);
+box = await surface();
+await drag({ x: box.x + box.width - 20, y: box.y + 40 }, { x: box.x + 20, y: box.y + 40 });
 await page.waitForTimeout(400);
 check('swiping past the last week stays on it', (await read()).selected === 10, `week ${(await read()).selected}`);
 

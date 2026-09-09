@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
@@ -6,7 +6,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { bestsFromHistory,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
-import { PlanProgress,TodayCard,WeekList,waveSentence,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
+import { PlanProgress,TodayCard,WeekList,useWeekSwipe,waveSentence,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
 import { localDayIso } from '../lib/time';
 
 type SplitDay={name:string;dayType:string;muscles?:string[];exercises?:string[];cardioPolicy?:'none'|'forge'|'planned';cardio?:PlannedCardio[]};
@@ -97,6 +97,8 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
      the screen opens on the one you are in — which here is always the first,
      because the pre-program plan starts today. */
   const [viewWeek,setViewWeek]=useState(0);
+  const swipeTo=useRef<(direction:1|-1)=>void>(()=>{});
+  const swipe=useWeekSwipe(swipeTo);
   const active=roadmap[Math.max(0,Math.min(viewWeek,roadmap.length-1))];
   const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,undefined,history.anchors):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts]);
   if(!active)return null;
@@ -119,12 +121,12 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const sentence=`${waveSentence(0)}${active.mileage?` ${active.mileage} mi of running.`:''} Numbers firm up as you log.`;
   const short=(date:Date)=>date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const range=weekSessions.length?`${short(weekSessions[0].date)} – ${short(weekSessions[weekSessions.length-1].date)}`:'';
-  return <div className="pv">
+  swipeTo.current=direction=>setViewWeek(current=>Math.max(0,Math.min(current+direction,roadmap.length-1)));
+  return <div className="pv" {...swipe}>
     <PlanProgress weekIndex={viewWeek} current={0} total={roadmap.length} waveIndexFor={index=>index} sentence={sentence} onPick={setViewWeek}/>
     {viewWeek===0&&<TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout"/>}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={viewWeek===0?'This week':`Week ${viewWeek+1} · ${range}`}
-      note={viewWeek>0?'Weeks past this one are a projection. Numbers firm up as you log.':undefined}
-      onSwipe={direction=>setViewWeek(current=>Math.max(0,Math.min(current+direction,roadmap.length-1)))}/>
+      note={viewWeek>0?'Weeks past this one are a projection. Numbers firm up as you log.':undefined}/>
   </div>;
 }

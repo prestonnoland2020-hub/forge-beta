@@ -4,7 +4,7 @@ import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvi
 import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { PlanRebuildModal } from './PlanRebuildModal';
-import { PlanProgress, PlanActions, TodayCard, WeekList, waveSentence, type PlanSession } from './PlanView';
+import { PlanProgress, PlanActions, TodayCard, WeekList, useWeekSwipe, waveSentence, type PlanSession } from './PlanView';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -140,6 +140,11 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      it opens on and what it falls back to when a new block is built — so this
      never strands the screen on week 9 of a block that no longer has one. */
   const [viewWeek, setViewWeek] = useState<number | null>(null);
+  /* Written further down, once the block is resolved and there is a week count
+     to clamp against; held here because the hook has to run above the early
+     returns. */
+  const swipeTo = useRef<(direction: 1 | -1) => void>(() => {});
+  const swipe = useWeekSwipe(swipeTo);
   const autoAttempted = useRef(false);
   /* Generation UX: ~44s of API time gets staged narration instead of a dead
      spinner, and a generation orphaned by backgrounding the phone retries
@@ -447,8 +452,12 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      sentence the folded "whole block" panel used to carry. */
   const projection = `Weeks past this one are a projection: each time a rep count comes round it asks for one more step. Beat a set and the numbers rise; miss one and they hold.${records.length ? '' : ' Log a set and the first numbers appear.'}`;
   const workoutHref = recommendation ? `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}` : '/workout';
+  swipeTo.current = direction => {
+    const next = weekIndex + direction;
+    if (next >= 0 && next < plan.weeks.length) setViewWeek(next === currentIndex ? null : next);
+  };
 
-  return <div className="pv">
+  return <div className="pv" {...swipe}>
     {untrainedGoalLifts.length > 0 && <section className="card untrained-goal-banner">
       <div>
         <span className="eyebrow">NOT IN YOUR SPLIT</span>
@@ -488,11 +497,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {weekIndex === currentIndex && <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
-      note={weekIndex > currentIndex ? projection : undefined}
-      onSwipe={direction => {
-        const next = weekIndex + direction;
-        if (next >= 0 && next < plan.weeks.length) setViewWeek(next === currentIndex ? null : next);
-      }} />
+      note={weekIndex > currentIndex ? projection : undefined} />
     {liveAdjusted ? <p className="pv-footnote">Loads on this screen follow your latest logged bests, so they can differ from the block as first written.</p> : null}
   </div>;
 }
