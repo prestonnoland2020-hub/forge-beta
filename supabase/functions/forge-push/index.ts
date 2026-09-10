@@ -199,8 +199,36 @@ Deno.serve(async request => {
        within a second or two of the session being saved. */
     const actor = String(body.owner_id || '');
     if (!actor) return json({ sent: 0 });
-    const { data: actorProfile } = await admin.from('profiles').select('display_name,username').eq('id', actor).maybeSingle();
+    const { data: actorProfile } = await admin.from('profiles').select('display_name,username,unit_system').eq('id', actor).maybeSingle();
     const name = actorProfile?.display_name || actorProfile?.username || 'Your partner';
+    /* WHAT THEY ACTUALLY DID, IN THE NOTIFICATION.
+
+       "Adam trained" is the fact; "Adam trained · Bench 315 lb x 3" is the
+       reason anyone cares. The session is committed by the time this runs —
+       save_my_training_day writes the day, its top sets and its cardio in one
+       transaction, and pg_net only dispatches after that commits — so the sets
+       are there to be read.
+
+       The heaviest set by estimated max is the one worth naming: the same
+       36/(37-reps) curve every other surface uses, so a notification can never
+       call a different set of theirs the top one. */
+    const { data: session } = await admin.from('workout_days')
+      .select('workout_date,top_sets(lift_name,weight,reps),cardio_sessions(activity,summary)')
+      .eq('owner_id', actor).order('workout_date', { ascending: false }).limit(1).maybeSingle();
+    const unit = actorProfile?.unit_system === 'metric' ? 'kg' : 'lb';
+    const sets = (session?.top_sets || []) as Array<{ lift_name: string; weight: number; reps: number }>;
+    const heaviest = sets.reduce<{ lift_name: string; weight: number; reps: number } | null>((best, set) => {
+      const reps = Math.min(Math.max(Math.round(Number(set.reps) || 0), 1), 10);
+      const estimate = Number(set.weight) * (36 / (37 - reps));
+      const bestReps = best ? Math.min(Math.max(Math.round(Number(best.reps) || 0), 1), 10) : 0;
+      const bestEstimate = best ? Number(best.weight) * (36 / (37 - bestReps)) : 0;
+      return estimate > bestEstimate ? set : best;
+    }, null);
+    const topSet = heaviest ? `${heaviest.lift_name} ${Number(heaviest.weight)} ${unit} × ${Number(heaviest.reps)}` : '';
+    /* "Run · 2.27 mi · 21:04" — the distance is the part that fits. */
+    const cardioParts = String((session?.cardio_sessions as Array<{ activity: string; summary: string }> | null)?.[0]?.summary || '').split(' · ').filter(Boolean);
+    const cardioLine = cardioParts.length > 1 ? `${cardioParts[0]} ${cardioParts[1]}` : cardioParts[0] || '';
+    const did = [topSet, cardioLine].filter(Boolean).join(' · ');
     const { data: links } = await admin.from('friendships')
       .select('requester_id,addressee_id').eq('status', 'accepted')
       .or(`requester_id.eq.${actor},addressee_id.eq.${actor}`);
@@ -229,8 +257,8 @@ Deno.serve(async request => {
       const key = pairKey(row.owner_id, date);
       if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already told today' }); continue; }
       const payload = trained.has(key)
-        ? { title: `${name} trained`, body: 'Both of you are in today.', tag: `partner-${date}`, url: './#/' }
-        : { title: 'Your turn', body: `${name} trained today. You haven’t logged yet.`, tag: `partner-${date}`, url: './#/' };
+        ? { title: `${name} trained`, body: did ? `${did}. Both of you are in today.` : 'Both of you are in today.', tag: `partner-${date}`, url: './#/' }
+        : { title: 'Your turn', body: did ? `${name} did ${did}. You haven’t logged yet.` : `${name} trained today. You haven’t logged yet.`, tag: `partner-${date}`, url: './#/' };
       messages.push({ row, date, payload });
     }
   }

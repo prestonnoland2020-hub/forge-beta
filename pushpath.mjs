@@ -24,7 +24,9 @@ const state = {
 const table = name => {
   const q = { name, filters: [], eq(c, v) { this.filters.push([c, v]); return this; },
     in(c, v) { this.filters.push([c, v, 'in']); return this; },
-    select() { return this; }, limit() { return this; },
+    select(columns) { this.columns = String(columns || ''); return this; }, limit() { return this; },
+    /* The partner branch asks for the athlete's newest day and its sets. */
+    order(column, options) { this.orderBy = [column, options?.ascending !== false]; return this; },
     delete() { this.isDelete = true; return this; },
     maybeSingle() { return this.then(r => ({ data: r.data[0] ?? null })); },
     then(resolve) { return Promise.resolve(run(this)).then(resolve); },
@@ -39,7 +41,11 @@ function run(q) {
   }
   if (q.name === 'workout_days') {
     state.workoutQueries += 1;
-    return { data: state.workouts.filter(row => matches(row, q.filters)) };
+    let rows = state.workouts.filter(row => matches(row, q.filters));
+    if (q.orderBy) rows = [...rows].sort((a, b) => q.orderBy[1]
+      ? String(a[q.orderBy[0]]).localeCompare(String(b[q.orderBy[0]]))
+      : String(b[q.orderBy[0]]).localeCompare(String(a[q.orderBy[0]])));
+    return { data: rows };
   }
   if (q.name === 'profiles') return { data: state.profiles.filter(row => matches(row, q.filters)) };
   if (q.name === 'friendships') {
@@ -160,6 +166,59 @@ state.workouts = [];
 state.sentLog = [{ owner: 'friend', kind: 'partner', date: dayIn(AFTERNOON) }];
 out = await call({ kind: 'partner', owner_id: 'actor' });
 check('and a partner is told once a day, not once a session', state.pushed.length === 0);
+
+/* ── WHAT THEY DID, NOT JUST THAT THEY DID ────────────────────────────────
+   "Adam trained" is the fact; "Adam trained · Bench 315 lb x 3" is the reason
+   anyone cares. The whole day — the row, its top sets, its cardio — is written
+   by one RPC, so by the time pg_net dispatches this the sets are committed and
+   there to be read. */
+console.log('\nWhat the notification says they did');
+const session = (sets, cardio) => [{ owner_id: 'actor', workout_date: dayIn(AFTERNOON), id: 11,
+  top_sets: sets, cardio_sessions: cardio }];
+
+state.sentLog = []; state.subs = [sub('friend', AFTERNOON)];
+state.workouts = session([{ lift_name: 'Bench', weight: 315, reps: 3 }], []);
+await call({ kind: 'partner', owner_id: 'actor' });
+check('the top set is in the notification', /Bench 315 lb × 3/.test(state.pushed[0]?.payload.body || ''), state.pushed[0]?.payload.body);
+check('and the nudge is still there', /You haven’t logged yet/.test(state.pushed[0]?.payload.body || ''));
+
+/* The heaviest set by estimated max, on the same curve every other surface
+   uses — never whichever was logged first. */
+state.sentLog = []; state.subs = [sub('friend', AFTERNOON)];
+state.workouts = session([
+  { lift_name: 'Lat Pulldown', weight: 220, reps: 8 },
+  { lift_name: 'Bench', weight: 315, reps: 3 },
+  { lift_name: 'Pull Ups', weight: 105, reps: 5 },
+], []);
+await call({ kind: 'partner', owner_id: 'actor' });
+check('three sets, and it names the heaviest', /Bench 315 lb × 3/.test(state.pushed[0]?.payload.body || ''), state.pushed[0]?.payload.body);
+check('not the first one logged', !/Lat Pulldown/.test(state.pushed[0]?.payload.body || ''));
+
+state.sentLog = []; state.subs = [sub('friend', AFTERNOON)];
+state.workouts = session([{ lift_name: 'Squat', weight: 460, reps: 4 }],
+  [{ activity: 'Run', summary: 'Run · 2.27 mi · 21:04' }]);
+await call({ kind: 'partner', owner_id: 'actor' });
+check('a lift and a run both fit', /Squat 460 lb × 4 · Run 2.27 mi/.test(state.pushed[0]?.payload.body || ''), state.pushed[0]?.payload.body);
+
+/* A partner who has already trained hears the same session, framed as news. */
+state.sentLog = []; state.subs = [sub('friend', AFTERNOON)];
+state.workouts = [...session([{ lift_name: 'Bench', weight: 315, reps: 3 }], []),
+  { owner_id: 'friend', workout_date: dayIn(AFTERNOON), id: 12, top_sets: [], cardio_sessions: [] }];
+await call({ kind: 'partner', owner_id: 'actor' });
+check('both of you in, and it still says what they did',
+  /Bench 315 lb × 3\. Both of you are in today\./.test(state.pushed[0]?.payload.body || ''), state.pushed[0]?.payload.body);
+
+/* Cardio-only, and a session with nothing measurable in it at all. */
+state.sentLog = []; state.subs = [sub('friend', AFTERNOON)];
+state.workouts = session([], [{ activity: 'Run', summary: 'Run · 5.12 miles · 40:00' }]);
+await call({ kind: 'partner', owner_id: 'actor' });
+check('a run alone is worth saying', /Run 5.12 miles/.test(state.pushed[0]?.payload.body || ''), state.pushed[0]?.payload.body);
+
+state.sentLog = []; state.subs = [sub('friend', AFTERNOON)];
+state.workouts = session([], []);
+await call({ kind: 'partner', owner_id: 'actor' });
+check('and an empty one falls back to the old line',
+  state.pushed[0]?.payload.body === 'Adam Gomez trained today. You haven’t logged yet.', state.pushed[0]?.payload.body);
 
 console.log('\nWhen it cannot send');
 state.sentLog = [];

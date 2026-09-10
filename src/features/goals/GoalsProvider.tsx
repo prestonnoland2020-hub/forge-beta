@@ -23,7 +23,21 @@ const goalKey=(goal:CreatedGoal)=>`${goal.type}|${goal.exercise||goal.title}`.tr
    title and target) is the one that stays. */
 type GoalRow={type:string;name:string;target_value:number|string;muscle_group:string|null;target_date:string|null;min_weekly_mileage?:number|null;peak_weekly_mileage?:number|null};
 const athleteUsesMetric=(userId:string)=>{try{return JSON.parse(localStorage.getItem(`forge-athlete-setup-v1:${userId}`)||'null')?.units==='Metric'}catch{return false}};
-const importGoalRow=(row:GoalRow,userId:string):CreatedGoal=>{const strength=row.type==='lift';const value=Number(row.target_value);const unit=athleteUsesMetric(userId)?'kg':'lb';const connection=normalizeMuscleGroups([row.muscle_group]).join(', ')||'No fixed day';return{type:strength?'Strength':'Endurance',title:strength?`${value} ${unit} ${row.name}`:`${row.name} goal`,target:strength?`${value} ${unit}`:decimalMinutesToClock(value),date:row.target_date||'',connection,exercise:row.name,metric:strength?'Real 1RM':'Finish time',unit:strength?unit:'mm:ss',trackingSource:'Workout history',minWeeklyMileage:row.min_weekly_mileage==null?undefined:String(row.min_weekly_mileage),peakWeeklyMileage:row.peak_weekly_mileage==null?undefined:String(row.peak_weekly_mileage)} as CreatedGoal};
+/* A BODY-WEIGHT GOAL IS A GOAL LIKE THE OTHERS.
+
+   Preston has seven and six of them lived in the goals table. The seventh —
+   "200 lb body-weight goal" — lived only in athlete_settings, because the
+   table was built for lifts and races and nobody went back for it. That one
+   difference is why it is invisible to every server-side function, why the
+   Goals page only draws it after a second round trip that can fail on its own,
+   and why a first read of his account concluded he had no body-composition
+   goal at all.
+
+   It is a row now, like the rest. athlete_settings keeps its copy so an older
+   build on another device does not lose it. */
+const importGoalRow=(row:GoalRow,userId:string):CreatedGoal=>{const body=row.type==='bodyweight';const strength=row.type==='lift';const value=Number(row.target_value);const unit=athleteUsesMetric(userId)?'kg':'lb';const connection=normalizeMuscleGroups([row.muscle_group]).join(', ')||'No fixed day';
+  if(body)return{type:'Body Composition',title:`${value} ${unit} body-weight goal`,target:`${value} ${unit}`,date:row.target_date||'',connection,exercise:'',metric:'Body weight',unit,trackingSource:'Workout history'} as CreatedGoal;
+  return{type:strength?'Strength':'Endurance',title:strength?`${value} ${unit} ${row.name}`:`${row.name} goal`,target:strength?`${value} ${unit}`:decimalMinutesToClock(value),date:row.target_date||'',connection,exercise:row.name,metric:strength?'Real 1RM':'Finish time',unit:strength?unit:'mm:ss',trackingSource:'Workout history',minWeeklyMileage:row.min_weekly_mileage==null?undefined:String(row.min_weekly_mileage),peakWeeklyMileage:row.peak_weekly_mileage==null?undefined:String(row.peak_weekly_mileage)} as CreatedGoal};
 const mergeImported=(imported:CreatedGoal[],local:CreatedGoal[])=>{const localByKey=new Map(local.map(goal=>[goalKey(goal),goal] as const));const remoteKeys=new Set(imported.map(goalKey));return[...imported.map(goal=>localByKey.get(goalKey(goal))||goal),...local.filter(goal=>!remoteKeys.has(goalKey(goal)))]};
 export function GoalsProvider({children}:{children:ReactNode}){
   const {user}=useAuth();
@@ -77,7 +91,15 @@ export function GoalsProvider({children}:{children:ReactNode}){
       if(!isDemoMode&&user)saveAthleteSettings({goals:next.filter(item=>item.type==='Body Composition')});
       return next;
     });
-    if(isDemoMode||!user||goal.type==='Body Composition')return;const isTime=goal.type==='Endurance'&&String(goal.metric).toLowerCase().includes('time');const numericTarget=isTime?clockToSeconds(goal.target,String(goal.unit).includes('hh:mm:ss'))/60:Number.parseFloat(goal.target);const type=goal.type==='Endurance'?'race':'lift';void supabase.from('goals').upsert({owner_id:user.id,type,name:goal.exercise||goal.title,target_value:Number.isFinite(numericTarget)?numericTarget:0,muscle_group:normalizeMuscleGroups([goal.connection]).join(', ')||null,target_date:goal.date||null},{onConflict:'owner_id,type,name'}).then(({error})=>{if(error)console.warn('Goal sync failed',error.message)})};
+    if(isDemoMode||!user)return;
+    /* Body goals go to the table too, so nothing about them depends on a
+       second fetch that lifts and races do not need. */
+    if(goal.type==='Body Composition'){
+      const pounds=Number.parseFloat(String(goal.target).replace(/[^0-9.]/g,''));
+      void supabase.from('goals').upsert({owner_id:user.id,type:'bodyweight',name:goal.metric||'Body weight',target_value:Number.isFinite(pounds)?pounds:0,muscle_group:null,target_date:goal.date||null},{onConflict:'owner_id,type,name'}).then(({error})=>{if(error)console.warn('Goal sync failed',error.message)});
+      return;
+    }
+    const isTime=goal.type==='Endurance'&&String(goal.metric).toLowerCase().includes('time');const numericTarget=isTime?clockToSeconds(goal.target,String(goal.unit).includes('hh:mm:ss'))/60:Number.parseFloat(goal.target);const type=goal.type==='Endurance'?'race':'lift';void supabase.from('goals').upsert({owner_id:user.id,type,name:goal.exercise||goal.title,target_value:Number.isFinite(numericTarget)?numericTarget:0,muscle_group:normalizeMuscleGroups([goal.connection]).join(', ')||null,target_date:goal.date||null},{onConflict:'owner_id,type,name'}).then(({error})=>{if(error)console.warn('Goal sync failed',error.message)})};
   return <GoalsContext.Provider value={{goals,saveGoal,hydrated}}>{children}</GoalsContext.Provider>;
 }
 export function useGoals(){const context=useContext(GoalsContext);if(!context)throw new Error('useGoals must be used inside GoalsProvider');return context}
