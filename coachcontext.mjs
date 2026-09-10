@@ -24,8 +24,15 @@ const LIFTS = [
   ['2026-07-31', 'Pull Ups', 105, 5], ['2026-07-26', 'Squat', 455, 3], ['2026-07-21', 'Bench', 315, 6],
   ['2026-07-07', 'Bench', 360, 1], ['2026-06-01', 'Squat', 475, 1], ['2026-06-01', 'Bench', 320, 5],
 ];
-/* Weigh-ins, most recent first — the ones the coach said did not exist. */
-const WEIGHTS = [[0, 192], [1, 192], [3, 192], [4, 191], [5, 190], [6, 190], [7, 191], [8, 191]];
+/* His weigh-ins — the ones the coach said did not exist. Eight months of them,
+   thinned to a couple a week, which is what the real table holds: 189.7 in
+   March up to 192 now, a couple of pounds across the whole block. */
+const WEIGHTS = [
+  [0, 192], [1, 192], [3, 192], [4, 191], [5, 190], [6, 190], [7, 191], [8, 191],
+  [11, 190.8], [13, 190], [16, 190.3], [18, 190], [22, 189.5], [25, 188.9], [28, 190],
+  [32, 195], [36, 190], [39, 193], [43, 193], [50, 190], [57, 192], [64, 187], [71, 192],
+  [78, 190], [85, 189.5], [92, 188], [99, 191], [106, 189.5], [113, 191], [120, 189.7],
+];
 /* Running, by week: 11.2, 12.3, 13.9 and then a part-finished week. */
 const RUNS = [[22, 5.6], [20, 5.6], [15, 6.2], [13, 6.1], [8, 7.0], [6, 6.9], [1, 4.0]];
 
@@ -51,11 +58,15 @@ const GOALS = [
   { title: 'Bench 400', type: 'Strength', exercise: 'Bench', metric: 'Real 1RM', target: '400', unit: 'lb', date: '2026-12-30' },
   { title: 'Pull Ups 200', type: 'Strength', exercise: 'Pull Ups', metric: 'Real 1RM', target: '200', unit: 'lb', date: '2026-12-31' },
   { title: 'Mile', type: 'Endurance', exercise: 'Mile', target: '4:59', unit: '', date: '2026-12-31' },
+  /* HE DOES HAVE ONE. It lives in athlete_settings rather than the goals
+     table, which is why it is invisible to everything server-side and why the
+     first read of this said he had no body-composition goal at all. */
+  { title: '200 lb body-weight goal', type: 'Body Composition', metric: 'Body weight', exercise: '', target: '200 lb', unit: 'lb', date: '2026-12-31' },
 ];
 
 console.log('\n  body weight — the thing it said could not be assessed');
 const weights = bodyWeightSeries(records);
-check('the coach is given his weigh-ins', weights.length >= 8, `${weights.length} entries`);
+check('the coach is given his weigh-ins', weights.length >= 20, `${weights.length} entries`);
 check('the most recent one is the most recent one', weights[0].weight === 192, `${weights[0].weight} lb on ${weights[0].date}`);
 check('and they are ordered newest first', weights[0].date > weights[1].date);
 
@@ -90,9 +101,21 @@ check('the mile names the session that would measure it', /hard continuous mile 
 check('and never says an assessment is simply unavailable',
   !/not verified|unavailable|no assessment/i.test(`${mile.missing || ''}${mile.demonstrated || ''}`));
 
-console.log('\n  and it only ever speaks about goals he has');
-check('four goals in, four trajectories out', paths.length === 4, `${paths.length}`);
-check('none of them is body composition', !paths.some(path => /body|weight/i.test(path.goal)), paths.map(p => p.goal).join(', '));
+console.log('\n  every goal he has, and only those');
+check('five goals in, five trajectories out', paths.length === 5, `${paths.length}`);
+
+console.log('\n  the body-weight goal, which has more evidence than any of them');
+const body = paths.find(path => /body-weight/i.test(path.goal));
+check('it reads his weigh-ins, not his top sets', body.demonstrated === '192 lb', String(body.demonstrated));
+check('and never claims nothing is recorded', !/nothing has been recorded/i.test(body.missing || ''), String(body.missing));
+check('gaining toward 200 from 192 is a rate, not a gap', Boolean(body.weeklyRate), String(body.weeklyRate));
+/* Eight days of morning weigh-ins fitted 1.6 lb/week and put him at 217 by
+   December. Weekly medians see the two pounds he has actually moved. */
+check('the rate is weeks of evidence, not a fortnight of water',
+  Math.abs(Number(String(body.weeklyRate).replace(/[^0-9.-]/g, ''))) < 0.5, String(body.weeklyRate));
+check('so the projection stays in the realm of the possible',
+  Math.abs(Number(String(body.projected).replace(/[^0-9.-]/g, '').slice(0, 5)) - 192) < 12, String(body.projected));
+check('and a verdict', ['On track', 'Behind the rate', 'No trend yet', 'Reached'].includes(body.verdict), body.verdict);
 
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

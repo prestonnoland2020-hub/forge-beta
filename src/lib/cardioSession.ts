@@ -76,6 +76,44 @@ export function bestRunPaceMinutesPerMile(draft:CardioLogDraft):number{
   return candidates.length?Math.min(...candidates):0;
 }
 
+/* THE CONTINUOUS RUNNING PIECES OF A SESSION, one entry per piece.
+
+   A race model predicts from a run someone actually ran in one go, and the
+   only thing that qualifies is a single logged segment. Reading a session's
+   TOTALS instead turned Preston's Saturday — 6 x 400 m plus a separate 1.81
+   mile piece — into "3.31 miles in 8:00", a 2:25/mi pace, and the 5K goal
+   projected 7:30 against an 18:59 target and called him on track.
+
+   Two things did that, and both are handled here. A session with several
+   pieces is not one effort, so each piece is offered on its own. And a piece
+   logged with a distance but no time gave its miles to the session and no
+   minutes back — free distance, at infinite speed — so a piece only counts
+   when it carries both.
+
+   A session logged as one line is one effort, which is what a steady run is. */
+export function continuousRunEfforts(draft:CardioLogDraft):Array<{miles:number;minutes:number}>{
+  if(isNonRunningCardio(draft.activity)||/\bwalk\b/i.test(draft.activity))return [];
+  const legacy=legacyCardioIntervals(draft);
+  if(legacy.length)return legacy.flatMap(line=>{
+    const activity=String(line.cardioType||line.activity||draft.activity);
+    const unit=String(line.unit||line.distanceUnit||(isRunning(activity)?'miles':''));
+    if(isNonRunningCardio(activity)||/\bwalk\b/i.test(activity)||!isMileageInterval(activity,unit))return [];
+    const miles=distanceMiles(Number(line.distance)||0,unit);
+    const minutes=Number(line.time)||0;
+    return miles>0&&minutes>0?[{miles,minutes}]:[];
+  });
+  /* A structured interval session is its repeats, never their sum. */
+  if(draft.structure==='intervals')return (draft.intervalActuals||[]).flatMap(rep=>{
+    if(!rep.completed)return [];
+    const miles=Number(rep.distance)||0;
+    const minutes=clockSeconds(rep.time)/60;
+    return miles>0&&minutes>0?[{miles,minutes}]:[];
+  });
+  const miles=cardioMiles(draft);
+  const minutes=summarizeCardioDraft(draft).minutes;
+  return miles>0&&minutes>0?[{miles,minutes}]:[];
+}
+
 export function isRunningCardio(draft:CardioLogDraft):boolean{
   if(isNonRunningCardio(draft.activity)||/\bwalk\b/i.test(draft.activity))return false;
   const legacy=legacyCardioIntervals(draft);

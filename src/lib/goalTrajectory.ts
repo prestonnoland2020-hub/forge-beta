@@ -248,8 +248,94 @@ function raceTrajectory(goal: CreatedGoal, records: WorkoutRecord[]): GoalTrajec
   };
 }
 
+/* THE ONE GOAL WITH THE MOST EVIDENCE BEHIND IT.
+
+   A body-composition goal has no exercise and no top sets, so routing it
+   through the strength path reported "nothing has been recorded for it yet"
+   about an athlete who has weighed in almost every morning for eight months.
+   It reads the weigh-ins, which is the only place its answer was ever going to
+   come from.
+
+   Direction is decided by the target, not by a sign: someone at 190 aiming at
+   200 is gaining on purpose, and someone at 215 aiming at 200 is not. */
+function bodyTrajectory(goal: CreatedGoal, records: WorkoutRecord[]): GoalTrajectory {
+  const target = Number(String(goal.target || '').replace(/[^0-9.]/g, '')) || 0;
+  const weeks = weeksUntil(goal.date);
+  const unit = goal.unit || 'lb';
+  /* Oldest first, and one figure per day — a morning and an evening weigh-in
+     are not two data points about the same thing. */
+  const series = bodyWeightSeries(records, 400)
+    .map(point => ({ date: point.date, value: point.weight }))
+    .reverse();
+  const daily = bestPerDay(series, false);
+  const now = daily.at(-1);
+  const base = {
+    goal: goal.title, type: goal.type, target: `${target} ${unit}`,
+    deadline: goal.date, weeksRemaining: weeks,
+  };
+  if (!now) {
+    return { ...base, demonstrated: null, demonstratedOn: null, weeklyRate: null, projected: null,
+      requiredRate: null, confidence: 'Low', verdict: 'No trend yet',
+      missing: 'A logged body weight. Forge records it with a workout, and nothing has been entered yet.' };
+  }
+  const gaining = target > now.value;
+  if (gaining ? now.value >= target : now.value <= target) {
+    return { ...base, demonstrated: `${round1(now.value)} ${unit}`, demonstratedOn: now.date,
+      weeklyRate: null, projected: null, requiredRate: null, confidence: 'High', verdict: 'Reached', missing: null };
+  }
+  /* WEEKS, NOT MORNINGS. Body weight swings two pounds on water alone, so a
+     fortnight of daily weigh-ins can "prove" any rate you like — eight days of
+     Preston's real numbers fitted 1.6 lb/week and projected him twenty-five
+     pounds heavier by December. One median figure per week is the signal; the
+     mornings are the noise around it. */
+  const weekOf = (iso: string) => {
+    const date = new Date(`${iso}T12:00:00`);
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    return date.toISOString().slice(0, 10);
+  };
+  const buckets = new Map<string, number[]>();
+  daily
+    .filter(point => Date.now() - new Date(`${point.date}T12:00:00`).getTime() <= 200 * DAY)
+    .forEach(point => {
+      const key = weekOf(point.date);
+      buckets.set(key, [...(buckets.get(key) || []), point.value]);
+    });
+  const weekly = [...buckets].sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, values]) => ({ date, value: median(values) }));
+  const rate = weekly.length >= 5 ? ratePerWeek(weekly) : null;
+  const required = weeks > 0 ? (target - now.value) / weeks : null;
+  if (rate === null) {
+    return { ...base, demonstrated: `${round1(now.value)} ${unit}`, demonstratedOn: now.date,
+      weeklyRate: null, projected: null,
+      requiredRate: required === null ? null : `${round1(required)} ${unit}/week`,
+      confidence: 'Low', verdict: 'No trend yet',
+      missing: `Five weeks of weigh-ins would establish a rate; there ${weekly.length === 1 ? 'is 1' : `are ${weekly.length}`}.` };
+  }
+  /* Nobody gains or loses more than about one percent of themselves a week for
+     four months running, so no extrapolation is allowed to pretend they will. */
+  const capped = Math.max(-now.value * 0.01, Math.min(now.value * 0.01, rate));
+  const projected = now.value + capped * weeks;
+  const confidence: GoalTrajectory['confidence'] = weekly.length >= 12 ? 'High' : weekly.length >= 8 ? 'Medium' : 'Low';
+  return {
+    ...base,
+    demonstrated: `${round1(now.value)} ${unit}`,
+    demonstratedOn: now.date,
+    weeklyRate: `${round1(capped)} ${unit}/week`,
+    projected: `${round1(projected)} ${unit} by ${goal.date}`,
+    requiredRate: required === null ? null : `${round1(required)} ${unit}/week`,
+    confidence,
+    verdict: (gaining ? projected >= target : projected <= target) ? 'On track' : 'Behind the rate',
+    missing: null,
+  };
+}
+
+const isBodyGoal = (goal: CreatedGoal) =>
+  /body/i.test(String(goal.type || '')) || /body\s*weight/i.test(String(goal.metric || ''));
+
 export function goalTrajectories(goals: CreatedGoal[], records: WorkoutRecord[]): GoalTrajectory[] {
-  return goals.map(goal => goal.type === 'Endurance' || raceMiles(goal) !== null
-    ? raceTrajectory(goal, records)
-    : strengthTrajectory(goal, records));
+  return goals.map(goal => isBodyGoal(goal)
+    ? bodyTrajectory(goal, records)
+    : goal.type === 'Endurance' || raceMiles(goal) !== null
+      ? raceTrajectory(goal, records)
+      : strengthTrajectory(goal, records));
 }

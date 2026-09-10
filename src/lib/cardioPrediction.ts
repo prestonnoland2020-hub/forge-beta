@@ -1,5 +1,5 @@
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
-import { cardioMiles, summarizeCardioDraft } from './cardioSession';
+import { continuousRunEfforts } from './cardioSession';
 import { localDayIso } from './time';
 
 export type RacePrediction = {
@@ -23,16 +23,6 @@ const dateMs = (date: string) => new Date(`${date}T12:00:00`).getTime();
 const nonRunning = (value: string) => /row|ski|bike|cycl|wall ball|assault|hyrox|circuit|swim|elliptical|erg/i.test(value);
 const daysAgo = (date: string) => Math.max(0, Math.floor((dateMs(today()) - dateMs(date)) / DAY));
 
-function runsFrom(records: WorkoutRecord[]): Run[] {
-  return records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
-    const totals = summarizeCardioDraft(session);
-    const miles = cardioMiles(session);
-    const description = `${session.activity} ${session.summary}`;
-    if (!miles || !totals.minutes || nonRunning(description)) return [];
-    return [{ date: record.date, miles, seconds: totals.minutes * 60 }];
-  }));
-}
-
 function regression(points: Array<{ x: number; y: number }>) {
   const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
   const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
@@ -45,13 +35,21 @@ function regression(points: Array<{ x: number; y: number }>) {
  * the last 180 days, Riegel-adjusted to the target distance. */
 export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number): RacePrediction | null {
   if (!goalMiles) return null;
+  /* ONE PIECE, RUN IN ONE GO — never a session's totals.
+
+     This read the whole session: distance summed across every logged line,
+     time summed across every logged line. Preston's Saturday was 6 x 400 m
+     plus a separate 1.81 mile piece logged with no time, so the totals came to
+     3.31 miles in 8:00 — a 2:25/mi pace he has never run — and the 5K goal
+     projected 7:30 against an 18:59 target and reported him ON TRACK off a
+     card that said, one tile to the left, "Not logged".
+
+     A race is a continuous effort and the only evidence for one is a single
+     continuous segment. continuousRunEfforts hands those over one at a time,
+     and never hands over a piece that has distance without a time. */
   const runs = records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
-    if (session.structure !== 'steady' && session.structure !== 'custom') return [];
-    const totals = summarizeCardioDraft(session);
-    const miles = cardioMiles(session);
-    const description = `${session.activity} ${session.summary}`;
-    if (!miles || !totals.minutes || nonRunning(description)) return [];
-    return [{ date: record.date, miles, seconds: totals.minutes * 60 }];
+    if (nonRunning(`${session.activity} ${session.summary}`)) return [];
+    return continuousRunEfforts(session).map(effort => ({ date: record.date, miles: effort.miles, seconds: effort.minutes * 60 }));
   }));
   const windowDays = 180;
   const qualifying = runs.filter(run => daysAgo(run.date) <= windowDays && run.miles >= goalMiles * .8 && run.miles <= goalMiles * 1.25);
@@ -67,7 +65,7 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   return {
     seconds: Math.round(best.equivalentSeconds),
     confidence,
-    reason: `Best continuous run within 80–125% of the goal distance in the last 180 days, adjusted to the goal distance (Riegel).`,
+    reason: `Best single continuous effort within 80–125% of the goal distance in the last 180 days, adjusted to the goal distance (Riegel). Interval repeats and untimed pieces are not efforts.`,
     supportingRuns: qualifying.length,
     recentRunMiles: Math.round(recentMiles * 10) / 10,
     recentRunDays,
