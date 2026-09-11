@@ -18,7 +18,10 @@ type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:st
   /* The full prescription for ANY split position, built by the same pipeline
      as today's. The workout logger uses it when the athlete chooses a day the
      cycle does not currently owe. */
-  recommendationFor:(position:number,name?:string)=>DailyRecommendation|null};
+  recommendationFor:(position:number,name?:string)=>DailyRecommendation|null;
+  /* The calendar date recommendation.splitDay belongs to — today, or tomorrow
+     when today has already been trained. */
+  anchorDate:string};
 const Context=createContext<Value|null>(null);
 const isoToday=()=>{const date=new Date();return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`};
 
@@ -92,6 +95,13 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     return atCursor.position;
   })();
   const duePosition=cycle.revision>0?(statePosition||cycle.nextPosition):inferredPosition;
+  /* WHICH DAY THIS SPLIT DAY IS FOR. The position is the one AFTER the last
+     session logged, so on a day the athlete has already trained it belongs to
+     tomorrow — and anything drawing a calendar from it has to know that, or it
+     paints the next session onto a day that is already finished. */
+  const trainedToday=records.some(record=>record.date===isoToday()
+    &&((record.topSets||[]).some(set=>set.completed!==false)||(record.cardioSessions||[]).length>0));
+  const anchorDate=(()=>{if(!trainedToday)return isoToday();const next=new Date();next.setHours(12,0,0,0);next.setDate(next.getDate()+1);return`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`})();
   const splitDay=days.find(day=>day.position===duePosition)||trainingDays[0]||days[0]||{position:1,name:'Start training',type:'strength' as const,muscles:[],exercises:[],cardioTypes:[]};
   const date=isoToday();
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
@@ -336,7 +346,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      blank behind "Forge hit a snag". Fall back to the freshly built one rather
      than handing the app a recommendation with a hole in it. */
   const recommendation=(stored?.splitDay?stored:null)||generated;
-  const value=useMemo<Value>(()=>({recommendation,loading,syncError,recommendationFor,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist,recommendationFor]);
+  const value=useMemo<Value>(()=>({recommendation,loading,syncError,recommendationFor,anchorDate,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist,recommendationFor]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

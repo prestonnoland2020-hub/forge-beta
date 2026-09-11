@@ -124,14 +124,17 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
 export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', minWeeklyMileage, maxWeeklyMileage }: { goals: CreatedGoal[]; profile: AdaptiveProfile; splitDays: SplitDay[]; rhythm?: 'rolling' | 'weekly'; minWeeklyMileage: number; maxWeeklyMileage: number }) {
   const { records } = useWorkoutHistory();
   const { user } = useAuth();
-  const { recommendation } = useDailyRecommendation();
+  const { recommendation, anchorDate } = useDailyRecommendation();
   const { setup } = useProfileSetup();
   const metric = setup?.units === 'Metric';
   /* A recommendation restored from an older cache can arrive without its split
      day. Reading through it blanked the entire Plan tab behind "Forge hit a
      snag" — the block itself was fine. The anchor is an optimisation; the plan
      renders without it. */
-  const anchor = recommendation?.splitDay ? { position: recommendation.splitDay.position } : undefined;
+  /* The anchor carries the date it is for. Without it the week is drawn one
+     day early on any day the athlete has already trained, and the session that
+     belongs to tomorrow is painted onto today behind the logged one. */
+  const anchor = recommendation?.splitDay ? { position: recommendation.splitDay.position, dateIso: anchorDate } : undefined;
   const [stored, setStored] = useState<StoredAiPlan | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [generating, setGenerating] = useState(false);

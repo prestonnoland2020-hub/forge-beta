@@ -582,11 +582,21 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
 /* Which split days land inside a given plan week. A rolling cycle that is not
    7 days long rotates, so an 8-day split shows only 7 of its days in any one
    week — the volume math has to agree with the schedule about which. */
-export function weekCycleDays(startIso: string, weekIndex: number, splitDays: SplitDayRef[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }): SplitDayRef[] {
+/* AN ANCHOR BELONGS TO A DATE, AND IT IS NOT ALWAYS TODAY.
+
+   The anchor is the NEXT split day — the one after the last session logged.
+   This assumed that day was today's, and on any day the athlete had already
+   trained it was tomorrow's: the whole week got drawn one day early, and the
+   day that should have been tomorrow was painted onto today, where the logged
+   session covers it. Preston trained Chest & Back 2 on the Friday, so Legs 2
+   was written onto Friday behind it and the week read Chest & Back 2 → Sharms
+   2. Legs 2, the next day in his own split, did not appear anywhere. */
+export function weekCycleDays(startIso: string, weekIndex: number, splitDays: SplitDayRef[], rhythm: 'rolling' | 'weekly', anchor?: { position: number; dateIso?: string }): SplitDayRef[] {
   const cycle = splitDays.length ? splitDays : [{ name: 'Training', dayType: 'strength' } as SplitDayRef];
   const start = new Date(`${startIso}T12:00:00`); start.setDate(start.getDate() + weekIndex * 7);
-  const today = new Date(); today.setHours(12, 0, 0, 0);
-  const todayAbsolute = Math.floor(today.getTime() / 86400000);
+  const anchorDay = anchor?.dateIso ? new Date(`${anchor.dateIso}T12:00:00`) : new Date();
+  anchorDay.setHours(12, 0, 0, 0);
+  const todayAbsolute = Math.floor(anchorDay.getTime() / 86400000);
   const anchorIndex = anchor ? cycle.findIndex((_, index) => index + 1 === anchor.position) : -1;
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(start); date.setDate(start.getDate() + index);
