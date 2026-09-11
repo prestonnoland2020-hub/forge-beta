@@ -12,6 +12,7 @@ import { HistoryPage } from '../pages/HistoryPage';
 import { InsightsPage } from '../pages/InsightsPage';
 import { GoalsPage } from '../pages/GoalsPage';
 import { ProfilePage } from '../pages/ProfilePage';
+import { OwnerPage } from '../pages/OwnerPage';
 import { CoachPage } from '../pages/CoachPage';
 
 
@@ -48,6 +49,10 @@ export function App() {
           <Route path="/partners" element={<PartnersPage />} />
           <Route path="/partners/:id" element={<PartnerDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          {/* Not in any navigation. The server decides who sees anything here —
+              forge_account_overview returns nothing to anyone but the owner, so
+              the route existing gives nothing away. */}
+          <Route path="/owner" element={<OwnerPage />} />
           </Route>
         </Route>
       </Route>

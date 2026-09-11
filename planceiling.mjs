@@ -51,6 +51,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-119
 const run = async (hist, rows, fingerprint) => {
   const page = await b.newPage({ viewport: { width: 430, height: 1400 } });
   let built = 0;
+  page.on('console', m => { if (m.type() === 'error') console.log('CONSOLE:', m.text().slice(0, 200)); });
   await page.route('**/*', route => {
     const url = route.request().url();
     if (url.startsWith(BASE)) return route.continue();

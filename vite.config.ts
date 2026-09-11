@@ -9,13 +9,22 @@ import react from '@vitejs/plugin-react';
    this, a stale PWA can sit on last week's engine indefinitely. */
 const buildId = Date.now().toString(36);
 let demoBuild = false;
+let outDir = 'dist';
 
 export default defineConfig({
   base: './',
   define: { __FORGE_BUILD__: JSON.stringify(buildId) },
   plugins: [react(), {
+    /* WRITTEN INTO THE DIRECTORY THAT WAS ACTUALLY BUILT. This hardcoded
+       'dist', so building any other outDir — the signed-in build the test
+       suite serves from dist-auth, for one — stamped ITS id over dist's
+       version file. The preview at dist then compared the id baked into its
+       bundle against a different one and told every visitor "Forge updated,
+       tap to refresh", which is both a lie and, in a browser test, a banner
+       over the thing being asserted. */
     name: 'forge-version-file',
-    closeBundle() { writeFileSync(resolve(__dirname, 'dist/version.json'), JSON.stringify({ build: buildId })); },
+    configResolved(config) { outDir = config.build.outDir || 'dist'; },
+    closeBundle() { writeFileSync(resolve(__dirname, outDir, 'version.json'), JSON.stringify({ build: buildId })); },
   }, {
     /* .env CARRIES VITE_DEMO_MODE=true FOR LOCAL WORK, and the deploy workflow
        overrides it, so production is safe. A local `npm run build` is not: it
