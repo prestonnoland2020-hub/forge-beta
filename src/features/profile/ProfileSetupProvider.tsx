@@ -4,7 +4,8 @@ import { isRestDay } from '../training/aiPlanService';
 import { supabase } from '../../lib/supabase';
 import { isDemoMode } from '../../lib/env';
 import { useAuth } from '../auth/AuthProvider';
-import { loadAthleteSettings, saveAthleteSettings } from './settingsSync';
+import { loadAthleteSettings, saveAthleteSettings, reportSettingsSyncTo } from './settingsSync';
+import { useSyncStatus } from '../sync/SyncStatusProvider';
 
 export type AthleteSetup = {
   displayName:string; username:string; birthDate:string; units:'Imperial'|'Metric'; height:string;
@@ -34,6 +35,12 @@ const setupFromProfile=(profile:ProfileRow,local:AthleteSetup|null):AthleteSetup
 
 export function ProfileSetupProvider({children}:{children:ReactNode}){
   const {user}=useAuth();
+  /* The settings table carries the athlete's profile AND their split editor
+     state, and it was the quietest write in the app. */
+  const {report}=useSyncStatus();
+  useEffect(()=>reportSettingsSyncTo(message=>report('athlete-settings',message
+    ?{label:'Profile and split',message:`Your latest change did not reach your account (${message}).`}
+    :null)),[report]);
   const [setup,setSetup]=useState<AthleteSetup|null>(null);
   const [loadedUserId,setLoadedUserId]=useState<string|null>(null);
   const loading=Boolean(user)&&loadedUserId!==user?.id;

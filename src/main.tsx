@@ -54,6 +54,7 @@ import './adaptive-plan.css';
 import './friends-pro.css';
 import './home-simple.css';
 import './history.css';
+import { SyncStatusProvider } from './features/sync/SyncStatusProvider';
 import './onboarding.css';
 import './onboarding-equipment.css';
 import './onboarding-split.css';
@@ -119,7 +120,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppErrorBoundary><HashRouter>
       <AuthProvider>
-        <BillingProvider><AppearanceProvider><GoalsProvider><WorkoutHistoryProvider><AdaptiveTrainingProvider><ProfileSetupProvider><TrainingLibraryProvider><CoachingStrategyProvider><DailyRecommendationProvider><App /></DailyRecommendationProvider></CoachingStrategyProvider></TrainingLibraryProvider></ProfileSetupProvider></AdaptiveTrainingProvider></WorkoutHistoryProvider></GoalsProvider></AppearanceProvider></BillingProvider>
+        <SyncStatusProvider><BillingProvider><AppearanceProvider><GoalsProvider><WorkoutHistoryProvider><AdaptiveTrainingProvider><ProfileSetupProvider><TrainingLibraryProvider><CoachingStrategyProvider><DailyRecommendationProvider><App /></DailyRecommendationProvider></CoachingStrategyProvider></TrainingLibraryProvider></ProfileSetupProvider></AdaptiveTrainingProvider></WorkoutHistoryProvider></GoalsProvider></AppearanceProvider></BillingProvider></SyncStatusProvider>
       </AuthProvider>
     </HashRouter></AppErrorBoundary>
   </StrictMode>,

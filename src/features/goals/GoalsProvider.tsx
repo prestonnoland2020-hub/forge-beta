@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { loadAthleteSettings, saveAthleteSettings } from '../profile/settingsSync';
 import { clockToSeconds, decimalMinutesToClock } from '../../lib/time';
 import { useAuth } from '../auth/AuthProvider';
+import { useSyncStatus } from '../sync/SyncStatusProvider';
 
 /* `hydrated` is the difference between "this athlete has no goals" and "the
    goals have not arrived yet". Without it, an empty list means both, and a
@@ -13,7 +14,16 @@ import { useAuth } from '../auth/AuthProvider';
    device back into setup for the seconds before the server answers. */
 type GoalsContextValue={goals:CreatedGoal[];saveGoal:(goal:CreatedGoal,index?:number|null)=>void;deleteGoal:(index:number)=>void;hydrated:boolean;syncError:string|null};
 const GoalsContext=createContext<GoalsContextValue|null>(null);
-const goalKey=(goal:CreatedGoal)=>`${goal.type}|${goal.exercise||goal.title}`.trim().toLowerCase().replace(/\s+goal$/,'');
+/* A GOAL'S IDENTITY MUST NOT MOVE WHEN ITS TARGET DOES. A body-composition
+   goal has no exercise, so this fell through to the TITLE — and the title of a
+   body goal is "200 lb body-weight goal". Raise the target to 195 and it became
+   a different goal: the table's copy and the settings copy no longer matched,
+   the merge treated them as two goals, and the athlete's goal list grew a
+   second body-weight target every time they edited the first. It keys on the
+   metric now, which is what the row is keyed on server-side as well. */
+const goalKey=(goal:CreatedGoal)=>(goal.type==='Body Composition'
+  ?`${goal.type}|${goal.metric||'Body weight'}`
+  :`${goal.type}|${goal.exercise||goal.title}`).trim().toLowerCase().replace(/\s+goal$/,'');
 
 /* A GOAL ROW COMES BACK IN THE ATHLETE'S UNIT. The server stores the bare
    number; it used to be relabelled "lb" on every load, so a kg lifter's
@@ -68,6 +78,11 @@ export function GoalsProvider({children}:{children:ReactNode}){
      onboarding gate decided they had no goals and sent them back through
      setup. Silence is what made a one-line schema fault survive that long. */
   const [syncError,setSyncError]=useState<string|null>(null);
+  /* The Goals page keeps its own line — that is where the athlete is when it
+     happens — and the same failure also goes to the app-wide channel, so it is
+     visible from whatever screen they wander to next. */
+  const {report}=useSyncStatus();
+  useEffect(()=>report('goals',syncError?{label:'Goals',message:syncError}:null),[syncError,report]);
   useEffect(()=>localStorage.setItem('forge-goals',JSON.stringify(goals)),[goals]);
   /* A goal can arrive from either of two places, and BOTH have to answer
      before emptiness means anything. The goals TABLE holds lift and race
@@ -100,6 +115,11 @@ export function GoalsProvider({children}:{children:ReactNode}){
     const stored=Array.isArray(settings?.goals)?settings?.goals as CreatedGoal[]:[];
     const bodyGoals=stored.filter(item=>item?.type==='Body Composition'&&item.title);
     if(!bodyGoals.length)return;
+    /* THE TABLE IS THE AUTHORITY; THIS COPY IS A MIGRATION PATH. athlete_settings
+       still carries body goals so an older build on another device does not lose
+       them, but it is only ever read for a goal the table does not already hold.
+       A stale copy here must never overwrite, resurrect, or duplicate the row —
+       which is what "one of them wins" has to mean in practice. */
     setGoals(local=>{const keys=new Set(local.map(goalKey));return[...local,...bodyGoals.filter(item=>!keys.has(goalKey(item)))]});
   }).catch(()=>{if(active)setSettingsAnswered(true)});return()=>{active=false}},[user]);
   /* A wiped device can race auth: local storage empty, first fetch missed.

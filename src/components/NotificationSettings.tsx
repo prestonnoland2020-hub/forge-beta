@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadNotificationPrefs, notificationPermission, notificationsSupported, requestNotificationPermission, saveNotificationPrefs, type NotificationPrefs } from '../lib/notifications';
-import { installedToHomeScreen, syncPushSubscription, disablePush, sendTestPush } from '../lib/push';
+import { installedToHomeScreen, syncPushSubscription, disablePush, sendTestPush, readPushHealth, describePushHealth, type PushHealth } from '../lib/push';
 
 /* iOS is the only platform where an install is the difference between a
    notification and nothing, so it is the only one told to install. */
@@ -18,12 +18,21 @@ export function NotificationSettings() {
   /* "I'm not getting notifications" has four causes that look identical from
      the outside. This asks the server to send one and then asks what became of
      it, so the athlete finds out which one they have instead of guessing. */
+  /* WHEN A NOTIFICATION LAST ACTUALLY ARRIVED. Delivery receipts were being
+     written and nothing showed them, so a subscription that had gone stale
+     looked exactly like one that was working — the athlete just stopped
+     hearing from Forge. Three weeks of silence took a database query to
+     explain; this is the line that would have made it a glance. */
+  const [health, setHealth] = useState<PushHealth | null>(null);
+  const refreshHealth = useCallback(() => { void readPushHealth().then(setHealth); }, []);
+  useEffect(() => refreshHealth(), [refreshHealth]);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState('');
   const runTest = async () => {
     setTesting(true); setTestResult('Sending…');
     try {
       const outcome = await sendTestPush();
+      refreshHealth();
       setTestResult(outcome);
     } catch {
       setTestResult('Could not reach Forge to send a test. Check your connection and try again.');
@@ -56,6 +65,7 @@ export function NotificationSettings() {
     <div className="toggle-row"><div><strong>Morning workout</strong><span>Your day's training, each morning.</span></div><input type="checkbox" aria-label="Morning workout notifications" checked={prefs.morningWorkout} onChange={() => void toggle('morningWorkout')} /></div>
     <div className="toggle-row"><div><strong>Injury follow-ups</strong><span>A daily check-in while a body-log entry is active.</span></div><input type="checkbox" aria-label="Injury follow-up notifications" checked={prefs.injuryFollowUp} onChange={() => void toggle('injuryFollowUp')} /></div>
     <div className="toggle-row"><div><strong>A partner trained</strong><span>Once a day, when a training partner logs a session.</span></div><input type="checkbox" aria-label="Training partner notifications" checked={prefs.partnerTrained} onChange={() => void toggle('partnerTrained')} /></div>
+    {health && <small className={health.registered && health.lastDelivered ? 'notification-note' : 'notification-note warn'}>{describePushHealth(health)}</small>}
     {!notificationsSupported() && <small className="notification-note">This browser does not support system notifications; Ask Forge still shows every check-in.</small>}
     {/* THE ONE THING IOS WILL NOT DO FROM A BROWSER TAB. Web push reaches an
         iPhone only when Forge has been added to the Home Screen, so anyone

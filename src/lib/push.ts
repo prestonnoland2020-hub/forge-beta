@@ -169,3 +169,47 @@ export async function sendTestPush(): Promise<string> {
   }
   return 'Apple accepted it but your phone has not shown it. Check Notifications for Forge in iOS Settings — and if that looks right, delete Forge from your Home Screen and add it again.';
 }
+
+
+/* WHAT THIS PHONE'S NOTIFICATIONS ARE ACTUALLY DOING. One line an athlete can
+   read, and one an owner can be told over a text message, instead of a silence
+   that takes three weeks and a database query to explain. */
+export type PushHealth = { registered: boolean; lastDelivered: string | null; lastAttempt: string | null; lastOutcome: string | null; installs: number };
+
+export async function readPushHealth(): Promise<PushHealth | null> {
+  if (isDemoMode) return null;
+  const { data, error } = await supabase.rpc('forge_push_health');
+  if (error) return null;
+  const rows = (Array.isArray(data) ? data : []) as Array<{
+    last_delivered_at: string | null; last_attempt_at: string | null; last_attempt_outcome: string | null;
+  }>;
+  if (!rows.length) return { registered: false, lastDelivered: null, lastAttempt: null, lastOutcome: null, installs: 0 };
+  const newest = (pick: (row: typeof rows[number]) => string | null) =>
+    rows.map(pick).filter((value): value is string => Boolean(value)).sort().at(-1) || null;
+  const lastAttempt = newest(row => row.last_attempt_at);
+  return {
+    registered: true,
+    lastDelivered: newest(row => row.last_delivered_at),
+    lastAttempt,
+    lastOutcome: rows.find(row => row.last_attempt_at === lastAttempt)?.last_attempt_outcome || null,
+    installs: rows.length,
+  };
+}
+
+export function describePushHealth(health: PushHealth | null): string {
+  if (!health) return '';
+  if (!health.registered) return 'This device is not registered for notifications yet.';
+  const when = (iso: string) => {
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    if (days < 14) return `${days} days ago`;
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+  if (health.lastDelivered) {
+    const stale = Date.now() - new Date(health.lastDelivered).getTime() > 7 * 86400000;
+    return `A notification last reached this account ${when(health.lastDelivered)}.${stale ? ' That is a while — send a test to check this phone is still registered.' : ''}`;
+  }
+  if (health.lastAttempt) return `Forge has tried to send since ${when(health.lastAttempt)} and nothing has been confirmed as arriving${health.lastOutcome === 'retired' ? ' — this install is no longer registered with Apple' : ''}. Send a test.`;
+  return 'Registered, but Forge has not sent anything to this account yet.';
+}

@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useSt
 import type { CardioLogDraft } from '../../lib/cardioSession';
 import { isDemoMode } from '../../lib/env';
 import { useAuth } from '../auth/AuthProvider';
+import { useSyncStatus } from '../sync/SyncStatusProvider';
 import { deleteWorkoutDay,findWorkoutDayId,loadWorkoutHistory,saveWorkoutDay } from './workoutHistoryService';
 
 export type LoggedTopSet = { id?:string; recommendationTopSetId?:string; muscle:string; lift:string; weight:number; reps:number; calculatedMax?:number; completed?:boolean };
@@ -73,6 +74,12 @@ export function WorkoutHistoryProvider({children}:{children:ReactNode}){
     merged.filter(item=>pendingIds.current.has(item.id)).forEach(persist);
   };
   useEffect(()=>{if(isDemoMode||!user){setLoading(false);return}let active=true;setLoading(true);void load().catch(error=>{if(active)setSyncError(error instanceof Error?error.message:'Could not load workout history.')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {report}=useSyncStatus();
+  /* Training days already had a banner of their own; it reports here too so
+     one strip can speak for everything that has not reached the account. */
+  useEffect(()=>report('workout-history',syncError
+    ?{label:'Training days',message:syncError,retry:()=>{const unsent=recordsRef.current.filter(item=>pendingIds.current.has(item.id));unsent.forEach(persist)}}
+    :null),[syncError,report]);
   const value=useMemo<HistoryValue>(()=>({records,loading,syncing,syncError,retrySync:()=>{const unsent=recordsRef.current.filter(item=>pendingIds.current.has(item.id));if(unsent.length)unsent.forEach(persist);else if(!isDemoMode&&user){setLoading(true);void load().catch(error=>setSyncError(error instanceof Error?error.message:'Could not load workout history.')).finally(()=>setLoading(false))}},addRecord:(draft)=>{
     const current=recordsRef.current;const normalized=normalizeRecord(draft);const sameDay=current.find(item=>item.date===draft.date);const incomingSets=normalizedTopSets(normalized);const duplicate=sameDay&&incomingSets.length>0&&incomingSets.every(set=>normalizedTopSets(sameDay).some(saved=>setSignature(saved)===setSignature(set)))&&!draft.cardioSessions?.length?sameDay:undefined;
     if(duplicate)return {ok:false,duplicate};

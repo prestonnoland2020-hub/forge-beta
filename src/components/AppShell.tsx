@@ -5,6 +5,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { isDemoMode } from '../lib/env';
+import { useSyncStatus } from '../features/sync/SyncStatusProvider';
 import { localDayIso } from '../lib/time';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
@@ -73,6 +74,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const location = useLocation();
   const { recovery } = useAdaptiveTraining();
   const { setup } = useProfileSetup();
+  const { failures: syncFailures, retryAll } = useSyncStatus();
   const { user } = useAuth();
   const { loading: historyLoading, syncing, syncError, retrySync, records: stravaRecords, addRecord: stravaAddRecord } = useWorkoutHistory();
   /* STRAVA SYNC RUNS WHEN THE ATHLETE LOOKS. A six-hour throttle meant a run
@@ -235,7 +237,16 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
           workflow ships the fake session with nothing saving anywhere — and
           looked identical to the real app. Now it cannot be mistaken for one. */}
       {isDemoMode && <div className="demo-banner" role="status">Preview build — training is not saved to an account.</div>}
-      {!isDemoMode && syncError && <div className="data-sync-error"><span>Your latest training is saved on this phone but hasn’t reached your account yet. It will retry, or tap Retry now.</span><button onClick={retrySync}>Retry</button></div>}
+      {/* ONE STRIP FOR EVERYTHING THAT HAS NOT REACHED THE ACCOUNT. Training
+          days had this banner to themselves; goals, the exercise library and
+          the profile/split failed in silence. They all report to one channel
+          now, and it names what is unsaved rather than saying "something". */}
+      {!isDemoMode && syncFailures.length > 0 && <div className="data-sync-error">
+        <span>{syncFailures.length === 1
+          ? `${syncFailures[0].label}: ${syncFailures[0].message} It is safe on this phone and will retry.`
+          : `${syncFailures.map(failure => failure.label).join(', ')} haven’t reached your account. They’re safe on this phone and will retry.`}</span>
+        <button onClick={() => { retrySync(); retryAll(); }}>Retry</button>
+      </div>}
       <main className="page"><Outlet /></main>
     </div>
     <nav className="bottom-nav" aria-label="Mobile navigation">

@@ -3,6 +3,7 @@ import { useWorkoutHistory, type WorkoutRecord } from '../features/training/Work
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { isCardioMovement } from '../lib/muscleGroups';
+import { primaryMusclesFor } from '../lib/liftAliases';
 import { cardioMiles, summarizeCardioDraft, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 
@@ -18,21 +19,37 @@ const weekStartIso = (iso: string) => { const day = new Date(`${iso}T12:00:00`);
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const isStrengthSession = (record: WorkoutRecord) => (record.topSets || []).some(set => set.completed !== false) || (record.muscles || []).some(muscle => !['cardio', 'rest', 'none'].includes(muscle.trim().toLowerCase()));
 const hasCardioSession = (record: WorkoutRecord) => (record.cardioSessions || []).length > 0;
-/* WHAT COUNTS AS TRAINING A MUSCLE. A cardio-only day credits nothing, however
-   its movements are tagged: rowing lists Back and Quads because the row uses
-   them, not because the session was a back day. Days already saved the old way
-   are caught here as well as at the point of writing, so the chart heals
-   itself rather than waiting for the history to age out. */
-const trainedALift = (record: WorkoutRecord, isCardioLift: (name: string) => boolean) =>
-  (record.topSets || []).some(set => set.completed !== false && set.lift && !isCardioLift(set.lift));
-const countsTowardMuscleFrequency = (record: WorkoutRecord, isCardioLift: (name: string) => boolean) =>
-  trainedALift(record, isCardioLift) || (!hasCardioSession(record) && isStrengthSession(record));
+/* WHAT COUNTS AS TRAINING A MUSCLE.
+
+   The record keeps everything a cardio movement uses — rowing is tagged Back,
+   Quads, Hamstrings, Glutes, and that is how Forge knows a hard row leaves the
+   back tired. Recovery and fatigue are entitled to it. The frequency chart is
+   not: it answers "what have I neglected", and crediting a 2k row as a back
+   session is how that question gets the opposite of the right answer.
+
+   So this subtracts rather than gates. A muscle drops out of the count when
+   nothing but cardio put it there on that day; a muscle a lift also trained
+   stays. A day with no lifting on it counts nothing at all. Both are decided
+   from the day's own sets, so days already saved count correctly too. */
+const musclesTrainedOn = (record: WorkoutRecord, isCardioLift: (name: string) => boolean, musclesOf: (lift: string) => string[]) => {
+  const completed = (record.topSets || []).filter(set => set.completed !== false && set.lift);
+  const lifted = completed.filter(set => !isCardioLift(set.lift));
+  /* Cardio and nothing else: the day trained no muscle group, whatever its
+     movements are tagged with or whatever its split day was called. */
+  if (!lifted.length && (hasCardioSession(record) || completed.length)) return [];
+  const fromLifts = new Set(lifted.flatMap(set => musclesOf(set.lift)));
+  const fromCardioOnly = new Set(completed.filter(set => isCardioLift(set.lift))
+    .flatMap(set => musclesOf(set.lift)).filter(muscle => !fromLifts.has(muscle)));
+  return (record.muscles || []).filter(muscle => muscle !== 'Cardio' && !fromCardioOnly.has(muscle));
+};
 
 export function InsightsClassic() {
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
   const { exercises } = useTrainingLibrary();
   const isCardioLift = useCallback((name: string) => isCardioMovement(exercises.find(exercise => exercise.name === name)), [exercises]);
+  const musclesOf = useCallback((lift: string) => primaryMusclesFor(lift, exercises.find(exercise => exercise.name === lift)?.muscles || [])
+    .filter(muscle => muscle !== 'Cardio'), [exercises]);
   const unit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const todayIso = isoOf(new Date());
 
@@ -88,15 +105,15 @@ export function InsightsClassic() {
   const frequency = useMemo(() => {
     const window = records.filter(record => record.date >= rangeCutoffIso);
     const muscles = new Map<string, number>();
-    window.filter(record => countsTowardMuscleFrequency(record, isCardioLift))
-      .forEach(record => (record.muscles || []).forEach(muscle => { if (muscle !== 'Cardio') muscles.set(muscle, (muscles.get(muscle) || 0) + 1); }));
+    window.forEach(record => musclesTrainedOn(record, isCardioLift, musclesOf)
+      .forEach(muscle => muscles.set(muscle, (muscles.get(muscle) || 0) + 1)));
     const cardioTypes = new Map<string, number>();
     window.forEach(record => (record.cardioSessions || []).forEach(session => { const type = session.activity || 'Cardio'; cardioTypes.set(type, (cardioTypes.get(type) || 0) + 1); }));
     return {
       muscles: [...muscles.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
       cardio: [...cardioTypes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
     };
-  }, [records, rangeCutoffIso, isCardioLift]);
+  }, [records, rangeCutoffIso, isCardioLift, musclesOf]);
 
   /* ------------------------------------------------------ PRs (all time) */
   const bestByLift = useMemo(() => {

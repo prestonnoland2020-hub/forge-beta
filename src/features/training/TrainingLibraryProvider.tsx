@@ -5,6 +5,7 @@ import { canonicalLiftKey, primaryMusclesFor } from '../../lib/liftAliases';
 import { normalizeMuscleGroups } from '../../lib/muscleGroups';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import { useSyncStatus } from '../sync/SyncStatusProvider';
 
 export type LibraryExercise={id:number;name:string;kind:'Strength'|'Cardio';muscles:string[];detail:string;enabled:boolean;custom?:boolean;defaultTarget?:string;defaultUnit?:string;categories?:ExerciseCategory[]};
 export type LibraryWorkout={id:number;name:string;kind:'Strength'|'Cardio'|'Circuit';source:'User'|'Forge';summary:string;exercises?:string[];plan?:PlannedCardio};
@@ -84,6 +85,13 @@ const normalizeExercise=(item:Partial<LibraryExercise>,id:number):LibraryExercis
 
 export function TrainingLibraryProvider({children}:{children:ReactNode}){
   const {user}=useAuth();
+  /* THE LIBRARY IS ACCOUNT DATA TOO. Every write here answered a failure with
+     console.warn, so an exercise added, renamed or switched off on a phone that
+     could not reach the account looked saved and was not. */
+  const {report}=useSyncStatus();
+  const libraryFailed=(action:string)=>({error}:{error:{message:string}|null})=>report('exercise-library',error
+    ?{label:'Exercise library',message:`${action} did not reach your account (${error.message}).`}
+    :null);
   const [state,setState]=useState<{exercises:LibraryExercise[];workouts:LibraryWorkout[];circuitLibraryVersion:number}>(()=>{try{
     const saved=JSON.parse(localStorage.getItem(key)||'{}');
     const savedExercises=Array.isArray(saved.exercises)?saved.exercises.map((item:Partial<LibraryExercise>,index:number)=>normalizeExercise(item,Date.now()+index)):[];
@@ -110,8 +118,8 @@ export function TrainingLibraryProvider({children}:{children:ReactNode}){
     setState(value=>{const remoteNames=new Set(imported.map(item=>canonicalLiftKey(item.name)));return{...value,exercises:[...imported,...value.exercises.filter(item=>!remoteNames.has(canonicalLiftKey(item.name)))]}});
   });return()=>{active=false}},[user]);
 
-  const addExercise=(exercise:Omit<LibraryExercise,'id'>)=>{const next=normalizeExercise({...exercise,id:Date.now()},Date.now());setState(value=>({...value,exercises:[...value.exercises,next]}));if(!isDemoMode&&user)void supabase.from('exercise_library').insert({owner_id:user.id,name:next.name,kind:next.kind,muscle_groups:next.muscles,detail:next.detail,enabled:next.enabled,default_target:next.defaultTarget||null,default_unit:next.defaultUnit||null}).then(({error})=>{if(error)console.warn('Exercise sync failed',error.message)});return next};
-  const updateExercise=(id:number,change:Partial<LibraryExercise>)=>{const target=state.exercises.find(item=>item.id===id);if(!target)return;const next=normalizeExercise({...target,...change,id},id);setState(value=>({...value,exercises:value.exercises.map(item=>item.id===id?next:item)}));if(!isDemoMode&&user)void supabase.from('exercise_library').update({name:next.name,kind:next.kind,muscle_groups:next.muscles,detail:next.detail,enabled:next.enabled,default_target:next.defaultTarget||null,default_unit:next.defaultUnit||null}).eq('owner_id',user.id).eq('name',target.name).then(({error})=>{if(error)console.warn('Exercise update sync failed',error.message)});};
+  const addExercise=(exercise:Omit<LibraryExercise,'id'>)=>{const next=normalizeExercise({...exercise,id:Date.now()},Date.now());setState(value=>({...value,exercises:[...value.exercises,next]}));if(!isDemoMode&&user)void supabase.from('exercise_library').insert({owner_id:user.id,name:next.name,kind:next.kind,muscle_groups:next.muscles,detail:next.detail,enabled:next.enabled,default_target:next.defaultTarget||null,default_unit:next.defaultUnit||null}).then(({error}:{error:{message:string}|null})=>libraryFailed('A new exercise')({error}));return next};
+  const updateExercise=(id:number,change:Partial<LibraryExercise>)=>{const target=state.exercises.find(item=>item.id===id);if(!target)return;const next=normalizeExercise({...target,...change,id},id);setState(value=>({...value,exercises:value.exercises.map(item=>item.id===id?next:item)}));if(!isDemoMode&&user)void supabase.from('exercise_library').update({name:next.name,kind:next.kind,muscle_groups:next.muscles,detail:next.detail,enabled:next.enabled,default_target:next.defaultTarget||null,default_unit:next.defaultUnit||null}).eq('owner_id',user.id).eq('name',target.name).then(({error}:{error:{message:string}|null})=>libraryFailed('An exercise edit')({error}));};
   const removeExercise=(id:number)=>{const target=state.exercises.find(item=>item.id===id);if(!target)return;setState(value=>({...value,exercises:value.exercises.filter(item=>item.id!==id)}));try{const plan=JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null');if(plan?.days){plan.days=plan.days.map((day:{exercises?:string[]})=>({...day,exercises:(day.exercises||[]).filter(name=>name!==target.name)}));localStorage.setItem('forge-training-plan-v1',JSON.stringify(plan))}}catch{console.warn('Could not remove the exercise from the locally saved split.')}if(!isDemoMode&&user)void supabase.from('exercise_library').delete().eq('owner_id',user.id).eq('name',target.name).then(async({error})=>{if(error){window.alert(`“${target.name}” was removed here, but could not be deleted from your account. Refresh and try again.`);return}const {data:days,error:daysError}=await supabase.from('training_split_days').select('id,goal_lifts');if(daysError)return;await Promise.all((days||[]).filter(day=>Array.isArray(day.goal_lifts)&&day.goal_lifts.includes(target.name)).map(day=>supabase.from('training_split_days').update({goal_lifts:day.goal_lifts.filter((name:string)=>name!==target.name)}).eq('id',day.id)))});};
   const addWorkout=(workout:Omit<LibraryWorkout,'id'>)=>{const next={...workout,id:Date.now()};setState(value=>({...value,workouts:[...value.workouts,next]}));return next};
   const updateWorkout=(id:number,change:Partial<LibraryWorkout>)=>setState(value=>({...value,workouts:value.workouts.map(item=>item.id===id?{...item,...change}:item)}));
@@ -121,7 +129,7 @@ export function TrainingLibraryProvider({children}:{children:ReactNode}){
      row on every open — so an exercise switched off came back on at the next
      launch. A starter exercise has no row yet, so this upserts rather than
      updates. */
-  const toggleExercise=(id:number)=>{const target=state.exercises.find(item=>item.id===id);if(!target)return;const enabled=!target.enabled;setState(value=>({...value,exercises:value.exercises.map(item=>item.id===id?{...item,enabled}:item)}));if(!isDemoMode&&user)void supabase.from('exercise_library').upsert({owner_id:user.id,name:target.name,kind:target.kind,muscle_groups:target.muscles,detail:target.detail,enabled,default_target:target.defaultTarget||null,default_unit:target.defaultUnit||null},{onConflict:'owner_id,name'}).then(({error})=>{if(error)console.warn('Exercise toggle sync failed',error.message)})};
+  const toggleExercise=(id:number)=>{const target=state.exercises.find(item=>item.id===id);if(!target)return;const enabled=!target.enabled;setState(value=>({...value,exercises:value.exercises.map(item=>item.id===id?{...item,enabled}:item)}));if(!isDemoMode&&user)void supabase.from('exercise_library').upsert({owner_id:user.id,name:target.name,kind:target.kind,muscle_groups:target.muscles,detail:target.detail,enabled,default_target:target.defaultTarget||null,default_unit:target.defaultUnit||null},{onConflict:'owner_id,name'}).then(({error}:{error:{message:string}|null})=>libraryFailed('Switching an exercise on or off')({error}))};
   return <Context.Provider value={{...state,addExercise,updateExercise,removeExercise,addWorkout,updateWorkout,removeWorkout,toggleExercise}}>{children}</Context.Provider>;
 }
 export function useTrainingLibrary(){const value=useContext(Context);if(!value)throw new Error('Training library provider missing');return value}

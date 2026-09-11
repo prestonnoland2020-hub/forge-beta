@@ -108,14 +108,23 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
     const nearest=anchors?.size
       ?[...anchors].sort((a,b)=>Math.abs(a[0]-stage.reps)-Math.abs(b[0]-stage.reps))[0]
       :undefined;
+    /* AND SAY WHEN IT IS AN ESTIMATE. A load written from the athlete's own set
+       at these reps and a load extrapolated eight reps away were stated with
+       exactly the same confidence — so a double computed from a ten-rep set, the
+       least reliable conversion in the whole curve, read as though they had
+       done a double. The sentence now names the distance the estimate travelled
+       and calls it one. And the unit is the athlete's: every one of these was
+       hardcoded "lb", so a kilogram lifter was told their numbers in pounds. */
+    const unit=metric?'kg':'lb';
+    const gap=nearest?Math.abs(nearest[0]-stage.reps):0;
     const evidence=atReps
-      ?`Your best ${stage.reps === 1 ? 'single' : `set of ${stage.reps}`} is ${atReps} lb; latest was ${latest.weight} lb ×${latest.reps} on ${latest.date}.`
+      ?`Your best ${stage.reps === 1 ? 'single' : `set of ${stage.reps}`} is ${atReps} ${unit}; latest was ${latest.weight} ${unit} ×${latest.reps} on ${latest.date}.`
       :nearest
-        ?`Nearest evidence is ${nearest[1]} lb ×${nearest[0]}; latest was ${latest.weight} lb ×${latest.reps} on ${latest.date}.`
-        :`Best recent comparable estimate came from ${strongestRecent.weight} lb ×${strongestRecent.reps}; latest was ${latest.weight} lb ×${latest.reps} on ${latest.date}.`;
+        ?`Estimated from your ${nearest[1]} ${unit} ×${nearest[0]}${gap>=4?`, ${gap} reps away — you have no logged set at ${stage.reps}, so treat this as a starting point`:''}; latest was ${latest.weight} ${unit} ×${latest.reps} on ${latest.date}.`
+        :`Estimated from ${strongestRecent.weight} ${unit} ×${strongestRecent.reps}, the only comparable set on file; latest was ${latest.weight} ${unit} ×${latest.reps} on ${latest.date}.`;
     const rationale=`${stage.rationale} ${evidence}${supportsProgress?' Recent performance supports one small progression step.':' Forge is holding the demonstrated level until another comparable result confirms progress.'}`;
     const backoffSets=stage.isTest?2:3;const backoffReps=stage.reps<=2?Math.max(3,stage.reps+2):stage.reps;const backoffWeight=Math.max(5,Math.round(adjustedWeight*(stage.isTest?.85:.9)/5)*5);
-    return {...template,weight:adjustedWeight,reps:stage.reps,backoffSets,backoffReps,backoffWeight,calculatedMax:adjustedMax,stage:stage.label,rationale:`${rationale}${goalMaxByLift[canonicalLiftKey(template.exercise)]?` This load is progressing toward the ${goalMaxByLift[canonicalLiftKey(template.exercise)]} lb goal.`:' No movement-specific goal is set, so Forge targets a conservative improvement over demonstrated strength.'}${safeBias?` Coach load adjustment: ${safeBias>0?'+':''}${safeBias}%.`:''}`,source};
+    return {...template,weight:adjustedWeight,reps:stage.reps,backoffSets,backoffReps,backoffWeight,calculatedMax:adjustedMax,stage:stage.label,rationale:`${rationale}${goalMaxByLift[canonicalLiftKey(template.exercise)]?` This load is progressing toward the ${goalMaxByLift[canonicalLiftKey(template.exercise)]} ${metric?'kg':'lb'} goal.`:' No movement-specific goal is set, so Forge targets a conservative improvement over demonstrated strength.'}${safeBias?` Coach load adjustment: ${safeBias>0?'+':''}${safeBias}%.`:''}`,source};
   });
   return{activeDays7,activeDaysPrior7,workloadTrend,daysSinceTraining,headline,reason,topSets};
 }

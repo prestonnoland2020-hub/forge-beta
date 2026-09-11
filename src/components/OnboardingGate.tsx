@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { isEditingSplit, onSplitEditingChange } from '../features/profile/splitEditing';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useGoals } from '../features/goals/GoalsProvider';
 
@@ -16,6 +18,9 @@ export function OnboardingGate(){
   const {completed,loading,setup}=useProfileSetup();
   const {goals,hydrated}=useGoals();
   const location=useLocation();
+  /* Re-read on every editor mount and unmount rather than only on navigation. */
+  const [editingSplitNow,setEditingSplitNow]=useState(isEditingSplit);
+  useEffect(()=>onSplitEditingChange(()=>setEditingSplitNow(isEditingSplit())),[]);
   if(loading||!hydrated)return <main className="profile-loading"><span className="forge-mark">—</span><strong>FORGE</strong><p>Loading your training profile…</p></main>;
   if(!completed)return <Navigate to="/onboarding" replace state={{from:location.pathname}}/>;
   /* Set up before the goal step existed: finish the part that is missing. */
@@ -36,7 +41,12 @@ export function OnboardingGate(){
   const localLifting=localPlanDays.filter(day=>day.dayType==='strength'||day.dayType==='mixed');
   const mappedAnywhere=lifting.some(day=>(day.exercises||[]).length)||localLifting.some(day=>(day.exercises||[]).length);
   const unmapped=(lifting.length>0||localLifting.length>0)&&!mappedAnywhere;
-  const editingSplit=location.pathname.startsWith('/split')||location.pathname.startsWith('/plan');
+  /* THE EDITOR SAYS WHEN IT IS EDITING. This matched two path prefixes, so the
+     protection was correct on exactly the two screens someone had thought of
+     and absent everywhere else. The paths stay as a backstop for a screen that
+     has not registered itself yet — one that empties a day and does not say so
+     is still a bug, but it should not be an ejection. */
+  const editingSplit=editingSplitNow||location.pathname.startsWith('/split')||location.pathname.startsWith('/plan');
   if(unmapped&&!editingSplit)return <Navigate to="/onboarding" replace state={{from:location.pathname,needsExercises:true}}/>;
   return <Outlet/>;
 }

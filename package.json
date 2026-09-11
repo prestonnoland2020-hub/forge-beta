@@ -12,7 +12,9 @@
     "import:legacy": "node migration/import-legacy.mjs",
     "import:legacy:guided": "bash migration/import-legacy-guided.sh",
     "ios:sync": "npm run build && npx cap sync ios",
-    "ios:open": "npx cap open ios"
+    "ios:open": "npx cap open ios",
+    "test": "node runtests.mjs",
+    "test:logic": "node runtests.mjs --logic"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

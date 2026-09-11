@@ -15,6 +15,7 @@ import { useAuth } from '../features/auth/AuthProvider';
 import { saveTrainingSplit } from '../features/splits/splitService';
 import { saveAthleteSettings } from '../features/profile/settingsSync';
 import { isDemoMode } from '../lib/env';
+import { useEditingSplit } from '../features/profile/splitEditing';
 
 const muscles=['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps','Triceps','Forearms','Abs'];
 type CardioPolicy='none'|'forge'|'planned';
@@ -30,6 +31,9 @@ const durationForDay=(day:TrainingDay,cardio=day.cardio)=>{const cardioMinutes=c
    They were two tabs on one page — Preston's call: Plan opens on the plan,
    and the split lives under Profile with a way back. */
 export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
+  /* This screen empties and refills split days, so it declares itself rather
+     than relying on the gate recognising its URL. */
+  useEditingSplit();
   const {user}=useAuth();
   const {goals}=useGoals();const {records}=useWorkoutHistory();const {profile}=useAdaptiveTraining();
   const {strategy}=useCoachingStrategy();
