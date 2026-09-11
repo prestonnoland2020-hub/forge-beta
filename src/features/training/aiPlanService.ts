@@ -520,18 +520,15 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
        the max the load is written from, and the next raise stacks on that. */
     const raises = holding ? 0 : Math.floor(Math.max(0, sessions) / ACCESSORY_SESSIONS_PER_RAISE);
     const workingMax = Math.max(0, best) + raises * plateStep;
-    const fromMax = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
-    /* ONCE A RUNG HAS EVIDENCE, THE EVIDENCE WRITES IT. The calculated max
-       seeds a rung the athlete has never trained — that is where the plate per
-       five sessions lands. After that the rung asks one plate step over the
-       load actually completed there, which is the rule the rest of Forge lives
-       by and the only one that behaves at both ends: a rung held down by three
-       misses does not snap from the 100 x 8 he just took to the 125 x 8 the
-       drifting max wants, and a rung he keeps beating is not held under the
-       max's own conservative read of a twelve. */
-    const done = completedAt(accessoryReps);
-    const weight = done ? Math.floor(done / plateStep) * plateStep + plateStep : fromMax;
-    return { weight: Math.max(plateStep, weight), reps: accessoryReps, isMax: false };
+    /* ONE MAX WRITES ALL FOUR RUNGS, which is the point of running them off a
+       calculated max at all: the twelve, the ten, the eight and the six stay in
+       proportion to each other and to the athlete. Writing each rung from its
+       own logged history instead let them drift apart — a 105 x 12 beside a
+       105 x 6 is not a ladder, it is four unrelated numbers that happen to sit
+       on the same lift. The only thing that ever breaks the proportion is a
+       rung the athlete has failed three times, which is handled above. */
+    const weight = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
+    return { weight, reps: accessoryReps, isMax: false };
   }
   const { reps, isMax } = waveSlot(weekIndex);
   /* "A rep higher than last PR by 5-10": a real logged single anchors the

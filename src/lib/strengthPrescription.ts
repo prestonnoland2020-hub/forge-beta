@@ -1,4 +1,4 @@
-import { WAVE_REPS, waveSlot, wavePrescription, ACCESSORY_REPS, ACCESSORY_SESSIONS_PER_RAISE } from '../features/training/aiPlanService';
+import { WAVE_REPS, waveSlot, wavePrescription, ACCESSORY_REPS, ACCESSORY_SESSIONS_PER_RAISE, FAILURES_BEFORE_BACKOFF } from '../features/training/aiPlanService';
 import { calculateEstimatedOneRepMax } from './strength';
 
 /* THIS FILE IS AN ADAPTER, NOT A PROGRAM. It used to run its own sequence —
@@ -41,6 +41,10 @@ export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = fal
   /* No step when the evidence has not moved: one session with this lift, or a
      latest result that did not hold up against the best of the window. */
   const wave = wavePrescription(baselineMax, weekIndex, { metric, bestSingle, tests: allowTest, anchors, holding, accessory, sessions, misses, lastAt });
+  /* Three misses at these reps is the one thing that takes a rung off the
+     calculated-max ladder, so the card has to say so rather than claiming the
+     max wrote a number it did not. */
+  const backedOffHere = (misses?.get(wave.reps) || 0) >= FAILURES_BEFORE_BACKOFF;
   const recovering = readiness < 65 || highFatigue;
   /* A recovery safeguard trims the load. It does not rewrite the rep target,
      and it never converts a max week into something else — the athlete simply
@@ -52,7 +56,7 @@ export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = fal
   /* The accessory cycle does not run on the wave's calendar, so the wave's
      max-week sentence must not be printed over it. */
   const rationale = accessory
-    ? `${wave.reps}-rep slot of the ${ACCESSORY_REPS.join('/')} accessory cycle, session ${sessions + 1} on this lift. ${lastAt?.get(wave.reps) ? 'One step over the last set you completed at these reps' : `Written from your calculated max, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.${recovering ? ' Recovery safeguard trimmed the load.' : ''}`
+    ? `${wave.reps}-rep slot of the ${ACCESSORY_REPS.join('/')} accessory cycle, session ${sessions + 1} on this lift. ${backedOffHere ? `You have missed these reps three times, so this is the last load you completed at them — it will rejoin the cycle as soon as you hold it.` : `Written from your calculated max, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session.`}${recovering ? ' Recovery safeguard trimmed the load.' : ''}`
     : wave.isMax
     ? 'Max week: a tested single, because this lift carries a Real 1RM goal that only a logged single can move.'
     : slot.isMax

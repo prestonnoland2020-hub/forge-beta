@@ -9,7 +9,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE} from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF} from './aiPlanService';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
@@ -297,7 +297,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
          over it was describing a program it is not running. */
       return{...prescription,source:'history' as const,rationale:tests
         ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`
-        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${liveLastAt.get(key)?.get(prescription.reps)?`one step over the last ${prescription.reps}-rep set you completed`:`from your best calc max ${live.best}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`};
+        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from your best calc max ${live.best}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`};
     };
     /* The day's plan prescription leads with the goal lift; every other set
        keeps its own exercise and simply joins the wave. */

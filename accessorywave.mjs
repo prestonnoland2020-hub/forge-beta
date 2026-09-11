@@ -77,25 +77,31 @@ check('the rungs come round in order', [twelve, ten, eight, six].map(r => r.reps
   [twelve, ten, eight, six].map(r => r.reps).join(','));
 check('three misses at the 8 send it back to the 100 he completed', eight.weight === 100, `${eight.weight} × 8`);
 check('and three at the 6 back to the 105 he completed', six.weight === 105, `${six.weight} × 6`);
-/* The rungs he is holding ask one plate over the loads he last completed there
-   — 100 x 12 and 105 x 10 — while the 8 and the 6 sit still. */
-check('the 12 moves on from the 100 he completed', twelve.weight === 105, `${twelve.weight} × 12`);
-check('and the 10 from the 105 he completed', ten.weight === 110, `${ten.weight} × 10`);
-const kept = bestsFromHistory([curl(0, 105, 12), ...story]);
-const nextTwelve = wavePrescription(kept.bests.get(key), 0, { accessory: true, sessions: 8,
-  anchors: kept.anchors.get(key), misses: kept.misses.get(key), lastAt: kept.lastAt.get(key) });
-check('and it moves again once he actually takes it', nextTwelve.weight === 110, `${nextTwelve.weight} × 12`);
+/* THE LADDER STAYS A LADDER. All four rungs are written from one calculated
+   max, so the twelve is lighter than the ten is lighter than the eight — the
+   only rungs that break the proportion are the ones he has failed three times. */
+check('the 12 sits under the 10', twelve.weight < ten.weight, `${twelve.weight} × 12 vs ${ten.weight} × 10`);
+check('and the failed rungs are the only ones off the ladder',
+  eight.weight === 100 && six.weight === 105, `${eight.weight} × 8, ${six.weight} × 6`);
 
-console.log('\n  and one success at a rung clears that rung alone');
+console.log('\n  and one better set lifts the whole program');
+/* This is the reason the max writes all four: a single heavy set is new
+   evidence about the athlete, so every rung moves with it at once. */
+const stronger = bestsFromHistory([curl(0, 150, 5), ...story]);
+const after = sessions => wavePrescription(stronger.bests.get(key), 0, { accessory: true, sessions,
+  anchors: stronger.anchors.get(key), misses: stronger.misses.get(key), lastAt: stronger.lastAt.get(key) });
+check('the 12 goes up', after(8).weight > twelve.weight, `${twelve.weight} → ${after(8).weight}`);
+check('the 10 goes up', after(9).weight > ten.weight, `${ten.weight} → ${after(9).weight}`);
+check('and the rung he keeps failing does not', after(10).weight === 100, `${after(10).weight} × 8`);
+
+console.log('\n  and one success at a rung puts that rung back on the ladder');
 const recovered = bestsFromHistory([curl(0, 100, 8), ...story]);
-const clearedEight = wavePrescription(recovered.bests.get(key), 0, { accessory: true, sessions: 10,
+const ladder = sessions => wavePrescription(recovered.bests.get(key), 0, { accessory: true, sessions,
   anchors: recovered.anchors.get(key), misses: recovered.misses.get(key), lastAt: recovered.lastAt.get(key) });
-/* One plate over the 100 he just completed — not a leap to wherever the
-   working max drifted to while the rung was held down. */
-check('the 8 asks one plate over the 100 he just completed', clearedEight.weight === 105, `${clearedEight.weight} × 8`);
-const stillSix = wavePrescription(recovered.bests.get(key), 0, { accessory: true, sessions: 11,
-  anchors: recovered.anchors.get(key), misses: recovered.misses.get(key), lastAt: recovered.lastAt.get(key) });
-check('while the 6 is still held at its last completed 105', stillSix.weight === 105, `${stillSix.weight} × 6`);
+const unpinned = wavePrescription(recovered.bests.get(key), 0, { accessory: true, sessions: 10 });
+check('the 8 is back to what the max says', ladder(10).weight === unpinned.weight, `${ladder(10).weight} × 8`);
+check('and it is above the 100 he was pinned at', ladder(10).weight > 100, `${ladder(10).weight}`);
+check('while the 6 is still held at its last completed 105', ladder(11).weight === 105, `${ladder(11).weight} × 6`);
 
 console.log(`\n  (one plate every ${ACCESSORY_SESSIONS_PER_RAISE} sessions)`);
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
