@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
+import { isCardioMovement } from '../lib/muscleGroups';
 import { cardioMiles, summarizeCardioDraft, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 
@@ -16,10 +18,21 @@ const weekStartIso = (iso: string) => { const day = new Date(`${iso}T12:00:00`);
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const isStrengthSession = (record: WorkoutRecord) => (record.topSets || []).some(set => set.completed !== false) || (record.muscles || []).some(muscle => !['cardio', 'rest', 'none'].includes(muscle.trim().toLowerCase()));
 const hasCardioSession = (record: WorkoutRecord) => (record.cardioSessions || []).length > 0;
+/* WHAT COUNTS AS TRAINING A MUSCLE. A cardio-only day credits nothing, however
+   its movements are tagged: rowing lists Back and Quads because the row uses
+   them, not because the session was a back day. Days already saved the old way
+   are caught here as well as at the point of writing, so the chart heals
+   itself rather than waiting for the history to age out. */
+const trainedALift = (record: WorkoutRecord, isCardioLift: (name: string) => boolean) =>
+  (record.topSets || []).some(set => set.completed !== false && set.lift && !isCardioLift(set.lift));
+const countsTowardMuscleFrequency = (record: WorkoutRecord, isCardioLift: (name: string) => boolean) =>
+  trainedALift(record, isCardioLift) || (!hasCardioSession(record) && isStrengthSession(record));
 
 export function InsightsClassic() {
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
+  const { exercises } = useTrainingLibrary();
+  const isCardioLift = useCallback((name: string) => isCardioMovement(exercises.find(exercise => exercise.name === name)), [exercises]);
   const unit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const todayIso = isoOf(new Date());
 
@@ -75,14 +88,15 @@ export function InsightsClassic() {
   const frequency = useMemo(() => {
     const window = records.filter(record => record.date >= rangeCutoffIso);
     const muscles = new Map<string, number>();
-    window.forEach(record => (record.muscles || []).forEach(muscle => { if (muscle !== 'Cardio') muscles.set(muscle, (muscles.get(muscle) || 0) + 1); }));
+    window.filter(record => countsTowardMuscleFrequency(record, isCardioLift))
+      .forEach(record => (record.muscles || []).forEach(muscle => { if (muscle !== 'Cardio') muscles.set(muscle, (muscles.get(muscle) || 0) + 1); }));
     const cardioTypes = new Map<string, number>();
     window.forEach(record => (record.cardioSessions || []).forEach(session => { const type = session.activity || 'Cardio'; cardioTypes.set(type, (cardioTypes.get(type) || 0) + 1); }));
     return {
       muscles: [...muscles.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
       cardio: [...cardioTypes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
     };
-  }, [records, rangeCutoffIso]);
+  }, [records, rangeCutoffIso, isCardioLift]);
 
   /* ------------------------------------------------------ PRs (all time) */
   const bestByLift = useMemo(() => {

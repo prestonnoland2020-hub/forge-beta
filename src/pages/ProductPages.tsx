@@ -13,6 +13,7 @@ import { TopSetCards } from '../components/TopSetCards';
 import { TopSetSheet, type TopSetDraft } from '../components/TopSetSheet';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { sameLift, primaryMusclesFor, canonicalLiftKey } from '../lib/liftAliases';
+import { isCardioMovement } from '../lib/muscleGroups';
 import { DialField } from '../components/NumberDial';
 
 function CompletedDayReview({record,unit,records,metric}:{record:WorkoutRecord;unit:string;records:WorkoutRecord[];metric:boolean}) {
@@ -202,7 +203,13 @@ function WorkoutEditor() {
   const sourceMuscles=usingSplit?(plannedDay?.muscles??[]):freeMuscles;
   /* The muscles a lift logs against: its primary movers (alias-folded), else
      its library entry, else the local map. */
-  const liftPrimary=(name:string)=>primaryMusclesFor(name,exercises.find(exercise=>exercise.name===name)?.muscles??liftMuscles[name]??[]).filter(muscle=>muscle!=='Cardio');
+  /* A CARDIO MOVEMENT CONTRIBUTES NO MUSCLES. Rowing's library entry lists
+     Back, Quads, Hamstrings and Glutes — true of the movement, and what lets
+     Forge know a hard row leaves the back tired — but a 2k row is not a back
+     day, and letting it write those muscles onto the record makes it one
+     everywhere the record is read. */
+  const liftIsCardio=(name:string)=>isCardioMovement(exercises.find(exercise=>exercise.name===name));
+  const liftPrimary=(name:string)=>liftIsCardio(name)?[]:primaryMusclesFor(name,exercises.find(exercise=>exercise.name===name)?.muscles??liftMuscles[name]??[]).filter(muscle=>muscle!=='Cardio');
   const plannedExerciseNames=new Set((((plannedDay as {exercises?:string[]}|undefined)?.exercises)||[]).map((name:string)=>String(name).trim().toLowerCase()));
   const restrictToPlannedExercises=usingSplit&&plannedExerciseNames.size>0;
   const strengthCatalogue=exercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));
@@ -324,7 +331,7 @@ function WorkoutEditor() {
        here is a chest session that never happened. On a fresh day the muscles
        ARE what the athlete said they trained, so they stand. */
     const dayMuscles=usingSplit?[]:freeMuscles.filter(muscle=>muscle!=='Cardio');
-    const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set([...dayMuscles,...(primary.length?primary:[set.muscle])])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
+    const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set([...dayMuscles,...(liftIsCardio(set.lift)?[]:primary.length?primary:[set.muscle])])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
     /* Saving a set keeps the session OPEN — only "Finish Day" completes the
        recommendation. The athlete keeps logging sets and cardio freely. */
     setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`${set.lift} · ${set.weight} ${weightUnit} ×${set.reps} saved — keep logging, then Finish Day when you’re done.`)};
@@ -396,7 +403,14 @@ function WorkoutEditor() {
     const assignedDayMuscles=(editingRecord
       ?(dayOverride?savedDays[selectedPlanDay]?.muscles:editingRecord.splitPosition?savedDays[editingRecord.splitPosition-1]?.muscles:undefined)
       :((usingSplit||dayOverride)?plannedDay?.muscles:undefined))?.filter(muscle=>muscle!=='Cardio');
-    const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:exerciseDriven.length?exerciseDriven:(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
+    /* AND A DAY WITH NO LIFTING ON IT TAKES NONE FROM ITS SPLIT DAY. Choosing
+       a lifting day out of the split and then only logging a row wrote that
+       day's whole muscle list onto a session that trained none of it. */
+    const trainedALift=savedTopSets.some(set=>set.lift&&!liftIsCardio(set.lift));
+    const contentMuscles=!trainedALift&&hasCardio?[]
+      :assignedDayMuscles?.length?assignedDayMuscles
+      :exerciseDriven.length?exerciseDriven
+      :(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
     const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id))};
     /* A second session added to an already-saved day keeps THAT DAY's identity.
        Without this, the split cursor has advanced by the time the athlete comes

@@ -23,3 +23,20 @@ export const isTrainedMuscle = (value: string) => {
   return Boolean(normalized) && !nonMuscleLabels.has(normalized);
 };
 export const trainedMuscles = (values: string[] | undefined) => [...new Set((values || []).filter(isTrainedMuscle))];
+
+/* CARDIO IS NOT A MUSCLE SESSION.
+
+   Rowing is tagged Back · Quads · Hamstrings · Glutes, and that is true of the
+   movement — it is what lets Forge know a hard row leaves the back tired. It is
+   not a back day. Counting it as one inflates every frequency read the athlete
+   uses to decide what to train next: row three times in a week and the app
+   reports back, quads, hamstrings and glutes trained three times each, so the
+   one thing it is supposed to tell them — what has been neglected — is exactly
+   what it gets wrong.
+
+   A movement is cardio if its library entry says so, either by kind or by
+   carrying Cardio in its muscle list. Both are checked because the two have
+   drifted apart before. */
+export const isCardioMovement = (exercise?: { kind?: string; muscles?: string[] } | null): boolean =>
+  Boolean(exercise && (String(exercise.kind || '').trim().toLowerCase() === 'cardio'
+    || (exercise.muscles || []).some(muscle => String(muscle || '').trim().toLowerCase() === 'cardio')));

@@ -9,6 +9,7 @@ import { useDailyRecommendation } from '../features/training/DailyRecommendation
 import { splitDayKey } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { primaryMusclesFor } from '../lib/liftAliases';
+import { isCardioMovement } from '../lib/muscleGroups';
 import { DialField } from './NumberDial';
 
 /* A SYNCED ACTIVITY IS HALF A RECORD, AND IT DESERVES THE WHOLE SCREEN.
@@ -202,18 +203,24 @@ export function StravaReviewModal() {
 
     /* 2. The split day the athlete assigns owns the day's identity. */
     const libraryMuscles = exercises.find(item => item.name === lift)?.muscles || [];
-    const liftMuscles = hasTopSet ? primaryMusclesFor(lift, libraryMuscles) : [];
+    /* A cardio movement contributes no muscles, however its library entry is
+       tagged — rowing lists Back and Quads because the row uses them, not
+       because the session was a back day. */
+    const cardioLift = (name: string) => isCardioMovement(exercises.find(item => item.name === name));
+    const liftMuscles = hasTopSet && !cardioLift(lift) ? primaryMusclesFor(lift, libraryMuscles) : [];
     if (chosenDay) {
       /* A DAY THAT WAS LIFTED ON IS NOT A CARDIO DAY. The sets already logged
          count toward the day's muscles too — without them a session with a
          real top set on it came back reading "Cardio" and nothing else. */
-      const loggedMuscles = loggedTopSets.flatMap(set => primaryMusclesFor(set.lift, exercises.find(item => item.name === set.lift)?.muscles || []));
+      const loggedMuscles = loggedTopSets.filter(set => !cardioLift(set.lift)).flatMap(set => primaryMusclesFor(set.lift, exercises.find(item => item.name === set.lift)?.muscles || []));
       next = {
         ...next,
         title: chosenDay.name || record.title,
         splitPosition: Number(dayIndex) + 1,
         muscles: Array.from(new Set([
-          ...(chosenDay.muscles || []).filter(muscle => muscle !== 'Cardio'),
+          /* And a day with no lifting on it takes no muscles from the split
+             day it was assigned to. */
+          ...(loggedMuscles.length || liftMuscles.length ? (chosenDay.muscles || []).filter(muscle => muscle !== 'Cardio') : []),
           ...loggedMuscles,
           ...liftMuscles,
           ...(next.hasCardio ? ['Cardio'] : []),
