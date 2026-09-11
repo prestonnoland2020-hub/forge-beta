@@ -7,6 +7,7 @@ import { buildWeeklyCardio, type GeneratedSession } from './cardioEngine';
 import { normalizeMuscleGroups } from './muscleGroups';
 import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
+import { liftPositions, rungFor } from './liftProgression';
 
 /* Bump this whenever the engine's OUTPUT changes shape or policy — the daily
    card is snapshotted to Supabase, and a stale snapshot with a matching
@@ -169,7 +170,15 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
      count came back 0 on every render and the athlete repeated the 8-rep week
      forever, never reaching a 4, a 2 or a max week. It is always a number, so
      the alias-aware fallback downstream never rescued it either. */
-  const templates=selectedExercises.map(({exercise})=>({exercise:exercise.name,calculatedMax:0,exposureIndex:new Set(completed.filter(result=>canonicalLiftKey(result.lift)===canonicalLiftKey(exercise.name)).map(result=>result.date)).size}));
+/* WHERE THE LIFT IS, NOT HOW OFTEN IT HAS BEEN LOGGED. Counting sessions
+     meant any set moved the block: Preston's plan asked for a double, he took
+     320 x 6, and the wave wrapped from his max week back to the 8-rep week —
+     good work that cost him his place. A prescription is answered when the
+     athlete does what it asked; anything else is evidence, and evidence raises
+     loads without moving the schedule. */
+  const positions=liftPositions(input.records,lift=>!goalMaxByLift[canonicalLiftKey(lift)]);
+  const positionOf=(name:string)=>positions.get(canonicalLiftKey(name));
+  const templates=selectedExercises.map(({exercise})=>({exercise:exercise.name,calculatedMax:0,exposureIndex:rungFor(positionOf(exercise.name)||{exposures:0,offScript:0,misses:0,reseated:false})}));
   const intelligence=buildTrainingIntelligence({records:input.records,recovery:input.recovery,templates,goalMaxByLift,today:new Date(`${input.date}T12:00:00`),loadBiasPercent:input.loadBiasPercent});
   /* A cardio-only split day prescribes no strength: no top set appears on
      Today or in the workout log for that day. */

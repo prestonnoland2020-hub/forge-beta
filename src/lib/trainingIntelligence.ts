@@ -53,6 +53,7 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
      written its loads from these; the logger did not, and the two screens
      disagreed by forty pounds on the same lift on the same morning. */
   const {anchors:liftAnchors,singles:liftSingles,sessions:liftSessions,misses:liftMisses,lastAt:liftLastAt}=bestsFromHistory(records);
+
   const topSets=templates.map(template=>{
     const history=strengthResults(records).filter(record=>sameLift(record.lift,template.exercise)&&record.weight&&record.reps).sort((a,b)=>b.date.localeCompare(a.date)||(b.calculatedMax??epleyMax(b.weight,b.reps))-(a.calculatedMax??epleyMax(a.weight,a.reps)));
     const latest=history[0];

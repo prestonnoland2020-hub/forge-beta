@@ -5,7 +5,13 @@ import { useAuth } from '../auth/AuthProvider';
 import { useSyncStatus } from '../sync/SyncStatusProvider';
 import { deleteWorkoutDay,findWorkoutDayId,loadWorkoutHistory,saveWorkoutDay } from './workoutHistoryService';
 
-export type LoggedTopSet = { id?:string; recommendationTopSetId?:string; muscle:string; lift:string; weight:number; reps:number; calculatedMax?:number; completed?:boolean };
+/* prescribedReps / prescribedWeight: WHAT THE PLAN ASKED FOR on the set that
+   answered it. Progression used to be inferred by counting sessions, so any
+   logged set advanced the wave — a double asked for and a set of six taken
+   wrapped the block back to the top. What the plan asked cannot be recovered
+   later, so it is recorded here, beside the result. Undefined means free
+   training: no prescription was outstanding, and none was answered. */
+export type LoggedTopSet = { id?:string; recommendationTopSetId?:string; muscle:string; lift:string; weight:number; reps:number; calculatedMax?:number; completed?:boolean; prescribedReps?:number; prescribedWeight?:number };
 export type WorkoutRecord = { id:string; date:string; title:string; muscles:string[]; topSets?:LoggedTopSet[]; lift?:string; weight?:number; reps?:number; calculatedMax?:number; hasCardio:boolean; cardioSessions?:CardioLogDraft[]; effort?:string; notes?:string; bodyWeight?:number; recommendationId?:string; selectedRecommendationTopSetIds?:string[]; splitId?:string; splitDayId?:string; splitPosition?:number };
 const seedRecords:WorkoutRecord[]=[];
 type AddResult={ok:true;record:WorkoutRecord}|{ok:false;duplicate:WorkoutRecord};

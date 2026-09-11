@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import type { PlannedCardio } from './CardioPlanBuilder';
@@ -21,6 +21,7 @@ import {
   bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
   calendarEmptyState,
 } from '../features/training/aiPlanService';
+import { liftPositions, rungFor } from '../lib/liftProgression';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
 /* The prose `detail` stays for the coach and the roadmap; `lifts` and `run`
@@ -168,6 +169,18 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      screen read "Back Squat 275x5" as a 321 max while Today folded the same
      history to 380 and prescribed forty-five pounds more. */
   const history = useMemo(() => bestsFromHistory(records), [records]);
+  /* EACH LIFT'S OWN PLACE IN ITS PROGRESSION, read from the same function
+     Today reads, so the two screens cannot disagree about what week a lift is
+     in. A future week adds the exposures that lift would collect getting there,
+     which is what makes the block a projection rather than a promise. */
+  const goalLiftSet = useMemo(() => goalLiftNames(goals), [goals]);
+  const positions = useMemo(() => liftPositions(records, lift => !goalLiftSet.has(canonicalLiftKey(lift))), [records, goalLiftSet]);
+  const rungOf = useCallback((lift: string) => {
+    const position = positions.get(canonicalLiftKey(lift));
+    return position ? rungFor(position) : undefined;
+  }, [positions]);
+  const exposuresPerWeek = useCallback((lift: string) => Math.max(1,
+    splitDays.filter(day => (day.exercises || []).some(name => canonicalLiftKey(name) === canonicalLiftKey(lift))).length), [splitDays]);
   const bests = history.bests;
   const liftAnchors = history.anchors;
   const bestSingles = history.singles;
@@ -405,7 +418,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)) }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored) }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),

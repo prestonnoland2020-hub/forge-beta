@@ -141,8 +141,11 @@ function WorkoutEditor() {
   const prescribeSplitDay=(index:number):LoggedTopSet[]=>{
     const day=savedDays[index];
     const built=recommendationFor(index+1,day?.name);
+    /* The row carries what it ASKED for as well as what it shows, so editing
+       the weight or reps before logging does not erase the prescription the
+       set is answering. */
     const prescribed:LoggedTopSet[]=(built?.topSets||[]).filter(set=>set.selected)
-      .map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true}));
+      .map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true,prescribedReps:set.reps||undefined,prescribedWeight:set.weight||undefined}));
     if(prescribed.length)return prescribed;
     /* No prescription for this day yet — a lift with no logged history has
        nothing to wave off. The day's own mapped movements still stand as rows
@@ -165,7 +168,7 @@ function WorkoutEditor() {
      initial render and the day picker came to disagree about what a chosen day
      prescribes. */
   const splitDayTopSets:LoggedTopSet[]=prescribeSplitDay(selectedPlanDay);
-  const recommendationTopSets:LoggedTopSet[]=(recommendation?.topSets||[]).filter(set=>set.selected).map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true}));
+  const recommendationTopSets:LoggedTopSet[]=(recommendation?.topSets||[]).filter(set=>set.selected).map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true,prescribedReps:set.reps||undefined,prescribedWeight:set.weight||undefined}));
   /* Editing shows ONLY what the record actually holds — a day logged without
      top sets must never be back-filled with today's recommendation or the
      split day's template sets. */
@@ -318,7 +321,23 @@ function WorkoutEditor() {
     addRecord({date:sessionIso,title:usingSplit?(plannedDay?.name||'Planned Workout'):'Custom Workout',
       muscles:['Cardio'],cardioSessions:entries,hasCardio:true,...recommendationMetadata});
   };
-  const quickLogTopSet=(set:LoggedTopSet)=>{if(!set.lift||!set.weight||!set.reps)return;if(!dayLabel){setQuickLogMessage(noDayReason);return}interacted.current=true;const completed={...set,completed:true,calculatedMax:calculateEstimatedOneRepMax(set.weight,set.reps)??undefined};const primary=liftPrimary(set.lift);/* A DAY IS NAMED AFTER THE SPLIT DAY IT IS, NOT THE FIRST LIFT ON IT. Saving
+  /* WHAT WAS ASKED, SAVED BESIDE WHAT WAS DONE. Progression was inferred by
+     counting sessions, so any set advanced the block — a double asked for and a
+     set of six taken wrapped the wave back to the top and cost the athlete
+     their place. Whether a set answered the plan cannot be worked out later, so
+     the prescription rides along with the result. Free training carries none,
+     which is what tells the progression it was not an answer to anything.
+
+     A row seeded from the plan already carries its own. A set added through the
+     sheet does not, so it inherits the day's prescription for that lift when
+     there is one: opening the sheet and logging Bench on a day that asked for
+     Bench is still an answer to the plan. */
+  const prescriptionFor=(set:LoggedTopSet)=>{
+    if(set.prescribedReps)return{prescribedReps:set.prescribedReps,prescribedWeight:set.prescribedWeight};
+    const planned=topSets.find(row=>row.prescribedReps&&sameLift(row.lift,set.lift));
+    return planned?{prescribedReps:planned.prescribedReps,prescribedWeight:planned.prescribedWeight}:{};
+  };
+  const quickLogTopSet=(set:LoggedTopSet)=>{if(!set.lift||!set.weight||!set.reps)return;if(!dayLabel){setQuickLogMessage(noDayReason);return}interacted.current=true;const completed={...set,...prescriptionFor(set),completed:true,calculatedMax:calculateEstimatedOneRepMax(set.weight,set.reps)??undefined};const primary=liftPrimary(set.lift);/* A DAY IS NAMED AFTER THE SPLIT DAY IT IS, NOT THE FIRST LIFT ON IT. Saving
      one set created "Top set · Back Squat", so a history of real training days
      read as a list of lifts — and the day carried the lift's muscles alone,
      not the day's. When the session belongs to a split day, that day names it

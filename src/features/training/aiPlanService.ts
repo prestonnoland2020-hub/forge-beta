@@ -145,6 +145,20 @@ export const accessorySlot = (sessionIndex: number) => ({ reps: ACCESSORY_REPS[M
    athlete succeeds again, which clears the count. */
 export const FAILURES_BEFORE_BACKOFF = 3;
 
+/* WHEN A SET ANSWERS WHAT THE PLAN ASKED.
+
+   The tolerance runs one way. Asked for two and got three is the set — an extra
+   rep is not a different session, and there is no credit for it. Asked for two
+   and got ONE is not the set: that is coming up short, which is what the
+   three-miss back-off exists to answer. Asked for two and got eight is neither
+   — that is a different session, and it is off script.
+
+   This lives here, beside the wave, because it is a training rule and not a
+   detail of how progression is counted. Everything that asks "did they do it"
+   asks here. */
+export const REP_TOLERANCE = 1;
+export const answeredThePlan = (asked: number, did: number) => did >= asked && did <= asked + REP_TOLERANCE;
+
 /* WHAT AN EMPTY CALENDAR CELL SAYS. Two screens draw the same week and each
    wrote its own version of this line, so a change to one silently disagreed
    with the other. It consumes an already-derived stress/kind rather than
@@ -192,7 +206,7 @@ export const isRestDay = (day: { name?: string; type?: string; dayType?: string 
    same lift, the same week, forty-five pounds apart on two screens. Every
    surface builds it here now. */
 export function bestsFromHistory(
-  records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean }> }>,
+  records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean; prescribedReps?: number }> }>,
 ): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>>; lastAt: LiftAnchors } {
   const bests = new Map<string, number>();
   const singles = new Map<string, number>();
@@ -230,9 +244,16 @@ export function bestsFromHistory(
   ordered.forEach((record, order) => (record.topSets || []).forEach(set => {
     if (!set.lift || !set.weight || !set.reps) return;
     const key = canonicalLiftKey(set.lift);
-    const repSlot = Math.min(Math.max(Math.round(set.reps), 1), PRESCRIPTION_REP_CAP);
+    /* A MISS BELONGS TO THE REP COUNT THAT WAS ASKED FOR, not the one the
+       athlete managed. Asked for a double and got a single is a miss at the
+       DOUBLE, and the double is the load the back-off has to drop. A set with
+       no prescription behind it answers for itself, which is what this did
+       before prescriptions were recorded. */
+    const askedReps = set.prescribedReps || set.reps;
+    const repSlot = Math.min(Math.max(Math.round(askedReps), 1), PRESCRIPTION_REP_CAP);
     const settledKey = `${key}|${repSlot}`;
-    if (set.completed === false) {
+    const cameUpShort = Boolean(set.prescribedReps) && !answeredThePlan(set.prescribedReps!, set.reps) && set.reps < set.prescribedReps!;
+    if (set.completed === false || cameUpShort) {
       if (!settled.has(settledKey)) {
         const byReps = misses.get(key) || new Map<number, number>();
         byReps.set(repSlot, (byReps.get(repSlot) || 0) + 1);
@@ -642,8 +663,15 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
   /* weekIndex is the CALENDAR week; waveIndex is where that week sits in the
      8/6/4/2/1 wave and defaults to it. They differ when the block entered the
      wave mid-way — see StoredAiPlan.waveOffset. */
-  block: { weekIndex: number; blockWeeks: number; waveIndex?: number; currentWaveIndex?: number },
-  strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean; anchors?: LiftAnchors; sessions?: Map<string, number>; misses?: Map<string, Map<number, number>>; lastAt?: LiftAnchors },
+  block: { weekIndex: number; blockWeeks: number; waveIndex?: number; currentWaveIndex?: number; currentWeekIndex?: number },
+  /* `rungOf` is how far along its own progression a lift is — how many
+     prescriptions it has answered. Every lift has its own, because they are
+     trained at different rates and an off-script set on one must not move the
+     others. `exposuresPerWeek` is what turns that into a projection for a week
+     further out: a lift trained twice a week is two rungs along by next week.
+     Without them this falls back to the block's single wave index, which is
+     what every surface used before positions existed. */
+  strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean; anchors?: LiftAnchors; sessions?: Map<string, number>; misses?: Map<string, Map<number, number>>; lastAt?: LiftAnchors; rungOf?: (lift: string) => number | undefined; exposuresPerWeek?: (lift: string) => number },
   /* The days this week actually contains — a rolling cycle longer than 7 days
      shows only some of itself per week, and the running has to be measured
      over what is really there. Defaults to the whole split. */
@@ -771,7 +799,16 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
     const best = lookup(strength.bests, set.exercise);
     if (!best) return set;
     const tests = testsOneRepMax(set.exercise, strength.goalLifts);
-    const waveIndex = block.waveIndex ?? block.weekIndex;
+    /* THE RUNG IS THE LIFT'S, NOT THE BLOCK'S. One wave index for the whole
+       week meant Today and Plan could never agree — Today counted sessions per
+       lift, Plan counted calendar weeks — and a lift trained once a fortnight
+       was dragged along by the calendar. A week further out is a projection:
+       the lift's position plus the exposures it would collect getting there. */
+    const weeksAhead = Math.max(0, block.weekIndex - (block.currentWeekIndex ?? block.weekIndex));
+    const ownRung = strength.rungOf?.(set.exercise);
+    const waveIndex = ownRung === undefined
+      ? (block.waveIndex ?? block.weekIndex)
+      : ownRung + weeksAhead * Math.max(1, Math.round(strength.exposuresPerWeek?.(set.exercise) ?? 1));
     /* How many passes through the wave separate this week from the one the
        athlete is actually in. Zero for the current pass and everything behind
        it — those are drawn from evidence, not projected. */
