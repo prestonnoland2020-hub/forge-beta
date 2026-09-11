@@ -233,7 +233,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Shared builder. This was a fourth copy, and its bare Epley read a logged
        405x1 as a 419 max — inflating a true single by 3.3% and prescribing off
        the inflated number. */
-    const {bests:liveBests,singles:liveSingles,anchors:liveAnchors,sessions:liveSessions,misses:liveMisses}=bestsFromHistory(records);
+    const {bests:liveBests,singles:liveSingles,anchors:liveAnchors,sessions:liveSessions,misses:liveMisses,lastAt:liveLastAt}=bestsFromHistory(records);
     /* ONE ATTEMPT PER LIFT PER WEEK, THE SAME ONE THE PLAN TAB PICKS. A
        rolling split shorter than seven days hits the same day twice inside a
        week; the Plan tab demoted the second exposure to the heavy double and
@@ -254,7 +254,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       const key=set?canonicalLiftKey(set.exercise):'';
       const best=key?liveBests.get(key)||0:0;
       const setTests=set?testsOneRepMax(set.exercise,goalLifts):false;
-      const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key)}):null;
+      const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key)}):null;
       return{
         exercise:set?.exercise,
         reps:live?.reps,
@@ -286,7 +286,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
       /* A tested single the athlete is not taking today falls back to the
          double the lift already earned, rather than being offered twice. */
-      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key)});
+      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key)});
       const accessorySessions=liveSessions.get(key)||0;
       const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
@@ -297,7 +297,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
          over it was describing a program it is not running. */
       return{...prescription,source:'history' as const,rationale:tests
         ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`
-        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · from your best calc max ${live.best}. The load steps up every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session.`};
+        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${liveLastAt.get(key)?.get(prescription.reps)?`one step over the last ${prescription.reps}-rep set you completed`:`from your best calc max ${live.best}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`};
     };
     /* The day's plan prescription leads with the goal lift; every other set
        keeps its own exercise and simply joins the wave. */

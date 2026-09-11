@@ -10,7 +10,7 @@ import { calculateEstimatedOneRepMax } from './strength';
 export const TOP_SET_SEQUENCE = WAVE_REPS;
 export type TopSetStage = { reps: number; label: string; weight: number; calculatedMax: number; targetCalculatedMax: number; percentOfGoal: number; isTest: boolean; rationale: string };
 
-export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = false, readiness = 100, highFatigue = false, allowTest = false, bestSingle = 0, metric = false, anchors, accessory = false, sessions = 0, misses }: {
+export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = false, readiness = 100, highFatigue = false, allowTest = false, bestSingle = 0, metric = false, anchors, accessory = false, sessions = 0, misses, lastAt }: {
   /* `holding` is the caller saying the evidence does not support a step this
      time. It used to be a `progress` number that was typed, computed, passed —
      and never destructured, so it did nothing at all. The rationale said
@@ -32,13 +32,15 @@ export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = fal
   accessory?: boolean; sessions?: number;
   /* Failed attempts since the last success, per rep count. */
   misses?: Map<number, number>;
+  /* The last load actually completed at each rep count. */
+  lastAt?: Map<number, number>;
 }): TopSetStage {
   /* `allowTest` is now the ONLY gate, and its callers pass the goal-lift
      answer from `testsOneRepMax`. Readiness can reduce a load; it can never
      grant or withhold a max attempt, because the rule is about goals. */
   /* No step when the evidence has not moved: one session with this lift, or a
      latest result that did not hold up against the best of the window. */
-  const wave = wavePrescription(baselineMax, weekIndex, { metric, bestSingle, tests: allowTest, anchors, holding, accessory, sessions, misses });
+  const wave = wavePrescription(baselineMax, weekIndex, { metric, bestSingle, tests: allowTest, anchors, holding, accessory, sessions, misses, lastAt });
   const recovering = readiness < 65 || highFatigue;
   /* A recovery safeguard trims the load. It does not rewrite the rep target,
      and it never converts a max week into something else — the athlete simply
@@ -50,7 +52,7 @@ export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = fal
   /* The accessory cycle does not run on the wave's calendar, so the wave's
      max-week sentence must not be printed over it. */
   const rationale = accessory
-    ? `${wave.reps}-rep slot of the ${ACCESSORY_REPS.join('/')} accessory cycle, loaded backward from the calculated max. Session ${sessions + 1} on this lift; the load steps up every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session.${recovering ? ' Recovery safeguard trimmed the load.' : ''}`
+    ? `${wave.reps}-rep slot of the ${ACCESSORY_REPS.join('/')} accessory cycle, session ${sessions + 1} on this lift. ${lastAt?.get(wave.reps) ? 'One step over the last set you completed at these reps' : `Written from your calculated max, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.${recovering ? ' Recovery safeguard trimmed the load.' : ''}`
     : wave.isMax
     ? 'Max week: a tested single, because this lift carries a Real 1RM goal that only a logged single can move.'
     : slot.isMax

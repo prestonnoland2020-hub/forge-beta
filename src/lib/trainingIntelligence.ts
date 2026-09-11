@@ -52,7 +52,7 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
   /* Every lift's heaviest set at each rep count. The Plan tab has always
      written its loads from these; the logger did not, and the two screens
      disagreed by forty pounds on the same lift on the same morning. */
-  const {anchors:liftAnchors,singles:liftSingles,sessions:liftSessions,misses:liftMisses}=bestsFromHistory(records);
+  const {anchors:liftAnchors,singles:liftSingles,sessions:liftSessions,misses:liftMisses,lastAt:liftLastAt}=bestsFromHistory(records);
   const topSets=templates.map(template=>{
     const history=strengthResults(records).filter(record=>sameLift(record.lift,template.exercise)&&record.weight&&record.reps).sort((a,b)=>b.date.localeCompare(a.date)||(b.calculatedMax??epleyMax(b.weight,b.reps))-(a.calculatedMax??epleyMax(a.weight,a.reps)));
     const latest=history[0];
@@ -95,7 +95,7 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
        toward a single nothing is measuring. */
     const liftKey=canonicalLiftKey(template.exercise);
     const accessory=!goalMax;
-    const stage=prescribeTopSet({baselineMax,goalMax,weekIndex:completedProgrammedExposures,holding:!supportsProgress,readiness:recovery.confidence==='Low'?100:recovery.readiness,highFatigue:recovery.strengthFatigue==='High',anchors,allowTest:Boolean(goalMax),bestSingle:liftSingles.get(liftKey)||0,metric,accessory,sessions:liftSessions.get(liftKey)||0,misses:liftMisses.get(liftKey)});
+    const stage=prescribeTopSet({baselineMax,goalMax,weekIndex:completedProgrammedExposures,holding:!supportsProgress,readiness:recovery.confidence==='Low'?100:recovery.readiness,highFatigue:recovery.strengthFatigue==='High',anchors,allowTest:Boolean(goalMax),bestSingle:liftSingles.get(liftKey)||0,metric,accessory,sessions:liftSessions.get(liftKey)||0,misses:liftMisses.get(liftKey),lastAt:liftLastAt.get(liftKey)});
     const safeBias=Math.max(-10,Math.min(10,loadBiasPercent));const adjustedWeight=Math.max(0,Math.round(stage.weight*(1+safeBias/100)/5)*5);const adjustedMax=epleyMax(adjustedWeight,stage.reps);
     const source='history' as const;
     /* SAY WHAT ACTUALLY DECIDED THE LOAD. This named the athlete's highest

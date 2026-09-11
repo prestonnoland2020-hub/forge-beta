@@ -193,7 +193,7 @@ export const isRestDay = (day: { name?: string; type?: string; dayType?: string 
    surface builds it here now. */
 export function bestsFromHistory(
   records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean }> }>,
-): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>> } {
+): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>>; lastAt: LiftAnchors } {
   const bests = new Map<string, number>();
   const singles = new Map<string, number>();
   /* HOW MANY TIMES THIS LIFT HAS BEEN TRAINED, counted in days rather than in
@@ -206,6 +206,13 @@ export function bestsFromHistory(
      answered. */
   const misses = new Map<string, Map<number, number>>();
   const settled = new Set<string>();
+  /* THE LAST LOAD ACTUALLY COMPLETED AT EACH REP COUNT — the most recent one,
+     not the heaviest. This is what a rung falls back to after three misses:
+     "go back to the last successful 8" means the 8 the athlete really did, and
+     if their heaviest 8 was a one-off from months ago that is not where the
+     plan should restart them. */
+  const lastAt: LiftAnchors = new Map();
+  const lastOn = new Map<string, string>();
   /* THE HEAVIEST SET AT EACH REP COUNT, kept as itself. A single number per
      lift means every week of the wave is an extrapolation from one set —
      usually the athlete's best high-rep set, because that is what estimates
@@ -213,7 +220,14 @@ export function bestsFromHistory(
      gets. Held per rep count, the heavy weeks can be written from heavy
      evidence and the rep weeks from rep evidence. */
   const anchors: LiftAnchors = new Map();
-  records.forEach((record, order) => (record.topSets || []).forEach(set => {
+  /* NEWEST FIRST, WHATEVER THE CALLER HANDED OVER. The failure count is
+     "in a row", which only means anything walking backwards from today — a
+     caller passing an oldest-first list would have counted misses the athlete
+     has since answered. */
+  const ordered = [...records].every(record => record.date)
+    ? [...records].sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    : records;
+  ordered.forEach((record, order) => (record.topSets || []).forEach(set => {
     if (!set.lift || !set.weight || !set.reps) return;
     const key = canonicalLiftKey(set.lift);
     const repSlot = Math.min(Math.max(Math.round(set.reps), 1), PRESCRIPTION_REP_CAP);
@@ -228,6 +242,17 @@ export function bestsFromHistory(
     }
     settled.add(settledKey);
     const dayKey = record.date || `#${order}`;
+    /* Walking newest first, the first completed set at a rep count is the
+       latest one — later records only replace it if their date is genuinely
+       newer, which covers a caller that has not sorted. */
+    const stamp = record.date || '';
+    const seenOn = lastOn.get(settledKey);
+    if (seenOn === undefined || stamp > seenOn) {
+      lastOn.set(settledKey, stamp);
+      const byRepsLast = lastAt.get(key) || new Map<number, number>();
+      byRepsLast.set(repSlot, set.weight);
+      lastAt.set(key, byRepsLast);
+    }
     const days = sessionDays.get(key) || new Set<string>();
     days.add(dayKey);
     sessionDays.set(key, days);
@@ -241,7 +266,7 @@ export function bestsFromHistory(
     anchors.set(key, byReps);
   }));
   const sessions = new Map([...sessionDays].map(([key, days]) => [key, days.size] as const));
-  return { bests, singles, anchors, sessions, misses };
+  return { bests, singles, anchors, sessions, misses, lastAt };
 }
 
 /* Every lift's heaviest set at each rep count, 1-10. */
@@ -453,13 +478,16 @@ export type WaveOptions = {
   sessions?: number;
   /* Failed attempts since the last success, per rep count. */
   misses?: Map<number, number>;
+  /* The last load actually completed at each rep count — where a rung that has
+     been failed three times in a row goes back to. */
+  lastAt?: Map<number, number>;
 };
 
 /* THE ARGUMENT LIST WAS EIGHT POSITIONS LONG and three of them were booleans,
    so `(best, i, false, 0, true, anchors)` said nothing about what it meant and
    a call site that got the order wrong was silently a different program. */
 export function wavePrescription(best: number, weekIndex: number, options: WaveOptions = {}): { weight: number; reps: number; isMax: boolean } {
-  const { metric = false, bestSingle = 0, tests = false, anchors, projectSteps = 0, holding = false, accessory = false, sessions = 0, misses } = options;
+  const { metric = false, bestSingle = 0, tests = false, anchors, projectSteps = 0, holding = false, accessory = false, sessions = 0, misses, lastAt } = options;
   /* `holding` asks for exactly what the athlete has already done, with no step
      on top — for the caller that has decided the evidence does not support one
      yet. Without it, a lift with a single logged session was stepped up five
@@ -472,14 +500,38 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
   const stepFor = (count: number) => (holding || backedOff(count) ? 0 : plateStep);
   const step = holding ? 0 : plateStep;
   const bump = metric ? 3.75 : 7.5;
+  /* WHERE A BACKED-OFF RUNG LANDS: the last load the athlete actually
+     completed at that rep count, falling back to their heaviest there when the
+     history has no dated copy of it. */
+  const completedAt = (count: number) => {
+    const slot = Math.min(Math.max(Math.round(count), 1), PRESCRIPTION_REP_CAP);
+    return lastAt?.get(slot) || anchors?.get(Math.min(slot, REP_MAX_CAP)) || 0;
+  };
   if (accessory) {
     const { reps: accessoryReps } = accessorySlot(sessions);
+    /* EACH RUNG ANSWERS FOR ITSELF. Succeed at the 12 and the 10 and they keep
+       climbing with the working max; fail the 8 three times in a row and the 8
+       — and only the 8 — goes back to the load actually completed there. The
+       whole cycle used to move together, so one rung the athlete could not hold
+       either dragged every other rung down with it or kept being asked for. */
+    const held = backedOff(accessoryReps) ? completedAt(accessoryReps) : 0;
+    if (held) return { weight: Math.max(plateStep, Math.floor(held / plateStep) * plateStep), reps: accessoryReps, isMax: false };
     /* Compounding: every completed fifth session adds another plate step to
        the max the load is written from, and the next raise stacks on that. */
     const raises = holding ? 0 : Math.floor(Math.max(0, sessions) / ACCESSORY_SESSIONS_PER_RAISE);
-    const workingMax = Math.max(0, best) + raises * plateStep - (backedOff(accessoryReps) ? plateStep : 0);
-    const weight = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
-    return { weight, reps: accessoryReps, isMax: false };
+    const workingMax = Math.max(0, best) + raises * plateStep;
+    const fromMax = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
+    /* ONCE A RUNG HAS EVIDENCE, THE EVIDENCE WRITES IT. The calculated max
+       seeds a rung the athlete has never trained — that is where the plate per
+       five sessions lands. After that the rung asks one plate step over the
+       load actually completed there, which is the rule the rest of Forge lives
+       by and the only one that behaves at both ends: a rung held down by three
+       misses does not snap from the 100 x 8 he just took to the 125 x 8 the
+       drifting max wants, and a rung he keeps beating is not held under the
+       max's own conservative read of a twelve. */
+    const done = completedAt(accessoryReps);
+    const weight = done ? Math.floor(done / plateStep) * plateStep + plateStep : fromMax;
+    return { weight: Math.max(plateStep, weight), reps: accessoryReps, isMax: false };
   }
   const { reps, isMax } = waveSlot(weekIndex);
   /* "A rep higher than last PR by 5-10": a real logged single anchors the
@@ -490,9 +542,8 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
      athlete's other sets — a 225 x 10 pushes the implied double to 256 — so
      dropping the step alone left the bar where it was. After three misses the
      prescription is their own completed set at that rep count, full stop. */
-  const proven = (count: number) => anchors?.get(Math.min(Math.max(Math.round(count), 1), REP_MAX_CAP)) || 0;
   const loadFor = (count: number) => {
-    const held = backedOff(count) ? proven(count) : 0;
+    const held = backedOff(count) ? completedAt(count) : 0;
     if (held) return Math.max(plateStep, Math.floor(held / plateStep) * plateStep);
     return Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
   };
@@ -585,7 +636,7 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
      8/6/4/2/1 wave and defaults to it. They differ when the block entered the
      wave mid-way — see StoredAiPlan.waveOffset. */
   block: { weekIndex: number; blockWeeks: number; waveIndex?: number; currentWaveIndex?: number },
-  strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean; anchors?: LiftAnchors; sessions?: Map<string, number>; misses?: Map<string, Map<number, number>> },
+  strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean; anchors?: LiftAnchors; sessions?: Map<string, number>; misses?: Map<string, Map<number, number>>; lastAt?: LiftAnchors },
   /* The days this week actually contains — a rolling cycle longer than 7 days
      shows only some of itself per week, and the running has to be measured
      over what is really there. Defaults to the whole split. */
@@ -629,6 +680,7 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
     table?.get(name) ?? [...(table?.entries() || [])].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(name))?.[1];
   const anchorsFor = (name: string) => strength.anchors?.get(canonicalLiftKey(name));
   const missesFor = (name: string) => strength.misses?.get(canonicalLiftKey(name));
+  const lastAtFor = (name: string) => strength.lastAt?.get(canonicalLiftKey(name));
   const sessionsFor = (name: string) => strength.sessions?.get(canonicalLiftKey(name)) || 0;
   let adjusted = false;
   /* A DAY THAT TRAINS TWO GOAL LIFTS PRESCRIBES BOTH ON THE SAME DAY, and a
@@ -682,7 +734,7 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
        step per projected pass, since a projected week is drawn as though the
        sessions between here and there were completed. */
     const accessory = !tests;
-    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise) };
+    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise), lastAt: lastAtFor(set.exercise) };
     const live = wavePrescription(best, waveIndex, waveOptions);
     if (live.weight !== set.weight || live.reps !== set.reps) adjusted = true;
     /* On a max week a tested lift also carries the double it falls back to
