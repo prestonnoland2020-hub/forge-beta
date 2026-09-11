@@ -104,7 +104,7 @@ export function recommendationFingerprint(input:Omit<EngineInput,'recovery'|'pro
 
 export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:string}):DailyRecommendation{
   const completed=strengthResults(input.records);
-  const lastCompletedByLift=completed.reduce<Record<string,string>>((map,result)=>{if(!map[result.lift]||result.date>map[result.lift])map[result.lift]=result.date;return map},{});
+  const lastCompletedByLift=completed.reduce<Record<string,string>>((map,result)=>{const key=canonicalLiftKey(result.lift);if(!map[key]||result.date>map[key])map[key]=result.date;return map},{});
   const strengthLibrary=input.exercises.filter(exercise=>exercise.enabled&&exercise.kind==='Strength'&&!/HYROX|CrossFit/i.test(exercise.detail));
   const strengthGoals=input.goals.filter(goal=>goal.type==='Strength'&&goal.exercise);
   const goalByLift=new Map(strengthGoals.map(goal=>[normalized(goal.exercise||''),goal]));
@@ -119,7 +119,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
     if(aExplicit!==bExplicit)return aExplicit?-1:1;
     const aGoal=goalByLift.has(normalized(a.name));const bGoal=goalByLift.has(normalized(b.name));
     if(aGoal!==bGoal)return aGoal?-1:1;
-    const aLast=lastCompletedByLift[a.name]||'';const bLast=lastCompletedByLift[b.name]||'';
+    const aLast=lastCompletedByLift[canonicalLiftKey(a.name)]||'';const bLast=lastCompletedByLift[canonicalLiftKey(b.name)]||'';
     if(Boolean(aLast)!==Boolean(bLast))return aLast?1:-1;
     if(aLast!==bLast)return aLast.localeCompare(bLast);
     const aPrimary=/primary/i.test(a.detail);const bPrimary=/primary/i.test(b.detail);
@@ -163,7 +163,13 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
       used.add(normalized(candidate.name));coveredMuscles.add(muscle);
     });
   }
-  const templates=selectedExercises.map(({exercise})=>({exercise:exercise.name,calculatedMax:0,exposureIndex:new Set(completed.filter(result=>result.lift===exercise.name).map(result=>result.date)).size}));
+  /* EXPOSURES ARE COUNTED ON THE CANONICAL NAME, like every other lookup in
+     this file. A raw === meant a library "Back Squat" never matched a history
+     logged as "Squat" — the exact case the alias table exists for — so the
+     count came back 0 on every render and the athlete repeated the 8-rep week
+     forever, never reaching a 4, a 2 or a max week. It is always a number, so
+     the alias-aware fallback downstream never rescued it either. */
+  const templates=selectedExercises.map(({exercise})=>({exercise:exercise.name,calculatedMax:0,exposureIndex:new Set(completed.filter(result=>canonicalLiftKey(result.lift)===canonicalLiftKey(exercise.name)).map(result=>result.date)).size}));
   const intelligence=buildTrainingIntelligence({records:input.records,recovery:input.recovery,templates,goalMaxByLift,today:new Date(`${input.date}T12:00:00`),loadBiasPercent:input.loadBiasPercent});
   /* A cardio-only split day prescribes no strength: no top set appears on
      Today or in the workout log for that day. */

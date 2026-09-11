@@ -116,7 +116,12 @@ export function TrainingLibraryProvider({children}:{children:ReactNode}){
   const addWorkout=(workout:Omit<LibraryWorkout,'id'>)=>{const next={...workout,id:Date.now()};setState(value=>({...value,workouts:[...value.workouts,next]}));return next};
   const updateWorkout=(id:number,change:Partial<LibraryWorkout>)=>setState(value=>({...value,workouts:value.workouts.map(item=>item.id===id?{...item,...change}:item)}));
   const removeWorkout=(id:number)=>setState(value=>({...value,workouts:value.workouts.filter(item=>item.id!==id)}));
-  const toggleExercise=(id:number)=>setState(value=>({...value,exercises:value.exercises.map(item=>item.id===id?{...item,enabled:!item.enabled}:item)}));
+  /* ON/OFF IS A REAL EDIT, and it has to reach the account. It only ever
+     changed local state, while the signed-in load re-imports `enabled` from the
+     row on every open — so an exercise switched off came back on at the next
+     launch. A starter exercise has no row yet, so this upserts rather than
+     updates. */
+  const toggleExercise=(id:number)=>{const target=state.exercises.find(item=>item.id===id);if(!target)return;const enabled=!target.enabled;setState(value=>({...value,exercises:value.exercises.map(item=>item.id===id?{...item,enabled}:item)}));if(!isDemoMode&&user)void supabase.from('exercise_library').upsert({owner_id:user.id,name:target.name,kind:target.kind,muscle_groups:target.muscles,detail:target.detail,enabled,default_target:target.defaultTarget||null,default_unit:target.defaultUnit||null},{onConflict:'owner_id,name'}).then(({error})=>{if(error)console.warn('Exercise toggle sync failed',error.message)})};
   return <Context.Provider value={{...state,addExercise,updateExercise,removeExercise,addWorkout,updateWorkout,removeWorkout,toggleExercise}}>{children}</Context.Provider>;
 }
 export function useTrainingLibrary(){const value=useContext(Context);if(!value)throw new Error('Training library provider missing');return value}

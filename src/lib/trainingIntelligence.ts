@@ -35,7 +35,7 @@ const parseDay=(date:string)=>new Date(`${date}T12:00:00`).getTime();
 const uniqueDates=(records:WorkoutRecord[])=>[...new Set(records.map(record=>record.date))];
 const strengthResults=(records:WorkoutRecord[])=>records.flatMap(record=>record.topSets?.length?record.topSets.filter(set=>set.completed!==false).map(set=>({date:record.date,lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax})):(record.lift&&record.weight&&record.reps?[{date:record.date,lift:record.lift,weight:record.weight,reps:record.reps,calculatedMax:record.calculatedMax}]:[]));
 
-export function buildTrainingIntelligence({records,recovery,templates,goalMaxByLift={},today=new Date(),loadBiasPercent=0}:{records:WorkoutRecord[];recovery:RecoveryState;templates:LiftTemplate[];goalMaxByLift?:Record<string,number|undefined>;today?:Date;loadBiasPercent?:number}):TrainingIntelligence{
+export function buildTrainingIntelligence({records,recovery,templates,goalMaxByLift={},today=new Date(),loadBiasPercent=0,metric=false}:{records:WorkoutRecord[];recovery:RecoveryState;templates:LiftTemplate[];goalMaxByLift?:Record<string,number|undefined>;today?:Date;loadBiasPercent?:number;metric?:boolean}):TrainingIntelligence{
   const todayStart=new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime();
   const ages=uniqueDates(records).map(date=>Math.floor((todayStart-parseDay(date))/dayMs)).filter(age=>age>=0);
   const activeDays7=ages.filter(age=>age<7).length;
@@ -52,7 +52,7 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
   /* Every lift's heaviest set at each rep count. The Plan tab has always
      written its loads from these; the logger did not, and the two screens
      disagreed by forty pounds on the same lift on the same morning. */
-  const {anchors:liftAnchors}=bestsFromHistory(records);
+  const {anchors:liftAnchors,singles:liftSingles,sessions:liftSessions,misses:liftMisses}=bestsFromHistory(records);
   const topSets=templates.map(template=>{
     const history=strengthResults(records).filter(record=>sameLift(record.lift,template.exercise)&&record.weight&&record.reps).sort((a,b)=>b.date.localeCompare(a.date)||(b.calculatedMax??epleyMax(b.weight,b.reps))-(a.calculatedMax??epleyMax(a.weight,a.reps)));
     const latest=history[0];
@@ -63,13 +63,39 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
     const strongestRecent=comparablePool.reduce((winner,result)=>(result.calculatedMax??epleyMax(result.weight!,result.reps!))>(winner.calculatedMax??epleyMax(winner.weight!,winner.reps!))?result:winner);
     const baselineMax=strongestRecent.calculatedMax??epleyMax(strongestRecent.weight!,strongestRecent.reps!);
     const latestMax=latest.calculatedMax??epleyMax(latest.weight!,latest.reps!);
-    const supportsProgress=comparablePool.length>=2&&latestMax>=baselineMax*.98;
-    const destination=goalMaxByLift[canonicalLiftKey(template.exercise)]&&goalMaxByLift[canonicalLiftKey(template.exercise)]!>baselineMax?goalMaxByLift[canonicalLiftKey(template.exercise)]!:baselineMax*1.04;
-    const evidenceStep=supportsProgress?baselineMax*.006:0;
-    const evidenceProgress=Math.max(0,Math.min(1,(destination-baselineMax)>0?evidenceStep/(destination-baselineMax):0));
+    /* WHAT "HOLDING" IS ACTUALLY FOR. This asked whether the latest session's
+       ESTIMATED max held up against the best estimate in the window — and the
+       best estimate in a window containing one high-rep set is that set. Adam
+       squats 260 x 2, beating his own best double by five pounds, and was told
+       Forge is "holding the demonstrated level" because a 225 x 10 from three
+       weeks ago estimates 300. He also got it for backing off to a lighter
+       double, which takes nothing away from the double he had already done.
+
+       The comparison was never needed. The load is already written as one step
+       over the athlete's own best set AT THIS REP COUNT, so a bad session
+       cannot inflate it — the best simply does not move. The only case that
+       needs holding is the one with no evidence to step off yet: a lift with a
+       single logged session. Failure is handled where it belongs, by the
+       three-miss back-off, not by second-guessing every set. */
+    const supportsProgress=comparablePool.length>=2;
     const completedProgrammedExposures=template.exposureIndex??Math.max(0,history.length-1);
     const anchors=liftAnchors.get(canonicalLiftKey(template.exercise));
-    const stage=prescribeTopSet({baselineMax,goalMax:goalMaxByLift[canonicalLiftKey(template.exercise)],weekIndex:completedProgrammedExposures,progress:evidenceProgress,readiness:recovery.confidence==='Low'?100:recovery.readiness,highFatigue:recovery.strengthFatigue==='High',anchors});
+    /* A LIFT WITH A REAL 1RM GOAL GETS ITS MAX WEEK HERE TOO.
+
+       allowTest was never passed, so it defaulted false and max week emitted
+       "no Real 1RM goal on this lift — it holds the heavy double instead of
+       spending a testing session it does not owe" to an athlete who had just
+       set that exact goal. The Plan tab, which does pass it, showed a tested
+       single for the same lift in the same week. bestSingle and metric were
+       missing with it: the attempt was written off an estimate rather than
+       their own logged single, and metric athletes got pound-sized steps. */
+    const goalMax=goalMaxByLift[canonicalLiftKey(template.exercise)];
+    /* NO GOAL ON THIS LIFT MEANS IT IS AN ACCESSORY, and an accessory runs its
+       own 12/10/8/6 cycle off the calculated max rather than climbing the wave
+       toward a single nothing is measuring. */
+    const liftKey=canonicalLiftKey(template.exercise);
+    const accessory=!goalMax;
+    const stage=prescribeTopSet({baselineMax,goalMax,weekIndex:completedProgrammedExposures,holding:!supportsProgress,readiness:recovery.confidence==='Low'?100:recovery.readiness,highFatigue:recovery.strengthFatigue==='High',anchors,allowTest:Boolean(goalMax),bestSingle:liftSingles.get(liftKey)||0,metric,accessory,sessions:liftSessions.get(liftKey)||0,misses:liftMisses.get(liftKey)});
     const safeBias=Math.max(-10,Math.min(10,loadBiasPercent));const adjustedWeight=Math.max(0,Math.round(stage.weight*(1+safeBias/100)/5)*5);const adjustedMax=epleyMax(adjustedWeight,stage.reps);
     const source='history' as const;
     /* SAY WHAT ACTUALLY DECIDED THE LOAD. This named the athlete's highest

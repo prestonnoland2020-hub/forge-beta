@@ -9,7 +9,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf} from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE} from './aiPlanService';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
@@ -203,7 +203,16 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* THE GOAL LIFT OWNS ITS DAY — same repair the Plan page applies, so
        Today never prescribes a machine variation on a day that maps the
        athlete's actual goal lift. */
-    const dayOwner=(generatedBase.splitDay.exercises||[]).find(name=>goalLiftNames(goals).has(canonicalLiftKey(name)));
+    /* WITH TWO GOAL LIFTS ON ONE DAY, whichever sat first in the split's
+       exercise list owned the day forever — so a race-week goal could never
+       take priority over an old one. The nearest deadline owns it, and a day
+       already prescribing one of the athlete's goal lifts is left alone. */
+    const goalNames=goalLiftNames(goals);
+    const goalDueByLift=new Map(goals.filter(goal=>goal.exercise).map(goal=>[canonicalLiftKey(String(goal.exercise)),goal.date?new Date(`${goal.date}T12:00:00`).getTime():Number.MAX_SAFE_INTEGER] as const));
+    const dayGoalLifts=(generatedBase.splitDay.exercises||[]).filter(name=>goalNames.has(canonicalLiftKey(name)));
+    const dayOwner=dayGoalLifts.some(name=>canonicalLiftKey(name)===canonicalLiftKey(rawMatch.exercise))
+      ?rawMatch.exercise
+      :[...dayGoalLifts].sort((a,b)=>(goalDueByLift.get(canonicalLiftKey(a))??Number.MAX_SAFE_INTEGER)-(goalDueByLift.get(canonicalLiftKey(b))??Number.MAX_SAFE_INTEGER)||a.localeCompare(b))[0];
     const match=dayOwner&&canonicalLiftKey(dayOwner)!==canonicalLiftKey(rawMatch.exercise)?{...rawMatch,exercise:dayOwner}:rawMatch;
     /* EVERY recommended top set runs the same 8/6/4/2/1 wave — not just the
        day's goal lift. An accessory used to come from a separate progression,
@@ -224,26 +233,49 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Shared builder. This was a fourth copy, and its bare Epley read a logged
        405x1 as a 419 max — inflating a true single by 3.3% and prescribing off
        the inflated number. */
-    const {bests:liveBests,singles:liveSingles,anchors:liveAnchors}=bestsFromHistory(records);
+    const {bests:liveBests,singles:liveSingles,anchors:liveAnchors,sessions:liveSessions,misses:liveMisses}=bestsFromHistory(records);
     /* ONE ATTEMPT PER LIFT PER WEEK, THE SAME ONE THE PLAN TAB PICKS. A
        rolling split shorter than seven days hits the same day twice inside a
        week; the Plan tab demoted the second exposure to the heavy double and
        Today did not, so the athlete was told to attempt a true single on both.
        `windowDays[0]` is today — the same window the running math uses — so
        both screens choose the same day. */
+    /* THE SAME COSTS THE PLAN TAB USES, NOT SIMILAR ONES. A rolling split can
+       land the same day name twice inside one window; the Plan tab charges the
+       long run and the quality session to the FIRST occurrence only, and this
+       charged every occurrence. Two different costs pick two different days
+       and the two screens disagree about where the attempt is. */
+    const longIndex=windowDays.findIndex(day=>day.name===week.longRunDay);
+    const qualityIndex=windowDays.findIndex(day=>day.name===week.qualityDay);
+    const easyNames=new Set(week.easyDays||[]);
+    const easySet=new Set(windowDays.map((day,index)=>easyNames.has(day.name)?index:-1).filter(index=>index>=0));
     const attemptDays=chooseMaxAttemptDays(windowDays.map((day,index)=>{
       const set=(week.topSets||[]).find(entry=>entry.splitDay===day.name);
       const key=set?canonicalLiftKey(set.exercise):'';
       const best=key?liveBests.get(key)||0:0;
-      const live=best?wavePrescription(best,waveIdx,metric,liveSingles.get(key)||0,testsOneRepMax(set!.exercise,goalLifts),liveAnchors.get(key)):null;
+      const setTests=set?testsOneRepMax(set.exercise,goalLifts):false;
+      const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key)}):null;
       return{
         exercise:set?.exercise,
         reps:live?.reps,
         hasHold:Boolean(live?.isMax),
-        cost:(day.name===week.longRunDay?2:0)+(day.name===week.qualityDay?3:0)+((week.easyDays||[]).includes(day.name)?1:0)+index*0.01,
+        cost:(index===longIndex?2:0)+(index===qualityIndex?3:0)+(easySet.has(index)?1:0),
       };
     }));
-    const todayHoldsTheAttempt=attemptDays.has(0);
+    /* WHICH SLOT OF THE WINDOW TODAY ACTUALLY IS.
+
+       This asked attemptDays.has(0). windowDays starts at the PLAN WEEK'S
+       start date, not at today — the comment above it said otherwise and was
+       wrong — so index 0 is today only on the one day a week the block began.
+       On the other six the answer was about a different day entirely: Today
+       handed out a 1RM attempt the Plan tab showed as a double, or printed
+       "the attempt is scheduled on another day this week" over the day the
+       Plan tab had chosen. */
+    const weekStart=new Date(`${storedPlan.startDate}T12:00:00`);
+    weekStart.setDate(weekStart.getDate()+currentWeekIndex(storedPlan)*7);
+    const noon=new Date();noon.setHours(12,0,0,0);
+    const todayIndex=Math.max(0,Math.min(6,Math.round((noon.getTime()-weekStart.getTime())/86400000)));
+    const todayHoldsTheAttempt=attemptDays.has(todayIndex);
     const isMaxWeek=waveSlot(waveIdx).isMax;
     const waveFor=(exercise:string,fallback:{weight:number;reps:number})=>{
       const key=canonicalLiftKey(exercise);
@@ -254,12 +286,18 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
       /* A tested single the athlete is not taking today falls back to the
          double the lift already earned, rather than being offered twice. */
-      const prescription=wavePrescription(live.best,waveIdx,metric,live.single,tests&&todayHoldsTheAttempt,liveAnchors.get(key));
-      const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':isMaxWeek?(tests?'MAX WEEK — the attempt is scheduled on another day this week':'MAX WEEK — heavy double, no goal on this lift'):`${prescription.reps}-rep week`;
+      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key)});
+      const accessorySessions=liveSessions.get(key)||0;
+      const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
          weight when the set says so, and an unwaved 'baseline' flag was
          hiding real prescriptions behind "Log a baseline set". */
-      return{...prescription,source:'history' as const,rationale:`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`};
+      /* A lift with no goal on it is not on the wave's calendar at all — its
+         cycle advances with its own sessions, so saying "week 4 of the wave"
+         over it was describing a program it is not running. */
+      return{...prescription,source:'history' as const,rationale:tests
+        ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`
+        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · from your best calc max ${live.best}. The load steps up every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session.`};
     };
     /* The day's plan prescription leads with the goal lift; every other set
        keeps its own exercise and simply joins the wave. */

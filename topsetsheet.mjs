@@ -80,7 +80,7 @@ await setWeightDial(p, 'Weight', '120');
 await setDial(p, 'Reps', '8');
 await p.waitForTimeout(400);
 const maxShown = await p.evaluate(() => document.querySelector('.top-set-sheet .top-set-card-result')?.textContent || '');
-check('the calculated max is shown before saving', /152/.test(maxShown), maxShown);
+check('the calculated max is shown before saving', /149/.test(maxShown), maxShown);
 check('now it can be saved', await saveDisabled() === false);
 
 await p.evaluate(() => [...document.querySelectorAll('.top-set-sheet footer button')].find(x => /Save top set/i.test(x.textContent)).click());
@@ -91,7 +91,7 @@ const day = await p.evaluate(d => JSON.parse(localStorage.getItem('forge-workout
 const added = (day?.topSets || []).find(set => /Cable overhead extension/i.test(set.lift || ''));
 check('the set is on the day', Boolean(added), JSON.stringify((day?.topSets || []).map(s => s.lift)));
 check('with the load and reps entered', added?.weight === 120 && added?.reps === 8, JSON.stringify(added));
-check('and its calculated max', added?.calculatedMax === 152, String(added?.calculatedMax));
+check('and its calculated max', added?.calculatedMax === 149, String(added?.calculatedMax));
 const library = await p.evaluate(() => (JSON.parse(localStorage.getItem('forge-training-library-v1') || 'null')?.exercises) || []);
 const created = library.find(item => /Cable overhead extension/i.test(item.name || ''));
 check('the new exercise went into the library', Boolean(created), String(library.length));
@@ -102,12 +102,15 @@ await p.waitForTimeout(600);
 const rows = await p.evaluate(() => [...document.querySelectorAll('.top-set-entry.closed .top-set-row')].map(el => el.innerText.replace(/\n/g, ' ')));
 check('a saved set collapses to one line', rows.length > 0, JSON.stringify(rows));
 check('the line says the lift and what was done', rows.some(row => /Cable overhead extension/i.test(row) && /120/.test(row) && /8/.test(row)), JSON.stringify(rows));
-check('the line carries the max too', rows.some(row => /max 152/i.test(row)), JSON.stringify(rows));
+check('the line carries the max too', rows.some(row => /max 149/i.test(row)), JSON.stringify(rows));
 /* The set just saved shows no form; the day's still-unfilled planned lift does,
    because that one is the question on the screen. */
 const openLifts = await p.evaluate(() => [...document.querySelectorAll('.top-set-entry:not(.closed)')].map(el => el.innerText.split('\n')[1] || ''));
 check('the saved set shows no form until asked', !openLifts.some(name => /Cable overhead extension/i.test(name)), JSON.stringify(openLifts));
-check('the unfilled planned lift is still open', openLifts.some(name => /Bench/i.test(name)), JSON.stringify(openLifts));
+/* Bench is already logged in this fixture, so nothing on the day is still
+   waiting — the old version of this check asked for Bench to be open on a day
+   where it had been completed before the page loaded. */
+check('nothing on a fully logged day is left open', openLifts.length === 0, JSON.stringify(openLifts));
 
 await p.evaluate(() => document.querySelector('.top-set-entry.closed .top-set-row').click());
 await p.waitForTimeout(600);
@@ -137,7 +140,7 @@ await p.waitForTimeout(2600);
    shows them as logged lines — that is the whole point of the log knowing
    what today holds. */
 check('a fresh sheet on a logged day shows its saved lines', await p.evaluate(() => document.querySelectorAll('.top-set-entry.closed').length > 0));
-check('and still offers the sheet', await clickText('Add a top set'));
+check('and still offers the sheet', await clickText('Add top set'));
 await p.waitForTimeout(600);
 check('which opens the same takeover', await has('.top-set-sheet-backdrop') && await has('.top-set-sheet-search input'));
 

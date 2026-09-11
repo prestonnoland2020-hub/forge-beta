@@ -36,12 +36,22 @@ check('it asks for one step over his best double, not forty pounds over it',
 check('and it names the set that decided it', /Your best set of 2 is 255 lb/.test(set.rationale), set.rationale.slice(0, 90));
 check('not the ten-rep set', !/225 lb ×10/.test(set.rationale));
 
-console.log('\n  max week without a goal holds the double, at the same load');
+/* He HAS a 315 squat goal, so max week is the tested single the goal exists
+   for — the earlier version of this block asserted the no-goal behaviour over
+   a fixture that carries one. The no-goal case is its own test below. */
+console.log('\n  max week on his goal lift is the tested single');
 const maxWeek = logger(4);
-check('still 260 x 2', maxWeek.weight === 260 && maxWeek.reps === 2, `${maxWeek.weight} x ${maxWeek.reps}`);
+check('a single, above the double it replaces', maxWeek.reps === 1 && maxWeek.weight > 260, `${maxWeek.weight} x ${maxWeek.reps}`);
+
+console.log('\n  and a lift he has no goal on is not marched up to a max at all');
+const accessory = buildTrainingIntelligence({ records: ADAM, recovery,
+  templates: [{ exercise: 'Squat', calculatedMax: 0, exposureIndex: 4 }],
+  goalMaxByLift: {}, loadBiasPercent: 0 }).topSets[0];
+check('it takes a rep slot from the 12/10/8/6 cycle', [12, 10, 8, 6].includes(accessory.reps), `${accessory.weight} x ${accessory.reps}`);
+check('and never a tested single', accessory.reps !== 1);
 
 console.log('\n  and the two screens agree');
-const plan = wavePrescription(bests.get('squat'), 3, false, 0, false, anchors.get('squat'));
+const plan = wavePrescription(bests.get('squat'), 3, { anchors: anchors.get('squat') });
 check('the Plan tab writes the same bar as the logger',
   plan.weight === set.weight && plan.reps === set.reps, `plan ${plan.weight} x ${plan.reps} vs logger ${set.weight} x ${set.reps}`);
 

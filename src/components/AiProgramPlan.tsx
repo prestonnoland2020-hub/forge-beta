@@ -19,6 +19,7 @@ import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
   bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
+  calendarEmptyState,
 } from '../features/training/aiPlanService';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -427,7 +428,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     title: session.title,
     lifts: session.lifts,
     run: session.run,
-    empty: session.stress === 'Rest' ? 'rest' : session.kind === 'Flexible' ? 'open' : undefined,
+    empty: calendarEmptyState(session),
   });
   const weekSessions = sessions.map(toPlanSession);
   const todaySession = weekSessions.find(session => localDayIso(session.date) === todayIso);

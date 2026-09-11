@@ -47,8 +47,31 @@ export function WorkoutHistoryProvider({children}:{children:ReactNode}){
   const pendingIds=useRef<Set<string>>(new Set(readPending()));
   const markPending=(id:string,pending:boolean)=>{if(pending)pendingIds.current.add(id);else pendingIds.current.delete(id);writePending([...pendingIds.current]);if(!pendingIds.current.size)setSyncing(false)};
   const persist=(record:WorkoutRecord)=>{if(isDemoMode||!user)return;markPending(record.id,true);setSyncing(true);setSyncError(null);const operation=syncQueue.current.catch(()=>undefined).then(()=>saveWorkoutDay(record)).then(()=>{markPending(record.id,false);setSyncError(null);window.dispatchEvent(new Event('forge-training-cycle-changed'))});syncQueue.current=operation.then(()=>undefined,()=>undefined);void operation.catch(error=>{setSyncError(error instanceof Error?error.message:'Could not sync this training day.');setSyncing(false)})};
-  /* Loading merges the outbox over the server's list, then sends it again. */
-  const load=async()=>{const remote=await loadWorkoutHistory();const unsent=recordsRef.current.filter(item=>pendingIds.current.has(item.id));const byDate=new Map(remote.map(item=>[item.date,item] as const));unsent.forEach(item=>{const existing=byDate.get(item.date);byDate.set(item.date,existing?mergeDay(existing,item):item)});const merged=[...byDate.values()].sort((a,b)=>b.date.localeCompare(a.date));pendingIds.current=new Set(unsent.map(item=>byDate.get(item.date)?.id||item.id));writePending([...pendingIds.current]);commit(merged);setSyncError(null);merged.filter(item=>pendingIds.current.has(item.id)).forEach(persist)};
+  /* WHAT WAS LOGGED WHILE THE FIRST LOAD WAS STILL IN FLIGHT.
+
+     Loading merged the server's list with the outbox and then replaced local
+     state wholesale — so a day saved SUCCESSFULLY during the load was in
+     neither list and vanished. Preston has 1409 days; that fetch is two pages
+     and several seconds, and nothing stops the athlete logging a set in the
+     middle of it. Worse than losing it from the screen: the next set on that
+     date found no day locally, rebuilt it from one set, and
+     save_my_training_day deletes and re-inserts a day's sets — so the first
+     set went from the server too.
+
+     Every local day written after the fetch was issued is merged back in,
+     pending or not. */
+  const load=async()=>{
+    const before=new Set(recordsRef.current.map(item=>item.id));
+    const remote=await loadWorkoutHistory();
+    const keep=recordsRef.current.filter(item=>pendingIds.current.has(item.id)||!before.has(item.id));
+    const byDate=new Map(remote.map(item=>[item.date,item] as const));
+    keep.forEach(item=>{const existing=byDate.get(item.date);byDate.set(item.date,existing?mergeDay(existing,item):item)});
+    const merged=[...byDate.values()].sort((a,b)=>b.date.localeCompare(a.date));
+    pendingIds.current=new Set(keep.filter(item=>pendingIds.current.has(item.id)).map(item=>byDate.get(item.date)?.id||item.id));
+    writePending([...pendingIds.current]);
+    commit(merged);setSyncError(null);
+    merged.filter(item=>pendingIds.current.has(item.id)).forEach(persist);
+  };
   useEffect(()=>{if(isDemoMode||!user){setLoading(false);return}let active=true;setLoading(true);void load().catch(error=>{if(active)setSyncError(error instanceof Error?error.message:'Could not load workout history.')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user]); // eslint-disable-line react-hooks/exhaustive-deps
   const value=useMemo<HistoryValue>(()=>({records,loading,syncing,syncError,retrySync:()=>{const unsent=recordsRef.current.filter(item=>pendingIds.current.has(item.id));if(unsent.length)unsent.forEach(persist);else if(!isDemoMode&&user){setLoading(true);void load().catch(error=>setSyncError(error instanceof Error?error.message:'Could not load workout history.')).finally(()=>setLoading(false))}},addRecord:(draft)=>{
     const current=recordsRef.current;const normalized=normalizeRecord(draft);const sameDay=current.find(item=>item.date===draft.date);const incomingSets=normalizedTopSets(normalized);const duplicate=sameDay&&incomingSets.length>0&&incomingSets.every(set=>normalizedTopSets(sameDay).some(saved=>setSignature(saved)===setSignature(set)))&&!draft.cardioSessions?.length?sameDay:undefined;
@@ -62,9 +85,21 @@ export function WorkoutHistoryProvider({children}:{children:ReactNode}){
   },deleteRecord:async(id)=>{const current=recordsRef.current;const target=current.find(item=>item.id===id);if(!target)return false;try{
     /* A day logged this session still carries its client id; the server
        knows it by the uuid it minted on save. Delete by the date, which is
-       the day's real identity on both sides. */
-    if(!isDemoMode&&user)await deleteWorkoutDay(isUuid(id)?id:await findWorkoutDayId(target.date));
-    markPending(id,false);const next=current.filter(item=>item.id!==id);commit(next);setSyncError(null);window.dispatchEvent(new Event('forge-training-cycle-changed'));return true}catch(error){setSyncError(error instanceof Error?error.message:'Could not delete this training day.');return false}
+       the day's real identity on both sides.
+
+       THE DELETE JOINS THE SAME QUEUE THE SAVES ARE IN. It used to run
+       straight away while a save for that very day was still queued behind a
+       bad signal — the delete landed, the queued save then re-inserted the day
+       and its sets, and the workout the athlete had deliberately removed was
+       back on the next launch with nothing to explain it. */
+    if(!isDemoMode&&user){
+      markPending(id,false);
+      const removal=syncQueue.current.catch(()=>undefined)
+        .then(async()=>deleteWorkoutDay(isUuid(id)?id:await findWorkoutDayId(target.date)));
+      syncQueue.current=removal.then(()=>undefined,()=>undefined);
+      await removal;
+    }
+    const next=current.filter(item=>item.id!==id);commit(next);setSyncError(null);window.dispatchEvent(new Event('forge-training-cycle-changed'));return true}catch(error){setSyncError(error instanceof Error?error.message:'Could not delete this training day.');return false}
   }}),[records,loading,syncing,syncError,user]); // eslint-disable-line react-hooks/exhaustive-deps
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>;
 }

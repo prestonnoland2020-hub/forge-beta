@@ -23,7 +23,7 @@ const fresh = async () => {
   return p;
 };
 
-/* 1. Setup announces three steps and names the goal step. */
+/* 1. Setup announces four steps and names the goal step. */
 const p = await fresh();
 let body = await text(p);
 if (/I understand and accept this/i.test(body)) {
@@ -33,7 +33,7 @@ if (/I understand and accept this/i.test(body)) {
   await p.waitForTimeout(700);
   body = await text(p);
 }
-check('setup is three steps, not two', /SETUP 1 OF 3/.test(body), body.slice(0, 90));
+check('setup is four steps, and the last one maps the days', /SETUP 1 OF 4/.test(body), body.slice(0, 90));
 check('the third step is named for the goal', /Your first goal/i.test(body));
 
 /* 2. Walk to the goal step. */
@@ -54,15 +54,17 @@ await p.waitForTimeout(300);
 await clickText(p, /continue/);
 await p.waitForTimeout(800);
 body = await text(p);
-check('the goal step is reached', /SETUP 3 OF 3/.test(body), body.slice(0, 80));
+check('the goal step is reached', /SETUP 3 OF 4/.test(body), body.slice(0, 80));
 check('the goal step explains why a goal is required', /One goal is all Forge needs/i.test(body));
 
 /* 4. THE GATE: finishing with no goal is refused, and the app is not entered. */
-await clickText(p, /enter forge|save profile/);
+/* The goal step is step 3 of 4, so the button that tries to leave it is
+   Continue — the finish button lives on the day-mapping step after it. */
+await clickText(p, /^continue/i);
 await p.waitForTimeout(1200);
 const url = p.url();
 body = await text(p);
-check('finishing without a goal is refused', /Add one goal to finish/i.test(body), body.slice(0, 120));
+check('finishing without a goal is refused', /Add one goal to continue/i.test(body), body.slice(0, 120));
 check('the athlete is still in setup', /#\/onboarding/.test(url), url);
 const committed = await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('forge-athlete-setup')).map(k => { try { return JSON.parse(localStorage.getItem(k)).completedAt || ''; } catch { return ''; } }));
 check('setup was never marked complete', committed.every(stamp => !stamp), JSON.stringify(committed));
@@ -91,7 +93,7 @@ await returning.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded'
 await returning.waitForTimeout(2200);
 check('a goal-less athlete is routed into the goal step', /#\/onboarding/.test(returning.url()), returning.url());
 const returningBody = await text(returning);
-check('they land on the goal step, not back at step one', /SETUP 3 OF 3|Your first goal/i.test(returningBody), returningBody.slice(0, 100));
+check('they land on the goal step, not back at step one', /SETUP 3 OF 4|Your first goal/i.test(returningBody), returningBody.slice(0, 100));
 
 /* 7. An athlete WITH a goal is never bounced. */
 const settled = await b.newPage({ viewport: { width: 1280, height: 950 } });
@@ -99,7 +101,14 @@ await settled.addInitScript(() => {
   localStorage.clear();
   localStorage.setItem('forge-athlete-setup-v1:preview-user', JSON.stringify({
     displayName: 'Settled', username: 'settled', units: 'Imperial', primaryFocus: 'Hybrid',
-    trainingDays: 4, runningDays: 2, weeklyMileage: 12, longestRun: 4, splitDays: [],
+    trainingDays: 4, runningDays: 2, weeklyMileage: 12, longestRun: 4,
+    /* A MAPPED split. An empty list is normalised to the starter split, whose
+       lifting days name no movements — and an athlete whose lifting days train
+       nothing is exactly who the day-mapping gate is for, so the old fixture
+       was asking to be bounced. */
+    splitDays: [{ name: 'Upper Strength', type: 'Strength', muscles: ['Chest'], exercises: ['Bench Press'] },
+      { name: 'Lower Strength', type: 'Strength', muscles: ['Quads'], exercises: ['Squat'] },
+      { name: 'Conditioning', type: 'Cardio', muscles: [] }, { name: 'Recovery', type: 'Rest', muscles: [] }],
     acceptedSafety: true, completedAt: '2026-01-01T00:00:00.000Z',
   }));
   localStorage.setItem('forge-goals', JSON.stringify([{ type: 'Strength', title: '405 lb Squat', target: '405 lb', date: '2026-12-01', connection: 'Quads', exercise: 'Squat', metric: 'Real 1RM', unit: 'lb' }]));

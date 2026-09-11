@@ -55,7 +55,19 @@ function starterSplit(focus: AthleteSetup['primaryFocus'], count: number): Athle
   return Array.from({ length: Math.max(1, Math.min(7, count)) }, (_, index) => source[index % source.length]);
 }
 
+/* THE FORM READS THE PROFILE ONCE, on its first render, so it must not be
+   mounted before the profile has arrived. Opening /onboarding directly during
+   the first seconds after sign-in used to start the athlete on a blank form
+   over a complete profile — and saving it wrote the blanks back. The wrapper
+   holds the door until the profile is loaded; the form below then initialises
+   from the real thing. */
 export function OnboardingPage() {
+  const { loading } = useProfileSetup();
+  if (loading) return <main className="profile-loading"><span className="forge-mark">—</span><strong>FORGE</strong><p>Loading your training profile…</p></main>;
+  return <OnboardingForm />;
+}
+
+function OnboardingForm() {
   const { user } = useAuth();
   const { setup, saveSetup } = useProfileSetup();
   const { goals, saveGoal } = useGoals();

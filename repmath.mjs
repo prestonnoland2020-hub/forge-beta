@@ -47,21 +47,21 @@ check('a lift with no history falls back to the curve', Math.round(loadFromAncho
 const stalest = bestsFromHistory([
   day('2026-06-01', 'Squat', 475, 1), day('2026-09-04', 'Squat', 460, 4), day('2026-08-16', 'Squat', 408, 8),
 ]);
-const attemptFor = single => wavePrescription(stalest.bests.get('squat'), 4, false, single, true, stalest.anchors.get('squat')).weight;
+const attemptFor = single => wavePrescription(stalest.bests.get('squat'), 4, { bestSingle: single, tests: true, anchors: stalest.anchors.get('squat') }).weight;
 check('recent fours push the attempt past a spring single', attemptFor(475) > 490, `${attemptFor(475)}`);
 check('and the jump is capped at a tenth of the single', attemptFor(300) <= 330, `${attemptFor(300)}`);
 
 /* 4c. A ten-week block climbs instead of repeating itself. */
 const blockAnchors = bestsFromHistory([day('2026-09-04', 'Squat', 460, 4), day('2026-08-16', 'Squat', 408, 8)]);
-const week = (wave, project) => wavePrescription(blockAnchors.bests.get('squat'), wave, false, 475, wave % 5 === 4, blockAnchors.anchors.get('squat'), project).weight;
+const week = (wave, project) => wavePrescription(blockAnchors.bests.get('squat'), wave, { bestSingle: 475, tests: wave % 5 === 4, anchors: blockAnchors.anchors.get('squat'), projectSteps: project }).weight;
 check('the second pass at 8 reps is heavier than the first', week(5, 1) > week(0, 0), `${week(0, 0)} -> ${week(5, 1)}`);
 check('the second max week is heavier than the first', week(4, 0) < week(9, 1), `${week(4, 0)} -> ${week(9, 1)}`);
 check('the current pass is evidence, not projection', week(0, 0) === week(0, 0));
 
 /* 5. The max attempt never sits below the heavy double. */
 for (const [best, single] of [[526, 475], [526, 0], [380, 375], [300, 320]]) {
-  const double = wavePrescription(best, 3, false, single, false).weight;
-  const attempt = wavePrescription(best, 4, false, single, true).weight;
+  const double = wavePrescription(best, 3, { bestSingle: single }).weight;
+  const attempt = wavePrescription(best, 4, { bestSingle: single, tests: true }).weight;
   check(`attempt ${attempt} > double ${double}`, attempt > double);
 }
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed');

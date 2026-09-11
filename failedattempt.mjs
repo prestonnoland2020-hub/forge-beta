@@ -13,9 +13,12 @@ const mk = (date, weight, reps) => ({ id: date, date, title: 'Legs', muscles: ['
   topSets: [{ id: date + 't', muscle: 'Quads', lift: 'Squat', weight, reps, completed: true, calculatedMax: calculateEstimatedOneRepMax(weight, reps) }],
   lift: 'Squat', weight, reps, calculatedMax: calculateEstimatedOneRepMax(weight, reps), hasCardio: false, cardioSessions: [] });
 const recovery = { readiness: 100, confidence: 'Low', strengthFatigue: 'Low', hardTrainingAllowed: true };
+/* A SQUAT GOAL, because this is a test about the 8/6/4/2/1 wave and a lift
+   with no goal on it does not run that wave — it runs the 12/10/8/6 accessory
+   cycle, which is tested separately. */
 const ask = (records, exposures = 3) => buildTrainingIntelligence({ records, recovery,
   templates: [{ exercise: 'Squat', calculatedMax: 0, exposureIndex: exposures }],
-  goalMaxByLift: {}, loadBiasPercent: 0 }).topSets[0];
+  goalMaxByLift: { squat: 400 }, loadBiasPercent: 0 }).topSets[0];
 
 const BASE = [mk('2026-09-02', 255, 2), mk('2026-08-18', 225, 10), mk('2026-08-10', 245, 3), mk('2026-07-30', 235, 3)];
 
@@ -46,6 +49,23 @@ check('270', again.weight === 270, `${again.weight}`);
 console.log('\n  three misses in a row never compound');
 const thrice = ask([mk('2026-09-23', 260, 1), mk('2026-09-16', 260, 1), mk('2026-09-09', 260, 1), ...BASE]);
 check('still 260', thrice.weight === 260, `${thrice.weight}`);
+
+/* AND WHEN HE ACTUALLY MARKS THEM FAILED, the plan stops asking. A set logged
+   `completed: false` is the athlete saying the bar won; three of those at a rep
+   count and the prescription goes back to the last load he really completed
+   there, with no step on top, until he succeeds again. */
+const failed = (date, weight, reps) => { const day = mk(date, weight, reps); day.topSets[0].completed = false; return day; };
+console.log('\n  he marks three attempts at the double failed');
+const afterThreeFails = ask([failed('2026-09-23', 260, 2), failed('2026-09-16', 260, 2), failed('2026-09-09', 260, 2), ...BASE]);
+check('it returns to the 255 he actually completed', afterThreeFails.weight === 255 && afterThreeFails.reps === 2, `${afterThreeFails.weight} x ${afterThreeFails.reps}`);
+
+console.log('\n  two failures are not three');
+const twice = ask([failed('2026-09-16', 260, 2), failed('2026-09-09', 260, 2), ...BASE]);
+check('it still asks for 260', twice.weight === 260, `${twice.weight}`);
+
+console.log('\n  and a success since then clears the count');
+const cleared = ask([mk('2026-09-30', 255, 2), failed('2026-09-23', 260, 2), failed('2026-09-16', 260, 2), failed('2026-09-09', 260, 2), ...BASE]);
+check('the step comes back — 260', cleared.weight === 260, `${cleared.weight}`);
 
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

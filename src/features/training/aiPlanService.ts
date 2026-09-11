@@ -1,6 +1,6 @@
 import { isDemoMode } from '../../lib/env';
 import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
-import { calculateEstimatedOneRepMax, repMaxCoefficient, weightForReps } from '../../lib/strength';
+import { calculateEstimatedOneRepMax, repMaxCoefficient, weightForReps, PRESCRIPTION_REP_CAP, REP_MAX_CAP } from '../../lib/strength';
 import { supabase } from '../../lib/supabase';
 import { localDayIso } from '../../lib/time';
 
@@ -117,6 +117,40 @@ export const LONG_RUN_MAX_SHARE = 0.35;
 export const WAVE_REPS = [8, 6, 4, 2, 1] as const;
 export const WAVE_LENGTH = WAVE_REPS.length;
 export const waveSlot = (weekIndex: number) => ({ reps: WAVE_REPS[weekIndex % WAVE_LENGTH], isMax: weekIndex % WAVE_LENGTH === WAVE_LENGTH - 1 });
+
+/* A LIFT WITH NO GOAL ON IT IS NOT TRAINED LIKE ONE THAT HAS.
+
+   The 8/6/4/2/1 wave exists to walk a lift up to a tested single. An accessory
+   has no single to walk to — running it up the same wave spends heavy, risky
+   sets on a movement nothing is being measured against, and it is why a
+   non-goal lift used to end its wave on a heavy double it had no reason to
+   take. Accessories run 12/10/8/6 instead: rep work, off the calculated max,
+   and they advance PER SESSION on that lift rather than per calendar week,
+   because an accessory trained once a fortnight should not be four rungs along
+   because the block is four weeks old.
+
+   The load climbs one plate step every fifth completed session, and the raise
+   compounds — it stacks on the max it already raised, so 100 becomes 105 and
+   then 110, not 105 twice. */
+export const ACCESSORY_REPS = [12, 10, 8, 6] as const;
+export const ACCESSORY_LENGTH = ACCESSORY_REPS.length;
+export const ACCESSORY_SESSIONS_PER_RAISE = 5;
+export const accessorySlot = (sessionIndex: number) => ({ reps: ACCESSORY_REPS[Math.max(0, sessionIndex) % ACCESSORY_LENGTH] });
+
+/* AFTER THE THIRD MISS, THE PLAN STOPS ASKING. Forge writes one plate step
+   over the athlete's own best set at a rep count and waits to be beaten. Wait
+   forever and the same bar sits there every session with nothing behind it but
+   optimism. Three failed attempts at a rep count and the prescription returns
+   to the last load actually completed there — no step on top — until the
+   athlete succeeds again, which clears the count. */
+export const FAILURES_BEFORE_BACKOFF = 3;
+
+/* WHAT AN EMPTY CALENDAR CELL SAYS. Two screens draw the same week and each
+   wrote its own version of this line, so a change to one silently disagreed
+   with the other. It consumes an already-derived stress/kind rather than
+   deciding for itself what a rest day is — that answer belongs to isRestDay. */
+export const calendarEmptyState = (session: { stress?: string; kind?: string }): 'rest' | 'open' | undefined =>
+  session.stress === 'Rest' ? 'rest' : session.kind === 'Flexible' ? 'open' : undefined;
 /* Max week is a TRUE 1RM attempt — strength goals track Real 1RM, which only
    a 1-rep set can register. The attempt targets the current best + 5-10 lb
    (2.5 kg steps for metric athletes). */
@@ -158,10 +192,20 @@ export const isRestDay = (day: { name?: string; type?: string; dayType?: string 
    same lift, the same week, forty-five pounds apart on two screens. Every
    surface builds it here now. */
 export function bestsFromHistory(
-  records: Array<{ topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean }> }>,
-): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors } {
+  records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean }> }>,
+): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>> } {
   const bests = new Map<string, number>();
   const singles = new Map<string, number>();
+  /* HOW MANY TIMES THIS LIFT HAS BEEN TRAINED, counted in days rather than in
+     sets, so three sets of the same lift on one day is one session. This is
+     what moves an accessory along its 12/10/8/6 cycle. */
+  const sessionDays = new Map<string, Set<string>>();
+  /* FAILURES SINCE THE LAST SUCCESS, per rep count. Records arrive newest
+     first, so a completed set at a rep count stops the count for it: anything
+     older than the athlete's last success there is history they have already
+     answered. */
+  const misses = new Map<string, Map<number, number>>();
+  const settled = new Set<string>();
   /* THE HEAVIEST SET AT EACH REP COUNT, kept as itself. A single number per
      lift means every week of the wave is an extrapolation from one set —
      usually the athlete's best high-rep set, because that is what estimates
@@ -169,9 +213,24 @@ export function bestsFromHistory(
      gets. Held per rep count, the heavy weeks can be written from heavy
      evidence and the rep weeks from rep evidence. */
   const anchors: LiftAnchors = new Map();
-  records.forEach(record => (record.topSets || []).forEach(set => {
-    if (set.completed === false || !set.lift || !set.weight || !set.reps) return;
+  records.forEach((record, order) => (record.topSets || []).forEach(set => {
+    if (!set.lift || !set.weight || !set.reps) return;
     const key = canonicalLiftKey(set.lift);
+    const repSlot = Math.min(Math.max(Math.round(set.reps), 1), PRESCRIPTION_REP_CAP);
+    const settledKey = `${key}|${repSlot}`;
+    if (set.completed === false) {
+      if (!settled.has(settledKey)) {
+        const byReps = misses.get(key) || new Map<number, number>();
+        byReps.set(repSlot, (byReps.get(repSlot) || 0) + 1);
+        misses.set(key, byReps);
+      }
+      return;
+    }
+    settled.add(settledKey);
+    const dayKey = record.date || `#${order}`;
+    const days = sessionDays.get(key) || new Set<string>();
+    days.add(dayKey);
+    sessionDays.set(key, days);
     const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
     if (max > (bests.get(key) || 0)) bests.set(key, max);
     /* A real single is the only evidence a Real 1RM goal accepts. */
@@ -181,7 +240,8 @@ export function bestsFromHistory(
     if (set.weight > (byReps.get(reps) || 0)) byReps.set(reps, set.weight);
     anchors.set(key, byReps);
   }));
-  return { bests, singles, anchors };
+  const sessions = new Map([...sessionDays].map(([key, days]) => [key, days.size] as const));
+  return { bests, singles, anchors, sessions, misses };
 }
 
 /* Every lift's heaviest set at each rep count, 1-10. */
@@ -374,14 +434,68 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
    drawn one step heavier per pass, which is exactly what will happen if the
    athlete hits them. It is a projection and it says so; miss a week and the
    weeks after it recompute from what was really done. */
-export function wavePrescription(best: number, weekIndex: number, metric = false, bestSingle = 0, tests = false, anchors?: Map<number, number>, projectSteps = 0): { weight: number; reps: number; isMax: boolean } {
-  const step = metric ? 2.5 : 5;
+export type WaveOptions = {
+  /* Kilograms: plate steps and bumps change size, nothing else. */
+  metric?: boolean;
+  /* The athlete's heaviest real single, when they have one. */
+  bestSingle?: number;
+  /* Whether this lift carries a Real 1RM goal, which is the only thing that
+     earns a tested single at the top of the wave. */
+  tests?: boolean;
+  anchors?: Map<number, number>;
+  /* Weeks drawn ahead of today, each one step heavier — a projection. */
+  projectSteps?: number;
+  /* Ask for exactly what has already been done, with no step on top. */
+  holding?: boolean;
+  /* A lift with no goal on it: 12/10/8/6 off the calculated max instead. */
+  accessory?: boolean;
+  /* Completed sessions on this lift, which is what moves an accessory along. */
+  sessions?: number;
+  /* Failed attempts since the last success, per rep count. */
+  misses?: Map<number, number>;
+};
+
+/* THE ARGUMENT LIST WAS EIGHT POSITIONS LONG and three of them were booleans,
+   so `(best, i, false, 0, true, anchors)` said nothing about what it meant and
+   a call site that got the order wrong was silently a different program. */
+export function wavePrescription(best: number, weekIndex: number, options: WaveOptions = {}): { weight: number; reps: number; isMax: boolean } {
+  const { metric = false, bestSingle = 0, tests = false, anchors, projectSteps = 0, holding = false, accessory = false, sessions = 0, misses } = options;
+  /* `holding` asks for exactly what the athlete has already done, with no step
+     on top — for the caller that has decided the evidence does not support one
+     yet. Without it, a lift with a single logged session was stepped up five
+     pounds under a sentence saying it was being held. */
+  const plateStep = metric ? 2.5 : 5;
+  /* THREE MISSES AT A REP COUNT AND THE STEP COMES OFF, so the prescription
+     falls back to the last load actually completed there rather than asking
+     again for a bar that has beaten the athlete three times. */
+  const backedOff = (count: number) => (misses?.get(Math.min(Math.max(Math.round(count), 1), PRESCRIPTION_REP_CAP)) || 0) >= FAILURES_BEFORE_BACKOFF;
+  const stepFor = (count: number) => (holding || backedOff(count) ? 0 : plateStep);
+  const step = holding ? 0 : plateStep;
   const bump = metric ? 3.75 : 7.5;
+  if (accessory) {
+    const { reps: accessoryReps } = accessorySlot(sessions);
+    /* Compounding: every completed fifth session adds another plate step to
+       the max the load is written from, and the next raise stacks on that. */
+    const raises = holding ? 0 : Math.floor(Math.max(0, sessions) / ACCESSORY_SESSIONS_PER_RAISE);
+    const workingMax = Math.max(0, best) + raises * plateStep - (backedOff(accessoryReps) ? plateStep : 0);
+    const weight = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
+    return { weight, reps: accessoryReps, isMax: false };
+  }
   const { reps, isMax } = waveSlot(weekIndex);
   /* "A rep higher than last PR by 5-10": a real logged single anchors the
      attempt directly; without one, the estimated max stands in. */
-  const projection = Math.max(0, projectSteps) * step;
-  const loadFor = (count: number) => Math.max(step, Math.ceil((loadFromAnchors(anchors, best, count, step) + projection) / step) * step);
+  const projection = Math.max(0, projectSteps) * plateStep;
+  /* BACKED OFF MEANS THE LOAD THEY ACTUALLY COMPLETED, not a blend that
+     happens to land near it. The nearest-evidence average still reads the
+     athlete's other sets — a 225 x 10 pushes the implied double to 256 — so
+     dropping the step alone left the bar where it was. After three misses the
+     prescription is their own completed set at that rep count, full stop. */
+  const proven = (count: number) => anchors?.get(Math.min(Math.max(Math.round(count), 1), REP_MAX_CAP)) || 0;
+  const loadFor = (count: number) => {
+    const held = backedOff(count) ? proven(count) : 0;
+    if (held) return Math.max(plateStep, Math.floor(held / plateStep) * plateStep);
+    return Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
+  };
   /* THE ATTEMPT SITS ABOVE THE DOUBLE. The rep weeks are written from the
      calculated max (what the athlete's best rep work proves); the attempt was
      anchored to the last real single. When rep work had moved on and the
@@ -400,13 +514,13 @@ export function wavePrescription(best: number, weekIndex: number, metric = false
        for ten pounds over a stale single is a max week that cannot find the
        max. This is the same nearest-evidence blend the rep weeks use, read at
        one rep, so it is bounded by the athlete's own sets. */
-    const fromRepWork = anchors?.size ? loadFromAnchors(anchors, best, 1, step) : 0;
+    const fromRepWork = anchors?.size ? loadFromAnchors(anchors, best, 1, stepFor(1)) : 0;
     /* A ceiling on the jump, not a target: however loudly the rep work
        argues, one session does not add a tenth to a tested single. This binds
        only when an estimate has run away; a normal max week never reaches it. */
     const ceiling = bestSingle ? bestSingle * 1.1 : Infinity;
-    const attempt = Math.min(ceiling, Math.max(anchored, fromRepWork, loadFor(2) + step)) + projection;
-    return Math.max(step, Math.ceil(attempt / step) * step);
+    const attempt = Math.min(ceiling, Math.max(anchored, fromRepWork, loadFor(2) + plateStep)) + projection;
+    return Math.max(plateStep, Math.ceil(attempt / plateStep) * plateStep);
   };
   if (isMax) {
     if (tests) return { weight: attemptWeight(), reps: 1, isMax: true };
@@ -471,7 +585,7 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
      8/6/4/2/1 wave and defaults to it. They differ when the block entered the
      wave mid-way — see StoredAiPlan.waveOffset. */
   block: { weekIndex: number; blockWeeks: number; waveIndex?: number; currentWaveIndex?: number },
-  strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean; anchors?: LiftAnchors },
+  strength: { bests: Map<string, number>; singles?: Map<string, number>; goalLifts: Set<string>; metric?: boolean; anchors?: LiftAnchors; sessions?: Map<string, number>; misses?: Map<string, Map<number, number>> },
   /* The days this week actually contains — a rolling cycle longer than 7 days
      shows only some of itself per week, and the running has to be measured
      over what is really there. Defaults to the whole split. */
@@ -514,6 +628,8 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
   const lookup = (table: Map<string, number> | undefined, name: string) =>
     table?.get(name) ?? [...(table?.entries() || [])].find(([lift]) => canonicalLiftKey(lift) === canonicalLiftKey(name))?.[1];
   const anchorsFor = (name: string) => strength.anchors?.get(canonicalLiftKey(name));
+  const missesFor = (name: string) => strength.misses?.get(canonicalLiftKey(name));
+  const sessionsFor = (name: string) => strength.sessions?.get(canonicalLiftKey(name)) || 0;
   let adjusted = false;
   /* A DAY THAT TRAINS TWO GOAL LIFTS PRESCRIBES BOTH ON THE SAME DAY, and a
      day's other work keeps its own name. The rule "the goal lift owns its day"
@@ -561,11 +677,17 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
        athlete is actually in. Zero for the current pass and everything behind
        it — those are drawn from evidence, not projected. */
     const projectSteps = Math.max(0, Math.floor((waveIndex - (block.currentWaveIndex ?? waveIndex)) / WAVE_LENGTH));
-    const live = wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, tests, anchorsFor(set.exercise), projectSteps);
+    /* A NON-GOAL LIFT TAKES THE ACCESSORY CYCLE, advanced by how many times it
+       has actually been trained rather than by how old the block is — plus one
+       step per projected pass, since a projected week is drawn as though the
+       sessions between here and there were completed. */
+    const accessory = !tests;
+    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise) };
+    const live = wavePrescription(best, waveIndex, waveOptions);
     if (live.weight !== set.weight || live.reps !== set.reps) adjusted = true;
     /* On a max week a tested lift also carries the double it falls back to
        when the split hits that day more than once in the same week. */
-    const hold = live.reps === 1 ? wavePrescription(best, waveIndex, strength.metric, lookup(strength.singles, set.exercise) || 0, false, anchorsFor(set.exercise), projectSteps) : undefined;
+    const hold = live.reps === 1 ? wavePrescription(best, waveIndex, { ...waveOptions, tests: false, accessory: false }) : undefined;
     return { ...set, weight: live.weight, reps: live.reps, hold: hold && { weight: hold.weight, reps: hold.reps } };
   });
   return { ...resolved, topSets, adjusted };

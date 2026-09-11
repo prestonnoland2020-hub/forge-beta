@@ -30,16 +30,55 @@ const historyMax=(records:PlanHistoryRecord[],exercise?:string)=>{
   return bestsFromHistory(records).bests.get(canonicalLiftKey(exercise))||0;
 };
 export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,weeksRequested=16,records:PlanHistoryRecord[]=[]):PlanWeek[]{
-  const endurance=goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];const available=deadline?Math.max(4,Math.ceil((deadline-Date.now())/604800000)):weeksRequested;const total=Math.min(52,Math.max(8,Math.min(available,weeksRequested)));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return miles>=0.5&&minutes?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
+  const endurance=goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];/* THE HORIZON STOPS AT THE RACE.
+
+     `Math.max(8, …)` floored this at eight weeks no matter how close the event
+     was, so a half marathon three weeks out produced an eight-week roadmap
+     ending a month AFTER race day: mileage still climbing through the race
+     (37.5 → 45 → 48.7), race week labelled "Deload", and the taper landing in
+     weeks seven and eight — four weeks past the finish line. The Goals tab,
+     reading the same goal, said "3 weeks left · Taper & race", so the two
+     screens on one app contradicted each other.
+
+     Eight weeks is a sensible floor for someone with no date at all; it is
+     nonsense as an override of a date they gave. */
+  const available=deadline?Math.max(1,Math.ceil((deadline-Date.now())/604800000)):weeksRequested;
+  const total=deadline
+    ? Math.min(52,Math.max(1,Math.min(available,weeksRequested)))
+    : Math.min(52,Math.max(8,weeksRequested));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return miles>=0.5&&minutes?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
+  /* ONE DEFINITION OF A WEEK'S MILEAGE, so "this week" and "last week" cannot
+     be computed two different ways. */
+  const weekMileage=(index:number)=>{
+    if(!hasRunBaseline)return 0;
+    const progress=index/Math.max(1,total-1);
+    const taper=Boolean(endurance)&&index+1>Math.max(1,total-2);
+    const test=waveSlot(index).isMax;
+    const deload=!taper&&!test&&index%WAVE_LENGTH===WAVE_LENGTH-2;
+    /* A SHORT HORIZON DOES NOT LICENSE A BIG JUMP. The smooth ramp divides the
+       whole climb by however many weeks are left, so three weeks out it asked
+       for +75% in a week. Volume is rate-limited to 10% a week off the
+       athlete's real starting mileage, whatever the curve wants. */
+    const smooth=startMileage+(peak-startMileage)*Math.min(1,progress/.86);
+    const priorBuild=Math.min(smooth,startMileage*Math.pow(1.1,index));
+    return Number((taper?priorBuild*(test?.55:.72):deload?priorBuild*.78:priorBuild).toFixed(1));
+  };
   return Array.from({length:total},(_,index)=>{
-    const week=index+1;const weekDate=new Date();weekDate.setHours(12,0,0,0);weekDate.setDate(weekDate.getDate()+index*7);const taper=Boolean(endurance)&&week>total-2;
+    const week=index+1;const weekDate=new Date();weekDate.setHours(12,0,0,0);weekDate.setDate(weekDate.getDate()+index*7);/* A taper is the two weeks before the race, and on a horizon shorter than
+       three weeks every remaining week is one of them. */
+    const taper=Boolean(endurance)&&week>Math.max(1,total-2);
     /* The roadmap and the program render on the SAME screen, so they cannot
        run different calendars. Max week and the deload are the wave's — the
        5-week 8/6/4/2/1 cycle, deloading on the 2-rep week so the attempt
        always follows a lighter week — not "the last week of the horizon" and
        "every fourth week", which put DELOAD on the roadmap in a week the
        program called BUILD. */
-    const test=waveSlot(index).isMax;const deload=!taper&&!test&&index%WAVE_LENGTH===WAVE_LENGTH-2;const progress=index/Math.max(1,total-1);const phase:PlanWeek['phase']=test?'Test':taper?'Taper':deload?'Deload':progress<.25?'Foundation':progress<.65?'Build':'Specific';const priorBuild=startMileage+(peak-startMileage)*Math.min(1,progress/.86);const mileage=Number((hasRunBaseline?(taper?priorBuild*(test?.55:.72):deload?priorBuild*.78:priorBuild):0).toFixed(1));const previous=index===0?startMileage:startMileage+(peak-startMileage)*Math.min(1,(index-1)/Math.max(1,total-1)/.86);const change=hasRunBaseline&&previous?Math.round((mileage-previous)/previous*100):0;const repDistance=intervalMenu[Math.min(intervalMenu.length-1,Math.floor(progress*intervalMenu.length))];
+    const test=waveSlot(index).isMax;const deload=!taper&&!test&&index%WAVE_LENGTH===WAVE_LENGTH-2;const progress=index/Math.max(1,total-1);const phase:PlanWeek['phase']=test?'Test':taper?'Taper':deload?'Deload':progress<.25?'Foundation':progress<.65?'Build':'Specific';const mileage=weekMileage(index);/* THE CHANGE IS AGAINST LAST WEEK'S ACTUAL MILEAGE, not against a smooth
+       build curve that was never run. This re-evaluated the ramp for index-1
+       and ignored the taper, deload and test multipliers that had actually been
+       applied to that week — so the week after a deload showed "+9%" where the
+       real jump was +40%, every time. */
+    const previousMileage=index===0?startMileage:weekMileage(index-1);
+    const change=hasRunBaseline&&previousMileage?Math.round((mileage-previousMileage)/previousMileage*100):0;const repDistance=intervalMenu[Math.min(intervalMenu.length-1,Math.floor(progress*intervalMenu.length))];
     const goalSeconds=clockSeconds(endurance?.target);const goalMilesTotal=eventMiles(endurance);const goalPacePerMile=goalSeconds&&goalMilesTotal?goalSeconds/goalMilesTotal:0;
     /* Interval targets come from the GOAL pace, eased by phase — Foundation
        runs reps ~4% slower than goal pace, Specific runs them at goal pace. */
@@ -59,7 +98,7 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
     /* The same 25–35% band the resolver uses; .35 flat here put a different
        long run on the roadmap than the program showed for the same week. */
     const longMiles=hasRunBaseline?(Math.min(Math.max(mileage*LONG_RUN_MIN_SHARE,Math.min(3,mileage)),Math.min(mileage*LONG_RUN_MAX_SHARE,durabilityCap))*(taper?.72:test?.55:deload?.85:1)).toFixed(1):'0';const longMinutes=Number(longMiles)*(easyAnchor?easyAnchor/60:10);const easyMinutes=hasRunBaseline?Math.round(Math.max(20,Math.min(45,Math.min(longMinutes*.8,mileage/Math.max(1,profile.runningDays)*10)))):0;
-    const prescription=prescribeTopSet({baselineMax:currentStrength,goalMax:targetStrength||undefined,weekIndex:index,progress,readiness:profile.readiness,highFatigue:profile.strengthFatigue==='High',allowTest:test});const hasStrengthBaseline=Boolean(strength&&currentStrength);const topSet=!strength?'No strength goal':hasStrengthBaseline?`${strength.exercise}: ${prescription.weight} × ${prescription.reps}${prescription.isTest?' tested MAX':''}`:`${strength.exercise}: baseline needed`;const strengthFocus=!strength?'No strength progression':hasStrengthBaseline?`${prescription.label}-rep stage · ${phase==='Foundation'?'volume & technique':phase==='Build'?'progressive overload':phase==='Specific'?'goal-specific strength':deload?'fatigue control':taper?'maintain & freshen':'assessment'}`:'Log a comparable set first';
+    const prescription=prescribeTopSet({baselineMax:currentStrength,goalMax:targetStrength||undefined,weekIndex:index,readiness:profile.readiness,highFatigue:profile.strengthFatigue==='High',allowTest:test});const hasStrengthBaseline=Boolean(strength&&currentStrength);const topSet=!strength?'No strength goal':hasStrengthBaseline?`${strength.exercise}: ${prescription.weight} × ${prescription.reps}${prescription.isTest?' tested MAX':''}`:`${strength.exercise}: baseline needed`;const strengthFocus=!strength?'No strength progression':hasStrengthBaseline?`${prescription.label}-rep stage · ${phase==='Foundation'?'volume & technique':phase==='Build'?'progressive overload':phase==='Specific'?'goal-specific strength':deload?'fatigue control':taper?'maintain & freshen':'assessment'}`:'Log a comparable set first';
     return{week,start:dateLabel(weekDate),startDate:localDayIso(weekDate),phase,mileage,change,strengthFocus,topSet,strengthExercise:strength?.exercise||'Primary lift',strengthLoad:hasStrengthBaseline?prescription.weight:0,strengthReps:hasStrengthBaseline?prescription.reps:0,calculatedMax:hasStrengthBaseline?prescription.calculatedMax:0,strengthGoal:targetStrength,goalPercent:hasStrengthBaseline?prescription.percentOfGoal:0,quality,longRun:endurance?(hasRunBaseline?`${longMiles} mi easy${easyPaceText||' · conversational effort'}`:'Baseline needed'):'Not scheduled',easy:endurance?(hasRunBaseline?`${easyMinutes} min easy${easyPaceText||(profile.watchConnected?` · ${profile.easyHrMin}–${profile.easyHrMax} bpm`:' · conversational effort')}`:'Log an easy run first'):'Optional easy movement',why:!hasRunBaseline&&endurance?'Forge needs a real running baseline before progressing volume.':!hasStrengthBaseline&&strength?'Forge needs a comparable strength set before prescribing load.':`Progress toward ${endurance?.title||strength?.title||'the active goals'} without stacking hard stress.`,adjustment:hasStrengthBaseline?`${prescription.rationale} Regenerated after completed, missed, or failed work.`:'No strength load is inferred from the goal target.'};
   });
 }

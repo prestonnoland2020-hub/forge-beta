@@ -230,6 +230,11 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
           <Link className={onSettings ? 'top-settings active' : 'top-settings'} to="/profile?view=settings" aria-label="Settings" aria-current={onSettings ? 'page' : undefined}><NavGlyph name="gear"/></Link>
         </div>
       </header>
+      {/* A PREVIEW BUILD SAYS SO, ON EVERY SCREEN. `.env` carries
+          VITE_DEMO_MODE=true for local work, so a build made outside the deploy
+          workflow ships the fake session with nothing saving anywhere — and
+          looked identical to the real app. Now it cannot be mistaken for one. */}
+      {isDemoMode && <div className="demo-banner" role="status">Preview build — training is not saved to an account.</div>}
       {!isDemoMode && syncError && <div className="data-sync-error"><span>Your latest training is saved on this phone but hasn’t reached your account yet. It will retry, or tap Retry now.</span><button onClick={retrySync}>Retry</button></div>}
       <main className="page"><Outlet /></main>
     </div>

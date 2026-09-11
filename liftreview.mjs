@@ -76,7 +76,7 @@ await setWeightDial(p, 'Weight', '315');
 await setDial(p, 'Reps', '5');
 await p.waitForTimeout(400);
 const maxShown = await p.evaluate(() => document.querySelector('.strava-review-max')?.textContent || '');
-check('the calculated max is shown before saving', /368/.test(maxShown), maxShown);
+check('the calculated max is shown before saving', /354/.test(maxShown), maxShown);
 check('save is now offered', await saveDisabled() === false);
 
 await p.evaluate(() => [...document.querySelectorAll('.strava-review-sheet button.button')].find(b => /Save this day/.test(b.textContent)).click());
@@ -85,7 +85,7 @@ const day = await p.evaluate(d => JSON.parse(localStorage.getItem('forge-workout
 check('the day takes the split day it was assigned', day?.title === 'Lower Body', day?.title);
 check('it lands on that split position', day?.splitPosition === 2, String(day?.splitPosition));
 check('the top set is recorded', day?.topSets?.[0]?.lift === 'Squat' && day.topSets[0].weight === 315 && day.topSets[0].reps === 5, JSON.stringify(day?.topSets));
-check('the calculated max is stored', day?.topSets?.[0]?.calculatedMax === 368, String(day?.topSets?.[0]?.calculatedMax));
+check('the calculated max is stored', day?.topSets?.[0]?.calculatedMax === 354, String(day?.topSets?.[0]?.calculatedMax));
 check('muscles come from the day and the lift', ['Quads', 'Hamstrings', 'Glutes'].every(m => day?.muscles?.includes(m)), JSON.stringify(day?.muscles));
 check('the takeover closes once answered', !(await p.$('.strava-review-backdrop')));
 

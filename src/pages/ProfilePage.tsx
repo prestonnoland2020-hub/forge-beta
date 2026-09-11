@@ -45,7 +45,7 @@ export function ProfilePage(){
     {/* A way out. There was no sign-out anywhere — the only exit was deleting
         the account — so a shared phone or a wrong Google account was stuck. */}
     {view==='settings'&&<section className="simple-settings-list">
-      <button type="button" onClick={()=>{if(window.confirm('Sign out of Forge on this device? Your training is saved to your account.'))void signOut().catch(reason=>setConnectionMessage(reason instanceof Error?reason.message:'Could not sign out.'))}}><div><strong>Sign out</strong><span>{user?.email||'Signed in'}</span></div><b>›</b></button>
+      <button type="button" onClick={()=>{if(window.confirm('Sign out of Forge on this device? Everything that has reached your account stays there.'))void signOut().catch(reason=>setConnectionMessage(reason instanceof Error?reason.message:'Could not sign out.'))}}><div><strong>Sign out</strong><span>{user?.email||'Signed in'}</span></div><b>›</b></button>
       {connectionMessage&&view==='settings'&&<p className="connection-message">{connectionMessage}</p>}
     </section>}
     {view==='billing'&&<BillingSettings/>}

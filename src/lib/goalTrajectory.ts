@@ -98,10 +98,15 @@ const runs = (records: WorkoutRecord[]) => records.flatMap(record => (record.car
    happened, and marks the week that has not finished yet. */
 export type RunningWeek = { weekOf: string; miles: number; partial: boolean };
 export function weeklyRunning(records: WorkoutRecord[], weeks = 8): RunningWeek[] {
+  /* A LOCAL DATE, KEPT LOCAL. This built the date at local noon and then
+     serialised it with toISOString(), which is UTC — at +13 or +14 local noon
+     is the previous UTC day, so the shift was applied twice and every bucket
+     key missed its label. An athlete in Kiritimati was told they had run zero
+     miles every week, with no week marked partial. */
   const monday = (iso: string) => {
     const date = new Date(`${iso}T12:00:00`);
     date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-    return date.toISOString().slice(0, 10);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
   const thisWeek = monday(localDayIso());
   const totals = new Map<string, number>();
@@ -112,7 +117,7 @@ export function weeklyRunning(records: WorkoutRecord[], weeks = 8): RunningWeek[
   const start = new Date(`${thisWeek}T12:00:00`);
   return Array.from({ length: weeks }, (_, index) => {
     const date = new Date(start); date.setDate(start.getDate() - (weeks - 1 - index) * 7);
-    const weekOf = date.toISOString().slice(0, 10);
+    const weekOf = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     return { weekOf, miles: round1(totals.get(weekOf) || 0), partial: weekOf === thisWeek };
   });
 }
@@ -291,7 +296,7 @@ function bodyTrajectory(goal: CreatedGoal, records: WorkoutRecord[]): GoalTrajec
   const weekOf = (iso: string) => {
     const date = new Date(`${iso}T12:00:00`);
     date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-    return date.toISOString().slice(0, 10);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
   const buckets = new Map<string, number[]>();
   daily

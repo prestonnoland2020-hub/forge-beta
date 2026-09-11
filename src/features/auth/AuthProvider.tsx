@@ -79,10 +79,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  /* NOTHING UNSAVED IS THROWN AWAY, AND NOTHING IS CLEARED UNTIL THE SIGN-OUT
+     ACTUALLY HAPPENS.
+
+     This wiped the cache first and signed out second. Two ways that cost
+     someone their training. A session logged with no signal sits in the
+     outbox — the banner says it is still saved on this device — and sign-out
+     deleted it under a dialog reading "Your training is saved to your
+     account", when it was not. And when the sign-out itself failed (offline is
+     exactly when the outbox has something in it), the cache was already gone
+     while the session stayed live.
+
+     So: refuse while work is pending, sign out first, clear only once it has
+     succeeded. */
   const signOut = useCallback(async () => {
+    let pending = 0;
+    try { pending = (JSON.parse(localStorage.getItem('forge-workout-pending-v1') || '[]') as unknown[]).length; } catch { pending = 0; }
+    if (pending) {
+      throw new Error(`${pending === 1 ? 'One training day has' : `${pending} training days have`} not reached your account yet. Stay signed in until the sync finishes, or they will be lost.`);
+    }
+    await signOutOfSupabase();
     clearAccountCache();
     try { localStorage.removeItem(LAST_USER_KEY); } catch { /* ignore */ }
-    await signOutOfSupabase();
     if (!isDemoMode) { setSession(null); window.location.hash = '/login'; }
   }, []);
 
