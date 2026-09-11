@@ -344,7 +344,15 @@ const paceToMinutes = (pace?: string): number => {
   const match = String(pace || '').match(/(\d+):(\d{2})/);
   return match ? Number(match[1]) + Number(match[2]) / 60 : 0;
 };
-export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number; weeklyMileage?: number; longestRunMiles?: number };
+/* recentWeeklyMileage / recentLongestRun: WHAT THE ATHLETE HAS ACTUALLY BEEN
+   RUNNING, as opposed to what they typed into setup once. The plan was built
+   from the stated number alone, so an athlete running more than they said —
+   which is most people a month in — got a block pitched below their own
+   training. Preston's week asked for 1.5-mile easy runs and a 4.2-mile long run
+   while he was running five-mile long runs every week. A plan under the
+   athlete's current level cannot drive an adaptation; it is a taper with a
+   block's name on it. */
+export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number; weeklyMileage?: number; longestRunMiles?: number; recentWeeklyMileage?: number; recentLongestRun?: number };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
@@ -422,7 +430,13 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
     const high = ceilingMiles ? Math.min(value, ceilingMiles) : value;
     return floorMiles ? Math.max(high, floorMiles) : high;
   };
-  const startMiles = clampMiles(Number(athlete.weeklyMileage) || floorMiles || Number(week.mileage) || 0);
+  /* THE FLOOR IS WHAT THEY ARE ALREADY DOING. Stated mileage is a starting
+     guess that goes stale the week after setup; the last few weeks of real
+     running is not. The ceiling still holds — an athlete who has capped
+     themselves at 25 is not handed 30 — but nothing below their own training
+     gets prescribed as progress. */
+  const actualMiles = Number(athlete.recentWeeklyMileage) || 0;
+  const startMiles = clampMiles(Math.max(Number(athlete.weeklyMileage) || floorMiles || Number(week.mileage) || 0, actualMiles));
   const progress = blockWeeks > 1 ? Math.min(1, weekIndex / (blockWeeks - 1)) : 0;
   const climb = ceilingMiles ? startMiles + (ceilingMiles - startMiles) * progress : startMiles;
   /* THE MODEL'S WEEKLY NUMBER IS HONORED WHEN IT IS SANE. The athlete can ask
@@ -438,7 +452,13 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
     && (!ceilingMiles || modelMiles <= ceilingMiles + 1e-9)
     && (!floorMiles || modelMiles >= Math.min(floorMiles, startMiles) - 1e-9)
     && modelMiles <= rampCap;
-  const chosen = modelSane ? modelMiles : climb;
+  /* AND THE FLOOR BINDS WHICHEVER NUMBER WON. The model's weekly mileage is
+     honoured when it is sane, and "sane" said nothing about whether it was
+     above the athlete's own training — so a block written for 14 miles stood
+     over someone running 18. The chosen number is raised to what they actually
+     run, still under their own ceiling. A deload is measured from there and is
+     allowed to be a deload. */
+  const chosen = clampMiles(Math.max(modelSane ? modelMiles : climb, actualMiles));
   const target = clampMiles(round1(deloadIndex % 5 === 3 ? Math.min(chosen, climb) * 0.8 : chosen));
 
   const pace = paceToMinutes(week.easyPace) || 9.5;
@@ -446,9 +466,13 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      also capped by the body doing it: no plan hands an athlete whose longest
      run is 13.7 miles a 27-mile day. It may grow ~1 mile a week from their
      longest logged run; with no logged longest, the share caps alone hold. */
-  const longestKnown = Number(athlete.longestRunMiles) || 0;
+  const longestKnown = Math.max(Number(athlete.longestRunMiles) || 0, Number(athlete.recentLongestRun) || 0);
   const longCap = longestKnown > 0 ? Math.max(6, longestKnown + 1 + weekIndex) : Infinity;
-  const longRunMiles = hasLong ? round1(Math.min(Math.max(Number(week.longRunMiles), target * LONG_RUN_MIN_SHARE), target * LONG_RUN_MAX_SHARE, longCap)) : 0;
+  /* A long run the athlete has already been doing is the floor for the long
+     run, not a stretch goal — bounded by the week's volume, so it cannot eat
+     the whole week on a deload. */
+  const longFloor = Math.min(Number(athlete.recentLongestRun) || 0, target * LONG_RUN_MAX_SHARE);
+  const longRunMiles = hasLong ? round1(Math.min(Math.max(Number(week.longRunMiles), target * LONG_RUN_MIN_SHARE, longFloor), target * LONG_RUN_MAX_SHARE, longCap)) : 0;
   const qualityMiles = hasQuality ? qualitySessionMiles(String(week.quality), pace) : 0;
 
   /* Whatever is left is easy volume, split into real distances. */

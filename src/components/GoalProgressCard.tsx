@@ -10,6 +10,7 @@ import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { requestForgeCoach } from '../features/training/coachService';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
 import { localDayIso } from '../lib/time';
+import { goalFeasibility } from '../lib/goalFeasibility';
 
 type GoalEvidence = { date: string; value: number; label: string };
 type GoalCoachTurn = { question: string; answer: string; source: 'ai' | 'local' | 'limit' };
@@ -102,6 +103,8 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const [aiEstimateError,setAiEstimateError]=useState('');
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
+  const verdict = useMemo(() => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0 })[0], [goal, records, setup?.maxWeeklyMileage]);
+
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const goalText = `${goal.exercise || ''} ${goal.title}`.toLowerCase();
   const isHyrox = goalText.includes('hyrox');
@@ -299,6 +302,19 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
 
   return <article className={`goal-progress-card goal-tracker-simple${goal.type==='Endurance'?' endurance-goal':''}${goalReached?' goal-complete':''}`}>
     <header><div><span>{goal.type.toUpperCase()}{goal.type==='Body Composition'?(goal.metric?` · ${goal.metric}`:''):` · ${goal.exercise||goal.metric}`}</span><h3>{goal.title}</h3></div><div className="goal-head-side"><b className={goalReached ? 'on-track' : ''}>{goalReached ? 'Goal reached' : 'In progress'}</b><small>{roadmap.weeksRemaining} wks left · {formatDate(goal.date)}</small></div></header>
+    {/* IS THIS REACHABLE, SAID OUT LOUD. The card showed the gap in four tiles
+        and left the athlete to judge it. Preston had a 4:59 mile, a 10:59
+        two-mile and an 18:59 5K all due in sixteen weeks off a 5:48 mile and
+        thirteen miles a week, and Forge never once said that two of them were
+        not going to happen — it just kept reporting how far away they were
+        while prescribing half the volume he was already running. A verdict is
+        the one thing on this card that can change what he does on Monday. */}
+    {verdict && <div className={`goal-verdict ${verdict.verdict}`}>
+      <strong>{verdict.verdict === 'reachable' ? 'On the numbers, yes' : verdict.verdict === 'needs-more' ? 'Not on this training' : 'Not by this date'}</strong>
+      <p>{verdict.say}</p>
+      {verdict.insteadOf && <p className="goal-verdict-instead">{verdict.insteadOf}</p>}
+      {verdict.change && <p className="goal-verdict-change">{verdict.change}</p>}
+    </div>}
     <section className="goal-stat-tiles">
       <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{currentEvidence?.date?formatDate(currentEvidence.date):'Best logged evidence'}</small></div>
       <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?(projectionRun?`From your ${projectionRun.miles} mi on ${formatDate(projectionRun.date)}`:'Best qualifying effort'):'At goal date'}</small></div>

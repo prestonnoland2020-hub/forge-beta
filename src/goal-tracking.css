@@ -15,3 +15,21 @@
 .endurance-goal .goal-trajectory-chart{display:none}.cardio-progress-plain{padding:20px 22px;border-top:1px solid var(--line);background:var(--surface-1)}.cardio-progress-plain>header{display:flex;justify-content:space-between;align-items:end;gap:20px}.cardio-progress-plain>header>div{display:grid;gap:3px}.cardio-progress-plain>header span{font-size:10px;font-weight:900;letter-spacing:.1em;color:var(--accent-text)}.cardio-progress-plain>header strong{font-size:16px}.cardio-progress-plain>header small,.cardio-progress-plain>p{color:var(--muted)}.cardio-progress-plain>div{display:grid;margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden}.cardio-progress-plain article{display:grid;grid-template-columns:130px 90px 1fr;gap:16px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}.cardio-progress-plain article:last-child{border:0}.cardio-progress-plain time,.cardio-progress-plain article span{color:var(--muted);font-size:10px}.cardio-progress-plain article strong{font:800 18px var(--display)}@media(max-width:600px){.cardio-progress-plain>header{display:grid}.cardio-progress-plain article{grid-template-columns:1fr auto}.cardio-progress-plain article span{grid-column:1/-1}}
 .endurance-goal .goal-trajectory-chart{display:block}
 .goal-forecast-note{margin:12px 0 0;padding:10px 12px;border-left:3px solid var(--chart-2);background:var(--surface-sunken);color:var(--muted);font-size:10px;line-height:1.5}
+
+/* THE VERDICT, ABOVE THE NUMBERS. Colour carries it but never alone — the
+   heading says which of the three it is in words. */
+.goal-verdict{margin:var(--s2) 0 var(--s3);padding:12px 14px;border-left:3px solid var(--line);border-radius:6px;background:var(--surface-sunken)}
+.goal-verdict strong{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
+.goal-verdict p{margin:0;font-size:13px;line-height:1.5;color:var(--text)}
+.goal-verdict p+p{margin-top:6px}
+.goal-verdict .goal-verdict-instead{font-weight:700}
+.goal-verdict .goal-verdict-change{color:var(--muted);font-size:12.5px}
+.goal-verdict.reachable{border-left-color:var(--good,#2f7d52)}
+.goal-verdict.reachable strong{color:var(--good,#2f7d52)}
+.goal-verdict.needs-more{border-left-color:var(--warn,#c8922a)}
+.goal-verdict.needs-more strong{color:var(--warn,#c8922a)}
+.goal-verdict.out-of-reach{border-left-color:var(--bad)}
+.goal-verdict.out-of-reach strong{color:var(--bad)}
+.goal-clash{border-left:3px solid var(--warn,#c8922a);padding:14px 16px}
+.goal-clash strong{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--warn,#c8922a);margin-bottom:6px}
+.goal-clash p{margin:0;font-size:13px;line-height:1.55;color:var(--text)}

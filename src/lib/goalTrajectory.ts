@@ -337,6 +337,32 @@ function bodyTrajectory(goal: CreatedGoal, records: WorkoutRecord[]): GoalTrajec
 const isBodyGoal = (goal: CreatedGoal) =>
   /body/i.test(String(goal.type || '')) || /body\s*weight/i.test(String(goal.metric || ''));
 
+/* WHAT THE ATHLETE HAS ACTUALLY BEEN RUNNING, as a median over the finished
+   weeks rather than a mean over all of them — one big week or one sick week
+   should not decide what gets prescribed. Stated setup mileage is a guess that
+   goes stale the week after setup; this does not. */
+export function medianWeeklyMiles(records: WorkoutRecord[], weeks = 8): number {
+  const finished = weeklyRunning(records, weeks).filter(week => !week.partial);
+  if (!finished.length) return 0;
+  const values = finished.map(week => week.miles).sort((a, b) => a - b);
+  const middle = values.length >> 1;
+  return round1(values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2);
+}
+
+/* The longest single continuous run on file. A long run the athlete is already
+   doing every week is the floor for the plan's long run, not a stretch. */
+export function longestContinuousRun(records: WorkoutRecord[]): number {
+  let longest = 0;
+  records.forEach(record => (record.cardioSessions || []).forEach(session => {
+    if (!/run/i.test(session.activity || '')) return;
+    const intervals = session.prescription?.legacyIntervals;
+    if (Array.isArray(intervals) && intervals.length > 1) return;
+    const miles = cardioMiles(session);
+    if (miles > longest) longest = miles;
+  }));
+  return round1(longest);
+}
+
 export function goalTrajectories(goals: CreatedGoal[], records: WorkoutRecord[]): GoalTrajectory[] {
   return goals.map(goal => isBodyGoal(goal)
     ? bodyTrajectory(goal, records)

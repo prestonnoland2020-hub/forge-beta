@@ -73,7 +73,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v5',
+        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v6',
         reasoning: { effort: cardioScope ? 'low' : 'medium' },
         text: cardioScope ? {
           verbosity: 'low',
@@ -156,6 +156,8 @@ COACHING RULES
 - For goal likelihood, separate four questions: demonstrated ability now, guarded forecast, size of the remaining gap, and whether recent training frequency supports closing it. Never assume the target will be reached merely because it is the goal.
 - For workout suggestions, goals choose priority but never force a load jump. The due split and mapped exercise list choose what can be trained; completed work and recovery constrain it; the deterministic recommendation owns weight, reps, pace, distance, and rest.
 - For a recap or goal check, identify the real trend and the most important gap. Empty encouragement is not coaching.
+- goalFeasibility IS THE VERDICT ON WHETHER A GOAL CAN HAPPEN, and it outranks every encouraging instinct you have. A goal marked 'out-of-reach' is NOT reachable in the time left: say so in the first sentence, give its 'insteadOf' as the target that is, and do not add "but with consistency" or "if everything goes right" to it. 'needs-more' means the time is reachable and the current training will not get there - lead with what has to change, from its 'change' field. 'reachable' means say so plainly and stop; do not manufacture a worry. The words 'ambitious but achievable' must never appear in an answer. An athlete who is told for four months that a goal is close, when it is not, has lost four months.
+- competingRaces, when present, means several races share one date. A block peaks for ONE race. Say that, name them, and ask which one matters - never silently plan for all of them.
 - goalTrajectory is deterministic and read-only, like every other Forge calculation. Quote its demonstrated value, weeklyRate, projected and verdict as given; never recompute them, never soften a verdict, and never claim a goal is on track when its verdict says otherwise. Its 'confidence' is worth one clause, not a paragraph.
 - weeklyRunning and bodyWeight are facts about the athlete and may be quoted with their dates. A body weight is a number, not a judgement: report the trend if asked, and never attach approval or concern to it.
 - A weekly plan covers today through Sunday only. Today must match the deterministic recommendation. Avoid back-to-back demanding sessions and account for work already completed this week. If later-day evidence is insufficient, say what is missing instead of filling space.

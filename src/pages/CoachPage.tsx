@@ -13,7 +13,8 @@ import { cardioPlanSummary,type PlannedCardio,type CircuitStation } from '../com
 import { requestForgeCoach } from '../features/training/coachService';
 import { readLocalAiPlan, currentWeekIndex, resolvePlanWeek, goalLiftNames, weekCycleDays, waveIndexOf, bestsFromHistory} from '../features/training/aiPlanService';
 import { sameLift, canonicalLiftKey } from '../lib/liftAliases';
-import { goalTrajectories, weeklyRunning, bodyWeightSeries } from '../lib/goalTrajectory';
+import { goalTrajectories, weeklyRunning, bodyWeightSeries, medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
+import { goalFeasibility, competingRaces } from '../lib/goalFeasibility';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { normalizeMuscleGroups } from '../lib/muscleGroups';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -58,7 +59,7 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     const cycleDays=splitDays.map(day=>({name:day.name,dayType:day.dayType,exercises:day.exercises||[]}));
     const planRhythm=(savedPlan as {rhythm?:string}|null)?.rhythm==='weekly'?'weekly':'rolling';
     const windowDays=weekCycleDays(stored.startDate,index,cycleDays,planRhythm,recommendation?{position:recommendation.splitDay.position,dateIso:anchorDate}:undefined);
-    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles},{weekIndex:index,blockWeeks:stored.plan.weeks.length,waveIndex:waveIndexOf(stored,index)},{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric',anchors:history.anchors,sessions:history.sessions,misses:history.misses,lastAt:history.lastAt},windowDays);
+    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles,recentWeeklyMileage:medianWeeklyMiles(records),recentLongestRun:longestContinuousRun(records)},{weekIndex:index,blockWeeks:stored.plan.weeks.length,waveIndex:waveIndexOf(stored,index)},{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric',anchors:history.anchors,sessions:history.sessions,misses:history.misses,lastAt:history.lastAt},windowDays);
   },[records,goals,setup,profile,splitDays.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const dynamicAnswers:Record<string,string>={
     'What should I train today?':recommendation?`${recommendation.splitDay.name} is next because completed workout history placed the split at position ${recommendation.splitDay.position}. ${recommendation.topSets.filter(set=>set.selected).map(set=>set.source==='history'?`${set.exercise}: ${set.weight} ${weightUnit} × ${set.reps}`:`${set.exercise}: establish a baseline`).join(' · ')}${recommendation.cardio?.selected?` · ${recommendation.cardio.summary}`:''}`:`${dueDay?.name||fallbackDay?.name||'Your next split day'} is due. ${intelligence.reason}`,
@@ -106,6 +107,12 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
          where each goal is heading at the athlete's own rate, what they have
          actually run week by week, and what they weigh. */
       goalTrajectory:goalTrajectories(goals,records),
+      /* WHETHER EACH GOAL IS REACHABLE AT ALL, and the clash when several races
+         share a date. The coach had the gap and the rate; it did not have the
+         verdict, so it could describe how far away a goal was without ever
+         saying it was not going to happen. */
+      goalFeasibility:goalFeasibility(goals,records,{maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0}),
+      competingRaces:competingRaces(goals),
       weeklyRunning:weeklyRunning(records),
       bodyWeight:bodyWeightSeries(records),availableLibrary:{exercises:exercises.filter(exercise=>exercise.enabled).map(exercise=>({name:exercise.name,kind:exercise.kind,muscles:exercise.muscles})),workouts:workouts.map(workout=>({name:workout.name,kind:workout.kind,summary:workout.summary}))},establishedSplit:setup?.splitDays.map(day=>({name:day.name,type:day.type,muscles:day.muscles}))||[],savedDailyRecommendation:recommendation,dueSplitDay:recommendation?.splitDay||{name:dueDay?.name||fallbackDay?.name,type:dueDay?.dayType||fallbackDay?.type,muscles:dueMuscles,mappedExercises:eligible.map(exercise=>exercise.name)},recentTrainingHistory:coachingHistory,
     /* THE ATHLETE'S WHOLE TRAINING LIFE, at a resolution that fits. The coach
