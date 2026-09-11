@@ -724,7 +724,47 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
       forcedExercise.set(index, missing.shift()!);
     }
   });
-  const topSets = (resolved.topSets || []).map((raw, index) => {
+  /* EVERY MOVEMENT MAPPED TO THE DAY GETS A PRESCRIPTION.
+
+     The block's rows are whatever the model wrote — usually one or two per day
+     — and this function only ever repaired them. So a Chest & Back day mapping
+     Bench, Pull Ups, Smith Machine Incline Bench and Lat Pulldown showed two
+     lines, and opening the day showed the same two: the athlete had mapped four
+     movements and Forge had an opinion about two of them. The accessory cycle
+     exists precisely so the other two can be prescribed — 12/10/8/6 off the
+     calculated max — and nothing was asking it.
+
+     A day's remaining movements are appended in the order the athlete mapped
+     them, after the rows the block wrote, and go through the same prescription
+     below. A lift with no logged history is skipped: there is nothing to wave
+     off, and a row reading "0 × 0" is worse than no row. */
+  const padded = [...(resolved.topSets || [])];
+  const daysThisWeek = (runWindow?.length ? runWindow : splitDays).filter(day => !isRestDay(day));
+  const seenDay = new Set<string>();
+  daysThisWeek.forEach(day => {
+    /* A rolling cycle can land the same day twice in one week; its movements
+       are listed once. */
+    if (seenDay.has(day.name)) return;
+    seenDay.add(day.name);
+    /* Read the row's exercise AFTER the goal-lift repair. A row rewritten to
+       carry a goal lift no longer holds the movement it started with, and
+       judging presence from the old value would drop that movement — the
+       repair would silently cost the athlete an exercise instead of adding
+       one. Read this way it comes back below, as an accessory. */
+    const already = new Set(padded
+      .map((row, index) => ({ row, exercise: forcedExercise.get(index) || row.exercise }))
+      .filter(entry => entry.row.splitDay === day.name)
+      .map(entry => canonicalLiftKey(entry.exercise)));
+    (day.exercises || []).forEach(name => {
+      const liftKey = canonicalLiftKey(name);
+      if (already.has(liftKey)) return;
+      if (!lookup(strength.bests, name)) return;
+      already.add(liftKey);
+      padded.push({ splitDay: day.name, exercise: name, weight: 0, reps: 0 });
+      adjusted = true;
+    });
+  });
+  const topSets = padded.map((raw, index) => {
     const forced = forcedExercise.get(index);
     const set = forced && canonicalLiftKey(forced) !== canonicalLiftKey(raw.exercise) ? { ...raw, exercise: forced } : raw;
     if (set !== raw) adjusted = true;

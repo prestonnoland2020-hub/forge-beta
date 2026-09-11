@@ -11,7 +11,7 @@ import { useProfileSetup,type AthleteSetup } from '../features/profile/ProfileSe
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { cardioPlanSummary,type PlannedCardio,type CircuitStation } from '../components/CardioPlanBuilder';
 import { requestForgeCoach } from '../features/training/coachService';
-import { readLocalAiPlan, currentWeekIndex, resolvePlanWeek, goalLiftNames, weekCycleDays, waveIndexOf} from '../features/training/aiPlanService';
+import { readLocalAiPlan, currentWeekIndex, resolvePlanWeek, goalLiftNames, weekCycleDays, waveIndexOf, bestsFromHistory} from '../features/training/aiPlanService';
 import { sameLift, canonicalLiftKey } from '../lib/liftAliases';
 import { goalTrajectories, weeklyRunning, bodyWeightSeries } from '../lib/goalTrajectory';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -26,7 +26,7 @@ const questions=['What should I train today?','Weekly recap','What is my trainin
 const splitMuscles=(name:string,type:AthleteSetup['splitDays'][number]['type'])=>{const value=name.toLowerCase();if(type==='Cardio'||type==='Rest')return[];if(value.includes('upper')||value.includes('push')||value.includes('pull'))return['Chest','Back','Shoulders','Biceps','Triceps'];if(value.includes('lower'))return['Quads','Hamstrings','Glutes'];return['Quads','Glutes','Back','Shoulders']};
 
 export function CoachPage(){
-  const [params]=useSearchParams();const {records}=useWorkoutHistory();const {recovery,profile,updateProfile}=useAdaptiveTraining();const {goals}=useGoals();const {strategy,updateStrategy}=useCoachingStrategy();const {setup,saveSetup}=useProfileSetup();const weightUnit=setup?.units==='Metric'?'kg':'lb';const {exercises,workouts,addExercise,addWorkout,updateWorkout}=useTrainingLibrary();const {recommendation}=useDailyRecommendation();
+  const [params]=useSearchParams();const {records}=useWorkoutHistory();const {recovery,profile,updateProfile}=useAdaptiveTraining();const {goals}=useGoals();const {strategy,updateStrategy}=useCoachingStrategy();const {setup,saveSetup}=useProfileSetup();const weightUnit=setup?.units==='Metric'?'kg':'lb';const {exercises,workouts,addExercise,addWorkout,updateWorkout}=useTrainingLibrary();const {recommendation,anchorDate}=useDailyRecommendation();
 const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number(strengthGoal?.target.replace(/[^0-9.]/g,''))||undefined;
   const savedPlan=useMemo(()=>{try{return JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:Array<{name:string;dayType:string;muscles?:string[];exercises?:string[]}>}|null}catch{return null}},[setup]);const splitDays=savedPlan?.days||[];const fallbackDay=setup?.splitDays.find(day=>day.type!=='Rest');const dueDay=recommendation?{name:recommendation.splitDay.name,dayType:recommendation.splitDay.type,muscles:recommendation.splitDay.muscles,exercises:recommendation.splitDay.exercises}:splitDays[0]||null;const dueMuscles=normalizeMuscleGroups(recommendation?.splitDay.muscles||dueDay?.muscles||fallbackDay?.muscles||[]).filter(muscle=>muscle!=='Cardio');const strengthLibrary=exercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));const completedStrength=records.flatMap(record=>(record.topSets||[]).filter(set=>set.completed!==false).map(set=>({date:record.date,lift:set.lift})));const templates=(recommendation?.topSets.length?recommendation.topSets.map(set=>({exercise:set.exercise,calculatedMax:set.calculatedMax,exposureIndex:new Set(completedStrength.filter(result=>result.lift===set.exercise).map(result=>result.date)).size})):strengthLibrary.slice(0,1).map(exercise=>({exercise:exercise.name,calculatedMax:0,exposureIndex:0})));if(!templates.length)templates.push({exercise:'Strength exercise',calculatedMax:0,exposureIndex:0});const intelligence=buildTrainingIntelligence({records,recovery,templates,/* CANONICAL KEY, because that is what buildTrainingIntelligence reads it
        with. A "Back Squat" goal keyed as "Back Squat" and was looked up as
@@ -44,21 +44,21 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     const index=currentWeekIndex(stored);
     const raw=stored.plan.weeks[index];
     if(!raw)return null;
-    const bests=new Map<string,number>();const singles=new Map<string,number>();
-    records.forEach(record=>(record.topSets||[]).forEach(set=>{
-      if(set.completed===false||!set.lift||!set.weight)return;
-      const key=canonicalLiftKey(set.lift);
-      const max=set.calculatedMax||calculateEstimatedOneRepMax(set.weight,set.reps)||0;
-      if(max>(bests.get(key)||0))bests.set(key,max);
-      if(set.reps===1&&set.weight>(singles.get(key)||0))singles.set(key,set.weight);
-    }));
+    /* THE SHARED BUILDER, NOT A FOURTH COPY. This rebuilt bests and singles by
+       hand and had no anchors, no session counts, no miss counts and no last
+       completed loads — so resolvePlanWeek, whose entire purpose is that every
+       surface reads the same resolved week, was handed a thinner history here
+       than the Plan tab gives it. The coach could quote a load the screen does
+       not show, which is the one thing it must never do. */
+    const history=bestsFromHistory(records);
+    const {bests,singles}=history;
     /* The SAME seven-day window the Plan tab and Today measure — anything else
        splits the week's miles differently and the coach quotes a distance no
        screen shows. */
     const cycleDays=splitDays.map(day=>({name:day.name,dayType:day.dayType,exercises:day.exercises||[]}));
     const planRhythm=(savedPlan as {rhythm?:string}|null)?.rhythm==='weekly'?'weekly':'rolling';
-    const windowDays=weekCycleDays(stored.startDate,index,cycleDays,planRhythm,recommendation?{position:recommendation.splitDay.position}:undefined);
-    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles},{weekIndex:index,blockWeeks:stored.plan.weeks.length,waveIndex:waveIndexOf(stored,index)},{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric'},windowDays);
+    const windowDays=weekCycleDays(stored.startDate,index,cycleDays,planRhythm,recommendation?{position:recommendation.splitDay.position,dateIso:anchorDate}:undefined);
+    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles},{weekIndex:index,blockWeeks:stored.plan.weeks.length,waveIndex:waveIndexOf(stored,index)},{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric',anchors:history.anchors,sessions:history.sessions,misses:history.misses,lastAt:history.lastAt},windowDays);
   },[records,goals,setup,profile,splitDays.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const dynamicAnswers:Record<string,string>={
     'What should I train today?':recommendation?`${recommendation.splitDay.name} is next because completed workout history placed the split at position ${recommendation.splitDay.position}. ${recommendation.topSets.filter(set=>set.selected).map(set=>set.source==='history'?`${set.exercise}: ${set.weight} ${weightUnit} × ${set.reps}`:`${set.exercise}: establish a baseline`).join(' · ')}${recommendation.cardio?.selected?` · ${recommendation.cardio.summary}`:''}`:`${dueDay?.name||fallbackDay?.name||'Your next split day'} is due. ${intelligence.reason}`,
