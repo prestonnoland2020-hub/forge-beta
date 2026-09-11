@@ -225,9 +225,11 @@ Deno.serve(async request => {
       return estimate > bestEstimate ? set : best;
     }, null);
     const topSet = heaviest ? `${heaviest.lift_name} ${Number(heaviest.weight)} ${unit} × ${Number(heaviest.reps)}` : '';
-    /* "Run · 2.27 mi · 21:04" — the distance is the part that fits. */
+    /* "Run · 2.27 mi · 21:04" — the distance is the part that fits. A bare
+       "Run" is a session someone opened and never filled in, worth no miles
+       and no minutes; it is not news. */
     const cardioParts = String((session?.cardio_sessions as Array<{ activity: string; summary: string }> | null)?.[0]?.summary || '').split(' · ').filter(Boolean);
-    const cardioLine = cardioParts.length > 1 ? `${cardioParts[0]} ${cardioParts[1]}` : cardioParts[0] || '';
+    const cardioLine = cardioParts.length > 1 ? `${cardioParts[0]} ${cardioParts[1]}` : '';
     const did = [topSet, cardioLine].filter(Boolean).join(' · ');
     const { data: links } = await admin.from('friendships')
       .select('requester_id,addressee_id').eq('status', 'accepted')

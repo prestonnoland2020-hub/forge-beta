@@ -62,8 +62,11 @@ export function PartnerDetailPage() {
     ? `${partner.topLift} ${partner.topWeight} ${weightUnit} × ${partner.topReps}`
     : '';
   /* The feed sends "Run · 2.27 mi · 21:04"; the activity is the label and the
-     rest is the session. */
-  const cardio = (partner?.cardioSummary || '').split(' · ').filter(Boolean);
+     rest is the session. A bare "Run" is a session someone opened and never
+     filled in — no distance, no time — so there is nothing to put on the right
+     of the row and the row does not belong on the screen. */
+  const cardioParts = (partner?.cardioSummary || '').split(' · ').filter(Boolean);
+  const cardio = cardioParts.length > 1 ? cardioParts : [];
 
   if (loading) return <div className="stack-xl"><section className="card"><p>Loading…</p></section></div>;
   if (!partner) return <div className="stack-xl"><section className="card"><p>This partner is no longer on your list.</p></section></div>;
@@ -90,7 +93,7 @@ export function PartnerDetailPage() {
       {partner.trainedToday && (topSet || cardio.length)
         ? <div className="pv-lines">
             {topSet && <div className="pv-line"><span className="pv-line-name">{partner.topLift}</span><span className="pv-line-value">{partner.topWeight} <small>{weightUnit}</small> × {partner.topReps}</span></div>}
-            {cardio.length > 0 && <div className="pv-line"><span className="pv-line-name">{cardio[0]}</span><span className="pv-line-value">{cardio.slice(1).join(' · ') || '—'}</span></div>}
+            {cardio.length > 0 && <div className="pv-line"><span className="pv-line-name">{cardio[0]}</span><span className="pv-line-value">{cardio.slice(1).join(' · ')}</span></div>}
           </div>
         : <p className="partner-empty">{partner.trainedToday
             ? `${theirName} logged a session today without a top set or a run in it.`

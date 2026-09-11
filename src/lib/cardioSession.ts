@@ -91,6 +91,25 @@ export function bestRunPaceMinutesPerMile(draft:CardioLogDraft):number{
    when it carries both.
 
    A session logged as one line is one effort, which is what a steady run is. */
+/* IS THERE A SESSION HERE AT ALL?
+
+   Adam's Saturday run reached Preston's phone as "Run —". It was saved with a
+   distance of zero and a time of zero: the builder was opened, the activity
+   was picked, and the numbers never went in. Forge wrote the row anyway, so
+   the day carried a run worth no miles, no minutes and no pace — it counted
+   for nothing in his mileage, nothing in his pace history, and showed up on
+   his partner's screen as a dash.
+
+   A session needs one real number somewhere. Time alone is a session: a
+   forty-five minute bike has no distance and is still training. Neither is
+   not. */
+export function isLoggedCardio(draft:CardioLogDraft):boolean{
+  const legacy=legacyCardioIntervals(draft);
+  if(legacy.length)return legacy.some(line=>(Number(line.distance)||0)>0||(Number(line.time)||0)>0);
+  const totals=summarizeCardioDraft(draft);
+  return (Number(totals.distance)||0)>0||(Number(totals.minutes)||0)>0;
+}
+
 export function continuousRunEfforts(draft:CardioLogDraft):Array<{miles:number;minutes:number}>{
   if(isNonRunningCardio(draft.activity)||/\bwalk\b/i.test(draft.activity))return [];
   const legacy=legacyCardioIntervals(draft);

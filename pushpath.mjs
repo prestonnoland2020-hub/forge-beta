@@ -220,6 +220,14 @@ await call({ kind: 'partner', owner_id: 'actor' });
 check('and an empty one falls back to the old line',
   state.pushed[0]?.payload.body === 'Adam Gomez trained today. You haven’t logged yet.', state.pushed[0]?.payload.body);
 
+/* A run opened and never filled in — no distance, no time — reached Preston's
+   phone as "Run —". It is worth no miles and no minutes, so it is not news. */
+state.sentLog = []; state.subs = [sub('friend', AFTERNOON)];
+state.workouts = session([{ lift_name: 'Bench', weight: 185, reps: 13 }], [{ activity: 'Run', summary: 'Run' }]);
+await call({ kind: 'partner', owner_id: 'actor' });
+check('a cardio row with no numbers in it is left out',
+  /Bench 185 lb × 13\. You haven’t logged yet\./.test(state.pushed[0]?.payload.body || ''), state.pushed[0]?.payload.body);
+
 console.log('\nWhen it cannot send');
 state.sentLog = [];
 state.vapid = { pub: 'PUB', priv: '' };

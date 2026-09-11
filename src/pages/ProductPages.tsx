@@ -7,7 +7,7 @@ import { CardioBuilder } from '../components/CardioBuilder';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { useWorkoutHistory, type LoggedTopSet, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { cardioMiles, formatCardioSummary, summarizeCardioDraft, type CardioLogDraft } from '../lib/cardioSession';
+import { cardioMiles, formatCardioSummary, isLoggedCardio, summarizeCardioDraft, type CardioLogDraft } from '../lib/cardioSession';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { TopSetCards } from '../components/TopSetCards';
 import { TopSetSheet, type TopSetDraft } from '../components/TopSetSheet';
@@ -251,7 +251,12 @@ function WorkoutEditor() {
   const todayRecord=records.find(record=>record.date===sessionIso);
   const cardioKey=(entries:CardioLogDraft[]=[])=>JSON.stringify(entries.map(entry=>`${entry.id}:${entry.summary}`));
   const cardioSignature=useRef(cardioKey(editingRecord?.cardioSessions??todayRecord?.cardioSessions));
-  const persistCardio=(entries:CardioLogDraft[])=>{
+  const persistCardio=(allEntries:CardioLogDraft[])=>{
+    /* A SESSION NEEDS ONE REAL NUMBER. An entry saved with no distance and no
+       time is not a workout: it counts for nothing in mileage, nothing in pace
+       history, and it reached Adam's training partner as "Run —". Time alone
+       still counts — a 45-minute bike has no distance and is real training. */
+    const entries=allEntries.filter(isLoggedCardio);
     const signature=cardioKey(entries);
     if(signature===cardioSignature.current)return;
     interacted.current=true;
