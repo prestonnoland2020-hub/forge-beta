@@ -2,7 +2,7 @@ import type { CreatedGoal } from '../components/GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { prescribeTopSet } from './strengthPrescription';
 import { canonicalLiftKey } from './liftAliases';
-import { bestsFromHistory, waveSlot, WAVE_LENGTH, LONG_RUN_MIN_SHARE, LONG_RUN_MAX_SHARE } from '../features/training/aiPlanService';
+import { bestsFromHistory, waveSlot, WAVE_LENGTH, LONG_RUN_MIN_SHARE, LONG_RUN_MAX_SHARE ,longRunCap} from '../features/training/aiPlanService';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import type { CardioLogDraft } from './cardioSession';
 import { localDayIso } from './time';
@@ -100,7 +100,7 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
        slowly from the current longest run. It was previously FLOORED at the
        lifetime longest, which put a 13.2 mi long run inside a 14 mi week and
        froze it there for a year. */
-    const durabilityCap=profile.longestRunMiles+index*0.3;
+    const durabilityCap=longRunCap(profile.longestRunMiles,index);
     /* The same 25–35% band the resolver uses; .35 flat here put a different
        long run on the roadmap than the program showed for the same week. */
     const longMiles=hasRunBaseline?(Math.min(Math.max(mileage*LONG_RUN_MIN_SHARE,Math.min(3,mileage)),Math.min(mileage*LONG_RUN_MAX_SHARE,durabilityCap))*(taper?.72:test?.55:deload?.85:1)).toFixed(1):'0';const longMinutes=Number(longMiles)*(easyAnchor?easyAnchor/60:10);const easyMinutes=hasRunBaseline?Math.round(Math.max(20,Math.min(45,Math.min(longMinutes*.8,mileage/Math.max(1,profile.runningDays)*10)))):0;

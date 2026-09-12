@@ -129,3 +129,74 @@ export function MileageCheckOnGoal({ goal, onClose }: { goal: CreatedGoal; onClo
     </div>
   </div>;
 }
+
+/* THE CHECK THAT RUNS WHEN THE APP OPENS, FOR EVERY ATHLETE.
+
+   The standing cards on Plan and Goals only speak to someone who goes looking.
+   An athlete whose goal cannot be reached on the running they do should be
+   told on the way in, by the coach, with the fix attached — that is the whole
+   point of having a coach rather than a spreadsheet.
+
+   It is deliberately not a nag. One ask per day, and the ask is keyed to the
+   numbers behind it: dismissing it keeps it shut until the goal, the ceiling,
+   the floor or the running actually changes, at which point the answer is a
+   different answer and worth hearing again. */
+const CHECK_KEY = 'forge-mileage-check-v1';
+const today = () => new Date().toISOString().slice(0, 10);
+const fingerprintOf = (gap: MileageGap) =>
+  [gap.goal, gap.kind, gap.needed, gap.ceiling, gap.floor, Math.round(gap.base), gap.weeksAvailable].join('|');
+
+const alreadyAsked = (fingerprint: string) => {
+  try {
+    const raw = localStorage.getItem(CHECK_KEY);
+    if (!raw) return false;
+    const seen = JSON.parse(raw) as { fingerprint?: string; date?: string };
+    return seen.fingerprint === fingerprint && seen.date === today();
+  } catch { return false; }
+};
+const rememberAsked = (fingerprint: string) => {
+  try { localStorage.setItem(CHECK_KEY, JSON.stringify({ fingerprint, date: today() })); } catch { /* private mode */ }
+};
+
+export function MileageStartupCheck() {
+  const { goals } = useGoals();
+  const { records } = useWorkoutHistory();
+  const { setup, saveSetup, loading } = useProfileSetup();
+  const [closed, setClosed] = useState(false);
+  const metric = setup?.units === 'Metric';
+  const unit = metric ? 'km' : 'mi';
+  const show = (miles: number) => Math.round(metric ? miles * 1.609344 : miles);
+  const gap = useMemo(() => mileageGap(goals, records, setup), [goals, records, setup]);
+
+  /* HISTORY HAS TO HAVE ARRIVED BEFORE THIS CAN JUDGE. Asked while records are
+     still loading, "you are running 0 miles" is a statement about the network,
+     not about the athlete — and it would be the first thing they saw. */
+  const ready = !loading && Boolean(setup?.completedAt) && goals.length > 0;
+  const fingerprint = gap ? fingerprintOf(gap) : '';
+  /* Read once, on mount. Reading it every render would hide the dialog the
+     instant the answer is written, before the athlete's press has been acted
+     on. */
+  const [seenBefore] = useState(() => alreadyAsked(fingerprint));
+
+  /* THE ASK IS RECORDED WHEN IT IS ANSWERED, NOT WHEN IT IS SHOWN. Writing it
+     on render meant closing the app without answering counted as an answer,
+     and the one thing the athlete needed to know went quiet for a day. */
+  const finish = (next?: typeof setup) => {
+    rememberAsked(fingerprint);
+    if (next) saveSetup(next);
+    setClosed(true);
+  };
+
+  if (!ready || !gap || closed || seenBefore) return null;
+
+  return <div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Running volume for your goal">
+    <div className="mileage-check">
+      <GateCard
+        gap={gap} unit={unit} show={show}
+        heading="Forge checked your goals"
+        onBuild={() => finish(setup && applyMileageRamp(setup, gap))}
+        onMinimum={() => finish(setup && applyMileageGap(setup, gap))}
+        onDismiss={() => finish()} />
+    </div>
+  </div>;
+}

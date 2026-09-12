@@ -114,6 +114,18 @@ export async function generateAiPlan(context: Record<string, unknown>): Promise<
    band — three long runs for one week, all on screen together. */
 export const LONG_RUN_MIN_SHARE = 0.25;
 export const LONG_RUN_MAX_SHARE = 0.35;
+/* HOW FAST A LONG RUN MAY GROW, IN ONE PLACE.
+
+   The roadmap grew it 0.3 mi a week from the athlete's lifetime longest; the
+   week resolver allowed a mile a week from the longest it could see, recent
+   runs included. Two rules for one number, so the roadmap and the program
+   printed different long runs for the same week. A mile a week off the
+   longest run Forge actually knows about, never below six — which is the
+   distance at which "long run" starts meaning anything — and no cap at all
+   for an athlete who has never logged one, where the share of the week is the
+   only thing that should bind. */
+export const longRunCap = (longestKnown: number, weekIndex: number) =>
+  longestKnown > 0 ? Math.max(6, longestKnown + 1 + Math.max(0, weekIndex)) : Infinity;
 export const WAVE_REPS = [8, 6, 4, 2, 1] as const;
 export const WAVE_LENGTH = WAVE_REPS.length;
 export const waveSlot = (weekIndex: number) => ({ reps: WAVE_REPS[weekIndex % WAVE_LENGTH], isMax: weekIndex % WAVE_LENGTH === WAVE_LENGTH - 1 });
@@ -503,7 +515,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      run is 13.7 miles a 27-mile day. It may grow ~1 mile a week from their
      longest logged run; with no logged longest, the share caps alone hold. */
   const longestKnown = Math.max(Number(athlete.longestRunMiles) || 0, Number(athlete.recentLongestRun) || 0);
-  const longCap = longestKnown > 0 ? Math.max(6, longestKnown + 1 + weekIndex) : Infinity;
+  const longCap = longRunCap(longestKnown, weekIndex);
   /* A long run the athlete has already been doing is the floor for the long
      run, not a stretch goal — bounded by the week's volume, so it cannot eat
      the whole week on a deload. */

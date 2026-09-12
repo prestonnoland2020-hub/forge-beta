@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { MileageStartupCheck } from './MileageGate';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -256,6 +257,11 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       <NavLink to="/history" aria-label="Activities"><NavGlyph name="history"/><small>Activities</small></NavLink>
       <NavLink to="/profile" aria-label="Profile"><NavGlyph name="you"/><small>Profile</small></NavLink>
     </nav>
+    {/* THE COACH SPEAKS FIRST WHEN IT HAS SOMETHING THAT MATTERS. An athlete
+        whose goal cannot be reached on the running they do is told on the way
+        in, once a day, with the fix attached — not left to find a card on a
+        tab they may never open. */}
+    <MileageStartupCheck />
     {coachOpen && coachExpanded && <button className="coach-bubble-backdrop" type="button" aria-label="Close expanded Forge coach" onClick={() => setCoachExpanded(false)} />}
     <div className={`${coachExpanded ? 'coach-bubble-shell expanded' : 'coach-bubble-shell'}${location.pathname === '/coach' || location.pathname === '/workout' ? ' coach-bubble-hidden' : ''}`}>
       <section className={coachOpen ? 'coach-bubble-panel open' : 'coach-bubble-panel'} aria-hidden={!coachOpen} aria-label="Forge AI coach">
