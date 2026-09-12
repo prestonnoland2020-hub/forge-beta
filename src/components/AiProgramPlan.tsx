@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { bestRunDay, interferenceNotes, type PlannedDay } from '../lib/interference';
+import { paceModel } from '../lib/paceModel';
+import { weeksUntil } from '../lib/goalFeasibility';
 import { enduranceTarget } from '../lib/qualitySession';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
@@ -20,7 +23,7 @@ import { runShapedActivity } from '../features/training/stravaImportService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
+  weeksRemaining, currentWeekIndex, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
   bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
   calendarEmptyState, provenMax,
 } from '../features/training/aiPlanService';
@@ -46,7 +49,12 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    split-day name), but two hard guards run regardless of what the AI said:
    the quality session never lands on a lower-body day, and if the AI chose
    one anyway it is relocated to the best non-lower day of the week. */
-function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi'): Session[] {
+/* Returns the week's sessions AND where the running landed. The placement is
+   not a detail of rendering: it is what lets the screen say why the long run
+   is where it is, and that sentence is the difference between an instruction
+   and coaching. */
+type WeekPlan = { sessions: Session[]; days: PlannedDay[]; longIndex: number; hardIndex: number };
+function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi'): WeekPlan {
   /* The window comes from `weekCycleDays` — the same function the volume math
      uses. This was a byte-identical second copy of that rotation, which meant
      the schedule and the mileage that must agree were computed twice and free
@@ -71,10 +79,21 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     ? dayInfos.findIndex((info, index) => info.day.name === week.qualityDay && !info.lower && index !== longIndex)
     : -1;
   if (qualityIndex < 0 && week.quality && !/no goal/i.test(week.quality) && week.qualityDay) {
-    /* The AI picked a lower-body day (or a name that doesn't land this week):
-       relocate to the best non-lower day — cardio-type first, then any. */
-    qualityIndex = dayInfos.findIndex((info, index) => !info.lower && index !== longIndex && info.day.dayType.toLowerCase() === 'cardio');
-    if (qualityIndex < 0) qualityIndex = dayInfos.findIndex((info, index) => !info.lower && index !== longIndex && info.day.dayType.toLowerCase() !== 'rest');
+    /* The AI picked a lower-body day, or a name that does not land this week.
+       "The first day that is not a leg day" was the old answer and it is the
+       wrong one: on a split where every clear day sits between two heavy ones,
+       it puts the hard run in the worst place available and calls it solved.
+       The right answer is the day FURTHEST from heavy lifting, which is the
+       same answer on an easy split and a much better one on a hard split. */
+    const placed = bestRunDay(
+      dayInfos.map((info, index) => ({
+        name: info.day.name, index,
+        lowerBody: info.lower,
+        rest: info.day.dayType.toLowerCase() === 'rest',
+      })),
+      longIndex >= 0 ? [longIndex] : [],
+    );
+    qualityIndex = placed;
   }
   const easyPool = [...(week.easyDays || [])];
   const easySet = new Set<number>();
@@ -94,8 +113,14 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     hasHold: Boolean(info.topSet?.hold),
     cost: (index === longIndex ? 2 : 0) + (index === qualityIndex ? 3 : 0) + (easySet.has(index) ? 1 : 0),
   })));
+  const placedDays: PlannedDay[] = dayInfos.map((info, index) => ({
+    name: info.day.name, index,
+    lowerBody: info.lower,
+    rest: info.day.dayType.toLowerCase() === 'rest',
+    maxAttempt: attemptDays.has(index),
+  }));
   /* Pass 2 — render sessions. */
-  return dayInfos.map(({ date, day, topSet: rawTopSet, topSets: rawTopSets }, index) => {
+  const rendered = dayInfos.map(({ date, day, topSet: rawTopSet, topSets: rawTopSets }, index) => {
     const demoted = rawTopSet?.reps === 1 && rawTopSet.hold && !attemptDays.has(index);
     const topSet = demoted && rawTopSet?.hold ? { ...rawTopSet, ...rawTopSet.hold } : rawTopSet;
     const extraSets = (rawTopSets || []).slice(1);
@@ -124,6 +149,7 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     if (runText) return { date, kind: runKind, title: day.name, detail: runText, stress: runStress || 'Low', lifts, run };
     return { date, kind: 'Flexible', title: day.name, detail: 'Nothing required today — the week’s running is already covered.', stress: 'Low' as const, lifts, run };
   });
+  return { sessions: rendered, days: placedDays, longIndex, hardIndex: qualityIndex };
 }
 
 export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', minWeeklyMileage, maxWeeklyMileage }: { goals: CreatedGoal[]; profile: AdaptiveProfile; splitDays: SplitDay[]; rhythm?: 'rolling' | 'weekly'; minWeeklyMileage: number; maxWeeklyMileage: number }) {
@@ -202,6 +228,25 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const goalLifts = useMemo(() => goalLiftNames(goals), [goals]);
   /* The dated endurance goal the hard run is built for. */
   const runGoal = useMemo(() => enduranceTarget(goals), [goals]);
+  /* HOW LONG EACH GOAL HAS LEFT. When a max attempt and a race-effort week
+     land in the same seven days, the nearer goal keeps the week — it is the
+     only one for which this week cannot be replaced. */
+  const horizons = useMemo(() => {
+    const soonest = (type: string) => goals
+      .filter(goal => goal.type === type && goal.date)
+      .map(goal => weeksUntil(goal.date))
+      .filter(weeks => Number.isFinite(weeks))
+      .sort((a, b) => a - b)[0];
+    return { weeksToRace: soonest('Endurance') ?? Infinity, weeksToLiftGoal: soonest('Strength') ?? Infinity };
+  }, [goals]);
+  /* EVERY TRAINING PACE, FROM ONE PIECE OF EVIDENCE. Built from the athlete's
+     hardest recent continuous run, corrected for how far their weekly running
+     falls short of what that pace is normally built on — so a fast mile off
+     eight miles a week does not become a marathon pace nobody can hold. */
+  const paces = useMemo(
+    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records, 10)),
+    [records, runGoal],
+  );
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */
@@ -471,7 +516,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored) }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored), liftingMaxWeek: waveSlot(waveIndexOf(stored, index)).isMax, weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),
@@ -479,7 +524,17 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const currentIndex = currentWeekIndex(stored);
   const weekIndex = Math.max(0, Math.min(viewWeek ?? currentIndex, plan.weeks.length - 1));
   const week = plan.weeks[weekIndex];
-  const sessions = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi');
+  const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi');
+  const sessions = weekPlan.sessions;
+  /* WHY THE WEEK LOOKS LIKE THIS. At most one line, and only when there is
+     something true to say — a peak that had to give way, a long run on legs
+     that lifted yesterday, or a split with no room in it at all. */
+  const collision = interferenceNotes({
+    days: weekPlan.days, longRunIndex: weekPlan.longIndex, hardRunIndex: weekPlan.hardIndex,
+    liftingMaxWeek: waveSlot(waveIndexOf(stored, weekIndex)).isMax,
+    runningPeakWeek: ['Race', 'Taper', 'Peak', 'Specific'].includes(String(week.phase)),
+    weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal,
+  })[0];
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
      of them, not whichever goal happened to be created first — falling back to
      the heaviest set of the week when no goal lift is on the calendar. */
@@ -572,6 +627,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {/* Today belongs to today. Looking at week six, there is no "today" in it,
         and a card headed TODAY over a week in October would be a lie. */}
     {weekIndex === currentIndex && <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />}
+    {collision ? <p className="pv-collision">{collision.say}</p> : null}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />

@@ -8,6 +8,8 @@
    away rather than the calendar insisting. */
 import { qualitySession, qualityKindFor, thresholdMinutes, enduranceTarget, qualityPhaseFor, thresholdPaceFor, THRESHOLD_PACE_MULTIPLE, QUALITY_MAX_SHARE } from './src/lib/qualitySession.ts';
 import { resolveWeekRunning } from './src/features/training/aiPlanService.ts';
+import { eventProfileFor } from './src/lib/eventProfile.ts';
+import { phaseFor } from './src/lib/trainingPhase.ts';
 
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
@@ -91,7 +93,7 @@ check('and cutting back means less of it', tired.miles <= fresh.miles, `${fresh.
 console.log('\nDeload, taper and test are themselves');
 check('a deload stops while fresh', qualitySession(ctx({ phase: 'Deload' })).kind === 'fartlek');
 check('a taper is strides', qualitySession(ctx({ phase: 'Taper' })).kind === 'strides');
-check('the test week is the test', qualitySession(ctx({ phase: 'Test' })).kind === 'test');
+check('the test week is the test', qualitySession(ctx({ phase: 'Race' })).kind === 'test');
 
 console.log('\nNothing invented without a goal or a baseline');
 check('no goal pace, no prescription', qualitySession(ctx({ goalPaceSecondsPerMile: 0 })).kind === 'none');
@@ -150,7 +152,7 @@ check('below 55 the hard run comes off', /recovered/i.test(rough.quality), rough
 console.log('\nPhase mapping keeps the two calendars in step');
 check('a running deload is a deload', qualityPhaseFor('Build', true) === 'Deload');
 check('but never at the cost of the taper', qualityPhaseFor('Taper', true) === 'Taper');
-check('nor of race week', qualityPhaseFor('Race', true) === 'Test');
+check('nor of race week', qualityPhaseFor('Race', true) === 'Race');
 
 console.log('\nThe plan is tailored to the goal, not to one distance it was tuned on');
 /* "each person is not the same its dependant on their goals." Threshold used
@@ -186,15 +188,51 @@ check('threshold crosses goal pace at about an hour of racing',
 check('threshold gets slower as the goal gets longer, every step',
   thresholds.every((event, index) => index === 0 || event.thr > thresholds[index - 1].thr));
 
-console.log('\nReps are sized to the race, not to a 5K');
-const repsFor = event => qualitySession({ phase: 'Specific', weekIndex: 4, goalPaceSecondsPerMile: paceOf(event.seconds, event.miles), weeklyMiles: 40, goalMiles: event.miles }).text;
-check('a miler gets short reps', /\b[23]00 m\b/.test(repsFor(find('Mile 4'))), repsFor(find('Mile 4')));
-check('a marathoner gets long ones', /mi @/.test(repsFor(find('Marathon'))), repsFor(find('Marathon')));
-check('nobody is asked to race the session', EVENTS.every(event => {
-  const text = repsFor(event);
-  const rep = text.match(/@ (\d+):(\d{2})\/rep/);
-  return Boolean(rep);
-}));
+console.log('\nThe SESSION MIX is event-specific, not one rotation wearing six names');
+/* This is the part of the coaching brief that actually distinguishes the
+   distances. A miler is limited by turnover when the aerobic system is already
+   saturated; a marathoner by holding a pace that never saturates it. Same
+   weeks, same alternation, two athletes who need opposite training. */
+const blockFor = (event, weeks = 12) => Array.from({ length: weeks }, (_, index) => {
+  const profile = eventProfileFor(event.miles);
+  const phase = phaseFor({ weekIndex: index, blockWeeks: weeks, weeksToRace: weeks + 3, deloading: index % 5 === 3, shape: profile.shape });
+  return qualitySession({ phase, weekIndex: index, goalPaceSecondsPerMile: paceOf(event.seconds, event.miles), weeklyMiles: 40, goalMiles: event.miles });
+});
+const kindsIn = event => new Set(blockFor(event).map(session => session.kind));
+const mileKinds = kindsIn(find('Mile 4'));
+const maraKinds = kindsIn(find('Marathon'));
+check('a mile build contains repetition work', mileKinds.has('reps'), [...mileKinds].join(', '));
+check('a marathon build does not', !maraKinds.has('reps'), [...maraKinds].join(', '));
+check('a marathon build contains race-pace running', maraKinds.has('racepace'), [...maraKinds].join(', '));
+check('and still keeps threshold work under it', maraKinds.has('threshold'));
+check('a 5K build is threshold and VO2max, and neither of the extremes',
+  kindsIn(find('5K')).has('threshold') && kindsIn(find('5K')).has('intervals') && !kindsIn(find('5K')).has('reps'),
+  [...kindsIn(find('5K'))].join(', '));
+check('the mile and the marathon do not get the same block',
+  blockFor(find('Mile 4')).map(session => session.kind).join() !== blockFor(find('Marathon')).map(session => session.kind).join());
+
+console.log('\nRace-specific work is sized to the race and grows through the block');
+const maraRace = blockFor(find('Marathon')).filter(session => session.kind === 'racepace');
+check('a marathoner gets race-pace miles, not 400s', maraRace.every(session => /mi @/.test(session.text)), maraRace[0]?.text);
+check('and the segment gets longer as the race nears',
+  maraRace.length < 2 || maraRace[maraRace.length - 1].miles > maraRace[0].miles,
+  maraRace.map(session => session.miles).join(' → '));
+check('a miler\'s race-pace work is a few hundred metres, not miles',
+  blockFor(find('Mile 4')).filter(session => session.kind === 'racepace').every(session => / m @/.test(session.text)),
+  blockFor(find('Mile 4')).find(session => session.kind === 'racepace')?.text);
+
+console.log('\nVO2max reps stay in the band the physiology lives in');
+for (const event of EVENTS) {
+  const reps = blockFor(event).filter(session => session.kind === 'intervals');
+  const metres = reps.map(session => {
+    const asMiles = session.text.match(/× ([\d.]+) mi/);
+    return asMiles ? Number(asMiles[1]) * 1609.344 : Number(session.text.match(/× (\d+) m/)?.[1] || 0);
+  }).filter(Boolean);
+  check(`${event.label.padEnd(14)} reps are 300–2000 m`, metres.every(value => value >= 300 && value <= 2000),
+    metres.join(', ') || 'none');
+}
+check('nothing is prescribed faster than the athlete can run it',
+  EVENTS.every(event => blockFor(event).every(session => !/@ 0:0\d\//.test(session.text))));
 
 console.log('\nWhich race the block is for is decided, not left to database order');
 /* Preston's live goals: a mile, a two mile and a 5K, all dated the same day.

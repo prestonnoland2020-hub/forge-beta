@@ -1,5 +1,10 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
 import { qualitySession, enduranceTarget } from './qualitySession';
+import { phaseFor } from './trainingPhase';
+import { weeksUntil } from './goalFeasibility';
+import { paceModel } from './paceModel';
+import { eventProfileFor } from './eventProfile';
+import { deloadWeek } from './interference';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { prescribeTopSet } from './strengthPrescription';
 import { canonicalLiftKey } from './liftAliases';
@@ -7,9 +12,10 @@ import { bestsFromHistory, waveSlot, WAVE_LENGTH, LONG_RUN_MIN_SHARE, LONG_RUN_M
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import type { CardioLogDraft } from './cardioSession';
 import { localDayIso } from './time';
+import type { TrainingPhase } from './trainingPhase';
 import { anchorsPace } from './runQuality';
 
-export type PlanWeek={week:number;start:string;startDate:string;phase:'Foundation'|'Build'|'Specific'|'Deload'|'Taper'|'Test';mileage:number;change:number;strengthFocus:string;topSet:string;strengthExercise:string;strengthLoad:number;strengthReps:number;calculatedMax:number;strengthGoal:number;goalPercent:number;quality:string;longRun:string;easy:string;why:string;adjustment:string};
+export type PlanWeek={week:number;start:string;startDate:string;phase:TrainingPhase;mileage:number;change:number;strengthFocus:string;topSet:string;strengthExercise:string;strengthLoad:number;strengthReps:number;calculatedMax:number;strengthGoal:number;goalPercent:number;quality:string;longRun:string;easy:string;why:string;adjustment:string};
 const num=(value?:string)=>Number(String(value||'').replace(/[^0-9.]/g,''))||0;
 const dateLabel=(date:Date)=>date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 const clockSeconds=(value?:string)=>{const match=String(value||'').match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);if(!match)return 0;return (Number(match[1]||0)*3600)+(Number(match[2])*60)+Number(match[3])};
@@ -63,7 +69,7 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
     const progress=index/Math.max(1,total-1);
     const taper=Boolean(endurance)&&index+1>Math.max(1,total-2);
     const test=waveSlot(index).isMax;
-    const deload=!taper&&!test&&index%WAVE_LENGTH===WAVE_LENGTH-2;
+    const deload=!taper&&!test&&deloadWeek(index,WAVE_LENGTH);
     /* A SHORT HORIZON DOES NOT LICENSE A BIG JUMP. The smooth ramp divides the
        whole climb by however many weeks are left, so three weeks out it asked
        for +75% in a week. Volume is rate-limited to 10% a week off the
@@ -72,6 +78,9 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
     const priorBuild=Math.min(smooth,startMileage*Math.pow(1.1,index));
     return Number((taper?priorBuild*(test?.55:.72):deload?priorBuild*.78:priorBuild).toFixed(1));
   };
+  /* ONE PACE MODEL FOR THE WHOLE ROADMAP, from the athlete's own running.
+     Built once: it is the same evidence every week of the plan reads. */
+  const runPaces=paceModel(records as never[],endurance?{paceSecondsPerMile:clockSeconds(endurance.target)/eventMiles(endurance),miles:eventMiles(endurance)}:null,localDayIso(),startMileage);
   return Array.from({length:total},(_,index)=>{
     const week=index+1;const weekDate=new Date();weekDate.setHours(12,0,0,0);weekDate.setDate(weekDate.getDate()+index*7);/* A taper is the two weeks before the race, and on a horizon shorter than
        three weeks every remaining week is one of them. */
@@ -82,7 +91,13 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
        always follows a lighter week — not "the last week of the horizon" and
        "every fourth week", which put DELOAD on the roadmap in a week the
        program called BUILD. */
-    const test=waveSlot(index).isMax;const deload=!taper&&!test&&index%WAVE_LENGTH===WAVE_LENGTH-2;const progress=index/Math.max(1,total-1);const phase:PlanWeek['phase']=test?'Test':taper?'Taper':deload?'Deload':progress<.25?'Foundation':progress<.65?'Build':'Specific';const mileage=weekMileage(index);/* THE CHANGE IS AGAINST LAST WEEK'S ACTUAL MILEAGE, not against a smooth
+    /* THE PHASE IS ABOUT THE RUNNING, and the lifting wave keeps its own clock.
+       These were one field: waveSlot().isMax — the LIFTING max week — was
+       written into the phase as 'Test', so a squat max week was labelled a
+       running test week, on the same screen where the block called it a build.
+       One function now names the phase, shaped by the event, and the max week
+       is asked about separately wherever it actually matters. */
+    const test=waveSlot(index).isMax;const deloadCut=deloadWeek(index,WAVE_LENGTH);const phase:PlanWeek['phase']=phaseFor({weekIndex:index,blockWeeks:total,weeksToRace:endurance?weeksUntil(endurance.date):undefined,deloading:deloadCut,shape:eventProfileFor(eventMiles(endurance)).shape});const deload=phase==='Deload';const progress=index/Math.max(1,total-1);const mileage=weekMileage(index);/* THE CHANGE IS AGAINST LAST WEEK'S ACTUAL MILEAGE, not against a smooth
        build curve that was never run. This re-evaluated the ramp for index-1
        and ignored the taper, deload and test multipliers that had actually been
        applied to that week — so the week after a deload showed "+9%" where the
@@ -99,7 +114,7 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
        ternaries that only ever produced short reps, which is why a 5K build
        had no threshold running in it at all. qualitySession owns the choice,
        the pace and the distance, and the resolver reads the same function. */
-    const quality=!endurance?'No goal-driven cardio':qualitySession({phase,weekIndex:index,goalPaceSecondsPerMile:goalPacePerMile,weeklyMiles:mileage,hasBaseline:hasRunBaseline,goalMiles:goalMilesTotal||undefined,readiness:profile.readiness}).text;/* The long run is a SHARE of the week (~35%), capped by durability that grows
+    const quality=!endurance?'No goal-driven cardio':qualitySession({phase,weekIndex:index,goalPaceSecondsPerMile:goalPacePerMile,weeklyMiles:mileage,hasBaseline:hasRunBaseline,goalMiles:goalMilesTotal||undefined,readiness:profile.readiness,paces:runPaces}).text;/* The long run is a SHARE of the week (~35%), capped by durability that grows
        slowly from the current longest run. It was previously FLOORED at the
        lifetime longest, which put a 13.2 mi long run inside a 14 mi week and
        froze it there for a year. */

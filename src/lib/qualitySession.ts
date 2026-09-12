@@ -21,8 +21,13 @@
    athlete stops while still fresh, a taper gets strides, the test week is the
    test, and a rough check-in downgrades whatever was scheduled. */
 
-export type QualityPhase = 'Foundation' | 'Build' | 'Specific' | 'Deload' | 'Taper' | 'Test';
-export type QualityKind = 'threshold' | 'intervals' | 'fartlek' | 'strides' | 'test' | 'baseline' | 'none';
+import type { PaceModel } from './paceModel';
+import { normalizePhase, type TrainingPhase } from './trainingPhase';
+import { eventProfileFor, sessionKindFor, type SessionKind } from './eventProfile';
+
+/* Kept as aliases so nothing that already speaks these names has to change. */
+export type QualityPhase = TrainingPhase | 'Test';
+export type QualityKind = SessionKind;
 
 export type QualityContext = {
   phase: QualityPhase;
@@ -36,8 +41,19 @@ export type QualityContext = {
   readiness?: number;
   /* False before the athlete has logged any running. */
   hasBaseline?: boolean;
-  /* Goal distance in miles, used to size threshold reps for the event. */
+  /* Goal distance in miles. Picks the event profile, which decides the whole
+     shape of the session — not just how long the reps are. */
   goalMiles?: number;
+  /* The most of the week this session may be. Defaults to the usual third;
+     an athlete who runs twice a week has a bigger share available because
+     there are fewer runs to spread it over. */
+  maxShare?: number;
+  /* THE ATHLETE'S DEMONSTRATED FITNESS. Given, every pace except the
+     race-specific one comes from what they have actually run; the goal is used
+     only for the work that is by definition run at goal pace. Absent, the
+     session falls back to deriving everything from the goal, which is what the
+     app did before it could tell the two apart. */
+  paces?: PaceModel;
 };
 
 export type QualitySession = { kind: QualityKind; text: string; miles: number };
@@ -92,63 +108,108 @@ export const clockText = (seconds: number) => {
    distance a track can actually measure. */
 const INTERVAL_MENU = [400, 400, 600, 800, 800, 1000, 1200, 1600];
 const TRACK_STEPS = [200, 300, 400, 600, 800, 1000, 1200, 1600, 2000, 2400, 3200, 4800];
+export const VO2_MIN_METRES = 300;
+export const VO2_MAX_METRES = 1600;
 const snapToTrack = (metres: number) => TRACK_STEPS.reduce((best, step) =>
   Math.abs(step - metres) < Math.abs(best - metres) ? step : best, TRACK_STEPS[0]);
 const repDistanceFor = (weekIndex: number, goalMiles = 3.107) => {
   const base = INTERVAL_MENU[clamp(Math.floor(weekIndex / 1.5), 0, INTERVAL_MENU.length - 1)];
-  const scale = clamp((goalMiles > 0 ? goalMiles : 3.107) / 3.107, 0.5, 4.2);
-  return snapToTrack(base * scale);
+  /* VO2max reps live in a narrow band whatever the race — 400s to 1200s for
+     almost everyone, because the physiology being trained is the same. It is
+     the RACE-SPECIFIC work that scales with the event, not this. A 200 m rep
+     is a sprint, and a 2-mile rep is a tempo run; neither is VO2max work. */
+  const scale = clamp((goalMiles > 0 ? goalMiles : 3.107) / 3.107, 0.8, 3);
+  /* And it is a HARD band, not a preference. Scaling a 1600 by three gives a
+     three-mile "rep", which is a tempo run with the wrong label on it; a 5K
+     athlete's 400 scaled down gives a 200, which is a sprint. VO2max work is
+     300 m to a mile for everybody, because the system being trained does not
+     care what race is on the calendar. */
+  return clamp(snapToTrack(base * scale), VO2_MIN_METRES, VO2_MAX_METRES);
 };
 
 /* How long a threshold effort runs, growing through the block and capped by
    what the week can actually hold. */
-export function thresholdMinutes(weekIndex: number, weeklyMiles: number, paceSecondsPerMile: number): number {
+export function thresholdMinutes(weekIndex: number, weeklyMiles: number, paceSecondsPerMile: number, maxShare = QUALITY_MAX_SHARE): number {
   const wanted = clamp(12 + weekIndex * 1.5, 12, 30);
   if (!paceSecondsPerMile || !weeklyMiles) return Math.round(wanted);
-  const budgetMiles = Math.max(0, weeklyMiles * QUALITY_MAX_SHARE - WARMUP_COOLDOWN_MILES);
+  const budgetMiles = Math.max(0, weeklyMiles * maxShare - WARMUP_COOLDOWN_MILES);
   const budgetMinutes = (budgetMiles * paceSecondsPerMile) / 60;
   return Math.max(8, Math.round(Math.min(wanted, budgetMinutes)));
 }
 
-/* WHICH KIND OF HARD, THIS WEEK. Phase sets the lean; the week index breaks
-   the tie, so the two alternate rather than one of them never appearing. */
+/* WHICH KIND OF HARD, THIS WEEK — for the default event. The real answer is
+   event-specific and lives in eventProfile; this is the thin front door for
+   callers that have a phase and a week and no goal distance to hand. */
 export function qualityKindFor(phase: QualityPhase, weekIndex: number): QualityKind {
-  if (phase === 'Test') return 'test';
-  if (phase === 'Taper') return 'strides';
-  if (phase === 'Deload') return 'fartlek';
-  if (phase === 'Foundation') return weekIndex % 3 === 2 ? 'intervals' : 'threshold';
-  if (phase === 'Specific') return weekIndex % 3 === 2 ? 'threshold' : 'intervals';
-  return weekIndex % 2 === 0 ? 'threshold' : 'intervals';
+  return sessionKindFor(eventProfileFor(3.107), phase === 'Test' ? 'Race' : phase, weekIndex);
 }
 
 export function qualitySession(context: QualityContext): QualitySession {
-  const { phase, weekIndex, goalPaceSecondsPerMile: goalPace, weeklyMiles, readiness, hasBaseline = true, goalMiles = 3.107 } = context;
+  const { phase, weekIndex, goalPaceSecondsPerMile: goalPace, weeklyMiles, readiness, hasBaseline = true, goalMiles = 3.107, paces, maxShare } = context;
+  const share = maxShare && maxShare > 0 ? maxShare : QUALITY_MAX_SHARE;
   if (!goalPace) return { kind: 'none', text: 'No goal-driven cardio', miles: 0 };
   if (!hasBaseline) return { kind: 'baseline', text: 'Establish a comfortable running baseline', miles: 0 };
 
   /* A ROUGH MORNING OUTRANKS THE CALENDAR. The block does not know the athlete
      slept badly; the check-in does, and a hard session taken on a body that
      cannot absorb it is worse than no session at all. */
-  if (typeof readiness === 'number' && readiness < 55) {
+  const raceDay = sessionKindFor(eventProfileFor(goalMiles), phase === 'Test' ? 'Race' : phase, weekIndex) === 'test';
+  if (typeof readiness === 'number' && readiness < 55 && !raceDay) {
     return { kind: 'fartlek', text: 'Easy only — the hard run moves to when you have recovered', miles: 0 };
   }
   const soften = typeof readiness === 'number' && readiness < 70;
 
-  const kind = qualityKindFor(phase, weekIndex);
-  const thresholdPace = thresholdPaceFor(goalPace, goalMiles);
+  const event = eventProfileFor(goalMiles);
+  let kind = sessionKindFor(event, phase === 'Test' ? 'Race' : phase, weekIndex);
+  /* A GOAL SLOWER THAN THE ATHLETE'S EASY PACE IS NOT A TARGET TO REHEARSE.
+     A half marathon at 10:18/mi, for someone whose easy running is 10:11, asks
+     them to practise going slower. Race-pace work only means something when
+     the race pace is genuinely faster than cruising; below that the session
+     that actually helps is a threshold run, and the goal itself is one the
+     feasibility model should be calling comfortable. */
+  if (kind === 'racepace' && paces?.easyFast && goalPace >= paces.easyFast) kind = 'threshold';
 
+  /* CURRENT FITNESS PACES THE TRAINING; THE GOAL PACES ONLY THE RACE-SPECIFIC
+     WORK. That distinction is the whole of Part 8 of the coaching brief. A
+     threshold run at a pace the athlete has never demonstrated is not a
+     threshold run, it is a race they lose every week.
+
+     And even the race-specific work has a floor: nothing is ever prescribed
+     faster than the athlete's own repetition pace, because a goal that is
+     currently out of reach must not become a weekly injury risk. */
+  const thresholdPace = paces?.threshold || thresholdPaceFor(goalPace, goalMiles);
+  const intervalPace = paces?.interval || goalPace;
+  const repPace = paces?.repetition || goalPace * 0.97;
+  const racePace = paces?.repetition ? Math.max(goalPace, paces.repetition) : goalPace;
+
+  /* THE RACE IS NOT NEGOTIABLE. Every other session here is trimmed to a share
+     of the week; this one is the week. A marathon does not become a 12-mile
+     marathon because the athlete's training ceiling was 40. */
   if (kind === 'test') {
-    return { kind, text: `Goal effort assessment${goalMiles ? ` over ${goalMiles < 2 ? goalMiles.toFixed(1) : goalMiles.toFixed(goalMiles % 1 ? 1 : 0)} mi` : ''}`, miles: round1(goalMiles + WARMUP_COOLDOWN_MILES) };
+    const warmup = goalMiles > 6 ? 0 : WARMUP_COOLDOWN_MILES;
+    /* A ROUGH MORNING DOES NOT CANCEL A RACE THE ATHLETE HAS ENTERED. Every
+       other session comes off below 55; this one is a date in their calendar,
+       and quietly deleting it from the plan is not a coaching decision Forge
+       gets to make. It says what it sees and leaves the choice with them. */
+    if (typeof readiness === 'number' && readiness < 55) {
+      return { kind, miles: round1(goalMiles + warmup),
+        text: `Race day — but you are not recovered. Treat the target as a ceiling, not a promise` };
+    }
+    return { kind, text: `Goal effort assessment${goalMiles ? ` over ${goalMiles < 2 ? goalMiles.toFixed(1) : goalMiles.toFixed(goalMiles % 1 ? 1 : 0)} mi` : ''}`, miles: round1(goalMiles + warmup) };
   }
   if (kind === 'strides') {
-    return { kind, text: '4–6 × 20 s strides at goal effort, full recovery', miles: round1(Math.min(3, weeklyMiles * QUALITY_MAX_SHARE)) };
+    return { kind, text: '4–6 × 20 s strides at goal effort, full recovery', miles: round1(Math.min(3, weeklyMiles * share)) };
   }
   if (kind === 'fartlek') {
-    return { kind, text: 'Short fartlek — 6 × 1 min brisk, easy between. Stop while fresh', miles: round1(Math.min(4, Math.max(2, weeklyMiles * 0.22))) };
+    /* The two-mile floor was written for a normal week and kept for a deload,
+       where it became forty percent of a five-mile week — a "stop while fresh"
+       session that was the largest run of the week. The share cap wins. */
+    const miles = Math.min(4, Math.max(2, weeklyMiles * 0.22), weeklyMiles * share || Infinity);
+    return { kind, text: 'Short fartlek — 6 × 1 min brisk, easy between. Stop while fresh', miles: round1(miles) };
   }
 
   if (kind === 'threshold') {
-    const minutes = Math.max(8, thresholdMinutes(weekIndex, weeklyMiles, thresholdPace) - (soften ? 5 : 0));
+    const minutes = Math.max(8, thresholdMinutes(weekIndex, weeklyMiles, thresholdPace, share) - (soften ? 5 : 0));
     const paceText = `${clockText(thresholdPace)}/mi`;
     /* Past twenty minutes the effort is broken into cruise intervals — the
        physiology is the same and it is far likelier to be run at the right
@@ -157,25 +218,60 @@ export function qualitySession(context: QualityContext): QualitySession {
       ? `${Math.round(minutes / 8)} × 8 min @ ${paceText} · 90 s jog between`
       : `${minutes} min continuous @ ${paceText}`;
     const miles = round1(minutes * 60 / thresholdPace + WARMUP_COOLDOWN_MILES);
-    return { kind, text: `${text} · threshold`, miles: round1(Math.min(miles, weeklyMiles * QUALITY_MAX_SHARE || miles)) };
+    return { kind, text: `${text} · threshold`, miles: round1(Math.min(miles, weeklyMiles * share || miles)) };
+  }
+
+  /* RACE-SPECIFIC WORK: sustained running at the pace the race will be run at.
+     For a marathon this is most of the specific block and it belongs beside
+     the long run; for a mile it is the race, so it is short and there is not
+     much of it. Sized as a share of the event, never past the week's budget. */
+  if (kind === 'racepace') {
+    const budget = Math.max(1, weeklyMiles * share - WARMUP_COOLDOWN_MILES);
+    /* It grows through the block. Race-specific work that is the same size in
+       week twelve as it was in week four has not prepared anyone for anything;
+       the whole point of the specific phase is that the race-pace segment gets
+       longer until it is a meaningful fraction of the race itself. */
+    const ofRace = clamp((goalMiles > 13 ? 0.18 : goalMiles > 6 ? 0.35 : 0.5) * (1 + weekIndex * 0.07), 0.1, 0.75);
+    const wanted = clamp(goalMiles * ofRace, 0.4, budget);
+    const chunks = goalMiles > 13 ? 1 : goalMiles > 3 ? 2 : 3;
+    const each = wanted / chunks;
+    /* Short pieces are read as a target time per rep, the way every other
+       rep session on the card is; long ones as a pace, because nobody runs a
+       seven-mile segment off a stopwatch total. */
+    const short = each < 0.95;
+    const metres = snapToTrack(each * 1609.344);
+    const piece = short ? `${metres} m` : `${round1(each)} mi`;
+    const at = short ? `${clockText(Math.ceil(racePace / 1609.344 * metres))}/rep` : `${clockText(racePace)}/mi`;
+    const text = chunks === 1
+      ? `${piece} @ ${at} · race pace`
+      : `${chunks} × ${piece} @ ${at} · race pace${soften ? '' : ' · 3 min jog between'}`;
+    return { kind, text, miles: round1(Math.min(each * chunks + WARMUP_COOLDOWN_MILES, weeklyMiles * share || Infinity)) };
+  }
+
+  /* REPETITIONS: short, fast, fully recovered. Neuromuscular work — the point
+     is the quality of the movement, not the accumulated fatigue, which is why
+     the recovery is full and the volume is small. A miler needs these; a
+     marathoner does not, and the event profiles never ask for them. */
+  if (kind === 'reps') {
+    const distance = clamp(snapToTrack(goalMiles * 1609.344 * 0.2), 150, 600);
+    const reps = Math.max(4, (soften ? 6 : 8) - (distance > 400 ? 2 : 0));
+    const seconds = Math.ceil(repPace / 1609.344 * distance);
+    const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
+    return { kind, text: `${reps} × ${distance} m @ ${clockText(seconds)}/rep · full recovery`, miles: round1(Math.min(miles, weeklyMiles * share || miles)) };
   }
 
   const distance = repDistanceFor(weekIndex, goalMiles);
   const baseReps = distance <= 400 ? 8 : distance <= 800 ? 6 : distance <= 1200 ? 5 : distance <= 2400 ? 4 : 3;
   const reps = Math.max(3, baseReps - (soften ? 2 : 0));
-  /* Foundation runs reps a shade slower than goal pace; Specific runs them at
-     it. Nothing is ever prescribed faster than goal pace — a rep session run
-     too hard is a race nobody entered. */
-  const ease = phase === 'Foundation' ? 1.04 : phase === 'Build' ? 1.02 : 1;
   /* Rounded UP, always. To the nearest second a 1200 m rep can land a shade
-     under goal pace, and "never faster than goal pace" is a rule about what is
-     printed on the card, not about the arithmetic behind it. */
-  const repSeconds = Math.ceil((goalPace * ease) / 1609.344 * distance);
+     under the intended pace, and "never faster than prescribed" is a rule about
+     what is printed on the card, not about the arithmetic behind it. */
+  const repSeconds = Math.ceil(intervalPace / 1609.344 * distance);
   const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
   return {
     kind: 'intervals',
-    text: `${reps} × ${distance >= 1600 ? `${round1(distance / 1609.344)} mi` : `${distance} m`} @ ${clockText(repSeconds)}/rep${phase === 'Specific' ? ' · goal pace' : ''}`,
-    miles: round1(Math.min(miles, weeklyMiles * QUALITY_MAX_SHARE || miles)),
+    text: `${reps} × ${distance >= 1600 ? `${round1(distance / 1609.344)} mi` : `${distance} m`} @ ${clockText(repSeconds)}/rep`,
+    miles: round1(Math.min(miles, weeklyMiles * share || miles)),
   };
 }
 
@@ -238,24 +334,13 @@ export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null): E
   return { paceSecondsPerMile: seconds / miles, miles, goal, others: dated.slice(1) };
 }
 
-/* The AI block writes its phases in the strength block's language; the hard
-   run thinks in the running block's. A running deload outranks both, because
-   the week's volume has already been cut and a threshold session on top of a
-   cut week is not a deload. */
-export function qualityPhaseFor(planPhase: string | undefined, deloading: boolean): QualityPhase {
-  /* Race week and the taper outrank it: the volume cut IS the taper, and
-     turning the last sharpening session before a race into a deload fartlek
-     is how an athlete arrives flat. */
-  const phase = String(planPhase || '');
-  if (phase === 'Race') return 'Test';
-  if (phase === 'Taper') return 'Taper';
-  if (deloading) return 'Deload';
-  switch (phase) {
-    case 'Race': return 'Test';
-    case 'Taper': return 'Taper';
-    case 'Deload': return 'Deload';
-    case 'Peak': return 'Specific';
-    case 'Base': return 'Foundation';
-    default: return 'Build';
-  }
+/* The AI block writes its phases in the strength block's old language. One
+   vocabulary now owns the translation; a running deload is a deload, except in
+   a taper or race week, where the volume cut IS the plan and calling it a
+   deload turns the last sharpening session before a race into a
+   stop-while-fresh fartlek. */
+export function qualityPhaseFor(planPhase: string | undefined, deloading: boolean): TrainingPhase {
+  const phase = normalizePhase(planPhase);
+  if (phase === 'Race' || phase === 'Taper') return phase;
+  return deloading ? 'Deload' : phase;
 }

@@ -156,3 +156,7 @@
    inside the same screenful, is the same sentence twice. The row keeps its
    place in the week and gives the detail back to the card. */
 .pv-row.today .pv-row-body small{display:none}
+
+/* One line saying why the week is shaped the way it is. Quiet by design: it is
+   an explanation, not an alert, and it sits above the week it explains. */
+.pv-collision{margin:0 0 10px;padding:10px 12px;border-left:2px solid var(--accent,#2f6fd0);background:var(--surface-2,rgba(127,127,127,.06));border-radius:0 8px 8px 0;font-size:13px;line-height:1.5;color:var(--text-muted,#5c5c5c)}
