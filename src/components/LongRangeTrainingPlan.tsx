@@ -7,6 +7,7 @@ import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { bestsFromHistory,calendarEmptyState,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
 import { PlanProgress,TodayCard,WeekList,useWeekSwipe,waveSentence,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
+import { MileageGate } from './MileageGate';
 import { localDayIso } from '../lib/time';
 
 type SplitDay={name:string;dayType:string;muscles?:string[];exercises?:string[];cardioPolicy?:'none'|'forge'|'planned';cardio?:PlannedCardio[]};
@@ -125,6 +126,9 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   swipeTo.current=direction=>setViewWeek(current=>Math.max(0,Math.min(current+direction,roadmap.length-1)));
   return <div className="pv" {...swipe}>
     <PlanProgress weekIndex={viewWeek} current={0} total={roadmap.length} waveIndexFor={index=>index} sentence={sentence} onPick={setViewWeek}/>
+    {/* A goal the running is not built for says so here too — the pre-program
+        plan is where most athletes see their first week. */}
+    <MileageGate/>
     {viewWeek===0&&<TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout"/>}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={viewWeek===0?'This week':`Week ${viewWeek+1} · ${range}`}

@@ -39,6 +39,19 @@ export type Feasibility = {
   say: string;
   /* What would be reachable instead, when the goal is not. */
   insteadOf?: string;
+  /* WHAT THE GOAL ACTUALLY NEEDS, AS NUMBERS RATHER THAN A SENTENCE.
+     A paragraph telling an athlete to "build to 32 miles a week" is a chore
+     list. Given the figures, the app can offer to do it — raise the ceiling
+     in their settings and let the ramp climb to it — which is the difference
+     between software that reports a problem and software that fixes one. */
+  needs?: {
+    /* Weekly mileage the goal pace is normally built on. */
+    weeklyMiles: number;
+    /* What they are actually running now. */
+    running: number;
+    /* Their own ceiling, when it is what blocks the goal. */
+    ceiling?: number;
+  };
   /* The single change that matters most, when there is one. */
   change?: string;
 };
@@ -172,6 +185,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   if (targetSeconds >= nowAtDistance) {
     return { goal: goal.title, verdict: 'reachable',
       say: `Already within reach — your ${best.miles.toFixed(best.miles < 2 ? 0 : 1)}-mile at ${clock(best.seconds)} is worth about ${clock(nowAtDistance)} here.`,
+      needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: volume < volumeNeeded * 0.7 ? `Hold ${Math.round(volumeNeeded)} miles a week and race it.` : undefined };
   }
 
@@ -179,6 +193,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
     return { goal: goal.title, verdict: 'out-of-reach',
       say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are worth about ${clock(nowAtDistance)} today, so this asks for ${Math.round(shortfall * 100)}% — and ${Math.round(weeks)} weeks of good training buys about ${Math.round(affordable * 100)}%.`,
       insteadOf: `${clock(ceiling)} is the reachable target for this date. Keep ${clock(targetSeconds)} for next year.`,
+      needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: volume < volumeNeeded * 0.7
         ? `${clock(goalPace)}/mi is normally built on about ${Math.round(volumeNeeded)} miles a week. You are running ${volume.toFixed(0)}.`
         : `Add work at ${clock(goalPace)}/mi — the pace has to be trained, not just the distance.` };
@@ -188,10 +203,12 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   if (volume < volumeNeeded * 0.7) {
     return { goal: goal.title, verdict: 'needs-more',
       say: `Reachable, but not on ${volume.toFixed(0)} miles a week. ${clock(goalPace)}/mi is normally built on about ${Math.round(volumeNeeded)}.`,
+      needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: `Build to ${Math.round(volumeNeeded)} miles a week over the next ${Math.min(8, Math.round(weeks / 2))} weeks, no more than 10% up per week.` };
   }
   return { goal: goal.title, verdict: 'reachable',
     say: `On the numbers this holds: ${clock(nowAtDistance)} today, ${clock(targetSeconds)} needed, ${Math.round(weeks)} weeks to find ${Math.round(shortfall * 100)}%.`,
+    needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
     change: `Keep the volume and put the quality work at ${clock(goalPace)}/mi.` };
 }
 
@@ -243,6 +260,7 @@ export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], 
       const needed = volumeForPace(clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss')) / (milesOf(goal) || 1));
       if (needed > ceiling) {
         return [{ ...result,
+          needs: { weeklyMiles: Math.round(needed), running: result.needs?.running ?? 0, ceiling: Math.round(ceiling) },
           change: `${result.change ? `${result.change} ` : ''}Your weekly mileage is capped at ${Math.round(ceiling)} in settings and this pace is normally built on about ${Math.round(needed)} — raise the cap or move the target.` }];
       }
     }

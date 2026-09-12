@@ -118,6 +118,42 @@ export const WAVE_REPS = [8, 6, 4, 2, 1] as const;
 export const WAVE_LENGTH = WAVE_REPS.length;
 export const waveSlot = (weekIndex: number) => ({ reps: WAVE_REPS[weekIndex % WAVE_LENGTH], isMax: weekIndex % WAVE_LENGTH === WAVE_LENGTH - 1 });
 
+/* THE BLOCK OWNS THE MAX WEEK. THE LIFT OWNS ITS RUNG.
+
+   A lift's rung is counted in the sessions it has actually answered, which is
+   right — lifts are trained at different rates and a fortnightly movement
+   should not be dragged along by the calendar. But the 1 at the top of
+   8/6/4/2/1 is not a rung like the others: it is a TEST, and a test is an
+   event the block schedules, not something a lift wanders into because its own
+   session count happened to land on five.
+
+   Preston opened week 1 of a ten-week block to "Squat 520 x 1" under a banner
+   reading "4-REP WEEK" — 45 lb over his tested single, on a lift that had not
+   ramped at all, in a week the block had called a build week. Two clocks, and
+   the dangerous one won.
+
+   So an ordinary week walks each lift up its own ramp — 8, 6, 4, 2, and back
+   to 8 — and no week but the block's max week ever asks for a single. */
+export const RAMP_REPS = [8, 6, 4, 2] as const;
+export const RAMP_LENGTH = RAMP_REPS.length;
+export const rampReps = (rung: number) => RAMP_REPS[((Math.round(rung) % RAMP_LENGTH) + RAMP_LENGTH) % RAMP_LENGTH];
+/* How many times a lift has to have been trained inside the block before it is
+   allowed to test. A cold max is not a max, it is an injury with a number. */
+export const EXPOSURES_BEFORE_MAX = 3;
+/* HOW FAR A BLOCK MAY OUTRUN A TESTED SINGLE.
+
+   A calculated max is an inference from rep work; a tested single is a fact.
+   When they disagree the fact wins, and Preston's disagreed by a lot — an
+   all-out 415 x 8 estimates 526 while the bar he had actually taken for one
+   was 475. Every rung written off 526 was about a tenth too heavy, which is
+   how a ten-week block opened by asking for 45 lb over his best ever single.
+
+   So a lift with a tested single is written from a max no more than five
+   percent past it. Rep work still moves the number — the single is re-tested
+   every max week and the ceiling moves with it — but it moves a block at a
+   time, not in one jump off an estimate. */
+export const MAX_OVER_TESTED = 1.05;
+
 /* A LIFT WITH NO GOAL ON IT IS NOT TRAINED LIKE ONE THAT HAS.
 
    The 8/6/4/2/1 wave exists to walk a lift up to a tested single. An accessory
@@ -519,6 +555,14 @@ export type WaveOptions = {
   holding?: boolean;
   /* A lift with no goal on it: 12/10/8/6 off the calculated max instead. */
   accessory?: boolean;
+  /* Whether the BLOCK is on its max week. Given, it — and nothing about the
+     lift's own session count — decides whether a single is on the table, and
+     ordinary weeks read the rep count off the 8/6/4/2 ramp. Omitted, the old
+     behaviour stands: weekIndex is a block wave index and answers both. */
+  maxWeek?: boolean;
+  /* Whether this lift has been trained enough inside the block to test.
+     Default true, so nothing that does not track exposures changes. */
+  ramped?: boolean;
   /* Completed sessions on this lift, which is what moves an accessory along. */
   sessions?: number;
   /* Failed attempts since the last success, per rep count. */
@@ -532,7 +576,7 @@ export type WaveOptions = {
    so `(best, i, false, 0, true, anchors)` said nothing about what it meant and
    a call site that got the order wrong was silently a different program. */
 export function wavePrescription(best: number, weekIndex: number, options: WaveOptions = {}): { weight: number; reps: number; isMax: boolean } {
-  const { metric = false, bestSingle = 0, tests = false, anchors, projectSteps = 0, holding = false, accessory = false, sessions = 0, misses, lastAt } = options;
+  const { metric = false, bestSingle = 0, tests = false, anchors, projectSteps = 0, holding = false, accessory = false, sessions = 0, misses, lastAt, maxWeek, ramped = true } = options;
   /* `holding` asks for exactly what the athlete has already done, with no step
      on top — for the caller that has decided the evidence does not support one
      yet. Without it, a lift with a single logged session was stepped up five
@@ -575,7 +619,11 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
     const weight = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
     return { weight, reps: accessoryReps, isMax: false };
   }
-  const { reps, isMax } = waveSlot(weekIndex);
+  /* When the caller knows what the block is doing, the block decides the test
+     and the lift's own rung only picks its place on the ramp. */
+  const slot = waveSlot(weekIndex);
+  const isMax = maxWeek === undefined ? slot.isMax : maxWeek;
+  const reps = maxWeek === undefined ? slot.reps : rampReps(weekIndex);
   /* "A rep higher than last PR by 5-10": a real logged single anchors the
      attempt directly; without one, the estimated max stands in. */
   const projection = Math.max(0, projectSteps) * plateStep;
@@ -584,10 +632,29 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
      athlete's other sets — a 225 x 10 pushes the implied double to 256 — so
      dropping the step alone left the bar where it was. After three misses the
      prescription is their own completed set at that rep count, full stop. */
+  /* The heaviest this lift may be asked for at a given rep count, given what
+     the athlete has actually tested. Infinity for a lift never tested — there
+     is no fact to be disciplined by. Rounded DOWN to a plate step, so the
+     rounding cannot walk back over the ceiling it was applied to. */
+  const testedCeiling = (count: number) => {
+    /* A tested single is a fact about the LIFT, not about whether a goal
+       happens to be attached to it. Reading it off `tests` left the fallback
+       double — which is written with tests off — unclamped, so it came out
+       above the attempt it was meant to be lighter than. */
+    if (!bestSingle) return Infinity;
+    /* A PROJECTED WEEK ASSUMES THE MAX WEEKS BETWEEN HERE AND THERE HAPPENED.
+       Without this the ceiling froze the whole block at one number: week ten
+       could not be heavier than week five, because both were measured against
+       a single that, in the projection, had already been beaten twice. */
+    const headroom = Math.pow(MAX_OVER_TESTED, 1 + Math.max(0, projectSteps));
+    const supported = count <= 1 ? bestSingle * headroom : weightForReps(bestSingle * headroom, count);
+    return Math.max(plateStep, Math.floor(supported / plateStep) * plateStep);
+  };
   const loadFor = (count: number) => {
     const held = backedOff(count) ? completedAt(count) : 0;
     if (held) return Math.max(plateStep, Math.floor(held / plateStep) * plateStep);
-    return Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
+    const asked = Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
+    return Math.min(asked, testedCeiling(count));
   };
   /* THE ATTEMPT SITS ABOVE THE DOUBLE. The rep weeks are written from the
      calculated max (what the athlete's best rep work proves); the attempt was
@@ -609,14 +676,21 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
        one rep, so it is bounded by the athlete's own sets. */
     const fromRepWork = anchors?.size ? loadFromAnchors(anchors, best, 1, stepFor(1)) : 0;
     /* A ceiling on the jump, not a target: however loudly the rep work
-       argues, one session does not add a tenth to a tested single. This binds
-       only when an estimate has run away; a normal max week never reaches it. */
-    const ceiling = bestSingle ? bestSingle * 1.1 : Infinity;
-    const attempt = Math.min(ceiling, Math.max(anchored, fromRepWork, loadFor(2) + plateStep)) + projection;
-    return Math.max(plateStep, Math.ceil(attempt / plateStep) * plateStep);
+       argues, one block does not add a tenth to a tested single. Five percent
+       of a 475 lb squat is still 20 lb, which is a real PR attempt; ten was
+       45 lb and that is a different lift. This binds only when an estimate has
+       run away — a normal max week never reaches it. */
+    const attempt = Math.max(anchored, fromRepWork, loadFor(2) + plateStep) + projection;
+    const rounded = Math.max(plateStep, Math.ceil(attempt / plateStep) * plateStep);
+    /* Clamped AFTER rounding: rounding up to the next plate used to step back
+       over the ceiling — a 475 single capped at 498.75 came out as 500. */
+    return Math.min(rounded, testedCeiling(1));
   };
   if (isMax) {
-    if (tests) return { weight: attemptWeight(), reps: 1, isMax: true };
+    /* A LIFT THAT HAS NOT RAMPED DOES NOT TEST. Arriving at the block's max
+       week having trained the lift once is not a peak; it takes the double
+       instead and tests on the next one. */
+    if (tests && ramped) return { weight: attemptWeight(), reps: 1, isMax: true };
     /* No goal on this lift: it holds the double it earned. It is not offered
        a single — a max that serves no goal is a max the plan did not ask for. */
     return { weight: loadFor(2), reps: 2, isMax: false };
@@ -828,11 +902,22 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
        lift, Plan counted calendar weeks — and a lift trained once a fortnight
        was dragged along by the calendar. A week further out is a projection:
        the lift's position plus the exposures it would collect getting there. */
-    const weeksAhead = Math.max(0, block.weekIndex - (block.currentWeekIndex ?? block.weekIndex));
-    const ownRung = strength.rungOf?.(set.exercise);
-    const waveIndex = ownRung === undefined
-      ? (block.waveIndex ?? block.weekIndex)
-      : ownRung + weeksAhead * Math.max(1, Math.round(strength.exposuresPerWeek?.(set.exercise) ?? 1));
+    /* A GOAL LIFT RIDES THE BLOCK'S WAVE. THE ACCESSORIES RIDE THEIR OWN.
+
+       Giving every lift its own rung, counted in the sessions it had answered,
+       was meant to stop an off-script set from shunting the whole program. It
+       does stop that — but so does the calendar, which an off-script set
+       cannot touch at all, and the calendar is the clock the athlete is
+       actually shown. Two clocks meant the header said "4-rep week" over a
+       squat asking for a single, and Today and Plan could disagree about the
+       same Saturday.
+
+       So the goal lifts follow the block: one rung of 8/6/4/2/1 per block
+       week, the thing the banner names. Accessories are the case the per-lift
+       rung was really for — a movement trained once a fortnight should not be
+       four rungs along because the block is four weeks old — and they still
+       advance on their own session count, through accessorySlot below. */
+    const waveIndex = block.waveIndex ?? block.weekIndex;
     /* How many passes through the wave separate this week from the one the
        athlete is actually in. Zero for the current pass and everything behind
        it — those are drawn from evidence, not projected. */
@@ -842,7 +927,13 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
        step per projected pass, since a projected week is drawn as though the
        sessions between here and there were completed. */
     const accessory = !tests;
-    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise), lastAt: lastAtFor(set.exercise) };
+    /* THE MAX WEEK IS THE BLOCK'S, NOT THE LIFT'S. `waveIndex` above is how
+       far along its OWN progression this lift is — the right clock for a rep
+       rung and the wrong one for a test. Read on its own it put a 1RM attempt
+       in week 1 of a ten-week block, under a header the block had already
+       named a build week. The block says which week tests; the lift's rung
+       says where on 8/6/4/2 it stands the rest of the time. */
+    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise), lastAt: lastAtFor(set.exercise), ramped: sessionsFor(set.exercise) + projectSteps >= EXPOSURES_BEFORE_MAX };
     const live = wavePrescription(best, waveIndex, waveOptions);
     if (live.weight !== set.weight || live.reps !== set.reps) adjusted = true;
     /* On a max week a tested lift also carries the double it falls back to

@@ -9,7 +9,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF} from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF,EXPOSURES_BEFORE_MAX} from './aiPlanService';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
@@ -264,7 +264,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       const key=set?canonicalLiftKey(set.exercise):'';
       const best=key?liveBests.get(key)||0:0;
       const setTests=set?testsOneRepMax(set.exercise,goalLifts):false;
-      const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key)}):null;
+      const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX}):null;
       return{
         exercise:set?.exercise,
         reps:live?.reps,
@@ -296,7 +296,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
       /* A tested single the athlete is not taking today falls back to the
          double the lift already earned, rather than being offered twice. */
-      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key)});
+      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
       const accessorySessions=liveSessions.get(key)||0;
       const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a

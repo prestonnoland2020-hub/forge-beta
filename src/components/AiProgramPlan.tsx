@@ -5,6 +5,7 @@ import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { PlanRebuildModal } from './PlanRebuildModal';
 import { PlanProgress, PlanActions, TodayCard, WeekList, useWeekSwipe, waveSentence, type PlanSession } from './PlanView';
+import { MileageGate } from './MileageGate';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -499,6 +500,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     <PlanProgress weekIndex={weekIndex} current={currentIndex} total={plan.weeks.length}
       waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence}
       onPick={index => setViewWeek(index === currentIndex ? null : index)} />
+    {/* The gap between what a goal needs and what the plan is allowed to give
+        belongs where the plan is, not buried in a goal's detail panel. */}
+    <MileageGate onChanged={() => setRefreshAsk(true)} />
     <PlanActions
       saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
       onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}

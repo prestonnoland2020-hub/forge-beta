@@ -7,6 +7,7 @@ import { formatGoalTarget } from '../lib/time';
 import { competingRaces, goalFeasibility } from '../lib/goalFeasibility';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { MileageGate } from '../components/MileageGate';
 
 /* A GOAL'S OWN NAME IS THE POINT OF THE ROW. This page used to be a
    six-column table — type, title, target, due, edit, delete — squeezed into a
@@ -62,6 +63,8 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
       <strong>{clash.races.length} races on the same date</strong>
       <p>{clash.races.join(', ')} are all set for {new Date(`${clash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. A block peaks for one race — pick the one that matters and move the others out by a few weeks, or they all get a compromise.</p>
     </section>}
+
+    <MileageGate />
 
     <section className="card compact-goal-list">
       {syncError && <p className="data-sync-error">{syncError}</p>}

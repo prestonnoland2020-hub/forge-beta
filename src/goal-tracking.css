@@ -74,3 +74,15 @@
 .goal-cards .goal-card>.goal-card-face{padding:14px 16px 10px;border:0;border-radius:0}
 .goal-cards .goal-card>.goal-card-actions{padding:0 16px 14px}
 .goal-cards .goal-card>.goal-card-detail{padding:2px 12px 16px}
+
+/* THE GAP BETWEEN A GOAL AND THE PLAN, WITH THE FIX ATTACHED. Warning colour
+   because it is a warning; the action beside it because an app that only
+   reports the problem is a spreadsheet. */
+.mileage-gate{display:grid;gap:8px;border-left:3px solid var(--warn,#c8922a);padding:14px 16px}
+.mileage-gate .eyebrow{color:var(--warn,#c8922a)}
+.mileage-gate-say{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
+.mileage-gate-say strong{font-weight:800}
+.mileage-gate-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
+.mileage-gate-actions .button{flex:1 1 auto;min-height:44px;text-align:center}
+.mileage-gate-actions .text-button{flex:none;padding:0 4px;color:var(--ink-3);font-size:13px;font-weight:700;border:0;background:none}
+.mileage-gate>small{color:var(--ink-3);font-size:12px;line-height:1.5}
