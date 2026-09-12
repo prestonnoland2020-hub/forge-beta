@@ -101,40 +101,31 @@ async function trainedDays(pairs: Array<[string, string]>): Promise<Set<string>>
 
    The morning push used to say "Open Forge to see what is next in your split"
    to everyone, every day. It is one interruption a day and it should carry the
-   most useful thing Forge knows, which the morning after a hard session is not
-   the day's plan — it is the question only the athlete can answer. */
-type DayShape = { title: string; hasSingle: boolean; miles: number };
-/* ONE QUERY ANSWERS BOTH QUESTIONS. "Have they trained today" and "was
-   yesterday hard" are the same table over two dates, and asking twice doubles
-   the cost of the hourly cron for no information. This reads both dates at
-   once and the callers below slice what they need out of it. */
+   most useful thing Forge knows, which the morning after a session is not the
+   day's plan — it is the question only the athlete can answer.
+
+   One query covers it: "have they trained today" and "did they train
+   yesterday" are the same table over two dates, and asking twice doubles the
+   cost of the hourly cron for no information. Deliberately columns only, no
+   embedded sets or cardio — a lock-screen line does not need the weight on the
+   bar, it needs to get them to open the app, where the check-in has the whole
+   history and asks the precise question. */
+type DayShape = { title: string };
 async function daysAround(pairs: Array<[string, string]>): Promise<Map<string, DayShape>> {
   if (!pairs.length) return new Map();
   const owners = [...new Set(pairs.map(pair => pair[0]))];
   const dates = [...new Set(pairs.flatMap(pair => [pair[1], dayBefore(pair[1])]))];
-  /* top_sets and cardio_sessions are related tables, not columns — embedded
-     here so one round trip answers both for the whole cohort. */
-  const { data } = await admin.from('workout_days')
-    .select('owner_id,workout_date,title,top_sets(weight,reps),cardio_sessions(prescription_snapshot)')
+  const { data } = await admin.from('workout_days').select('owner_id,workout_date,title')
     .in('owner_id', owners).in('workout_date', dates);
   const found = new Map<string, DayShape>();
   for (const row of (data || []) as Array<Record<string, unknown>>) {
-    const sets = Array.isArray(row.top_sets) ? row.top_sets as Array<Record<string, unknown>> : [];
-    const cardio = Array.isArray(row.cardio_sessions) ? row.cardio_sessions as Array<Record<string, unknown>> : [];
-    const miles = cardio.reduce((total, session) => {
-      const legs = (session.prescription_snapshot as Record<string, unknown> | undefined)?.legacyIntervals;
-      const rows = Array.isArray(legs) ? legs as Array<Record<string, unknown>> : [];
-      return total + rows.reduce((sum, leg) => sum + (String(leg.unit || '').startsWith('mi') ? Number(leg.distance) || 0 : 0), 0);
-    }, 0);
-    found.set(pairKey(String(row.owner_id), String(row.workout_date)), {
-      title: String(row.title || 'yesterday\u2019s session'),
-      hasSingle: sets.some(set => Number(set.reps) === 1 && Number(set.weight) > 0),
-      miles,
-    });
+    found.set(pairKey(String(row.owner_id), String(row.workout_date)), { title: String(row.title || '') });
   }
   return found;
 }
 
+/* Whether today's check-in has already been answered — the one thing that
+   decides which of the two morning lines goes out. */
 async function answeredToday(pairs: Array<[string, string]>): Promise<Set<string>> {
   if (!pairs.length) return new Set();
   const owners = [...new Set(pairs.map(pair => pair[0]))];
@@ -243,18 +234,19 @@ Deno.serve(async request => {
       const key = pairKey(row.owner_id, date);
       if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already sent today' }); continue; }
       /* THE CHECK-IN OUTRANKS THE TRAINING BRIEF, including on a day they have
-         already trained — "how did you pull up" is worth asking after a hard
+         already trained — "how did you pull up" is worth asking after any
          session whatever today holds, and it is the input the whole plan runs
-         on. The brief itself still stands down once they have trained. */
-      const hard = days.get(pairKey(row.owner_id, dayBefore(date)));
-      const needsCheckIn = Boolean(hard) && !answered.has(key);
+         on. Whether the session was hard enough to be worth a question is
+         decided in the app, which has the history to judge it; out here the
+         job is only to get them to open it. The brief itself still stands down
+         once they have trained. */
+      const yesterday = days.get(pairKey(row.owner_id, dayBefore(date)));
+      const needsCheckIn = Boolean(yesterday) && !answered.has(key);
       if (!needsCheckIn && days.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already trained' }); continue; }
-      const payload = needsCheckIn && hard
+      const payload = needsCheckIn && yesterday
         ? {
           title: 'How did you pull up?',
-          body: hard.hasSingle ? `You took a single yesterday. Two taps and Forge will shape today around it.`
-            : hard.miles >= 4 ? `${hard.miles.toFixed(1)} miles yesterday. Two taps and Forge will shape today around it.`
-            : `${hard.title} yesterday. Two taps and Forge will shape today around it.`,
+          body: `${yesterday.title ? `${yesterday.title} yesterday` : 'You trained yesterday'}. Three taps and Forge shapes today around it.`,
           tag: `checkin-${date}`, url: './#/',
         }
         : { title: 'Today’s training', body: 'Open Forge to see what is next in your split.', tag: `morning-${date}`, url: './#/' };
