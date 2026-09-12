@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bestRunDay, interferenceNotes, type PlannedDay } from '../lib/interference';
 import { paceModel } from '../lib/paceModel';
+import { normalizePhase } from '../lib/trainingPhase';
 import { weeksUntil } from '../lib/goalFeasibility';
 import { enduranceTarget } from '../lib/qualitySession';
 import type { CreatedGoal } from './GoalBuilder';
@@ -532,7 +533,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const collision = interferenceNotes({
     days: weekPlan.days, longRunIndex: weekPlan.longIndex, hardRunIndex: weekPlan.hardIndex,
     liftingMaxWeek: waveSlot(waveIndexOf(stored, weekIndex)).isMax,
-    runningPeakWeek: ['Race', 'Taper', 'Peak', 'Specific'].includes(String(week.phase)),
+    runningPeakWeek: ['Race', 'Taper', 'Specific'].includes(normalizePhase(week.phase)),
     weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal,
   })[0];
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any

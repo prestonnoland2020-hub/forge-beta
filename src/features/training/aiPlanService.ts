@@ -5,8 +5,9 @@ import { supabase } from '../../lib/supabase';
 import { localDayIso } from '../../lib/time';
 import { qualitySession, qualityPhaseFor, QUALITY_MAX_SHARE } from '../../lib/qualitySession';
 import { peakConflict } from '../../lib/interference';
+import { eventProfileFor } from '../../lib/eventProfile';
 import type { PaceModel } from '../../lib/paceModel';
-import { normalizePhase } from '../../lib/trainingPhase';
+import { normalizePhase, phaseFor, type TrainingPhase } from '../../lib/trainingPhase';
 
 /* A running week is a peak when it is the race itself, the sharpening before
    it, or the specific phase where the race-pace work lives. */
@@ -25,7 +26,10 @@ const runningPeaks = (phase: string | undefined) => {
    the other carries the double it falls back to. */
 export type AiPlanTopSet = { splitDay: string; exercise: string; weight: number; reps: number; hold?: { weight: number; reps: number } };
 export type AiPlanWeek = {
-  week: number; phase: 'Base' | 'Build' | 'Peak' | 'Deload' | 'Taper' | 'Race';
+  /* Two vocabularies, because a stored block written by the planner speaks the
+     old one and the resolver writes the new one. normalizePhase reads either;
+     nothing in the app should write 'Base' or 'Peak' again. */
+  week: number; phase: 'Base' | 'Build' | 'Peak' | 'Deload' | 'Taper' | 'Race' | 'Foundation' | 'Specific';
   mileage: number; longRunMiles: number; longRunPace: string; longRunDay: string;
   quality: string; qualityPace: string; qualityDay: string;
   easyDays: string[]; easyMinutes: number; easyPace: string;
@@ -505,6 +509,45 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   /* A block with no running at all is a strength-only block — leave it. */
   if (!runningDays || !(Number(week.mileage) || 0)) return week;
 
+  /* THE PHASE IS COMPUTED, NOT READ OFF THE STORED BLOCK.
+
+     The block is written by the planner and every week of Preston's came back
+     labelled "Base" — week one Base, week six Base, all ten of them. Trusting
+     that string meant the whole periodisation collapsed: a permanent Foundation
+     phase, so the rotation alternated the same two sessions forever, the
+     specific phase never arrived, race-pace work never appeared, and there was
+     no taper because nothing was ever anything but Base.
+
+     Everything needed to answer this properly is already here — which week it
+     is, how long the block runs, when the race is, and what the race is. So it
+     is answered here, by the one function that owns the question, and the
+     stored label is only a fallback for a block with no goal attached to it. */
+  const phaseWeekIndex = Math.max(0, Number(block?.weekIndex) || 0);
+  const phaseWaveIndex = Math.max(0, Number(block?.waveIndex ?? block?.weekIndex) || 0);
+  const phaseBlockWeeks = Math.max(1, Number(block?.blockWeeks) || 10);
+  const goalPaceForPhase = Math.max(0, Number(athlete.goalPaceSecondsPerMile) || 0);
+  const storedPhase = normalizePhase(week.phase);
+  const knowsRaceDate = typeof block?.weeksToRace === 'number' && Number.isFinite(block.weeksToRace);
+  const computedPhase: TrainingPhase = goalPaceForPhase
+    ? phaseFor({
+        weekIndex: phaseWeekIndex,
+        blockWeeks: phaseBlockWeeks,
+        weeksToRace: knowsRaceDate ? block!.weeksToRace : undefined,
+        deloading: phaseWaveIndex % 5 === 3,
+        shape: eventProfileFor(Number(athlete.goalMiles) || undefined).shape,
+      })
+    : storedPhase;
+  /* WITH ONE EXCEPTION, AND IT MATTERS. Taper and race week are the only two
+     phases that are statements about a DATE rather than about a position in
+     the block, and a caller that does not know when the race is cannot compute
+     them — the daily screen is one such caller. Overwriting a stored "Race"
+     because we happen not to have the date to hand would turn somebody's race
+     day into an ordinary Tuesday. Where the date is known the computed answer
+     wins outright; where it is not, an explicit Race or Taper stands. */
+  const phase: TrainingPhase = !knowsRaceDate && (storedPhase === 'Race' || storedPhase === 'Taper')
+    ? storedPhase
+    : computedPhase;
+
   /* Which days run: the plan's long run and quality keep their days, and the
      rest of the athlete's stated run days are easy, never a rest day. */
   const isRest = (day: SplitDayRef) => isRestDay(day);
@@ -515,7 +558,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const present = (name?: string) => Boolean(name) && splitDays.some(day => day.name === name);
   /* The race is the long run. Scheduling another one in the same seven days is
      how an athlete arrives at the start line already tired. */
-  const raceWeek = normalizePhase(week.phase) === 'Race' && Math.max(0, Number(athlete.goalPaceSecondsPerMile) || 0) > 0;
+  const raceWeek = phase === 'Race' && goalPaceForPhase > 0;
   const hasLong = !raceWeek && Number(week.longRunMiles) > 0 && present(week.longRunDay);
   const goalPace = Math.max(0, Number(athlete.goalPaceSecondsPerMile) || 0);
   /* With a dated goal the hard run exists whatever the stored text says — a
@@ -686,7 +729,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      the event instead: the race, a little easy running either side of it, no
      long run, and no ceiling — because the distance is not negotiable and
      pretending otherwise just produces a dishonest number. */
-  const racing = normalizePhase(week.phase) === 'Race' && goalPace > 0;
+  const racing = phase === 'Race' && goalPace > 0;
   const raceMiles = racing ? Math.max(0, Number(athlete.goalMiles) || 0) : 0;
   /* A TAPER IS A VOLUME CUT. It is the only thing a taper is, and the engine
      did not have one — so the two weeks before a race came out HEAVIER than
@@ -699,7 +742,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      a taper works. The floor does not apply — an athlete's minimum weekly
      mileage is a statement about training, and a taper is the deliberate
      exception to it. */
-  const tapering = normalizePhase(week.phase) === 'Taper';
+  const tapering = phase === 'Taper';
   const lastTaperWeek = typeof block?.weeksToRace === 'number'
     ? block.weeksToRace - weekIndex <= 1
     : weekIndex >= blockWeeks - 2;
@@ -735,7 +778,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const longestKnown = Math.max(Number(athlete.longestRunMiles) || 0, Number(athlete.recentLongestRun) || 0);
   /* And durability stops growing in a taper: a long-run personal best nine
      days before a race is not a taper, it is a race nobody entered. */
-  const taperingNow = normalizePhase(week.phase) === 'Taper';
+  const taperingNow = phase === 'Taper';
   const longCap = taperingNow
     ? longRunCap(longestKnown, Math.max(0, weekIndex - 2)) * TAPER_LONG_SHARE
     : longRunCap(longestKnown, weekIndex);
@@ -770,13 +813,13 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      easy running, not by vanishing, so the week keeps its volume. */
   const yielding = peakConflict({
     liftingMaxWeek: Boolean(block?.liftingMaxWeek),
-    runningPeakWeek: runningPeaks(week.phase),
+    runningPeakWeek: phase === 'Specific' || phase === 'Taper' || phase === 'Race',
     weeksToRace: block?.weeksToRace,
     weeksToLiftGoal: block?.weeksToLiftGoal,
   })?.owner === 'lifting';
   const written = goalPace && hasQuality && !yielding
     ? qualitySession({
-        phase: qualityPhaseFor(week.phase, deloadIndex % 5 === 3),
+        phase,
         weekIndex,
         goalPaceSecondsPerMile: goalPace,
         weeklyMiles: budget,
@@ -876,7 +919,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const easyMinutes = easyRuns.length ? Math.round((easyRuns[0] * pace) / 5) * 5 : 0;
   /* The written session names its own pace; the stored qualityPace is appended
      by the card and would contradict it. */
-  return { ...week, quality: hasQuality ? qualityText : week.quality, qualityPace: written || yielding ? '' : week.qualityPace, mileage: scheduled, longRunMiles: raceWeek ? 0 : longRun || week.longRunMiles, easyDays, easyRuns, easyMinutes };
+  return { ...week, phase, quality: hasQuality ? qualityText : week.quality, qualityPace: written || yielding ? '' : week.qualityPace, mileage: scheduled, longRunMiles: raceWeek ? 0 : longRun || week.longRunMiles, easyDays, easyRuns, easyMinutes };
 }
 
 /* `projectSteps` is how many times this rep count comes round between now and

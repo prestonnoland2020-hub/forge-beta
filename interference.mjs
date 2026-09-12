@@ -59,19 +59,19 @@ const goal = enduranceTarget([{ type: 'Endurance', exercise: '5K', title: '5K', 
 const days = WEEK.map(entry => ({ name: entry.name, dayType: entry.rest ? 'Rest' : 'Cardio' }));
 const base = { runningDays: 4, minWeeklyMileage: 14, maxWeeklyMileage: 40, weeklyMileage: 20, recentWeeklyMileage: 18,
   goalPaceSecondsPerMile: goal.paceSecondsPerMile, goalMiles: goal.miles };
-const week = { week: 6, phase: 'Peak', mileage: 20, longRunMiles: 6, longRunPace: '9:00', longRunDay: 'Cardio',
+const week = { week: 9, phase: 'Peak', mileage: 20, longRunMiles: 6, longRunPace: '9:00', longRunDay: 'Cardio',
   quality: 'No goal-driven cardio', qualityPace: '7:00', qualityDay: 'Pull',
   easyDays: ['Upper'], easyMinutes: 40, easyPace: '9:00', topSets: [], note: '' };
-const normal = resolveWeekRunning(week, days, base, { weekIndex: 5, blockWeeks: 10, waveIndex: 5 });
+const normal = resolveWeekRunning(week, days, base, { weekIndex: 8, blockWeeks: 10, waveIndex: 9, weeksToRace: 12 });
 const yielded = resolveWeekRunning(week, days, base,
-  { weekIndex: 5, blockWeeks: 10, waveIndex: 5, liftingMaxWeek: true, weeksToRace: 30, weeksToLiftGoal: 2 });
+  { weekIndex: 8, blockWeeks: 10, waveIndex: 9, liftingMaxWeek: true, weeksToRace: 30, weeksToLiftGoal: 2 });
 check('normally the specific week runs hard', !/Easy/.test(normal.quality), normal.quality);
 check('with the max attempt owning the week, the hard run steps back',
   /max attempt/i.test(yielded.quality), yielded.quality);
 check('but the week keeps its volume — backing off is not skipping',
   yielded.mileage >= normal.mileage * 0.9, `${yielded.mileage} vs ${normal.mileage} mi`);
 const raceOwns = resolveWeekRunning(week, days, base,
-  { weekIndex: 5, blockWeeks: 10, waveIndex: 5, liftingMaxWeek: true, weeksToRace: 2, weeksToLiftGoal: 30 });
+  { weekIndex: 8, blockWeeks: 10, waveIndex: 9, liftingMaxWeek: true, weeksToRace: 12, weeksToLiftGoal: 30 });
 check('and when the race is the near goal the running is untouched',
   !/max attempt/i.test(raceOwns.quality), raceOwns.quality);
 
