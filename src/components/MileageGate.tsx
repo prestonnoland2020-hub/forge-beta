@@ -40,7 +40,7 @@ function GateCard({ gap, unit, show, onBuild, onMinimum, onDismiss, heading }: {
       <strong>{gap.goal}</strong> is normally built on about <strong>{show(gap.needed)} {unit} a week</strong>.{' '}
       {gap.kind === 'ceiling'
         ? <>Your ceiling is set to {show(gap.ceiling)}, so Forge will never plan above it{gap.climbNeeded ? null : gap.hasBaseline ? <> — below even the {show(gap.base)} you already run</> : null}.</>
-        : <>You are running about {show(gap.running)}, and the block starts from there.</>}
+        : <>You are running about {show(gap.running)} a week{gap.base > gap.running ? <>, and the block is built around {show(gap.base)}</> : null}.</>}
     </p>
 
     {/* THE RAMP IS THE ANSWER, SO IT IS SHOWN BEFORE IT IS AGREED TO — but only

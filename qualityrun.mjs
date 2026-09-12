@@ -6,13 +6,15 @@
    that threshold work exists, that it is paced off the goal, that there is
    never more than one hard run in a week, and that a rough check-in takes it
    away rather than the calendar insisting. */
-import { qualitySession, qualityKindFor, thresholdMinutes, THRESHOLD_PACE_MULTIPLE, QUALITY_MAX_SHARE } from './src/lib/qualitySession.ts';
+import { qualitySession, qualityKindFor, thresholdMinutes, enduranceTarget, qualityPhaseFor, THRESHOLD_PACE_MULTIPLE, QUALITY_MAX_SHARE } from './src/lib/qualitySession.ts';
+import { resolveWeekRunning } from './src/features/training/aiPlanService.ts';
 
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
 
 /* Preston: sub-19 5K is 6:06/mi. */
 const GOAL_PACE = 366;
+const ahead = weeks => { const d = new Date(); d.setDate(d.getDate() + weeks * 7); return d.toISOString().slice(0, 10); };
 const ctx = (over = {}) => ({ phase: 'Build', weekIndex: 2, goalPaceSecondsPerMile: GOAL_PACE, weeklyMiles: 22, ...over });
 
 console.log('\nThreshold work exists at all');
@@ -96,6 +98,53 @@ check('later weeks hold it longer', late > early, `${early} min → ${late} min`
 check('and it never runs past half an hour', late <= 30, `${late}`);
 check('a small week gets a shorter effort', thresholdMinutes(9, 10, GOAL_PACE * THRESHOLD_PACE_MULTIPLE) < late,
   `${thresholdMinutes(9, 10, GOAL_PACE * THRESHOLD_PACE_MULTIPLE)} min on 10 mi`);
+
+console.log('\nAnd it reaches the block the athlete actually trains from');
+/* "i also see no threshold work." qualitySession was wired only into the
+   pre-program roadmap; the stored AI block — the thing the Plan tab renders —
+   kept whatever prose the model wrote, which for a block generated before the
+   goal existed was "No goal-driven cardio" in all ten weeks. The resolver now
+   writes the session, so the two surfaces cannot disagree. */
+const goal = enduranceTarget([{ type: 'Endurance', exercise: '5K', target: '19:00', date: ahead(10) }]);
+check('a 5K goal resolves to its own pace', Math.round(goal.paceSecondsPerMile) === 367, `${Math.round(goal.paceSecondsPerMile)} s/mi`);
+
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(name => ({ name, dayType: name === 'Sun' ? 'Rest' : 'Cardio' }));
+const PHASES = ['Base', 'Base', 'Build', 'Build', 'Deload', 'Build', 'Peak', 'Peak', 'Taper', 'Race'];
+const athlete = { runningDays: 4, minWeeklyMileage: 14, maxWeeklyMileage: 40, weeklyMileage: 17, recentWeeklyMileage: 8, recentLongestRun: 6,
+  goalPaceSecondsPerMile: goal.paceSecondsPerMile, goalMiles: goal.miles };
+const resolved = PHASES.map((phase, index) => resolveWeekRunning(
+  { week: index + 1, phase, mileage: 17, longRunMiles: 6, longRunPace: '9:00', longRunDay: 'Sat',
+    quality: 'No goal-driven cardio', qualityPace: '7:00', qualityDay: 'Tue',
+    easyDays: ['Thu'], easyMinutes: 40, easyPace: '9:00', topSets: [], note: '' },
+  days, athlete, { weekIndex: index, blockWeeks: 10, waveIndex: index }));
+
+check('the stale "no goal" text does not survive the goal',
+  resolved.every(week => !/no goal/i.test(week.quality)));
+check('threshold running appears in the block',
+  resolved.some(week => /threshold/i.test(week.quality)),
+  resolved.map(week => week.quality).find(text => /threshold/i.test(text)) || 'none');
+check('every hard run is paced off the goal, never faster',
+  resolved.filter(week => /threshold/i.test(week.quality)).every(week => /6:2\d\/mi/.test(week.quality)),
+  resolved.find(week => /threshold/i.test(week.quality))?.quality);
+check('race week is the test, not a tempo run', /assessment/i.test(resolved[9].quality), resolved[9].quality);
+check('taper week sharpens rather than deloading', /strides/i.test(resolved[8].quality), resolved[8].quality);
+check('the written session owns its pace, so the card cannot contradict it',
+  resolved.every(week => !week.qualityPace));
+check('no hard session eats the week',
+  resolved.every(week => week.mileage <= athlete.maxWeeklyMileage), `${Math.max(...resolved.map(w => w.mileage))} mi`);
+
+console.log('\nA rough morning still outranks the block');
+const rough = resolveWeekRunning(
+  { week: 3, phase: 'Build', mileage: 17, longRunMiles: 6, longRunPace: '9:00', longRunDay: 'Sat',
+    quality: 'No goal-driven cardio', qualityPace: '', qualityDay: 'Tue',
+    easyDays: ['Thu'], easyMinutes: 40, easyPace: '9:00', topSets: [], note: '' },
+  days, { ...athlete, readiness: 48 }, { weekIndex: 2, blockWeeks: 10, waveIndex: 2 });
+check('below 55 the hard run comes off', /recovered/i.test(rough.quality), rough.quality);
+
+console.log('\nPhase mapping keeps the two calendars in step');
+check('a running deload is a deload', qualityPhaseFor('Build', true) === 'Deload');
+check('but never at the cost of the taper', qualityPhaseFor('Taper', true) === 'Taper');
+check('nor of race week', qualityPhaseFor('Race', true) === 'Test');
 
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);

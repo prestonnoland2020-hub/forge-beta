@@ -92,12 +92,23 @@ export function mileageGap(goals: CreatedGoal[], records: WorkoutRecord[], bound
   if (ceiling && ceiling < needed) {
     return { kind: 'ceiling', ...shared, target: Math.ceil(needed * CEILING_HEADROOM) };
   }
-  /* Permission is there; the ramp is starting too low to arrive. Never propose
-     a floor above the ceiling, or one that is not actually an increase. */
-  if (running > 0 && running < needed * ARRIVAL_SHARE) {
-    const step = Math.max(Math.ceil(running * SAFE_STEP), running + 1);
+  /* PERMISSION IS THERE; THE PLAN IS STARTING TOO LOW TO ARRIVE.
+
+     The step used to be measured from LOGGED RUNNING alone, and then discarded
+     if it landed below the floor the athlete had already set. Preston is the
+     case that shows why that is wrong: 8 miles a week logged, a floor of 14, a
+     goal needing 22. A safe step from 8 is 9, 9 is under his floor of 14, so
+     the whole alert went silent — on an athlete Forge had just finished
+     telling, in its own words, "reachable, but not on 8 miles a week". The one
+     case the feature exists for was the one case it would not speak in.
+
+     The step is measured from the BASE — what the plan will actually start
+     from, which is the highest of logged running, stated mileage and the floor
+     — so it is always a real increase on what is already guaranteed. */
+  if (base > 0 && base < needed * ARRIVAL_SHARE) {
+    const step = Math.max(Math.ceil(base * SAFE_STEP), base + 1);
     const target = ceiling ? Math.min(step, ceiling) : step;
-    if (target <= floor || target <= running) return null;
+    if (target <= floor || target <= base) return null;
     return { kind: 'floor', ...shared, target };
   }
   return null;

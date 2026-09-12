@@ -142,3 +142,63 @@ export function qualitySession(context: QualityContext): QualitySession {
     miles: round1(Math.min(miles, weeklyMiles * QUALITY_MAX_SHARE || miles)),
   };
 }
+
+/* THE GOAL THE HARD RUN IS FOR.
+
+   The pre-program roadmap derived goal pace inside its own module, so the
+   stored AI block — the thing the Plan tab actually renders — had no idea
+   what pace anything should be run at and kept whatever prose the model wrote.
+   That is why a 5K build showed no threshold work: the function that decides
+   what a hard run is was only ever called by the roadmap. One derivation,
+   exported, so both paths read the same numbers. */
+export type EnduranceGoalRef = { type?: string; exercise?: string; title?: string; target?: string; date?: string };
+
+export const goalClockSeconds = (value?: string): number => {
+  const match = String(value || '').match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);
+  if (!match) return 0;
+  return Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+};
+
+export const goalEventMiles = (goal?: EnduranceGoalRef): number => {
+  const name = `${goal?.exercise || ''} ${goal?.title || ''}`.toLowerCase();
+  if (name.includes('marathon') && !name.includes('half')) return 26.219;
+  if (name.includes('half')) return 13.109;
+  if (name.includes('10k')) return 6.214;
+  if (name.includes('5k')) return 3.107;
+  if (/\b2[\s-]?mile/.test(name)) return 2;
+  if (/\bmile\b/.test(name)) return 1;
+  return 3.107;
+};
+
+/* The nearest dated endurance goal is the one the block is built for. */
+export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null): { paceSecondsPerMile: number; miles: number } | null {
+  const goal = (goals || []).filter(entry => entry?.type === 'Endurance' && entry?.date)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  if (!goal) return null;
+  const seconds = goalClockSeconds(goal.target);
+  const miles = goalEventMiles(goal);
+  if (!seconds || !miles) return null;
+  return { paceSecondsPerMile: seconds / miles, miles };
+}
+
+/* The AI block writes its phases in the strength block's language; the hard
+   run thinks in the running block's. A running deload outranks both, because
+   the week's volume has already been cut and a threshold session on top of a
+   cut week is not a deload. */
+export function qualityPhaseFor(planPhase: string | undefined, deloading: boolean): QualityPhase {
+  /* Race week and the taper outrank it: the volume cut IS the taper, and
+     turning the last sharpening session before a race into a deload fartlek
+     is how an athlete arrives flat. */
+  const phase = String(planPhase || '');
+  if (phase === 'Race') return 'Test';
+  if (phase === 'Taper') return 'Taper';
+  if (deloading) return 'Deload';
+  switch (phase) {
+    case 'Race': return 'Test';
+    case 'Taper': return 'Taper';
+    case 'Deload': return 'Deload';
+    case 'Peak': return 'Specific';
+    case 'Base': return 'Foundation';
+    default: return 'Build';
+  }
+}

@@ -90,5 +90,28 @@ check('the floor is the ramp\'s first week, not its target',
 check('so the planner may climb and must start', built.minWeeklyMileage < built.maxWeeklyMileage,
   `${built.minWeeklyMileage} → ${built.maxWeeklyMileage}`);
 
+console.log('\nThe step is measured from what the plan will actually start from');
+/* Preston's live numbers, the day the gate stayed silent: 17 stated, 14 floor,
+   40 ceiling, and about 8 miles a week of running Forge can see. The step used
+   to be taken from the 8 — 8 → 9 — which fell under his own 14-mile floor and
+   was discarded, so goalFeasibility said "6:07/mi is normally built on about
+   22" and the gate said nothing at all. The plan never starts at 8; it starts
+   at the highest of logged running, stated mileage and the floor. */
+const run = (id, back, miles) => ({ id, date: iso(back),
+  cardioSessions: [{ id: `c${id}`, activity: 'Run', structure: 'steady',
+    prescription: { distanceUnit: 'miles', legacyIntervals: [{ cardioType: 'Run', unit: 'miles', distance: miles, time: miles * 9 }] } }] });
+const real = [...Array.from({ length: 8 }, (_, week) => run(`a${week}`, week * 7 + 2, 4)),
+  ...Array.from({ length: 8 }, (_, week) => run(`b${week}`, week * 7 + 5, 4)), timeTrial];
+const live = mileageGap([fiveK], real, { minWeeklyMileage: 14, maxWeeklyMileage: 40, weeklyMileage: 17 });
+check('the gate speaks instead of staying silent', Boolean(live), live ? `${live.kind} → ${live.target}` : 'null');
+check('it is a starting-point problem, not a ceiling one', live?.kind === 'floor', `${live?.kind}`);
+check('the block is built around the stated mileage, not the logged 8',
+  live?.base === 17, `${live?.base}`);
+check('so the step is a real increase on what is already guaranteed',
+  live?.target > live?.floor && live?.target > live?.base, `${live?.floor} floor, ${live?.base} base → ${live?.target}`);
+check('and it is a humane one', live?.target <= Math.ceil(live.base * 1.1), `${live?.target}`);
+check('it still reports what they are actually running', live?.running < live?.base, `${live?.running} logged`);
+check('and it arrives in the weeks that are left', live?.arrives === true, `${live?.weeksAvailable} weeks`);
+
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);
