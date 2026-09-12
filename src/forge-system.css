@@ -996,7 +996,10 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .kpi-tile small{font-size:10.5px;color:var(--ink-3)}
 .ic-card{display:grid;gap:10px;padding:15px 16px}
 .ic-head{display:flex;align-items:center;gap:8px}
-.ic-head i{width:14px;height:6px;border-radius:3px;background:var(--accent)}
+/* The accent dash that used to sit beside every one of these headings was
+   decoration six times over — it marked nothing, and it spent the one colour
+   the app uses to mean "you can press this". */
+.ic-head i{display:none}
 .ic-head h3{margin:0;font-size:13px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
 .ic-sub{margin:-4px 0 0;font-size:12.5px;color:var(--ink-2)}
 .ic-empty{margin:0;font-size:12.5px;color:var(--ink-3)}
@@ -1005,24 +1008,24 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ic-bars em{font-style:normal;font-size:10.5px;font-weight:800;color:var(--ink-2)}
 .ic-bar{display:flex;flex-direction:column;justify-content:flex-end;width:100%;max-width:30px;height:100%;border-radius:7px;overflow:hidden;background:var(--surface-sunken)}
 .ic-bar i.lift{background:var(--accent)}
-.ic-bar i.cardio{background:var(--hairline-strong)}
+.ic-bar i.cardio{background:var(--chart-2)}
 .ic-bars span{font-size:9.5px;color:var(--ink-3)}
 .ic-legend{display:flex;gap:14px;justify-content:center;font-size:11px;color:var(--ink-2)}
 .ic-legend span{display:flex;align-items:center;gap:5px}
 .ic-legend i{width:9px;height:9px;border-radius:50%}
 .ic-legend i.lift{background:var(--accent)}
-.ic-legend i.cardio{background:var(--hairline-strong)}
+.ic-legend i.cardio{background:var(--chart-2)}
 .ic-line{width:100%;height:auto}
 .ic-grid{stroke:var(--hairline)}
 .ic-axis{fill:var(--ink-3);font:700 8.5px Inter,sans-serif}
 .ic-stroke{stroke:var(--chart-1);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
 .ic-dot{fill:var(--surface-1);stroke:var(--chart-1);stroke-width:2}
 .ic-freq{display:grid;gap:8px}
-.ic-freq>div{display:grid;grid-template-columns:92px minmax(0,1fr) 22px;gap:10px;align-items:center}
+.ic-freq>div{display:grid;grid-template-columns:minmax(0,108px) minmax(0,1fr) 24px;gap:10px;align-items:center}
 .ic-freq span{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ic-track{height:10px;border-radius:999px;background:var(--surface-sunken);overflow:hidden}
 .ic-track i{display:block;height:100%;border-radius:inherit;background:var(--accent)}
-.ic-freq.muted .ic-track i{background:var(--hairline-strong)}
+.ic-freq.muted .ic-track i{background:var(--chart-2)}
 .ic-freq b{font-size:12.5px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
 .ic-pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .ic-pr-grid>div{display:grid;gap:2px;padding:12px 13px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-sunken)}
@@ -1059,7 +1062,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 
 /* Old-UI chart chrome: gold top accent on insight cards, date strip under
    every chart. */
-.ic-card{border-top:2px solid color-mix(in srgb,var(--accent) 33%,var(--hairline))}
+.ic-card{border-top:1px solid var(--hairline)}
 .ic-datebar{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3);margin-top:-4px;padding-top:6px;border-top:1px solid var(--hairline)}
 
 /* Insights range chips + the split-day picker on the log page. */
@@ -1087,7 +1090,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 
 /* ═══ INSIGHTS · actual numbers under the PR + Endurance charts ═══ */
 .ic-chart-kpis{margin-top:10px}
-.ic-chart-kpis .kpi-tile{border-top:2px solid color-mix(in srgb,var(--accent) 33%,var(--hairline))}
+.ic-chart-kpis .kpi-tile{border-top:1px solid var(--hairline)}
 .ic-chart-kpis .kpi-tile b{font-size:21px;overflow-wrap:anywhere}
 .ic-delta{font-weight:800}
 .ic-delta.up{color:var(--good)}
@@ -1441,3 +1444,33 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .owner-table td small{display:block;color:var(--warn,#c8922a);font-size:10.5px}
 .owner-table tr.disabled{opacity:.55}
 .owner-zero{color:var(--bad)}
+
+/* ─── ASK FORGE IS A CONVERSATION, SO IT SITS WHERE A CONVERSATION SITS ───
+   The composer used to render at the top of the page with six hundred pixels
+   of empty ground under it, which reads as a screen that failed to load. The
+   page now fills the height it is given: the transcript takes the slack and
+   scrolls, the prompts and the box stay at the bottom under the thumb. */
+.coach-page{display:flex;flex-direction:column;min-height:calc(100dvh - 232px)}
+.coach-page>.page-intro{flex:none}
+.coach-page .coach-conversation{flex:0 0 auto;display:flex;flex-direction:column;min-height:0}
+/* Only a live transcript earns the height. An empty screen that stretches
+   its one card to fill the viewport reads as a layout that broke. */
+.coach-page:has(.coach-chat-stream) .coach-conversation{flex:1 1 auto}
+.coach-page>.coach-boundary{margin-top:auto;padding-top:var(--s4)}
+.coach-page .coach-chat-stream{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
+.coach-page .question-chips{margin-top:auto}
+.coach-page .coach-composer{flex:none}
+.coach-page>.coach-boundary{flex:none}
+
+/* A ROW THAT SCROLLS SHOULD LOOK LIKE ONE. Chips and day cards ran off the
+   right edge mid-word with nothing to say there was more — the last one read
+   as a rendering fault. A fade at the edge is the whole affordance. */
+.edge-scroll,.coach-page .question-chips,.plan-day-list{
+  -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent);
+  mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent)}
+.edge-scroll,.coach-page .question-chips{scroll-snap-type:x proximity;scroll-padding-inline:2px}
+.edge-scroll>*,.coach-page .question-chips>button{scroll-snap-align:start}
+/* An empty transcript should read as an invitation, not a failed load. */
+.coach-page .coach-empty{flex:0 0 auto;display:grid;justify-items:start;gap:6px;border:0;background:none;padding:var(--s2) 0 var(--s3);text-align:left}
+.coach-page .coach-empty strong{font:800 16px var(--display);color:var(--ink-2)}
+.coach-page .coach-empty p{margin:0;max-width:34ch;color:var(--ink-3);font-size:13px;line-height:1.55}

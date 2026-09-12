@@ -65,7 +65,7 @@ body {
      32px condensed caps and ate a quarter of the viewport. Keep the title, drop
      the duplicate eyebrow, and leave room for any action the intro carries. */
   .page-intro { margin-bottom: 4px; }
-  .page-intro h2 { font-size: 26px !important; line-height: 1.06; letter-spacing: -.01em; }
+  .page-intro h2 { font-size: 21px !important; line-height: 1.06; letter-spacing: -.01em; }
   .page-intro > div > .eyebrow { display: none; }
   .page-intro p { display: none; }
   .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list { border-radius: 16px !important; }
@@ -128,7 +128,7 @@ body {
   .plan-day-list > .add-plan-day { flex-basis: 58%; display: grid; place-items: center; }
   .day-editor-panel { touch-action: pan-y; }
   .day-editor-panel > header { padding: 20px 18px; gap: 12px; }
-  .day-editor-panel h2 { font-size: 38px; }
+  .day-editor-panel h2 { font-size: 22px; }
   .mobile-swipe-hint { display: block; margin-top: 6px; color: var(--muted); font-size:11px; }
   .day-order-actions { display: grid; grid-template-columns: 1fr 1fr auto; width: 100%; }
   .day-editor-panel > header .day-order-actions button { min-height: 42px; min-width: 0; }
@@ -140,10 +140,10 @@ body {
 
   .top-set-card-stack { gap: 12px; }
   .top-set-card-stack > header { padding: 4px 2px; }
-  .top-set-card-stack > header h2 { font-size: 36px; }
+  .top-set-card-stack > header h2 { font-size: 21px; }
   .top-set-header-actions .button { min-height: 46px; }
   .top-set-entry { padding: 18px !important; border-left-width: 6px; }
-  .top-set-entry h3 { font-size: 24px; }
+  .top-set-entry h3 { font-size: 17px; }
   .inline-log-exercise { position: fixed; inset: auto 0 0; z-index: 75; max-height: 88dvh; overflow: auto; padding: 20px 16px calc(22px + env(safe-area-inset-bottom)); border-radius: 26px 26px 0 0; background: var(--panel); box-shadow: 0 -20px 60px var(--scrim); }
   .inline-log-exercise footer { display: grid; }
   .onboarding-simple { padding: 14px; }
@@ -154,12 +154,12 @@ body {
   .onboarding-simple .onboarding-grid > aside ol { grid-template-columns: repeat(2, 1fr); margin: 8px 0; }
   .onboarding-simple .onboarding-card { min-height: calc(100dvh - 155px); padding: 22px 17px; border-radius: 16px; }
   .onboarding-simple .setup-heading { padding-bottom: 16px; margin-bottom: 20px; }
-  .onboarding-simple .setup-heading h2 { font-size: 28px; }
+  .onboarding-simple .setup-heading h2 { font-size: 22px; }
   .onboarding-simple .setup-fields { gap: 17px; }
   .onboarding-simple .setup-actions { position: sticky; bottom: 0; margin: auto -17px -22px; padding: 14px 17px calc(14px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
   .onboarding-simple .setup-actions .button { min-height: 52px; }
   .exercise-library { gap: 14px; }
-  .simple-library-head h2 { font-size: 36px; }
+  .simple-library-head h2 { font-size: 21px; }
   .simple-library-head p { font-size: 13px; }
   .simple-library-head .button-row { display: grid; grid-template-columns: 1fr 1fr; }
   .simple-library-head .button { min-height: 48px; padding-inline: 10px; }
@@ -294,7 +294,7 @@ body {
   /* Completed-workout receipt: the check mark was vertically centred against a
      multi-line heading, so it floated below the title it belongs to. */
   .completed-day-card { align-items: start; }
-  .completed-day-card h2 { font-size: 24px; line-height: 1.08; }
+  .completed-day-card h2 { font-size: 20px; line-height: 1.08; }
   .completed-day-check { margin-top: 2px; }
 }
 

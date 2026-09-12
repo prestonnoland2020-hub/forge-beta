@@ -26,4 +26,4 @@
 
 /* The greeting is the Today screen's big line; at phone width it has to hold
    "Good afternoon, <name>" on one line for most names. */
-@media(max-width:640px){.feed-welcome h2{font-size:30px}}
+@media(max-width:640px){.feed-welcome h2{font-size:22px}}

@@ -46,7 +46,7 @@
 /* ── Today ──────────────────────────────────────────────────────────────── */
 .pv-today{display:grid;gap:14px;padding:20px;border-left:4px solid var(--accent)}
 .pv-today header{display:grid;gap:2px}
-.pv-today h2{margin:2px 0 0;font:800 26px/1.1 var(--display);letter-spacing:-.01em;color:var(--ink);text-transform:none}
+.pv-today h2{margin:2px 0 0;font:800 clamp(19px,5.2vw,26px)/1.15 var(--display);letter-spacing:-.01em;color:var(--ink);text-transform:none;overflow-wrap:anywhere}
 .pv-today header small{color:var(--ink-3);font-size:13px}
 .pv-today.done{border-left-color:var(--good)}
 .pv-today.done h2{color:var(--good)}
@@ -71,14 +71,17 @@
 .pv-week h3{margin:0;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .pv-week-rows{display:grid}
 .pv-row{border-top:1px solid var(--line)}
-.pv-row-main{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 18px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
+.pv-row-main{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:start;width:100%;padding:12px 18px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
 .pv-row-main:disabled{cursor:default}
 .pv-row-date{display:grid;line-height:1.1;text-align:center}
 .pv-row-date b{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .pv-row-date small{font:800 17px var(--display);color:var(--ink-2)}
 .pv-row-body{display:grid;gap:2px;min-width:0}
 .pv-row-body strong{font-size:15px;color:var(--ink)}
-.pv-row-body small{color:var(--ink-2);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A DAY'S DESCRIPTION CUT MID-WORD IS WORSE THAN NO DESCRIPTION. One line
+   with an ellipsis turned "Chest + Back strength · map an exercise for a
+   prescription" into "Chest + Back strength · map …". Two lines fit it. */
+.pv-row-body small{color:var(--ink-2);font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
 .pv-row-state{font-size:12px;font-weight:800;color:var(--ink-3);min-width:16px;text-align:right;white-space:nowrap}
 .pv-row.today{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .pv-row.today .pv-row-date b,.pv-row.today .pv-row-date small,.pv-row.today .pv-row-state{color:var(--accent-text)}
@@ -110,7 +113,7 @@
 .pv-block-body{display:grid;gap:2px;min-width:0}
 .pv-block-body strong{font-size:14px;color:var(--ink)}
 .pv-block-body strong em{font-style:normal;color:var(--accent-text)}
-.pv-block-body small{color:var(--ink-2);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-block-body small{color:var(--ink-2);font-size:12.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
 .pv-block-state{font-size:12px;font-weight:800;color:var(--ink-3)}
 .pv-block-week.past .pv-block-body strong,.pv-block-week.past .pv-block-num b{color:var(--ink-3)}
 .pv-block-week.past .pv-block-state{color:var(--good)}
@@ -148,3 +151,8 @@
   .pv>.untrained-goal-banner,.pv>.pv-progress,.pv>.pv-actions,.pv>.pv-block,.pv>.pv-footnote,.pv>.pv-state,.pv>.pv{grid-column:1/-1}
   .pv-today{position:sticky;top:12px}
 }
+
+/* TODAY IS ALREADY THE CARD ABOVE. Repeating its top set in the week list,
+   inside the same screenful, is the same sentence twice. The row keeps its
+   place in the week and gives the detail back to the card. */
+.pv-row.today .pv-row-body small{display:none}

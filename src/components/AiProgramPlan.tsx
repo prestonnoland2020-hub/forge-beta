@@ -112,7 +112,7 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     const setText = (item: AiPlanTopSet) => `${item.exercise}: ${item.weight} × ${item.reps}`;
     const strengthText = topSet
       ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${[setText(topSet), ...extraSets.map(setText)].join(' · ')}`
-      : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · map an exercise for a prescription` : '';
+      : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · no exercise mapped yet` : '';
     const lifts = topSet ? [topSet, ...extraSets] : [];
     const run = runKind && runText ? { kind: runKind, text: runText } : undefined;
     if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const, lifts, run };

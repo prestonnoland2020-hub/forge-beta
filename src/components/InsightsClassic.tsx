@@ -110,7 +110,10 @@ export function InsightsClassic() {
     const cardioTypes = new Map<string, number>();
     window.forEach(record => (record.cardioSessions || []).forEach(session => { const type = session.activity || 'Cardio'; cardioTypes.set(type, (cardioTypes.get(type) || 0) + 1); }));
     return {
-      muscles: [...muscles.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
+      /* "NONE" IS NOT A MUSCLE GROUP. The CSV import wrote it as the muscle
+         on days it could not classify, and it then sat in the frequency chart
+         between Glutes and Shoulders as if it were one. */
+      muscles: [...muscles.entries()].filter(([muscle]) => muscle && muscle !== 'None').sort((a, b) => b[1] - a[1]).slice(0, 8),
       cardio: [...cardioTypes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
     };
   }, [records, rangeCutoffIso, isCardioLift, musclesOf]);
@@ -217,12 +220,20 @@ export function InsightsClassic() {
     const ts = points.map(point => new Date(`${point.date}T12:00:00`).getTime());
     const minX = Math.min(...ts), maxX = Math.max(...ts);
     const ys = points.map(point => point.value);
-    const rawSpan = (Math.max(...ys) - Math.min(...ys)) || 1;
+    /* A SIX-POUND MOVE IS NOT A MOUNTAIN. Fitting the axis to the data alone
+       blew 366→372 lb across the full height of the plot, so a rounding-error
+       week read as a breakthrough and a real one read the same. The window
+       never closes tighter than 6% of the value being plotted; past that the
+       axis fits the data as before. */
+    const lo = Math.min(...ys), hi = Math.max(...ys);
+    const floorSpan = Math.abs((hi + lo) / 2) * 0.06;
+    const rawSpan = Math.max(hi - lo, floorSpan) || 1;
     const mag = Math.pow(10, Math.floor(Math.log10(rawSpan / 3)));
     const norm = rawSpan / 3 / mag;
     const step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
-    const niceMin = Math.floor(Math.min(...ys) / step) * step;
-    const niceMax = Math.ceil(Math.max(...ys) / step) * step;
+    const pad = Math.max(0, (rawSpan - (hi - lo)) / 2);
+    const niceMin = Math.floor((lo - pad) / step) * step;
+    const niceMax = Math.ceil((hi + pad) / step) * step;
     const ticks: number[] = [];
     for (let v = niceMin; v <= niceMax + step * .001; v += step) ticks.push(Math.round(v * 10) / 10);
     const xSpan = (maxX - minX) || 1, ySpan = (niceMax - niceMin) || 1;
@@ -289,8 +300,8 @@ export function InsightsClassic() {
     </section>
 
     <div className="kpi-grid">
-      <div className="kpi-tile gold"><b>{kpi.liftDays}</b><span>Lift days</span></div>
-      <div className="kpi-tile sage"><b>{kpi.cardioDays}</b><span>Cardio days</span></div>
+      <div className="kpi-tile"><b>{kpi.liftDays}</b><span>Lift days</span></div>
+      <div className="kpi-tile"><b>{kpi.cardioDays}</b><span>Cardio days</span></div>
       <div className="kpi-tile"><b>{kpi.miles.toFixed(1)}</b><span>Total miles</span></div>
       <div className="kpi-tile"><b>{kpi.weightEnd === null ? '—' : kpi.weightEnd.toFixed(1)}</b><span>Weight</span><small>{kpi.weightChange === null ? 'No weight logged' : kpi.weightChange === 0 ? 'No change' : `${kpi.weightChange > 0 ? '+' : ''}${kpi.weightChange.toFixed(1)} ${unit}`}</small></div>
       <div className="kpi-tile"><b>{kpi.adherence}%</b><span>Days logged</span></div>

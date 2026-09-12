@@ -21,7 +21,6 @@ type Props = {
   /* THE SECTIONS ARE NUMBERED, and this one was not — so a day with sets
      prescribed read "TOP SETS", "02 CARDIO", "03 SESSION DETAILS" and looked
      like something was missing above it. */
-  sectionNumber?: string;
   onRemove: (index: number) => void;
   /* Deleting a set that is already SAVED is a different act from dropping an
      unfinished row: it has to come back out of the training day, History and
@@ -44,7 +43,7 @@ const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${s
    A set that is saved collapses to what it is — the lift, the load, the max —
    and opens on a tap when it needs correcting. A set still being entered is
    open, because it is the question on the screen. */
-export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onDeleteLogged, onCreateExercise, planLabel, sectionNumber, blockedReason = '' }: Props) {
+export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onDeleteLogged, onCreateExercise, planLabel, blockedReason = '' }: Props) {
   /* Keyed, not indexed: rows are added and removed under this state. */
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [closedKeys, setClosedKeys] = useState<string[]>([]);
@@ -127,7 +126,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
   };
 
   return <section className="top-set-card-stack">
-    <header><div><span className="eyebrow">{sectionNumber ? `${sectionNumber} · ` : ''}{planLabel || 'TOP SETS'}</span><h2>{sets.length} {sets.length === 1 ? 'top set' : 'top sets'}</h2><p>Tap a saved set to correct it. Anything you add is saved as completed.</p></div><div className="top-set-header-actions"><button type="button" className="button ghost" onClick={onAdd}>＋ Add top set</button></div></header>
+    <header><div><span className="eyebrow">{planLabel || 'TOP SETS'}</span><h2>{sets.length} {sets.length === 1 ? 'top set' : 'top sets'}</h2><p>Tap a saved set to correct it. Anything you add is saved as completed.</p></div><div className="top-set-header-actions"><button type="button" className="button ghost" onClick={onAdd}>＋ Add top set</button></div></header>
     {creatingExercise && <section className="inline-log-exercise" aria-label="Add an exercise to your library">
       <header><div><span className="eyebrow">NEW STRENGTH EXERCISE</span><h3>Add it once. Log it now.</h3><p>The muscle mapping keeps future split recommendations accurate.</p></div><button type="button" className="text-button" onClick={() => setCreatingExercise(false)}>Cancel</button></header>
       <label>Exercise name<input autoFocus value={newExerciseName} onChange={event => { setNewExerciseName(event.target.value); setCreateError(''); }} placeholder="e.g. Dumbbell incline press" /></label>

@@ -119,8 +119,7 @@ const summarize = (lines: CardioLine[]) => {
   return [types.join(' + '), distanceText, minutes ? minutesToClock(minutes) : '', pace, count].filter(Boolean).join(' · ');
 };
 
-export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOpen = false, initialEntries = [], plannedSummary }: {
-  sectionNumber?: string;
+export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEntries = [], plannedSummary }: {
   onEntriesChange?: (hasEntries: boolean, entries: CardioLogDraft[]) => void;
   initialOpen?: boolean;
   initialEntries?: CardioLogDraft[];
@@ -264,7 +263,6 @@ export function CardioBuilder({ sectionNumber = '01', onEntriesChange, initialOp
 
   return <section className="card form-card cardio-log">
     <div className="section-title compact-title">
-      <span>{sectionNumber}</span>
       <div><h3>Cardio</h3><p>Log what you actually did. Add a line for each interval.</p></div>
     </div>
 
