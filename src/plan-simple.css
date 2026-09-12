@@ -58,10 +58,27 @@
 
 /* A lift or a run, as a row: name left, number right. Shared by every card. */
 .pv-lines{display:grid}
-.pv-line{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid var(--line)}
+.pv-line{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid var(--line);min-width:0}
 .pv-line:first-child{border-top:0;padding-top:0}
-.pv-line-name{color:var(--ink);font-weight:700}
-.pv-line-value{color:var(--ink);font:800 17px var(--display);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+/* A flex item will not shrink below its content unless it is told it may, which
+   is how "Smith Machine Shoulder Press" pushed its own weight off the right
+   edge of the phone rather than wrapping. */
+.pv-line-name{color:var(--ink);font-weight:700;min-width:0;overflow-wrap:anywhere}
+.pv-line-value{color:var(--ink);font:800 17px var(--display);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;min-width:0;flex-shrink:0}
+
+/* A RUN IS A SENTENCE, NOT A NUMBER. The value column was written for lift
+   loads — "435 lb × 6" — which are short, tabular and must never break across
+   lines. A running session is "5 × 1200 m @ 4:34/rep · goal pace", and holding
+   that to one line ran it straight off the screen with the pace and the label
+   the athlete actually needed hidden past the edge. Run lines wrap, and on a
+   phone they stack under their own label so the full session is readable. */
+.pv-line-run{flex-wrap:wrap}
+.pv-line-run .pv-line-name{flex:0 0 auto}
+.pv-line-run .pv-line-value{white-space:normal;flex:1 1 auto;text-align:right;overflow-wrap:anywhere;font-size:15px;line-height:1.4}
+@media (max-width:520px){
+  .pv-line-run{flex-direction:column;align-items:flex-start;gap:2px}
+  .pv-line-run .pv-line-value{text-align:left;width:100%}
+}
 .pv-line-value small{font:700 11px var(--body);color:var(--ink-3);margin:0 1px}
 .pv-today .pv-line-value{font-size:19px;white-space:normal}
 

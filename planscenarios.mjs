@@ -71,6 +71,29 @@ const CEILINGS = [0, 18, 40];
 const READINESS = [undefined, 62, 48];
 const RACE_AWAY = [5, 14, 40];
 
+/* Every invariant this sweep asserts, named so a clean run says what it
+   actually checked rather than saying nothing. */
+const INVARIANTS = [
+  'mileage is a number and the parts sum to the header',
+  'no week clears the ceiling the athlete set',
+  'no week clears what its running days can carry',
+  'the long run stays inside proven durability',
+  'no hard session eats the week',
+  'nothing is prescribed faster than the athlete has run',
+  'no "hard" session slower than easy running',
+  'rep distances stay in the VO2max band',
+  'rep counts and rep times are sane',
+  'deload weeks are lighter than the week before',
+  'week-on-week volume is rate-limited',
+  'the taper tapers, and never goes back up',
+  'race week fits the race, with no long run beside it',
+  'a rough check-in takes the hard session off',
+  'one hard session a week, and it has numbers in it',
+  'phases run forwards, and recovery follows the race',
+  'a long block reaches its race-specific phase',
+  'no block repeats one session type for its whole length',
+  'no block with a goal is left without hard running',
+];
 const violations = new Map();
 const flag = (kind, detail) => {
   if (!violations.has(kind)) violations.set(kind, []);
@@ -217,7 +240,12 @@ for (const athlete of ATHLETES) {
 }
 
 console.log(`\n${blocks.toLocaleString()} blocks · ${weeks.toLocaleString()} weeks (block-level checks ran on ${checkedBlocks.toLocaleString()}, ${kindTally.toLocaleString()} sessions classified)\n`);
-if (!violations.size) console.log('  No invariant violated.');
+if (!violations.size) {
+  /* The runner counts PASS/FAIL lines, and a suite that reports only "no
+     violations" showed up as zero checks — indistinguishable from a suite that
+     had quietly stopped asserting anything. Each invariant reports itself. */
+  for (const name of INVARIANTS) console.log(`  PASS  ${name}`);
+}
 console.log('\n  session mix across every block generated:');
 for (const [kind, n] of [...tally].sort((a, b) => b[1] - a[1])) console.log(`    ${String((n / kindTally * 100).toFixed(1)).padStart(5)}%  ${kind}`);
 for (const [kind, list] of [...violations].sort((a, b) => b[1].length - a[1].length)) {

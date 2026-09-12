@@ -72,7 +72,7 @@ export function LiftLine({ lift, unit }: { lift: PlanLift; unit: string }) {
   </div>;
 }
 export function RunLine({ run }: { run: PlanRun }) {
-  return <div className="pv-line">
+  return <div className="pv-line pv-line-run">
     <span className="pv-line-name">{run.kind}</span>
     <span className="pv-line-value">{run.text}</span>
   </div>;
