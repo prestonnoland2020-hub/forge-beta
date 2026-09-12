@@ -1373,9 +1373,14 @@ export const weeksRemaining = (stored: StoredAiPlan): number => {
    they were in. Where the block enters the wave is a question about REPS; which
    week it is, is a question about the calendar. `waveIndexOf` answers the
    first, this answers the second. */
-export const currentWeekIndex = (stored: StoredAiPlan): number => {
+export const currentWeekIndex = (stored: StoredAiPlan): number => weekIndexOn(stored, localDayIso());
+
+/* The same question asked about a DAY THAT HAS ALREADY HAPPENED. Judging how a
+   session went means knowing what was prescribed on the day it was run, not
+   what is prescribed this week. */
+export const weekIndexOn = (stored: StoredAiPlan, dayIso: string): number => {
   const start = new Date(`${stored.startDate}T12:00:00`).getTime();
-  const elapsed = Math.floor((Date.now() - start) / 604800000);
+  const elapsed = Math.floor((new Date(`${dayIso}T12:00:00`).getTime() - start) / 604800000);
   return Math.max(0, Math.min(stored.plan.weeks.length - 1, elapsed));
 };
 

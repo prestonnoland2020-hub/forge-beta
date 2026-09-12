@@ -1,4 +1,5 @@
 import { readinessFromCheckIn, strugglingStreak, STRUGGLING_RUN, type CheckIn } from './readiness';
+import type { SessionTrend } from './sessionVerdict';
 
 /* IS THE BLOCK WORKING?
 
@@ -31,6 +32,9 @@ export type PressureInput = {
   missedSessions: number;
   /* Whether any goal is currently not on track. */
   goalsBehind: boolean;
+  /* What the athlete's last few hard sessions actually did, compared to what
+     they were asked to do. The one signal Forge never used to have. */
+  sessions?: SessionTrend | null;
 };
 
 export type PlanPressure = {
@@ -48,8 +52,23 @@ const list = (items: string[]) =>
   items.length <= 1 ? items[0] || '' : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 
 export function planPressure(input: PressureInput): PlanPressure | null {
-  const { checkIns, backedOffLifts, missedSessions, goalsBehind } = input;
+  const { checkIns, backedOffLifts, missedSessions, goalsBehind, sessions } = input;
   const rough = strugglingStreak(checkIns);
+
+  /* THE SESSIONS THEMSELVES SPEAK FIRST. How an athlete feels is a report and
+     how they show up is a habit; what they actually ran against what they were
+     asked to run is a measurement, and it is the one that says whether the
+     prescription — the thing Forge is responsible for — is right. Three hard
+     sessions coming in short is not an athlete having a bad fortnight, it is
+     the paces being wrong, and it should be said that way round. */
+  if (sessions?.kind === 'asking-too-much') {
+    return {
+      verdict: 'too-much',
+      say: sessions.say,
+      offer: 'Reset the target paces to what you have been running and rebuild from there.',
+      instruction: sessions.instruction,
+    };
+  }
 
   /* TOO MUCH comes first. Being under-trained costs an athlete a result;
      being over-trained costs them the season, so when both readings are
@@ -84,6 +103,17 @@ export function planPressure(input: PressureInput): PlanPressure | null {
      who is on track should be left alone. */
   const recent = [...checkIns].sort((a, b) => b.date.localeCompare(a.date)).slice(0, COMFORTABLE_RUN);
   const comfortable = recent.length >= COMFORTABLE_RUN && recent.every(item => readinessFromCheckIn(item) >= COMFORTABLE_READINESS);
+  /* Beating every prescription is evidence on its own and does not need the
+     athlete to be behind a goal as well: a block pitched under someone is
+     wasting their weeks whether or not the deadline has noticed yet. */
+  if (sessions?.kind === 'paces-stale' && !missedSessions) {
+    return {
+      verdict: 'too-little',
+      say: sessions.say,
+      offer: 'Re-test your fitness and rebuild the paces from what you can actually run.',
+      instruction: sessions.instruction,
+    };
+  }
   if (comfortable && goalsBehind && !missedSessions) {
     return {
       verdict: 'too-little',

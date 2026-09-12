@@ -4,6 +4,12 @@ import { useCheckIns } from '../features/training/CheckInProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { dueCheckIn } from '../lib/checkInSchedule';
+import { sessionVerdicts } from '../features/training/sessionVerdicts';
+import { readLocalAiPlan } from '../features/training/aiPlanService';
+import { paceModel } from '../lib/paceModel';
+import { enduranceTarget } from '../lib/qualitySession';
+import { useGoals } from '../features/goals/GoalsProvider';
+import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
 import { readinessFromCheckIn, type CheckInScale } from '../lib/readiness';
 import { localDayIso } from '../lib/time';
 
@@ -65,6 +71,7 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   const { checkIns, answer, loading } = useCheckIns();
   const { records, loading: historyLoading } = useWorkoutHistory();
   const { setup } = useProfileSetup();
+  const { goals } = useGoals();
   const { pathname } = useLocation();
   const today = localDayIso();
   const [step, setStep] = useState<Step>('legs');
@@ -80,9 +87,34 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
      to ask how their legs feel is precisely the noise this is supposed to
      avoid. The question keeps until they are not mid-session. */
   const interrupting = pathname === '/workout';
+  /* WHAT THE COACH SAW, so it can open with that rather than with small talk.
+     "How did you pull up" is a question anyone could ask; "you faded over the
+     last few reps — was that the legs or did it go out hot" is the reason an
+     athlete bothers to answer. */
+  const verdictFor = useMemo(() => {
+    const stored = readLocalAiPlan();
+    if (!stored) return undefined;
+    const runGoal = enduranceTarget(goals);
+    const weekly = medianWeeklyMiles(records, 10);
+    const judged = sessionVerdicts(records, stored,
+      (setup?.splitDays || []).map(day => ({ name: day.name, dayType: day.type })), {
+        runningDays: Number(setup?.runningDays) || 0,
+        minWeeklyMileage: Number(setup?.minWeeklyMileage) || 0,
+        maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0,
+        weeklyMileage: Number(setup?.weeklyMileage) || 0,
+        recentWeeklyMileage: weekly,
+        recentLongestRun: longestContinuousRun(records),
+        goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
+        goalMiles: runGoal?.miles,
+        paces: paceModel(records, runGoal, today, weekly),
+      }, today);
+    const byRecord = new Map(judged.map(verdict => [verdict.recordId, verdict]));
+    return (recordId: string) => byRecord.get(recordId) || null;
+  }, [records, goals, setup, today]);
+
   const due = useMemo(
-    () => (loading || historyLoading || !setup?.completedAt || interrupting ? null : dueCheckIn(records, checkIns, today)),
-    [loading, historyLoading, setup?.completedAt, interrupting, records, checkIns, today],
+    () => (loading || historyLoading || !setup?.completedAt || interrupting ? null : dueCheckIn(records, checkIns, today, verdictFor)),
+    [loading, historyLoading, setup?.completedAt, interrupting, records, checkIns, today, verdictFor],
   );
   /* LATCHED THE MOMENT IT OPENS. Answering writes today's check-in, which makes
      dueCheckIn correctly say there is nothing to ask — and unmounted the card

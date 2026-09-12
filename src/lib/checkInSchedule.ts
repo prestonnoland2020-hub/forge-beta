@@ -92,7 +92,13 @@ const bigDayPrompt = (record: WorkoutRecord): string => {
 };
 
 /* Whether the coach should ask today, and what about. */
-export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayIso = iso(new Date())): CheckInAsk | null {
+/* When the coach knows how the session actually went, it opens with that
+   instead of with a generic question. "How did you pull up" is small talk;
+   "you faded over the last few reps — was that the legs or did it go out hot"
+   is the reason the athlete answers at all. */
+export type VerdictLookup = (recordId: string) => { ask: string } | null | undefined;
+
+export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayIso = iso(new Date()), verdictFor?: VerdictLookup): CheckInAsk | null {
   /* One a day, always. */
   if (checkIns.some(item => item.date === todayIso)) return null;
   const answered = new Set(checkIns.map(item => item.aboutRecordId).filter(Boolean) as string[]);
@@ -107,7 +113,7 @@ export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayI
     })
     .sort((a, b) => b.date.localeCompare(a.date));
   const big = recent.find(record => !answered.has(record.id) && isBigDay(record, records));
-  if (big) return { reason: 'big-day', aboutRecordId: big.id, prompt: bigDayPrompt(big) };
+  if (big) return { reason: 'big-day', aboutRecordId: big.id, prompt: verdictFor?.(big.id)?.ask || bigDayPrompt(big) };
 
   /* Otherwise the slow cadence — and only for someone who has actually been
      training, because the question is about training. */
