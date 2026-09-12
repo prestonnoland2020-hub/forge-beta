@@ -82,7 +82,21 @@
 .mileage-gate .eyebrow{color:var(--warn,#c8922a)}
 .mileage-gate-say{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
 .mileage-gate-say strong{font-weight:800}
-.mileage-gate-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
-.mileage-gate-actions .button{flex:1 1 auto;min-height:44px;text-align:center}
-.mileage-gate-actions .text-button{flex:none;padding:0 4px;color:var(--ink-3);font-size:13px;font-weight:700;border:0;background:none}
+.mileage-gate-actions{display:grid;gap:8px;margin-top:2px}
+.mileage-gate-actions .button{min-height:46px;text-align:center;white-space:nowrap}
+.mileage-gate-actions .text-button{justify-self:start;min-height:38px;padding:0 2px;color:var(--ink-2);font-size:13px;font-weight:700;border:0;background:none;text-align:left}
 .mileage-gate>small{color:var(--ink-3);font-size:12px;line-height:1.5}
+
+/* THE RAMP, SHOWN BEFORE IT IS AGREED TO. */
+.mileage-ramp{display:grid;gap:6px;padding:10px 12px;border-radius:var(--r-sm,8px);background:var(--surface-sunken)}
+.mileage-ramp-line{display:flex;align-items:center;gap:10px;font:800 17px var(--display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.mileage-ramp-line i{flex:1;height:2px;border-radius:2px;background:linear-gradient(to right,var(--hairline-strong),var(--accent))}
+.mileage-ramp p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.mileage-gate-foot{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.mileage-gate-foot>small{flex:1 1 auto}
+.mileage-gate-foot .text-button{flex:none;color:var(--ink-3);font-size:13px;font-weight:700;border:0;background:none;min-height:38px}
+
+/* The same card over the builder, the moment an endurance goal is saved. */
+.mileage-check-backdrop{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:18px;background:var(--scrim);backdrop-filter:blur(6px);overflow-y:auto}
+.mileage-check{width:min(560px,100%)}
+.mileage-check .mileage-gate{border-left-width:3px;box-shadow:0 28px 90px var(--scrim)}

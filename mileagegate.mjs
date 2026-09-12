@@ -10,7 +10,7 @@
    of; a ceiling that allows it while the ramp starts too low is a starting
    point. This pins which alert fires, what it offers, and that accepting it
    never writes an unsafe number. */
-import { mileageGap, applyMileageGap, CEILING_HEADROOM } from './src/lib/mileageGap.ts';
+import { mileageGap, applyMileageGap, applyMileageRamp, CEILING_HEADROOM } from './src/lib/mileageGap.ts';
 
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
@@ -74,6 +74,21 @@ console.log('\nThe hungriest goal is the one that speaks');
 const mile = { id: 'g3', title: 'Sub-5 mile', type: 'Endurance', target: '4:59', metric: 'Mile time', date: ahead(20) };
 const both = mileageGap([fiveK, mile], records, { minWeeklyMileage: 0, maxWeeklyMileage: 18 });
 check('one alert, for the goal that needs the most', Boolean(both) && both.needed >= capped.needed, `${both?.goal} needs ${both?.needed}`);
+
+console.log('\nThe alert carries the climb, not just the number');
+check('a ramp comes with it', Boolean(capped.ramp?.weeks?.length), `${capped.ramp?.weeks?.length} weeks`);
+check('it starts from what they run', capped.ramp.from === capped.running || capped.ramp.from === Math.max(1, capped.floor), `${capped.ramp.from}`);
+check('and climbs to what the goal needs', capped.ramp.to === capped.needed, `${capped.ramp.to}`);
+check('it knows how many weeks are left', capped.weeksAvailable > 0, `${capped.weeksAvailable}`);
+check('and says plainly whether that is enough', typeof capped.arrives === 'boolean', `${capped.arrives}`);
+
+console.log('\nAccepting the whole ramp opens the ceiling AND sets the floor');
+const built = applyMileageRamp({ minWeeklyMileage: 0, maxWeeklyMileage: 18 }, capped);
+check('the ceiling clears what the goal needs', built.maxWeeklyMileage >= capped.needed, `${built.maxWeeklyMileage}`);
+check('the floor is the ramp\'s first week, not its target',
+  built.minWeeklyMileage === Math.round(capped.ramp.weeks[0].miles), `${built.minWeeklyMileage}`);
+check('so the planner may climb and must start', built.minWeeklyMileage < built.maxWeeklyMileage,
+  `${built.minWeeklyMileage} → ${built.maxWeeklyMileage}`);
 
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);

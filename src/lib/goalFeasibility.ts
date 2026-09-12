@@ -57,7 +57,7 @@ export type Feasibility = {
 };
 
 const DAY = 86_400_000;
-const weeksUntil = (deadline: string) => {
+export const weeksUntil = (deadline: string) => {
   const ms = new Date(`${deadline}T12:00:00`).getTime();
   return Number.isFinite(ms) ? Math.max(0, (ms - Date.now()) / 604800000) : 12;
 };

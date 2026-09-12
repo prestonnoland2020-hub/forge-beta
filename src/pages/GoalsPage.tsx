@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { GoalBuilder } from '../components/GoalBuilder';
+import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
@@ -7,7 +7,7 @@ import { formatGoalTarget } from '../lib/time';
 import { competingRaces, goalFeasibility } from '../lib/goalFeasibility';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { MileageGate } from '../components/MileageGate';
+import { MileageGate, MileageCheckOnGoal } from '../components/MileageGate';
 
 /* A GOAL'S OWN NAME IS THE POINT OF THE ROW. This page used to be a
    six-column table — type, title, target, due, edit, delete — squeezed into a
@@ -45,6 +45,10 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      removing one should not be a single mis-tap — and a browser confirm() box
      is not something this app uses anywhere else. */
   const [confirming, setConfirming] = useState<number | null>(null);
+  /* A GOAL IS CHECKED AGAINST THE RUNNING THE MOMENT IT IS MADE. Finding out a
+     week later that the target cannot be reached on the miles you do is worse
+     than being told while you are still looking at it. */
+  const [checking, setChecking] = useState<CreatedGoal | null>(null);
   const activeIndex = selected === null ? null : Math.min(selected, Math.max(0, goals.length - 1));
   const toggleGoal = (index: number) => setSelected(current => (current === index ? null : index));
   const openBuilder = (index: number | null = null) => { setEditing(index); setOpen(true); };
@@ -53,7 +57,15 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     {open && <GoalBuilder
       initialGoal={editing === null ? undefined : goals[editing]}
       onClose={() => setOpen(false)}
-      onSave={goal => { saveGoal(goal, editing); setOpen(false); setEditing(null); if (editing === null) setSelected(goals.length); }} />}
+      onSave={goal => {
+        saveGoal(goal, editing);
+        setOpen(false);
+        setEditing(null);
+        if (editing === null) setSelected(goals.length);
+        if (goal.type === 'Endurance') setChecking(goal);
+      }} />}
+
+    {checking && <MileageCheckOnGoal goal={checking} onClose={() => setChecking(null)} />}
 
     {/* SEVERAL RACES ON ONE DATE IS NOT A PLAN. A mile, a two-mile and a 5K all
         due the same day are three different builds and the block can only peak

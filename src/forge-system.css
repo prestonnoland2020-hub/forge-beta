@@ -1450,17 +1450,25 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    of empty ground under it, which reads as a screen that failed to load. The
    page now fills the height it is given: the transcript takes the slack and
    scrolls, the prompts and the box stay at the bottom under the thumb. */
-.coach-page{display:flex;flex-direction:column;min-height:calc(100dvh - 232px)}
-.coach-page>.page-intro{flex:none}
-.coach-page .coach-conversation{flex:0 0 auto;display:flex;flex-direction:column;min-height:0}
+/* Scoped to the PAGE, never to the bubble. The floating coach renders the same
+   component inside a small panel, and a 100dvh min-height in there stretched
+   the grid rows of the transcript — every message became a tall empty card
+   with one line of text at the top of it. */
+.page .coach-page{display:flex;flex-direction:column;min-height:calc(100dvh - 232px)}
+.page .coach-page>.page-intro{flex:none}
+.page .coach-page .coach-conversation{flex:0 0 auto;display:flex;flex-direction:column;min-height:0}
 /* Only a live transcript earns the height. An empty screen that stretches
    its one card to fill the viewport reads as a layout that broke. */
-.coach-page:has(.coach-chat-stream) .coach-conversation{flex:1 1 auto}
-.coach-page>.coach-boundary{margin-top:auto;padding-top:var(--s4)}
-.coach-page .coach-chat-stream{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
-.coach-page .question-chips{margin-top:auto}
-.coach-page .coach-composer{flex:none}
-.coach-page>.coach-boundary{flex:none}
+.page .coach-page:has(.coach-chat-stream) .coach-conversation{flex:1 1 auto}
+.page .coach-page .coach-chat-stream{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
+.page .coach-page .question-chips{margin-top:auto}
+.page .coach-page .coach-composer{flex:none}
+.page .coach-page>.coach-boundary{flex:none;margin-top:auto;padding-top:var(--s4)}
+/* A MESSAGE IS AS TALL AS WHAT IT SAYS. The transcript is a grid, so its rows
+   stretch to fill whatever height the column has — which turned a one-line
+   answer into a card with six inches of empty grey under it. */
+.coach-chat-stream{align-content:start}
+.coach-chat-stream>*{align-self:start}
 
 /* A ROW THAT SCROLLS SHOULD LOOK LIKE ONE. Chips and day cards ran off the
    right edge mid-word with nothing to say there was more — the last one read
@@ -1471,6 +1479,6 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .edge-scroll,.coach-page .question-chips{scroll-snap-type:x proximity;scroll-padding-inline:2px}
 .edge-scroll>*,.coach-page .question-chips>button{scroll-snap-align:start}
 /* An empty transcript should read as an invitation, not a failed load. */
-.coach-page .coach-empty{flex:0 0 auto;display:grid;justify-items:start;gap:6px;border:0;background:none;padding:var(--s2) 0 var(--s3);text-align:left}
-.coach-page .coach-empty strong{font:800 16px var(--display);color:var(--ink-2)}
-.coach-page .coach-empty p{margin:0;max-width:34ch;color:var(--ink-3);font-size:13px;line-height:1.55}
+.page .coach-page .coach-empty{flex:0 0 auto;display:grid;justify-items:start;gap:6px;border:0;background:none;padding:var(--s2) 0 var(--s3);text-align:left}
+.page .coach-page .coach-empty strong{font:800 16px var(--display);color:var(--ink-2)}
+.page .coach-page .coach-empty p{margin:0;max-width:34ch;color:var(--ink-3);font-size:13px;line-height:1.55}
