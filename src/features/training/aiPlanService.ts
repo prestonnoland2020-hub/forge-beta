@@ -166,6 +166,20 @@ export const EXPOSURES_BEFORE_MAX = 3;
    time, not in one jump off an estimate. */
 export const MAX_OVER_TESTED = 1.05;
 
+/* THE MAX FORGE IS WILLING TO ACT ON, which is not always the one arithmetic
+   produces. A calculated max is an inference from rep work and a generous one;
+   a tested single is a fact. Where both exist the inference is held to five
+   percent over the fact — the same bound the wave is written under, so
+   anything asking "has this athlete passed what the block prescribes" compares
+   like with like.
+
+   Without a tested single there is nothing to hold it to and the calculation
+   stands: an athlete who has put up 500 for a double has genuinely outrun a
+   block topping out at 495, and saying otherwise would pin them to a program
+   they have already beaten. */
+export const provenMax = (calculated: number, tested: number) =>
+  tested > 0 ? Math.min(calculated, tested * MAX_OVER_TESTED) : calculated;
+
 /* A LIFT WITH NO GOAL ON IT IS NOT TRAINED LIKE ONE THAT HAS.
 
    The 8/6/4/2/1 wave exists to walk a lift up to a tested single. An accessory

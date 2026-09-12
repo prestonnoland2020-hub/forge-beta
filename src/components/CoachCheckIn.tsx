@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useCheckIns } from '../features/training/CheckInProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -64,6 +65,7 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   const { checkIns, answer, loading } = useCheckIns();
   const { records, loading: historyLoading } = useWorkoutHistory();
   const { setup } = useProfileSetup();
+  const { pathname } = useLocation();
   const today = localDayIso();
   const [step, setStep] = useState<Step>('legs');
   const [legs, setLegs] = useState<CheckInScale>(3);
@@ -73,9 +75,14 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   /* ASKED ONLY WHEN THERE IS A REASON, and never off half-loaded history — "how
      did that session feel" about a session that has not arrived yet is a
      question about the network. */
+  /* NOT WHILE THEY ARE TRAINING. Someone who opened the app on the gym floor
+     to log a set has told you what they came for, and standing in front of it
+     to ask how their legs feel is precisely the noise this is supposed to
+     avoid. The question keeps until they are not mid-session. */
+  const interrupting = pathname === '/workout';
   const due = useMemo(
-    () => (loading || historyLoading || !setup?.completedAt ? null : dueCheckIn(records, checkIns, today)),
-    [loading, historyLoading, setup?.completedAt, records, checkIns, today],
+    () => (loading || historyLoading || !setup?.completedAt || interrupting ? null : dueCheckIn(records, checkIns, today)),
+    [loading, historyLoading, setup?.completedAt, interrupting, records, checkIns, today],
   );
   /* LATCHED THE MOMENT IT OPENS. Answering writes today's check-in, which makes
      dueCheckIn correctly say there is nothing to ask — and unmounted the card

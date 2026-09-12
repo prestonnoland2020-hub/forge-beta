@@ -21,7 +21,7 @@ import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, goalLiftNames, testsOneRepMax, resolvePlanWeek, weekCycleDays,
   bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
-  calendarEmptyState,
+  calendarEmptyState, provenMax,
 } from '../features/training/aiPlanService';
 import { liftPositions, rungFor } from '../lib/liftProgression';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
@@ -274,6 +274,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      makes it standing rather than a one-off that the next automatic refresh
      quietly undoes. Returns whether the block was actually built, so the
      rebuild sheet can stay open (holding what was typed) when it was not. */
+  /* WHEN A BLOCK IS OVER RATHER THAN RESHAPED. Fewer than four weeks left is
+     not enough to program around, so that block has run its course and the
+     next one starts today. Above it, a rebuild is a reshaping of the weeks
+     that remain and the block keeps its calendar — the same number decides
+     both, or a block with three weeks left would be rebuilt forever without
+     ever being allowed to end. */
+  const BLOCK_ENDS_WITH = 4;
+
   const regenerate = async (adjustments?: string): Promise<boolean> => {
     if (generating) return false;
     setGenerating(true); setError(''); generateStartedAt.current = Date.now();
@@ -309,7 +317,23 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       };
       const plan = await generateAiPlan(context);
       /* A newly generated block starts unsaved — it has not been approved. */
-      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate: localDayIso(), fingerprint, blockWeeks: plan.weeks.length, saved: false, waveOffset, ...(adjustments ? { adjustments } : {}) };
+      /* A REBUILD RESHAPES THE BLOCK. IT DOES NOT START A NEW ONE.
+
+         startDate was stamped with today on every single generation, and the
+         week you are in is counted from it — so every rebuild put the athlete
+         back in Week 1. Since a block also rebuilds itself silently whenever
+         it reads as stale, the effect was that Preston opened Plan to "Week 1
+         of 10" indefinitely: the wave restarted at 8 reps and never reached a
+         max week, the mileage ramp restarted at the bottom and never climbed,
+         and the taper could never arrive before the race. Ten weeks of
+         programming that could only ever execute its first week.
+
+         The block's start is carried through a rebuild. A new block only
+         starts today when there genuinely is not one — nothing stored, or so
+         little of the old one left that reshaping it is meaningless. */
+      const roomLeft = stored && weeksRemaining(stored) >= BLOCK_ENDS_WITH;
+      const startDate = roomLeft ? stored!.startDate : localDayIso();
+      const next: StoredAiPlan = { plan, generatedAt: new Date().toISOString(), startDate, fingerprint, blockWeeks: plan.weeks.length, saved: false, waveOffset, ...(adjustments ? { adjustments } : {}) };
       await saveStoredAiPlan(next, Boolean(user));
       setStored(next);
       return true;
@@ -372,17 +396,33 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       if (estimate > (peak.get(key) || 0)) peak.set(key, estimate);
       return peak;
     }, new Map());
+    /* OUTGROWN IS MEASURED IN THE SAME CURRENCY THE BLOCK IS WRITTEN IN.
+
+       `bests` is a CALCULATED max — an inference from rep work, and a
+       deliberately generous one. The block's own ceiling is now capped at five
+       percent over the athlete's TESTED single, precisely because that
+       inference runs ahead of what they can actually take for one. Comparing
+       the two therefore reports "outgrown" for every athlete whose rep work
+       outruns their last test, which is most of them and was all of Preston's
+       lifts — so the block rebuilt itself on every visit, and each rebuild
+       reset the block to Week 1.
+
+       provenMax is the honest comparison: the same number the wave is written
+       from, held to five percent over a tested single where one exists and
+       left alone where none does. An athlete who has put up 500 for a double
+       has genuinely outrun a block topping out at 495 and gets a new one; an
+       athlete whose 415 x 8 merely IMPLIES 526 does not. */
     const outgrown = [...ceiling].some(([key, top]) => {
-      const best = bests.get(key);
-      return Boolean(best && top && best > top * 1.05);
+      const proven = provenMax(bests.get(key) || 0, bestSingles.get(key) || 0);
+      return Boolean(proven && top && proven > top * 1.05);
     });
     /* A SAVED PLAN IS PINNED. Forge may notice the block is stale, but it
        does not get to replace a block the athlete approved — only an explicit
        confirmed refresh does. */
     if (stored?.saved) return;
-    const stale = !stored || stored.fingerprint !== fingerprint || weeksRemaining(stored) < 4 || outgrown;
+    const stale = !stored || stored.fingerprint !== fingerprint || weeksRemaining(stored) < BLOCK_ENDS_WITH || outgrown;
     if (stale && baselineReady) { autoAttempted.current = true; void regenerate(stored?.adjustments); }
-  }, [storeLoading, stored, fingerprint, user, goals.length, splitDays.length, generating, bests, baselineReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [storeLoading, stored, fingerprint, user, goals.length, splitDays.length, generating, bests, bestSingles, baselineReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* A stored block renders even offline/demo; only GENERATION needs a user. */
   const canGenerate = !isDemoMode && Boolean(user);

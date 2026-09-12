@@ -40,6 +40,10 @@ await page.addInitScript(([s, h, sd, p]) => {
   localStorage.setItem('forge-goals', JSON.stringify([{ type: 'Strength', title: 'Squat 500', exercise: 'Squat', metric: 'Real 1RM', target: '500', unit: 'lb', date: '2026-12-30', connection: '' }]));
   localStorage.setItem('forge-workout-history-v1', JSON.stringify(h));
   localStorage.setItem('forge-ai-plan-v1', JSON.stringify(p));
+  /* This athlete has already answered the coach this morning, so the check-in
+     is not standing over the screen under test. Asking is covered by
+     checkins.mjs; this is about the week picker. */
+  localStorage.setItem('forge-check-ins-v1', JSON.stringify([{ date: new Date().toISOString().slice(0, 10), legs: 2, energy: 4, sleep: 4 }]));
   localStorage.setItem('forge-training-plan-v1', JSON.stringify({ name: 'Split', rhythm: 'rolling', minWeeklyMileage: 0, maxWeeklyMileage: 0,
     days: sd.map(d => ({ name: d.name, weekday: 'MON', dayType: 'strength', muscles: d.muscles, exercises: d.exercises, cardioPolicy: 'none', cardio: [], recoveryStyle: 'Full rest', strengthDuration: '60', maxDuration: '60' })) }));
 }, [{ ...setup, splitDays, completedAt: new Date().toISOString(), acceptedSafety: true }, hist, splitDays, storedPlan]);
