@@ -161,6 +161,18 @@ const rememberAsked = (fingerprint: string) => {
   try { localStorage.setItem(CHECK_KEY, JSON.stringify({ fingerprint, date: today() })); } catch { /* private mode */ }
 };
 
+/* WHETHER THE MILEAGE DIALOG IS ABOUT TO SPEAK. The check-in asks this before
+   deciding whether to show itself, so the two can never stack — one place
+   decides, rather than each component guessing about the other. */
+export function useMileageCheckPending(): boolean {
+  const { goals } = useGoals();
+  const { records } = useWorkoutHistory();
+  const { setup, loading } = useProfileSetup();
+  const gap = useMemo(() => mileageGap(goals, records, setup), [goals, records, setup]);
+  const [seenBefore] = useState(() => (gap ? alreadyAsked(fingerprintOf(gap)) : false));
+  return Boolean(!loading && setup?.completedAt && goals.length > 0 && gap && !seenBefore);
+}
+
 export function MileageStartupCheck() {
   const { goals } = useGoals();
   const { records } = useWorkoutHistory();
@@ -175,11 +187,21 @@ export function MileageStartupCheck() {
   /* HISTORY HAS TO HAVE ARRIVED BEFORE THIS CAN JUDGE. Asked while records are
      still loading, "you are running 0 miles" is a statement about the network,
      not about the athlete — and it would be the first thing they saw. */
-  /* NEVER TWO DIALOGS ON ONE OPEN. The body question is quick and it goes
-     first; this one waits for a morning of its own rather than stacking a
-     second backdrop on top of the first. */
-  const checkInPending = useMemo(() => Boolean(dueCheckIn(records, checkIns, localDayIso())), [records, checkIns]);
-  const ready = !loading && Boolean(setup?.completedAt) && goals.length > 0 && !checkInPending;
+  /* NEVER TWO DIALOGS ON ONE OPEN — AND THIS IS THE ONE THAT GOES FIRST.
+
+     The original rule was the other way round: the check-in is quick, so it
+     went first and this waited for a morning of its own. In practice that
+     morning never came. The check-in runs on a three-day cadence and fires
+     again the morning after anything hard, so for anyone training regularly
+     there is almost no day on which one is not pending — and the message that
+     an athlete's goal is out of reach on the mileage they run, which is the
+     single most consequential thing Forge has to say, was queued behind a
+     question about how their legs feel, indefinitely.
+
+     Priority goes to the rarer message. The check-in recurs on its own and
+     loses nothing by waiting a day; this one is keyed to a specific gap and
+     goes quiet again the moment it is answered. */
+  const ready = !loading && Boolean(setup?.completedAt) && goals.length > 0;
   const fingerprint = gap ? fingerprintOf(gap) : '';
   /* Read once, on mount. Reading it every render would hide the dialog the
      instant the answer is written, before the athlete's press has been acted

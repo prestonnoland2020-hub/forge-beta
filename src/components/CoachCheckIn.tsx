@@ -4,6 +4,7 @@ import { useCheckIns } from '../features/training/CheckInProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { dueCheckIn } from '../lib/checkInSchedule';
+import { useMileageCheckPending } from './MileageGate';
 import { sessionVerdicts } from '../features/training/sessionVerdicts';
 import { readLocalAiPlan } from '../features/training/aiPlanService';
 import { paceModel } from '../lib/paceModel';
@@ -87,6 +88,11 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
      to ask how their legs feel is precisely the noise this is supposed to
      avoid. The question keeps until they are not mid-session. */
   const interrupting = pathname === '/workout';
+  /* AND IT YIELDS TO THE MILEAGE GATE. Two backdrops stacked on one app open
+     is the fastest way to teach someone to dismiss both without reading
+     either. That one is rare, specific and consequential; this one comes round
+     again in three days and loses nothing by waiting. */
+  const mileageAsking = useMileageCheckPending();
   /* WHAT THE COACH SAW, so it can open with that rather than with small talk.
      "How did you pull up" is a question anyone could ask; "you faded over the
      last few reps — was that the legs or did it go out hot" is the reason an
@@ -113,8 +119,10 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   }, [records, goals, setup, today]);
 
   const due = useMemo(
-    () => (loading || historyLoading || !setup?.completedAt || interrupting ? null : dueCheckIn(records, checkIns, today, verdictFor)),
-    [loading, historyLoading, setup?.completedAt, interrupting, records, checkIns, today, verdictFor],
+    () => (loading || historyLoading || !setup?.completedAt || interrupting || mileageAsking
+      ? null
+      : dueCheckIn(records, checkIns, today, verdictFor)),
+    [loading, historyLoading, setup?.completedAt, interrupting, mileageAsking, records, checkIns, today, verdictFor],
   );
   /* LATCHED THE MOMENT IT OPENS. Answering writes today's check-in, which makes
      dueCheckIn correctly say there is nothing to ask — and unmounted the card

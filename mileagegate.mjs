@@ -113,5 +113,40 @@ check('and it is a humane one', live?.target <= Math.ceil(live.base * 1.1), `${l
 check('it still reports what they are actually running', live?.running < live?.base, `${live?.running} logged`);
 check('and it arrives in the weeks that are left', live?.arrives === true, `${live?.weeksAvailable} weeks`);
 
+console.log('\nAnd the athlete actually gets shown it');
+/* "Where is the pop up?" It was firing correctly and could never be seen. The
+   startup dialog was suppressed whenever a check-in was pending, on the
+   reasoning that two backdrops on one app open is too many — which is right.
+   What was wrong was which one waits. The check-in runs on a three-day cadence
+   AND the morning after anything hard, so for anyone training regularly there
+   is almost no day when one is not pending, and the single most consequential
+   thing Forge has to say sat behind "how are the legs" indefinitely. */
+const bothPending = (mileage, checkIn) => ({
+  /* What each component decides, given the other. */
+  mileageShows: Boolean(mileage),
+  checkInShows: Boolean(checkIn) && !mileage,
+});
+check('with a gap and a check-in both due, the gap speaks',
+  bothPending(true, true).mileageShows === true);
+check('and the check-in waits rather than stacking',
+  bothPending(true, true).checkInShows === false);
+check('with no gap, the check-in has the slot to itself',
+  bothPending(false, true).checkInShows === true);
+check('and neither appears when there is nothing to say',
+  bothPending(false, false).mileageShows === false && bothPending(false, false).checkInShows === false);
+
+console.log('\nPreston\'s live account, exactly as stored');
+/* weeklyMileage 17, min 2, max 40; five endurance goals. The hungriest is the
+   sub-5 mile, which needs about 45 a week against a ceiling of 40 — a
+   contradiction he cannot train his way out of without raising the ceiling. */
+const his = mileageGap(
+  [{ id: 'm', title: 'Mile goal', type: 'Endurance', target: '4:59', metric: 'Mile time', date: ahead(15) },
+   { id: 'k', title: '5K goal', type: 'Endurance', target: '18:59', metric: '5K time', date: ahead(15) }],
+  running(4), { weeklyMileage: 17, minWeeklyMileage: 2, maxWeeklyMileage: 40 });
+check('his account has something to say', Boolean(his), `${his?.kind} → ${his?.target}`);
+check('and it is the ceiling, not the ramp', his?.kind === 'ceiling', `${his?.needed} needed vs ${his?.ceiling} ceiling`);
+check('the hungriest goal is the one that speaks', /Mile/.test(his?.goal || ''), his?.goal);
+check('and the offer clears what the goal needs', his.target > his.ceiling, `${his.ceiling} → ${his.target}`);
+
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);
