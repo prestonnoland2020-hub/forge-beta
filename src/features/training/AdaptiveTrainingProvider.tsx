@@ -1,5 +1,7 @@
 import { createContext,useContext,useEffect,useMemo,useState,type ReactNode } from 'react';
 import { deriveRecoveryState,type DailyHealthSnapshot,type RecoveryState } from '../../lib/recoveryEngine';
+import { applyCheckIn } from '../../lib/readiness';
+import { useCheckIns } from './CheckInProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { cardioMiles,isRunningCardio,summarizeCardioDraft } from '../../lib/cardioSession';
 import { countsAsRunVolume } from '../../lib/runQuality';
@@ -50,7 +52,14 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
   const combinedHistory=useMemo(()=>{const loggedIds=new Set(loggedRunHistory.map(run=>run.id));return[...history.filter(run=>!loggedIds.has(run.id)),...loggedRunHistory].sort((a,b)=>b.date.localeCompare(a.date))},[history,loggedRunHistory]);
   const strengthLoad=useMemo(()=>{const cutoff=Date.now()-7*86400000;const effortLoad:Record<string,number>={Easy:2,Moderate:3,Hard:5,'Max effort':7};return records.filter(record=>record.lift&&new Date(`${record.date}T12:00:00`).getTime()>=cutoff).reduce((sum,record)=>sum+(effortLoad[record.effort||'']||3),0)},[records]);
   const latest=health[health.length-1]||unavailableHealth();
-  const recovery=useMemo(()=>deriveRecoveryState(latest,health,strengthLoad,prefs.injuryConstraint),[latest,health,strengthLoad,prefs.injuryConstraint]);
+  /* THE ATHLETE'S OWN ANSWER IS PART OF THE RECOVERY STATE, not a second
+     opinion sitting beside it. Everything downstream — the volume scale, the
+     hold on load when fatigue is high, the repeat-instead-of-progress rule —
+     reads one RecoveryState and must not have to know whether a watch or a
+     person produced the number. Without a watch this was readiness 100 every
+     day of every athlete's life. */
+  const {checkIns}=useCheckIns();
+  const recovery=useMemo(()=>applyCheckIn(deriveRecoveryState(latest,health,strengthLoad,prefs.injuryConstraint),checkIns,localDateIso(new Date())),[latest,health,strengthLoad,prefs.injuryConstraint,checkIns]);
   const profile=useMemo<AdaptiveProfile>(()=>{const cutoff=new Date();cutoff.setHours(0,0,0,0);cutoff.setDate(cutoff.getDate()-6);const cutoffIso=localDateIso(cutoff);const observedWeekly=loggedRunHistory.filter(run=>run.date>=cutoffIso&&run.date<=today).reduce((sum,run)=>sum+run.distanceMiles,0);const observedLongest=loggedRunHistory.reduce((longest,run)=>Math.max(longest,run.distanceMiles),0);return{...prefs,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):prefs.weeklyMileage,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):prefs.longestRunMiles,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected:latest.provider!=='Unavailable'}},[prefs,recovery,latest,loggedRunHistory]);
   useEffect(()=>localStorage.setItem('forge-training-preferences',JSON.stringify(prefs)),[prefs]);
   useEffect(()=>localStorage.setItem('forge-run-history',JSON.stringify(history)),[history]);

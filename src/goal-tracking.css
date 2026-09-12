@@ -100,3 +100,12 @@
 .mileage-check-backdrop{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:18px;background:var(--scrim);backdrop-filter:blur(6px);overflow-y:auto}
 .mileage-check{width:min(560px,100%)}
 .mileage-check .mileage-gate{border-left-width:3px;box-shadow:0 28px 90px var(--scrim)}
+
+/* The coach saying the block is wrong, with the fix on the same card. */
+.plan-pressure{display:grid;gap:8px;padding:14px 16px;border-left:3px solid var(--warn,#c8922a)}
+.plan-pressure.too-little{border-left-color:var(--accent)}
+.plan-pressure .eyebrow{color:var(--warn,#c8922a)}
+.plan-pressure.too-little .eyebrow{color:var(--accent-text)}
+.plan-pressure-say{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
+.plan-pressure-offer{margin:0;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.plan-pressure .button{justify-self:start;min-height:44px;margin-top:2px}

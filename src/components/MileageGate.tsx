@@ -4,6 +4,9 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { mileageGap, applyMileageGap, applyMileageRamp, type MileageGap } from '../lib/mileageGap';
 import type { CreatedGoal } from './GoalBuilder';
+import { useCheckIns } from '../features/training/CheckInProvider';
+import { dueCheckIn } from '../lib/checkInSchedule';
+import { localDayIso } from '../lib/time';
 
 /* AN ENDURANCE GOAL THE PLAN IS NOT BUILDING FOR SHOULD SAY SO, AND OFFER THE FIX.
 
@@ -161,6 +164,7 @@ const rememberAsked = (fingerprint: string) => {
 export function MileageStartupCheck() {
   const { goals } = useGoals();
   const { records } = useWorkoutHistory();
+  const { checkIns } = useCheckIns();
   const { setup, saveSetup, loading } = useProfileSetup();
   const [closed, setClosed] = useState(false);
   const metric = setup?.units === 'Metric';
@@ -171,7 +175,11 @@ export function MileageStartupCheck() {
   /* HISTORY HAS TO HAVE ARRIVED BEFORE THIS CAN JUDGE. Asked while records are
      still loading, "you are running 0 miles" is a statement about the network,
      not about the athlete — and it would be the first thing they saw. */
-  const ready = !loading && Boolean(setup?.completedAt) && goals.length > 0;
+  /* NEVER TWO DIALOGS ON ONE OPEN. The body question is quick and it goes
+     first; this one waits for a morning of its own rather than stacking a
+     second backdrop on top of the first. */
+  const checkInPending = useMemo(() => Boolean(dueCheckIn(records, checkIns, localDayIso())), [records, checkIns]);
+  const ready = !loading && Boolean(setup?.completedAt) && goals.length > 0 && !checkInPending;
   const fingerprint = gap ? fingerprintOf(gap) : '';
   /* Read once, on mount. Reading it every render would hide the dialog the
      instant the answer is written, before the athlete's press has been acted

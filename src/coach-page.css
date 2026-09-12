@@ -13,3 +13,20 @@
 .coach-settings{display:grid;gap:var(--s4)}
 .coach-boundary a{color:var(--ink-2);text-decoration:underline}
 .coach-bubble-content .coach-learnings-strip{padding:8px 12px;margin-bottom:11px}
+
+/* THE COACH'S CHECK-IN. One question on screen at a time; three taps and it is
+   gone. Sized so the options are thumb-reachable at the bottom of a phone. */
+.coach-checkin-backdrop{position:fixed;inset:0;z-index:72;display:grid;place-items:end center;padding:16px;background:var(--scrim);backdrop-filter:blur(6px)}
+.coach-checkin{width:min(560px,100%);display:grid;gap:10px;padding:18px 18px 16px;box-shadow:0 28px 90px var(--scrim)}
+.coach-checkin .eyebrow{color:var(--accent-text)}
+.coach-checkin-ask{margin:0;font:800 19px/1.25 var(--display);color:var(--ink)}
+.coach-checkin-detail{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+.coach-checkin-options{display:grid;gap:8px;margin-top:4px}
+.coach-checkin-options button{min-height:48px;padding:0 16px;border:1px solid var(--hairline-strong);border-radius:999px;background:var(--surface-2);color:var(--ink);font-size:15px;font-weight:700;text-align:left}
+.coach-checkin-options button:hover,.coach-checkin-options button:focus-visible{border-color:var(--accent);color:var(--accent-text)}
+.coach-checkin-actions{display:grid;margin-top:4px}
+.coach-checkin-actions .button{min-height:46px;text-align:center}
+.coach-checkin-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:2px}
+.coach-checkin-progress{font-style:normal;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--ink-3)}
+.coach-checkin-foot .text-button{border:0;background:none;color:var(--ink-3);font-size:13px;font-weight:700;min-height:38px}
+@media(min-width:700px){.coach-checkin-backdrop{place-items:center}}

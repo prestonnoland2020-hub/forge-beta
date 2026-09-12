@@ -400,7 +400,10 @@ const paceToMinutes = (pace?: string): number => {
    while he was running five-mile long runs every week. A plan under the
    athlete's current level cannot drive an adaptation; it is a taper with a
    block's name on it. */
-export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number; weeklyMileage?: number; longestRunMiles?: number; recentWeeklyMileage?: number; recentLongestRun?: number };
+export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; maxWeeklyMileage?: number; weeklyMileage?: number; longestRunMiles?: number; recentWeeklyMileage?: number; recentLongestRun?: number;
+  /* 0-100, from the watch or from what the athlete said this morning. Absent
+     means nothing is known and the block stands as written. */
+  readiness?: number };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
@@ -521,7 +524,14 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      the whole week on a deload. */
   const longFloor = Math.min(Number(athlete.recentLongestRun) || 0, target * LONG_RUN_MAX_SHARE);
   const longRunMiles = hasLong ? round1(Math.min(Math.max(Number(week.longRunMiles), target * LONG_RUN_MIN_SHARE, longFloor), target * LONG_RUN_MAX_SHARE, longCap)) : 0;
-  const qualityMiles = hasQuality ? qualitySessionMiles(String(week.quality), pace) : 0;
+  /* A HARD SESSION ON A BODY THAT CANNOT ABSORB IT IS WORSE THAN NO SESSION.
+     The block was written weeks ago and does not know how this morning went;
+     the check-in does. Below 55 the hard run comes off and the miles stay as
+     easy running — the week keeps its volume, it just stops asking for
+     something the athlete has already said they do not have. */
+  const cooked = typeof athlete.readiness === 'number' && athlete.readiness < 55;
+  const qualityText = cooked ? 'Easy only — the hard run moves to when you have recovered' : String(week.quality);
+  const qualityMiles = hasQuality && !cooked ? qualitySessionMiles(String(week.quality), pace) : 0;
 
   /* Whatever is left is easy volume, split into real distances. */
   const easyTotal = Math.max(0, round1(target - longRunMiles - qualityMiles));
@@ -541,7 +551,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   /* The header equals the sum of what is actually scheduled beneath it. */
   const scheduled = round1(longRunMiles + qualityMiles + easyRuns.reduce((total, miles) => total + miles, 0));
   const easyMinutes = easyRuns.length ? Math.round((easyRuns[0] * pace) / 5) * 5 : 0;
-  return { ...week, mileage: scheduled, longRunMiles: longRunMiles || week.longRunMiles, easyDays, easyRuns, easyMinutes };
+  return { ...week, quality: hasQuality ? qualityText : week.quality, mileage: scheduled, longRunMiles: longRunMiles || week.longRunMiles, easyDays, easyRuns, easyMinutes };
 }
 
 /* `projectSteps` is how many times this rep count comes round between now and
@@ -945,7 +955,13 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
        in week 1 of a ten-week block, under a header the block had already
        named a build week. The block says which week tests; the lift's rung
        says where on 8/6/4/2 it stands the rest of the time. */
-    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise), lastAt: lastAtFor(set.exercise), ramped: sessionsFor(set.exercise) + projectSteps >= EXPOSURES_BEFORE_MAX };
+    /* A MAX ATTEMPT IS THE LAST THING TO TAKE ON A BAD DAY, and the one most
+       likely to hurt someone. Readiness gates the CURRENT week only: a future
+       week is a projection and is drawn as though the athlete arrives at it in
+       one piece, which they usually do. */
+    const thisWeek = block.weekIndex === (block.currentWeekIndex ?? block.weekIndex);
+    const readyEnough = !(thisWeek && typeof athlete.readiness === 'number' && athlete.readiness < 55);
+    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests: tests && readyEnough, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise), lastAt: lastAtFor(set.exercise), ramped: sessionsFor(set.exercise) + projectSteps >= EXPOSURES_BEFORE_MAX };
     const live = wavePrescription(best, waveIndex, waveOptions);
     if (live.weight !== set.weight || live.reps !== set.reps) adjusted = true;
     /* On a max week a tested lift also carries the double it falls back to

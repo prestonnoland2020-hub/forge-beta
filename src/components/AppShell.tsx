@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { MileageStartupCheck } from './MileageGate';
+import { CoachCheckIn } from './CoachCheckIn';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -261,6 +262,10 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         whose goal cannot be reached on the running they do is told on the way
         in, once a day, with the fix attached — not left to find a card on a
         tab they may never open. */}
+    {/* ONE CONVERSATION AT A TIME. The check-in asks about the body and is
+        answered in seconds; the mileage question asks about the program and
+        deserves a clear head. The body goes first. */}
+    <CoachCheckIn />
     <MileageStartupCheck />
     {coachOpen && coachExpanded && <button className="coach-bubble-backdrop" type="button" aria-label="Close expanded Forge coach" onClick={() => setCoachExpanded(false)} />}
     <div className={`${coachExpanded ? 'coach-bubble-shell expanded' : 'coach-bubble-shell'}${location.pathname === '/coach' || location.pathname === '/workout' ? ' coach-bubble-hidden' : ''}`}>

@@ -6,6 +6,7 @@ import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { PlanRebuildModal } from './PlanRebuildModal';
 import { PlanProgress, PlanActions, TodayCard, WeekList, useWeekSwipe, waveSentence, type PlanSession } from './PlanView';
 import { MileageGate } from './MileageGate';
+import { PlanPressureCard } from './PlanPressureCard';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -143,6 +144,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [refreshAsk, setRefreshAsk] = useState(false);
+  /* What the coach wants the rebuild to be told, when the athlete accepts a
+     reshape. It prefills the request box so they can edit or add to it — the
+     coach proposes, the athlete still signs. */
+  const [coachInstruction, setCoachInstruction] = useState('');
   /* Which week the tab is SHOWING. Null means "the one I am in", which is what
      it opens on and what it falls back to when a new block is built — so this
      never strands the screen on week 9 of a block that no longer has one. */
@@ -423,7 +428,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest }, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored) }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored) }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),
@@ -503,6 +508,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {/* The gap between what a goal needs and what the plan is allowed to give
         belongs where the plan is, not buried in a goal's detail panel. */}
     <MileageGate onChanged={() => setRefreshAsk(true)} />
+    {/* And when the block itself is the problem, the coach says so here and
+        hands the rebuild the instruction, rather than leaving the athlete to
+        press Regenerate and think of something to type. */}
+    <PlanPressureCard onReshape={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />
     <PlanActions
       saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
       onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}
@@ -510,12 +519,12 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       error={error && !refreshAsk ? `${error} — showing the stored block.` : undefined} />
     {refreshAsk ? <PlanRebuildModal
       saved={Boolean(stored.saved)}
-      standing={stored.adjustments}
+      standing={coachInstruction || stored.adjustments}
       busy={generating}
       stage={generatingStage}
       error={error}
-      onCancel={() => { setRefreshAsk(false); setError(''); }}
-      onRebuild={adjustments => void rebuild(adjustments)}
+      onCancel={() => { setRefreshAsk(false); setError(''); setCoachInstruction(''); }}
+      onRebuild={adjustments => { setCoachInstruction(''); void rebuild(adjustments); }}
     /> : null}
     {/* Today belongs to today. Looking at week six, there is no "today" in it,
         and a card headed TODAY over a week in October would be a lie. */}

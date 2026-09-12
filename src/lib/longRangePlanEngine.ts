@@ -1,4 +1,5 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
+import { qualitySession } from './qualitySession';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { prescribeTopSet } from './strengthPrescription';
 import { canonicalLiftKey } from './liftAliases';
@@ -51,7 +52,7 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
      prescribed easy runs slower than the athlete's genuine easy pace — the walk
      was quietly setting the program's tempo. runQuality decides what may anchor
      a pace; the rule is written once and every surface reads it. */
-  const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return anchorsPace(miles,minutes*60)?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
+  const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return anchorsPace(miles,minutes*60)?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);
   /* ONE DEFINITION OF A WEEK'S MILEAGE, so "this week" and "last week" cannot
      be computed two different ways. */
   const weekMileage=(index:number)=>{
@@ -84,19 +85,18 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
        applied to that week — so the week after a deload showed "+9%" where the
        real jump was +40%, every time. */
     const previousMileage=index===0?startMileage:weekMileage(index-1);
-    const change=hasRunBaseline&&previousMileage?Math.round((mileage-previousMileage)/previousMileage*100):0;const repDistance=intervalMenu[Math.min(intervalMenu.length-1,Math.floor(progress*intervalMenu.length))];
+    const change=hasRunBaseline&&previousMileage?Math.round((mileage-previousMileage)/previousMileage*100):0;
     const goalSeconds=clockSeconds(endurance?.target);const goalMilesTotal=eventMiles(endurance);const goalPacePerMile=goalSeconds&&goalMilesTotal?goalSeconds/goalMilesTotal:0;
-    /* Interval targets come from the GOAL pace, eased by phase — Foundation
-       runs reps ~4% slower than goal pace, Specific runs them at goal pace. */
-    const phaseEase=phase==='Foundation'?1.04:phase==='Build'?1.02:1;
-    const repSeconds=goalPacePerMile?goalPacePerMile/1609.344*repDistance*phaseEase:0;
-    const repPaceText=repSeconds?` @ ${clockText(repSeconds)}/rep`:'';
     /* Easy pace comes from what the athlete actually LOGS — the goal-pace
        multiple made sub-20 athletes "jog" at 8:14/mi. Slight drift faster as
        the plan progresses; goal-derived pacing is only the no-history fallback. */
     const easyAnchor=loggedEasyPace?loggedEasyPace*60*(1-Math.min(.05,progress*.05)):goalPacePerMile?goalPacePerMile*1.35:0;
     const easyPaceText=easyAnchor?` @ ${clockText(easyAnchor*.97)}–${clockText(easyAnchor*1.08)}/mi`:'';
-    const quality=!endurance?'No goal-driven cardio':!hasRunBaseline?'Establish a comfortable running baseline':taper?'4–6 relaxed strides with full recovery':test?`Goal effort assessment for ${endurance.exercise||'priority event'}`:phase==='Foundation'?`${6+Math.floor(index/2)} × ${repDistance} m${repPaceText}`:phase==='Build'?`${5+Math.floor(index/3)} × ${repDistance} m${repPaceText} · threshold to goal effort`:deload?'Short fartlek · stop while fresh':`${4+Math.floor(index/4)} × ${repDistance} m${repPaceText} · goal pace`;/* The long run is a SHARE of the week (~35%), capped by durability that grows
+    /* ONE PLACE DECIDES WHAT THE HARD RUN IS. This used to be a ladder of
+       ternaries that only ever produced short reps, which is why a 5K build
+       had no threshold running in it at all. qualitySession owns the choice,
+       the pace and the distance, and the resolver reads the same function. */
+    const quality=!endurance?'No goal-driven cardio':qualitySession({phase,weekIndex:index,goalPaceSecondsPerMile:goalPacePerMile,weeklyMiles:mileage,hasBaseline:hasRunBaseline,goalMiles:goalMilesTotal||undefined,readiness:profile.readiness}).text;/* The long run is a SHARE of the week (~35%), capped by durability that grows
        slowly from the current longest run. It was previously FLOORED at the
        lifetime longest, which put a 13.2 mi long run inside a 14 mi week and
        froze it there for a year. */
