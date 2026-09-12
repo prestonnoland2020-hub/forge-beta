@@ -2,6 +2,7 @@ import { createContext,useContext,useEffect,useMemo,useState,type ReactNode } fr
 import { deriveRecoveryState,type DailyHealthSnapshot,type RecoveryState } from '../../lib/recoveryEngine';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { cardioMiles,isRunningCardio,summarizeCardioDraft } from '../../lib/cardioSession';
+import { countsAsRunVolume } from '../../lib/runQuality';
 
 export type RunningExperience='New'|'Recreational'|'Experienced'|'Competitive';
 export type Environment='Road'|'Track'|'Trail'|'Treadmill'|'Mixed';
@@ -40,7 +41,12 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
   const [prefs,setPrefs]=useState<StoredPrefs>(()=>{try{return{...preferences,...JSON.parse(localStorage.getItem('forge-training-preferences')||'{}')}}catch{return preferences}});
   const [health,setHealth]=useState<DailyHealthSnapshot[]>(()=>{try{const saved=JSON.parse(localStorage.getItem('forge-health-snapshots')||'null');const wearable=Array.isArray(saved)?saved.filter(item=>item?.provider&&item.provider!=='Manual'&&item.provider!=='Unavailable'):[];return wearable.length?wearable:[unavailableHealth()]}catch{return[unavailableHealth()]}});
   const [history,setHistory]=useState<RunResult[]>(()=>{try{const saved=JSON.parse(localStorage.getItem('forge-run-history')||'null');return Array.isArray(saved)?saved:initialHistory}catch{return initialHistory}});
-  const loggedRunHistory=useMemo<RunResult[]>(()=>records.flatMap(record=>(record.cardioSessions||[]).filter(session=>isRunningCardio(session)&&(session.structure==='steady'||session.structure==='custom')).map(session=>{const totals=summarizeCardioDraft(session);const distanceMiles=cardioMiles(session);const activity=session.activity.toLowerCase();const kind:RunResult['kind']=activity.includes('race')?'Race':activity.includes('long')?'Long':/speed|tempo|threshold|interval/.test(activity)?'Intervals':'Easy';return{id:`workout-${record.id}-${session.id}`,date:record.date,kind,distanceMiles,durationMinutes:totals.minutes,completed:distanceMiles>0&&totals.minutes>0}})).filter(run=>run.completed),[records]);
+  const loggedRunHistory=useMemo<RunResult[]>(()=>records.flatMap(record=>(record.cardioSessions||[]).filter(session=>isRunningCardio(session)&&(session.structure==='steady'||session.structure==='custom')).map(session=>{const totals=summarizeCardioDraft(session);const distanceMiles=cardioMiles(session);const activity=session.activity.toLowerCase();const kind:RunResult['kind']=activity.includes('race')?'Race':activity.includes('long')?'Long':/speed|tempo|threshold|interval/.test(activity)?'Intervals':'Easy';return{id:`workout-${record.id}-${session.id}`,date:record.date,kind,distanceMiles,durationMinutes:totals.minutes,/* A WALK IS NOT A RUN RESULT. This fed observed weekly mileage, the
+       observed longest run, and every pace the cardio engine scales from — so
+       a mile logged at 20:00 raised the athlete's apparent base and slowed the
+       paces derived from it at the same time. One classifier, in runQuality,
+       decides for every surface. */
+      completed:countsAsRunVolume(distanceMiles,totals.minutes*60)}})).filter(run=>run.completed),[records]);
   const combinedHistory=useMemo(()=>{const loggedIds=new Set(loggedRunHistory.map(run=>run.id));return[...history.filter(run=>!loggedIds.has(run.id)),...loggedRunHistory].sort((a,b)=>b.date.localeCompare(a.date))},[history,loggedRunHistory]);
   const strengthLoad=useMemo(()=>{const cutoff=Date.now()-7*86400000;const effortLoad:Record<string,number>={Easy:2,Moderate:3,Hard:5,'Max effort':7};return records.filter(record=>record.lift&&new Date(`${record.date}T12:00:00`).getTime()>=cutoff).reduce((sum,record)=>sum+(effortLoad[record.effort||'']||3),0)},[records]);
   const latest=health[health.length-1]||unavailableHealth();

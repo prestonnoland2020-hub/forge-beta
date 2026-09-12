@@ -6,6 +6,7 @@ import { bestsFromHistory, waveSlot, WAVE_LENGTH, LONG_RUN_MIN_SHARE, LONG_RUN_M
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import type { CardioLogDraft } from './cardioSession';
 import { localDayIso } from './time';
+import { anchorsPace } from './runQuality';
 
 export type PlanWeek={week:number;start:string;startDate:string;phase:'Foundation'|'Build'|'Specific'|'Deload'|'Taper'|'Test';mileage:number;change:number;strengthFocus:string;topSet:string;strengthExercise:string;strengthLoad:number;strengthReps:number;calculatedMax:number;strengthGoal:number;goalPercent:number;quality:string;longRun:string;easy:string;why:string;adjustment:string};
 const num=(value?:string)=>Number(String(value||'').replace(/[^0-9.]/g,''))||0;
@@ -45,7 +46,12 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
   const available=deadline?Math.max(1,Math.ceil((deadline-Date.now())/604800000)):weeksRequested;
   const total=deadline
     ? Math.min(52,Math.max(1,Math.min(available,weeksRequested)))
-    : Math.min(52,Math.max(8,weeksRequested));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return miles>=0.5&&minutes?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
+    : Math.min(52,Math.max(8,weeksRequested));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;/* THE EASY PACE IS ANCHORED TO RUNNING, not to everything on feet. A mile
+     logged at 20:00 and another at 15:16 sat in this median, so the plan
+     prescribed easy runs slower than the athlete's genuine easy pace — the walk
+     was quietly setting the program's tempo. runQuality decides what may anchor
+     a pace; the rule is written once and every surface reads it. */
+  const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return anchorsPace(miles,minutes*60)?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);const intervalMenu=[200,300,400,600,800,1000,1200,1600];
   /* ONE DEFINITION OF A WEEK'S MILEAGE, so "this week" and "last week" cannot
      be computed two different ways. */
   const weekMileage=(index:number)=>{

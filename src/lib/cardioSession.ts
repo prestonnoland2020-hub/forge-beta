@@ -1,3 +1,4 @@
+import { anchorsPace } from './runQuality';
 export type CardioStructure='steady'|'intervals'|'circuit'|'custom';
 export type CardioSegmentRole='warmup'|'work'|'recovery'|'cooldown'|'station'|'rest';
 export type CardioEntrySource='manual'|'wearable'|'imported';
@@ -60,7 +61,12 @@ export function cardioMiles(draft:CardioLogDraft):number{
    segment actually covered the distance: per-interval for structured
    sessions, whole-session for steady runs. Sanity bounds 4-18 min/mi. */
 export function bestRunPaceMinutesPerMile(draft:CardioLogDraft):number{
-  const consider=(miles:number,minutes:number,out:number[])=>{if(miles>=1&&minutes>0){const pace=minutes/miles;if(pace>=4&&pace<=18)out.push(pace)}};
+/* THE SAME CLASSIFIER AS EVERY OTHER SURFACE. This had its own window — a
+     pace between 4 and 18 minutes a mile — which let an 18:00/mi walk set an
+     athlete's "best run pace" and rejected a genuine 3:55 repeat. runQuality
+     owns the judgement now, so this cannot drift from the plan, the feasibility
+     model or the volume maths again. */
+  const consider=(miles:number,minutes:number,out:number[])=>{if(anchorsPace(miles,minutes*60)&&miles>=1)out.push(minutes/miles)};
   const candidates:number[]=[];
   const legacy=legacyCardioIntervals(draft);
   if(legacy.length){

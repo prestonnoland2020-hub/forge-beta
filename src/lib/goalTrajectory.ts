@@ -5,6 +5,7 @@ import { sameLift } from './liftAliases';
 import { predictRaceFromLegacyMethod } from './cardioPrediction';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
+import { countsAsRunVolume, isRaceEvidence, anchorsPace } from './runQuality';
 
 /* WHAT THE COACH WAS NEVER TOLD.
 
@@ -81,10 +82,15 @@ const bestPerDay = (points: Array<{ date: string; value: number }>, lowerIsBette
   }, new Map()).values()].sort((a, b) => a.date.localeCompare(b.date));
 
 /* Every logged run, with the pace it was actually covered at. */
+/* A WALK LOGGED AS A RUN IS NOT RUNNING VOLUME. Preston has miles in here at
+   20:00 and 15:16 a mile; counting them told the plan he had a base he has not
+   built, and told the feasibility model he was closer than he is. Classified
+   once, in runQuality, so every surface throws out the same things. */
 const runs = (records: WorkoutRecord[]) => records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
   const miles = cardioMiles(session);
   const minutes = summarizeCardioDraft(session).minutes;
   if (!miles || !minutes || !/run/i.test(`${session.activity} ${session.summary || ''}`)) return [];
+  if (!countsAsRunVolume(miles, minutes * 60)) return [];
   return [{ date: record.date, miles, minutes }];
 }));
 
@@ -343,8 +349,16 @@ const isBodyGoal = (goal: CreatedGoal) =>
    goes stale the week after setup; this does not. */
 export function medianWeeklyMiles(records: WorkoutRecord[], weeks = 8): number {
   const finished = weeklyRunning(records, weeks).filter(week => !week.partial);
-  if (!finished.length) return 0;
-  const values = finished.map(week => week.miles).sort((a, b) => a - b);
+  /* THE WEEKS BEFORE THEY STARTED ARE NOT WEEKS THEY RAN NOTHING. An athlete
+     three weeks into using Forge has five empty buckets in an eight-week
+     window, and the median of that is zero — so the floor that is supposed to
+     stop the plan prescribing under them did nothing for exactly the athletes
+     who are new. Leading empty weeks are dropped; an off week INSIDE their
+     training counts, because that is part of what they actually do. */
+  const firstRan = finished.findIndex(week => week.miles > 0);
+  const since = firstRan < 0 ? [] : finished.slice(firstRan);
+  if (!since.length) return 0;
+  const values = since.map(week => week.miles).sort((a, b) => a - b);
   const middle = values.length >> 1;
   return round1(values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2);
 }
@@ -358,6 +372,9 @@ export function longestContinuousRun(records: WorkoutRecord[]): number {
     const intervals = session.prescription?.legacyIntervals;
     if (Array.isArray(intervals) && intervals.length > 1) return;
     const miles = cardioMiles(session);
+    /* And a 6-mile walk is not a 6-mile long run. Untimed distance still
+       counts — not knowing how long it took does not mean it was a stroll. */
+    if (!countsAsRunVolume(miles, summarizeCardioDraft(session).minutes * 60)) return;
     if (miles > longest) longest = miles;
   }));
   return round1(longest);

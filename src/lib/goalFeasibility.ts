@@ -4,6 +4,7 @@ import { weeklyRunning } from './goalTrajectory';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
+import { isRaceEvidence } from './runQuality';
 import { sameLift } from './liftAliases';
 
 /* IS THIS GOAL REACHABLE, AND SAY SO OUT LOUD.
@@ -119,11 +120,12 @@ export function bestContinuousEffort(records: WorkoutRecord[]) {
     if (Array.isArray(intervals) && intervals.length > 1) return;
     const miles = cardioMiles(session);
     const minutes = summarizeCardioDraft(session).minutes;
-    /* Under three quarters of a mile predicts nothing, and slower than 12
-       minutes a mile is a walk however it was logged. */
+    /* Under three quarters of a mile predicts nothing at a race distance, and
+       runQuality owns the rest of the judgement — what is a walk, what is a
+       mislog — so this file cannot drift from every other one. */
     if (miles < 0.75 || !minutes) return;
     const seconds = minutes * 60;
-    if (seconds / miles > 720) return;
+    if (!isRaceEvidence(miles, seconds)) return;
     const equivalentMile = equivalentSeconds(seconds, miles, 1);
     if (!best || equivalentMile < best.equivalentMile) best = { miles, seconds, date: record.date, equivalentMile };
   }));

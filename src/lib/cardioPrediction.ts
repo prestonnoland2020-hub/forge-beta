@@ -1,6 +1,7 @@
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { continuousRunEfforts } from './cardioSession';
 import { localDayIso } from './time';
+import { isRaceEvidence } from './runQuality';
 
 export type RacePrediction = {
   seconds: number;
@@ -49,7 +50,13 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      and never hands over a piece that has distance without a time. */
   const runs = records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
     if (nonRunning(`${session.activity} ${session.summary}`)) return [];
-    return continuousRunEfforts(session).map(effort => ({ date: record.date, miles: effort.miles, seconds: effort.minutes * 60 }));
+    /* AND THE EFFORT HAS TO BE ONE. A walk at 20:00 a mile and a 2:25/mi
+       "mile" are both in this athlete's log, and both were eligible to become
+       a race prediction. runQuality throws out what is not running before any
+       of it is converted to the goal distance. */
+    return continuousRunEfforts(session)
+      .filter(effort => isRaceEvidence(effort.miles, effort.minutes * 60))
+      .map(effort => ({ date: record.date, miles: effort.miles, seconds: effort.minutes * 60 }));
   }));
   const windowDays = 180;
   const qualifying = runs.filter(run => daysAgo(run.date) <= windowDays && run.miles >= goalMiles * .8 && run.miles <= goalMiles * 1.25);
