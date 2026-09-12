@@ -5,6 +5,8 @@ import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
 import { isRaceEvidence } from './runQuality';
+
+const round1 = (value: number) => Math.round(value * 10) / 10;
 import { sameLift } from './liftAliases';
 
 /* IS THIS GOAL REACHABLE, AND SAY SO OUT LOUD.
@@ -159,10 +161,27 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   const targetSeconds = clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss'));
   if (!targetSeconds) return null;
   const weeks = weeksUntil(goal.date);
-  const best = bestContinuousEffort(records);
   const volume = recentWeeklyMiles(records);
   const goalPace = targetSeconds / distance;
   const volumeNeeded = volumeForPace(goalPace);
+
+  /* THE PREDICTION COMES FROM THE BEST EFFORT, AT WHATEVER DISTANCE.
+
+     The tiles under this banner use a near-distance predictor — only efforts
+     within 80–125% of the goal — and the temptation, when the two disagreed
+     in public on Preston's 2-mile card, was to make this one match. That is
+     wrong, and trying it proved it: restricted to near-distance, his 5K was
+     predicted from an easy 2.5-mile jog at 10:00/mi rather than from his
+     all-out 5:48 mile, and came back 31:29. Proximity in distance does not
+     beat quality of effort — a jog is not a race performance at any distance.
+
+     So the best effort wins, carried across by Riegel with the volume stretch.
+     What was actually broken was the floor underneath it: a 1.4-mile at
+     3:39/mi was accepted as evidence and produced "your 2-mile is worth 7:27",
+     a time no human has run, presented to the athlete as his own fitness.
+     runQuality holds race evidence to the world record now, which is the line
+     that should always have been there. */
+  const best = bestContinuousEffort(records);
 
   if (!best) {
     return { goal: goal.title, verdict: 'needs-more',
@@ -176,6 +195,11 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
      fast mile off thirteen miles a week is not read as a 5K result. */
   const volumeShortfall = volumeNeeded ? Math.max(0, 1 - volume / volumeNeeded) : 0;
   const nowAtDistance = equivalentSeconds(best.seconds, best.miles, distance, volumeShortfall);
+  /* WHAT THE PREDICTION IS BUILT ON, named at full precision. The distance was
+     printed with toFixed(0), so a 1.4-mile effort appeared as "your 1-mile" —
+     which turned an obviously bad log into a credible-sounding claim and hid
+     the one detail that would have told the athlete not to believe it. */
+  const from = `your ${round1(best.miles)} mi in ${clock(best.seconds)}`;
   const ceiling = reachableSeconds(nowAtDistance, weeks);
   const shortfall = (nowAtDistance - targetSeconds) / nowAtDistance;
   /* What the horizon actually buys, stated as the number it is — saying "it
@@ -184,7 +208,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
 
   if (targetSeconds >= nowAtDistance) {
     return { goal: goal.title, verdict: 'reachable',
-      say: `Already within reach — your ${best.miles.toFixed(best.miles < 2 ? 0 : 1)}-mile at ${clock(best.seconds)} is worth about ${clock(nowAtDistance)} here.`,
+      say: `Already within reach — ${from} is worth about ${clock(nowAtDistance)} here.`,
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: volume < volumeNeeded * 0.7 ? `Hold ${Math.round(volumeNeeded)} miles a week and race it.` : undefined };
   }

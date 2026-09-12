@@ -63,7 +63,25 @@ export const countsAsRunVolume = (miles: number, seconds: number) => {
   return quality === 'run' || quality === 'unmeasured';
 };
 
-/* RACE EVIDENCE is the strictest of the three: real running, timed, and long
-   enough that the conversion to another distance means something. */
+/* NOBODY HAS RUN FASTER THAN THIS, so an effort that claims to is a mislog.
+
+   classifyEffort's plausibility curve is deliberately loose — it is built off
+   a 3:05 mile so that it never second-guesses a real performance at a short
+   repeat, where a genuinely fast 400 is far quicker per mile than any mile
+   ever run. That is right for deciding what counts as running at all, and far
+   too loose for deciding what may PREDICT A RACE: a 1.4-mile effort at
+   3:39/mi sailed through, and Forge told Preston his two-mile was worth 7:27
+   — a time no human has run, presented to him as his own current fitness.
+
+   Race evidence gets the real line instead: the mile world record, scaled the
+   way race times scale. It binds only at half a mile and up, which is the only
+   place race evidence is taken from, so short repeats are untouched. */
+export const WORLD_RECORD_MILE_SECONDS = 223;
+export const recordPaceSeconds = (miles: number) =>
+  WORLD_RECORD_MILE_SECONDS * Math.pow(Math.max(miles, 0.01), 1.06);
+
+/* RACE EVIDENCE is the strictest of the three: real running, timed, long
+   enough that the conversion to another distance means something, and inside
+   what a human being has actually done. */
 export const isRaceEvidence = (miles: number, seconds: number) =>
-  classifyEffort(miles, seconds) === 'run' && miles >= 0.5;
+  classifyEffort(miles, seconds) === 'run' && miles >= 0.5 && seconds >= recordPaceSeconds(miles);

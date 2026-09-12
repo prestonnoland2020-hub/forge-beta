@@ -9,6 +9,7 @@
    This is the arithmetic that says no. */
 import { goalFeasibility, competingRaces, equivalentSeconds, volumeForPace, reachableSeconds, bestContinuousEffort } from './src/lib/goalFeasibility.ts';
 import { calculateEstimatedOneRepMax } from './src/lib/strength.ts';
+import { isRaceEvidence, recordPaceSeconds, classifyEffort } from './src/lib/runQuality.ts';
 
 let fails = 0;
 const check = (l, c, d = '') => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${d ? ` — ${d}` : ''}`); if (!c) fails++; };
