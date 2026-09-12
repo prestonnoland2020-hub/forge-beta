@@ -2,7 +2,7 @@ import type { CreatedGoal } from '../components/GoalBuilder';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { weeklyRunning } from './goalTrajectory';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
-import { clockToSeconds } from './time';
+import { clockToSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
 import { isRaceEvidence } from './runQuality';
 
@@ -123,11 +123,27 @@ const MAX_IMPROVEMENT_WEEKS = 12;
 export const reachableSeconds = (currentSeconds: number, weeks: number) =>
   currentSeconds * Math.pow(1 - WEEKLY_IMPROVEMENT, Math.min(weeks, MAX_IMPROVEMENT_WEEKS));
 
+/* AND IT HAS TO BE RECENT ENOUGH TO BE ABOUT THE ATHLETE WHO EXISTS NOW.
+
+   This had no window at all. Preston imported years of Strava history when he
+   signed up, so his "best continuous effort" was a 3:54 mile from 2021 — he
+   was in high school — and every 2026 goal verdict was being measured against
+   it. The mislogs were the loud version of this; the quiet version is worse,
+   because a genuine personal best from five years ago looks entirely
+   plausible and is just as wrong an answer to "what are you worth today".
+
+   Six months, which is the same window the other race predictor already uses,
+   so the two cannot disagree about which efforts are even eligible. */
+export const RACE_EVIDENCE_WINDOW_DAYS = 180;
+
 /* The athlete's best CONTINUOUS run, as a time at a distance — the only thing a
    race prediction can honestly be built from. Intervals are not a race. */
-export function bestContinuousEffort(records: WorkoutRecord[]) {
+export function bestContinuousEffort(records: WorkoutRecord[], todayIso = localDayIso()) {
+  const cutoff = new Date(`${todayIso}T12:00:00`);
+  cutoff.setDate(cutoff.getDate() - RACE_EVIDENCE_WINDOW_DAYS);
+  const since = cutoff.toISOString().slice(0, 10);
   let best: { miles: number; seconds: number; date: string; equivalentMile: number } | null = null;
-  records.forEach(record => (record.cardioSessions || []).forEach(session => {
+  records.forEach(record => (record.date >= since ? record.cardioSessions || [] : []).forEach(session => {
     if (!/run/i.test(session.activity || '')) return;
     const intervals = session.prescription?.legacyIntervals;
     /* A session logged as many lines is an interval session; its parts are not
@@ -185,7 +201,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
 
   if (!best) {
     return { goal: goal.title, verdict: 'needs-more',
-      say: `Forge cannot judge this yet — there is no continuous run on file to predict from.`,
+      say: `Forge cannot judge this yet — no hard continuous run in the last ${RACE_EVIDENCE_WINDOW_DAYS / 30} months to predict from.`,
       change: `Run ${distance <= 1 ? 'a hard mile' : `${Math.min(distance, 3).toFixed(distance < 2 ? 0 : 1)} miles`} as one effort and log it. That one session makes every projection here real.` };
   }
 
