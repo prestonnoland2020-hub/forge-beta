@@ -109,3 +109,7 @@
 .plan-pressure-say{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
 .plan-pressure-offer{margin:0;font-size:13px;line-height:1.5;color:var(--ink-2)}
 .plan-pressure .button{justify-self:start;min-height:44px;margin-top:2px}
+/* The clash card's heading is a block label; the race name inside the sentence
+   below it is not, and inherited the label's uppercase warning styling. */
+.goal-clash .goal-clash-built{margin-top:8px;color:var(--text-muted,#6b6b6b)}
+.goal-clash .goal-clash-built strong{display:inline;font-size:inherit;letter-spacing:normal;text-transform:none;color:var(--text);margin:0}

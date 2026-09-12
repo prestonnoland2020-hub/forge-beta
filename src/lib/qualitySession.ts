@@ -42,9 +42,31 @@ export type QualityContext = {
 
 export type QualitySession = { kind: QualityKind; text: string; miles: number };
 
-/* Threshold is run a touch slower than 5K pace — about 10K to 15K effort.
-   Comfortably hard: you could hold it for an hour if you had to, and you never
-   do. Below 5K goal pace this is the number that actually builds the ceiling. */
+/* THRESHOLD IS A PHYSIOLOGY, NOT A PERCENTAGE OF WHATEVER YOU ENTERED.
+
+   This used to be a flat 1.06 x goal pace, which is only ever right for one
+   distance. It is calibrated on a 5K, and every other goal it is handed comes
+   out wrong in the direction of that goal's distance:
+
+     - a 4:59 mile goal became a 5:17/mi "threshold" — the athlete's own race
+       pace, prescribed as a fifteen-minute comfortably-hard effort;
+     - a 4:00 marathon goal became 9:42/mi, which is that athlete's easy pace.
+       A session that is easier than easy running trains nothing.
+
+   Threshold is the pace you could hold for about an hour, so that is what it
+   is computed as: the goal performance carried to a one-hour race distance by
+   the same Riegel curve the goal predictions already use. One derivation that
+   lands on 5:33/mi for the miler, 6:22/mi for the 5K and 8:24/mi for the
+   marathoner, from their own goals, with no per-distance table to maintain. */
+export const THRESHOLD_EQUIVALENT_MILES = 6.214;
+const RIEGEL = 1.06;
+export const thresholdPaceFor = (goalPaceSecondsPerMile: number, goalMiles: number): number => {
+  if (!goalPaceSecondsPerMile) return 0;
+  const miles = goalMiles > 0 ? goalMiles : 3.107;
+  const total = goalPaceSecondsPerMile * miles;
+  return total * Math.pow(THRESHOLD_EQUIVALENT_MILES / miles, RIEGEL) / THRESHOLD_EQUIVALENT_MILES;
+};
+/* Kept for the tests and callers that still reason in multiples of 5K pace. */
 export const THRESHOLD_PACE_MULTIPLE = 1.06;
 /* Warm-up and cool-down, which are real miles and have to be counted or the
    week's total is a lie. */
@@ -60,9 +82,23 @@ export const clockText = (seconds: number) => {
 };
 
 /* Rep distance walks up as the block goes on: short and sharp early is a way
-   to get hurt before the aerobic work is done. */
+   to get hurt before the aerobic work is done.
+
+   AND IT IS SIZED TO THE RACE. The menu below is written for a 5K; handed to a
+   marathon goal it prescribes 400s at 9:09/mi, which is a jog with a rest in
+   it, and handed to a mile goal it prescribes 1600s at mile pace, which is the
+   race. Reps are a share of the event — roughly an eighth to a half of it — so
+   the ladder is scaled by the goal's own distance and then rounded to a
+   distance a track can actually measure. */
 const INTERVAL_MENU = [400, 400, 600, 800, 800, 1000, 1200, 1600];
-const repDistanceFor = (weekIndex: number) => INTERVAL_MENU[clamp(Math.floor(weekIndex / 1.5), 0, INTERVAL_MENU.length - 1)];
+const TRACK_STEPS = [200, 300, 400, 600, 800, 1000, 1200, 1600, 2000, 2400, 3200, 4800];
+const snapToTrack = (metres: number) => TRACK_STEPS.reduce((best, step) =>
+  Math.abs(step - metres) < Math.abs(best - metres) ? step : best, TRACK_STEPS[0]);
+const repDistanceFor = (weekIndex: number, goalMiles = 3.107) => {
+  const base = INTERVAL_MENU[clamp(Math.floor(weekIndex / 1.5), 0, INTERVAL_MENU.length - 1)];
+  const scale = clamp((goalMiles > 0 ? goalMiles : 3.107) / 3.107, 0.5, 4.2);
+  return snapToTrack(base * scale);
+};
 
 /* How long a threshold effort runs, growing through the block and capped by
    what the week can actually hold. */
@@ -99,7 +135,7 @@ export function qualitySession(context: QualityContext): QualitySession {
   const soften = typeof readiness === 'number' && readiness < 70;
 
   const kind = qualityKindFor(phase, weekIndex);
-  const thresholdPace = goalPace * THRESHOLD_PACE_MULTIPLE;
+  const thresholdPace = thresholdPaceFor(goalPace, goalMiles);
 
   if (kind === 'test') {
     return { kind, text: `Goal effort assessment${goalMiles ? ` over ${goalMiles < 2 ? goalMiles.toFixed(1) : goalMiles.toFixed(goalMiles % 1 ? 1 : 0)} mi` : ''}`, miles: round1(goalMiles + WARMUP_COOLDOWN_MILES) };
@@ -124,8 +160,8 @@ export function qualitySession(context: QualityContext): QualitySession {
     return { kind, text: `${text} · threshold`, miles: round1(Math.min(miles, weeklyMiles * QUALITY_MAX_SHARE || miles)) };
   }
 
-  const distance = repDistanceFor(weekIndex);
-  const baseReps = distance <= 400 ? 8 : distance <= 800 ? 6 : distance <= 1200 ? 5 : 4;
+  const distance = repDistanceFor(weekIndex, goalMiles);
+  const baseReps = distance <= 400 ? 8 : distance <= 800 ? 6 : distance <= 1200 ? 5 : distance <= 2400 ? 4 : 3;
   const reps = Math.max(3, baseReps - (soften ? 2 : 0));
   /* Foundation runs reps a shade slower than goal pace; Specific runs them at
      it. Nothing is ever prescribed faster than goal pace — a rep session run
@@ -138,7 +174,7 @@ export function qualitySession(context: QualityContext): QualitySession {
   const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
   return {
     kind: 'intervals',
-    text: `${reps} × ${distance} m @ ${clockText(repSeconds)}/rep${phase === 'Specific' ? ' · goal pace' : ''}`,
+    text: `${reps} × ${distance >= 1600 ? `${round1(distance / 1609.344)} mi` : `${distance} m`} @ ${clockText(repSeconds)}/rep${phase === 'Specific' ? ' · goal pace' : ''}`,
     miles: round1(Math.min(miles, weeklyMiles * QUALITY_MAX_SHARE || miles)),
   };
 }
@@ -170,15 +206,36 @@ export const goalEventMiles = (goal?: EnduranceGoalRef): number => {
   return 3.107;
 };
 
-/* The nearest dated endurance goal is the one the block is built for. */
-export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null): { paceSecondsPerMile: number; miles: number } | null {
-  const goal = (goals || []).filter(entry => entry?.type === 'Endurance' && entry?.date)
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+/* WHICH RACE THE BLOCK IS FOR, WHEN THERE IS MORE THAN ONE.
+
+   Sorting by date and taking the first is only a rule while the dates differ.
+   Preston has a mile, a two mile and a 5K all dated the 31st of December, so
+   the "soonest" goal was whichever the database happened to return first — the
+   mile — and his entire running plan was paced off 4:59/mi while the other two
+   goals were ignored outright. Arbitrary is the one thing a training plan
+   cannot be.
+
+   The tie goes to the LONGEST race on that date. Every coach builds the season
+   around the longest event and treats the shorter ones as sharpening inside
+   it: a 5K build gives a miler an aerobic base and some speed, while a mile
+   build gives a 5K runner neither the volume nor the durability, and it
+   prescribes the shorter athlete paces they cannot survive at volume. The
+   safe, sane direction is down from the longest, not up from the shortest. */
+export type EnduranceTarget = { paceSecondsPerMile: number; miles: number; goal: EnduranceGoalRef; others: EnduranceGoalRef[] };
+export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null): EnduranceTarget | null {
+  const dated = (goals || [])
+    .filter(entry => entry?.type === 'Endurance' && entry?.date && goalClockSeconds(entry.target) > 0)
+    .sort((a, b) => {
+      const byDate = String(a.date).localeCompare(String(b.date));
+      if (byDate) return byDate;
+      return goalEventMiles(b) - goalEventMiles(a);
+    });
+  const goal = dated[0];
   if (!goal) return null;
   const seconds = goalClockSeconds(goal.target);
   const miles = goalEventMiles(goal);
   if (!seconds || !miles) return null;
-  return { paceSecondsPerMile: seconds / miles, miles };
+  return { paceSecondsPerMile: seconds / miles, miles, goal, others: dated.slice(1) };
 }
 
 /* The AI block writes its phases in the strength block's language; the hard

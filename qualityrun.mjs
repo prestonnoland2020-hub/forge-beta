@@ -6,7 +6,7 @@
    that threshold work exists, that it is paced off the goal, that there is
    never more than one hard run in a week, and that a rough check-in takes it
    away rather than the calendar insisting. */
-import { qualitySession, qualityKindFor, thresholdMinutes, enduranceTarget, qualityPhaseFor, THRESHOLD_PACE_MULTIPLE, QUALITY_MAX_SHARE } from './src/lib/qualitySession.ts';
+import { qualitySession, qualityKindFor, thresholdMinutes, enduranceTarget, qualityPhaseFor, thresholdPaceFor, THRESHOLD_PACE_MULTIPLE, QUALITY_MAX_SHARE } from './src/lib/qualitySession.ts';
 import { resolveWeekRunning } from './src/features/training/aiPlanService.ts';
 
 let fails = 0;
@@ -47,8 +47,14 @@ const paced = tempo.text.match(/(\d+):(\d\d)\/mi/);
 const tempoSeconds = paced ? Number(paced[1]) * 60 + Number(paced[2]) : 0;
 check('the pace is in the text', tempoSeconds > 0, `${paced?.[0]}`);
 check('and it is slower than goal pace, not faster', tempoSeconds > GOAL_PACE, `${tempoSeconds}s vs goal ${GOAL_PACE}s`);
-check('by about the threshold multiple',
-  Math.abs(tempoSeconds - GOAL_PACE * THRESHOLD_PACE_MULTIPLE) <= 1, `${tempoSeconds} vs ${Math.round(GOAL_PACE * THRESHOLD_PACE_MULTIPLE)}`);
+/* Derived from the goal now rather than multiplied by a constant, so for a 5K
+   — the distance the old constant was tuned on — it lands in the same place. */
+check('by the amount an hour of racing is slower than a 5K',
+  Math.abs(tempoSeconds - thresholdPaceFor(GOAL_PACE, 3.107)) <= 1,
+  `${tempoSeconds} vs ${Math.round(thresholdPaceFor(GOAL_PACE, 3.107))}`);
+check('which is within a few seconds of the old 1.06 constant it replaces',
+  Math.abs(tempoSeconds - GOAL_PACE * THRESHOLD_PACE_MULTIPLE) <= 10,
+  `${tempoSeconds} vs ${Math.round(GOAL_PACE * THRESHOLD_PACE_MULTIPLE)}`);
 
 console.log('\nNo session eats the week');
 for (const miles of [10, 14, 22, 35]) {
@@ -145,6 +151,73 @@ console.log('\nPhase mapping keeps the two calendars in step');
 check('a running deload is a deload', qualityPhaseFor('Build', true) === 'Deload');
 check('but never at the cost of the taper', qualityPhaseFor('Taper', true) === 'Taper');
 check('nor of race week', qualityPhaseFor('Race', true) === 'Test');
+
+console.log('\nThe plan is tailored to the goal, not to one distance it was tuned on');
+/* "each person is not the same its dependant on their goals." Threshold used
+   to be a flat 1.06 x goal pace, which is only ever right for a 5K. Carried to
+   the goals either side of it, it prescribed a 4:59 miler their own race pace
+   as a comfortably-hard effort, and a 4:00 marathoner their easy pace as a
+   hard session. It is now the pace they could hold for about an hour, carried
+   from their own goal by the same Riegel curve the predictions use. */
+const paceOf = (secs, miles) => secs / miles;
+const EVENTS = [
+  { label: 'Mile 4:59', miles: 1, seconds: 299 },
+  { label: '2 Mile 10:59', miles: 2, seconds: 659 },
+  { label: '5K 18:59', miles: 3.107, seconds: 1139 },
+  { label: '10K 40:00', miles: 6.214, seconds: 2400 },
+  { label: 'Half 1:35', miles: 13.109, seconds: 5700 },
+  { label: 'Marathon 4:00', miles: 26.219, seconds: 14400 },
+];
+const thresholds = EVENTS.map(event => ({ ...event, goal: paceOf(event.seconds, event.miles), thr: thresholdPaceFor(paceOf(event.seconds, event.miles), event.miles) }));
+for (const event of thresholds) {
+  console.log(`    ${event.label.padEnd(14)} goal ${Math.round(event.goal)} s/mi → threshold ${Math.round(event.thr)} s/mi`);
+}
+const find = label => thresholds.find(event => event.label.startsWith(label));
+check('a miler runs threshold SLOWER than their race pace', find('Mile 4').thr > find('Mile 4').goal,
+  `${Math.round(find('Mile 4').thr)} vs ${Math.round(find('Mile 4').goal)} s/mi`);
+check('and not by a token amount — the old 1.06 gave 318', find('Mile 4').thr > 325, `${Math.round(find('Mile 4').thr)} s/mi`);
+check('a marathoner runs threshold FASTER than their race pace', find('Marathon').thr < find('Marathon').goal,
+  `${Math.round(find('Marathon').thr)} vs ${Math.round(find('Marathon').goal)} s/mi`);
+check('a 4:00 marathoner gets about 8:24/mi, not 9:42', Math.abs(find('Marathon').thr - 504) < 20, `${Math.round(find('Marathon').thr)} s/mi`);
+check('the 5K case the old constant was tuned on barely moves',
+  Math.abs(find('5K').thr - find('5K').goal * 1.06) < 15, `${Math.round(find('5K').thr)} vs ${Math.round(find('5K').goal * 1.06)}`);
+check('threshold crosses goal pace at about an hour of racing',
+  find('10K').thr <= find('10K').goal * 1.02 && find('10K').thr >= find('10K').goal * 0.98, `${Math.round(find('10K').thr)} vs ${Math.round(find('10K').goal)}`);
+check('threshold gets slower as the goal gets longer, every step',
+  thresholds.every((event, index) => index === 0 || event.thr > thresholds[index - 1].thr));
+
+console.log('\nReps are sized to the race, not to a 5K');
+const repsFor = event => qualitySession({ phase: 'Specific', weekIndex: 4, goalPaceSecondsPerMile: paceOf(event.seconds, event.miles), weeklyMiles: 40, goalMiles: event.miles }).text;
+check('a miler gets short reps', /\b[23]00 m\b/.test(repsFor(find('Mile 4'))), repsFor(find('Mile 4')));
+check('a marathoner gets long ones', /mi @/.test(repsFor(find('Marathon'))), repsFor(find('Marathon')));
+check('nobody is asked to race the session', EVENTS.every(event => {
+  const text = repsFor(event);
+  const rep = text.match(/@ (\d+):(\d{2})\/rep/);
+  return Boolean(rep);
+}));
+
+console.log('\nWhich race the block is for is decided, not left to database order');
+/* Preston's live goals: a mile, a two mile and a 5K, all dated the same day.
+   Sorting by date alone left the winner to whatever came back first — the
+   mile — so the whole plan ran at 4:59/mi and two goals were ignored. */
+const sameDay = [
+  { type: 'Endurance', exercise: 'Mile', title: 'Mile goal', target: '4:59', date: '2026-12-31' },
+  { type: 'Endurance', exercise: '5K', title: '5K goal', target: '18:59', date: '2026-12-31' },
+  { type: 'Endurance', exercise: '2 Mile', title: '2 Mile goal', target: '10:59', date: '2026-12-31' },
+];
+const chosen = enduranceTarget(sameDay);
+check('the longest race on the date wins', chosen.goal.exercise === '5K', `${chosen.goal.title}`);
+check('and the others are reported, not dropped silently', chosen.others.length === 2,
+  chosen.others.map(goal => goal.title).join(', '));
+check('the order they arrive in does not change the answer',
+  enduranceTarget([...sameDay].reverse()).goal.exercise === '5K');
+check('a genuinely sooner race still outranks a longer later one',
+  enduranceTarget([...sameDay, { type: 'Endurance', exercise: 'Full Marathon', title: 'Marathon', target: '3:30:00', date: '2027-04-19' }]).goal.exercise === '5K');
+check('and a sooner race wins even when it is the shortest',
+  enduranceTarget([...sameDay, { type: 'Endurance', exercise: 'Mile', title: 'Spring mile', target: '4:55', date: '2026-10-01' }]).goal.title === 'Spring mile');
+check('a goal with no time set cannot steer the block',
+  enduranceTarget([{ type: 'Endurance', exercise: '10K', title: '10K', target: '', date: '2026-10-01' }, ...sameDay]).goal.exercise === '5K');
+check('no endurance goals, nothing to build for', enduranceTarget([{ type: 'Strength', title: 'Squat' }]) === null);
 
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);

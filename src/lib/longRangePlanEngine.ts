@@ -1,5 +1,5 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
-import { qualitySession } from './qualitySession';
+import { qualitySession, enduranceTarget } from './qualitySession';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { prescribeTopSet } from './strengthPrescription';
 import { canonicalLiftKey } from './liftAliases';
@@ -32,7 +32,10 @@ const historyMax=(records:PlanHistoryRecord[],exercise?:string)=>{
   return bestsFromHistory(records).bests.get(canonicalLiftKey(exercise))||0;
 };
 export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,weeksRequested=16,records:PlanHistoryRecord[]=[]):PlanWeek[]{
-  const endurance=goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];/* THE HORIZON STOPS AT THE RACE.
+  /* ONE FUNCTION PICKS THE RACE, on both paths. Sorting by date alone left the
+     winner to database order whenever two goals shared a date — see
+     enduranceTarget, which breaks the tie on distance. */
+  const endurance=(enduranceTarget(goals)?.goal as CreatedGoal|undefined)||goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];/* THE HORIZON STOPS AT THE RACE.
 
      `Math.max(8, …)` floored this at eight weeks no matter how close the event
      was, so a half marathon three weeks out produced an eight-week roadmap

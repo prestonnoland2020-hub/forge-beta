@@ -5,6 +5,7 @@ import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
 import { formatGoalTarget } from '../lib/time';
 import { competingRaces, goalFeasibility } from '../lib/goalFeasibility';
+import { enduranceTarget } from '../lib/qualitySession';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { MileageGate, MileageCheckOnGoal } from '../components/MileageGate';
@@ -28,6 +29,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { setup } = useProfileSetup();
   const roadmaps = useMemo(() => buildGoalRoadmaps(goals), [goals]);
   const clash = useMemo(() => competingRaces(goals), [goals]);
+  const built = useMemo(() => enduranceTarget(goals), [goals]);
   /* Every goal is asked about on its own, because goalFeasibility drops the
      ones it cannot judge and an index into a shortened list points at the
      wrong goal. */
@@ -74,6 +76,12 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     {clash && <section className="card goal-clash">
       <strong>{clash.races.length} races on the same date</strong>
       <p>{clash.races.join(', ')} are all set for {new Date(`${clash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. A block peaks for one race — pick the one that matters and move the others out by a few weeks, or they all get a compromise.</p>
+      {/* AND SAY WHICH ONE IT CHOSE. Telling someone to pick while quietly
+          picking for them is the same silence in a friendlier voice: the plan
+          is paced off one of these races today, and they cannot judge the
+          advice without knowing which. The longest race wins, because a build
+          for it gives the shorter ones a base and the reverse gives nothing. */}
+      {built && <p className="goal-clash-built">Until you do, the plan is built for the <strong>{built.goal.title || built.goal.exercise}</strong> — the longest of them — and paced off it. The shorter races are trained inside that build.</p>}
     </section>}
 
     <MileageGate />
