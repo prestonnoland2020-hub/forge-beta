@@ -5,6 +5,7 @@ import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
 import { isRaceEvidence } from './runQuality';
+import { predictRaceFromLegacyMethod } from './cardioPrediction';
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 import { sameLift } from './liftAliases';
@@ -90,29 +91,8 @@ const milesOf = (goal: CreatedGoal) => {
    nearer 1.15. So the exponent rises with the volume shortfall, and only when
    extrapolating UP in distance: going the other way, a long-run result
    predicting a short race needs no such help. */
-const RIEGEL = 1.06;
-const RIEGEL_UNDERTRAINED = 1.15;
-export const equivalentSeconds = (seconds: number, fromMiles: number, toMiles: number, volumeShortfall = 0) => {
-  const stretch = toMiles > fromMiles ? Math.min(1, Math.max(0, volumeShortfall)) : 0;
-  return seconds * Math.pow(toMiles / fromMiles, RIEGEL + (RIEGEL_UNDERTRAINED - RIEGEL) * stretch);
-};
-
-/* THE WEEKLY VOLUME A RACE PACE IS NORMALLY BUILT ON. Not a law — people break
-   it both ways — but the honest middle of it, and enough to tell an athletic
-   13-mile-a-week lifter that a sub-19 5K is a volume problem before it is a
-   speed problem. Miles per week against goal pace in seconds per mile. */
-const VOLUME_FOR_PACE: Array<{ secondsPerMile: number; miles: number }> = [
-  { secondsPerMile: 300, miles: 45 },  /* 5:00/mi */
-  { secondsPerMile: 330, miles: 35 },  /* 5:30/mi */
-  { secondsPerMile: 360, miles: 28 },  /* 6:00/mi */
-  { secondsPerMile: 390, miles: 22 },  /* 6:30/mi */
-  { secondsPerMile: 420, miles: 16 },  /* 7:00/mi */
-  { secondsPerMile: 480, miles: 12 },  /* 8:00/mi */
-];
-export const volumeForPace = (secondsPerMile: number) => {
-  const found = VOLUME_FOR_PACE.find(step => secondsPerMile <= step.secondsPerMile);
-  return found ? found.miles : 10;
-};
+export { RIEGEL, RIEGEL_UNDERTRAINED, equivalentSeconds, volumeForPace } from './riegel';
+import { equivalentSeconds, volumeForPace } from './riegel';
 
 /* HOW FAST A RACE TIME CAN HONESTLY IMPROVE. Around 1% a week is a good block
    for someone with room to grow; sustained double digits over a season is not
@@ -181,23 +161,20 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   const goalPace = targetSeconds / distance;
   const volumeNeeded = volumeForPace(goalPace);
 
-  /* THE PREDICTION COMES FROM THE BEST EFFORT, AT WHATEVER DISTANCE.
+  /* ONE PREDICTOR, SO THE CARD CANNOT DISAGREE WITH ITSELF.
 
-     The tiles under this banner use a near-distance predictor — only efforts
-     within 80–125% of the goal — and the temptation, when the two disagreed
-     in public on Preston's 2-mile card, was to make this one match. That is
-     wrong, and trying it proved it: restricted to near-distance, his 5K was
-     predicted from an easy 2.5-mile jog at 10:00/mi rather than from his
-     all-out 5:48 mile, and came back 31:29. Proximity in distance does not
-     beat quality of effort — a jog is not a race performance at any distance.
+     This banner and the tiles under it ran different predictions, and on
+     Preston's live account they contradicted each other on half his goals:
+     the pill said "Behind the rate · 5:13 at today's fitness" while the
+     banner directly above it said "Already within reach — worth about 4:57".
+     Both were defensible in isolation. Together they are just noise, and an
+     athlete has no way to know which half to believe.
 
-     So the best effort wins, carried across by Riegel with the volume stretch.
-     What was actually broken was the floor underneath it: a 1.4-mile at
-     3:39/mi was accepted as evidence and produced "your 2-mile is worth 7:27",
-     a time no human has run, presented to the athlete as his own fitness.
-     runQuality holds race evidence to the world record now, which is the line
-     that should always have been there. */
-  const best = bestContinuousEffort(records);
+     predictRaceFromLegacyMethod is now the only answer to "what are you worth
+     at this distance", and it weighs every effort with a penalty for how far
+     it had to be stretched rather than accepting only near-distance ones. */
+  const prediction = predictRaceFromLegacyMethod(records, distance);
+  const best = prediction?.source || null;
 
   if (!best) {
     return { goal: goal.title, verdict: 'needs-more',
@@ -210,7 +187,11 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
      their running volume falls short of what the goal pace is built on, so a
      fast mile off thirteen miles a week is not read as a 5K result. */
   const volumeShortfall = volumeNeeded ? Math.max(0, 1 - volume / volumeNeeded) : 0;
-  const nowAtDistance = equivalentSeconds(best.seconds, best.miles, distance, volumeShortfall);
+  /* The volume stretch is applied INSIDE the predictor now, so applying it
+     again here would charge the athlete for it twice — which read as Preston's
+     5K sliding from "reachable, but not on this volume" to "out of reach"
+     without anything about him changing. */
+  const nowAtDistance = prediction!.seconds;
   /* WHAT THE PREDICTION IS BUILT ON, named at full precision. The distance was
      printed with toFixed(0), so a 1.4-mile effort appeared as "your 1-mile" —
      which turned an obviously bad log into a credible-sounding claim and hid

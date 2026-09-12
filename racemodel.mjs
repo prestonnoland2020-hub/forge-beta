@@ -54,7 +54,14 @@ check('drawn from the three-mile piece', Math.abs(real.source.miles - 3) < 0.01,
 
 console.log('\n  the two together');
 const both = predictRaceFromLegacyMethod([SATURDAY, STEADY], 3.10686);
-check('the intervals cannot beat the real run', both.seconds === real.seconds, clock(both.seconds));
+/* The prediction is still DRAWN from the continuous run. The number itself is
+   allowed to move, because the interval day is real running and counts toward
+   the weekly volume the prediction is stretched by — more training makes the
+   same result predict a slightly better race, which is the point. */
+check('the intervals cannot become the prediction',
+  Math.abs(both.source.miles - real.source.miles) < 0.01, `${both.source.miles} mi`);
+check('and having trained more never makes the prediction worse',
+  both.seconds <= real.seconds, `${clock(both.seconds)} vs ${clock(real.seconds)}`);
 check('and nothing claims 7:30', both.seconds > 1000, clock(both.seconds));
 
 /* A leg inside a mixed session is still a continuous piece. */
