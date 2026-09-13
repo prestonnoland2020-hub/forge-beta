@@ -136,6 +136,23 @@ const raceWeek = raceDayOutlook(today5k, 0);
 check('with no weeks left there is no taper to collect', raceWeek.tapered === false);
 check('and nothing left to train for it either', raceWeek.best === Math.round(today5k));
 
+console.log('\nAn old best effort is still an effort');
+/* THE BUG THIS PINS. Credibility and recency were multiplied together before
+   the cut, so Preston's real log came back with NO CURVE AT ALL — a goal card
+   with no prediction on it. His best effort is a 5:32 mile from four months
+   ago: entirely credible, and old enough that recency had decayed its weight
+   to just under the bar. Everything behind it was slower, so nothing cleared
+   it. An effort earns its place by being plausible; age only decides how
+   loudly it speaks once it is in. */
+const OLD_BEST = [e(127, 1.02, '5:32'), e(60, 1, '6:23'), e(40, 3.01, '6:43'),
+  e(20, 5.01, '7:07'), e(8, 3.5, '8:34'), e(3, 5.03, '8:46')];
+const stale = fitnessCurve(OLD_BEST, TODAY);
+check('a four-month-old best effort still produces a curve', stale !== null);
+check('and it is the effort the curve is built on',
+  stale && Math.abs(stale.sources[0].miles - 1.02) < 0.01, stale?.sources[0]?.miles);
+check('with a prediction on the other side of it', stale && at(stale, 3.107).seconds > 0,
+  stale ? clock(at(stale, 3.107).seconds) : '');
+
 console.log('\nNothing to fit is answered honestly rather than invented');
 check('an empty log produces no curve', fitnessCurve([], TODAY) === null);
 check('and a single effort still produces one', fitnessCurve([e(7, 1, '5:19')], TODAY) !== null);

@@ -245,6 +245,15 @@ export function fitnessCurve(efforts: Effort[], todayIso: string, confirmed: Set
     if (setAside.has(effort)) return 0;
     return Math.exp(-((Math.max(0, level - reference) / TOL_SLOW) ** 2));
   };
+  /* CREDIBILITY AND RECENCY ARE DIFFERENT QUESTIONS, and multiplying them
+     together before the cut conflated them. Preston's best effort is a 5:32
+     mile from four months ago: fully credible, and old enough that recency had
+     decayed it to 0.29 — just under the bar. Every effort behind it was slower
+     still, so nothing cleared it and the whole curve came back NULL, which on
+     screen is a goal card with no prediction on it at all.
+     An effort earns its place by being plausible. Age decides how loudly it
+     speaks once it is in. */
+  const admitted = (effort: Effort, level: number, reference: number) => credence(effort, level, reference) >= CREDIBLE;
 
   /* ── The frontier and the exponent, fitted together ────────────────────── */
 
@@ -266,6 +275,7 @@ export function fitnessCurve(efforts: Effort[], todayIso: string, confirmed: Set
       effort,
       level: roundLevels[index],
       weight: recency(effort.date, todayIso) * credence(effort, roundLevels[index], roundReference),
+      credible: admitted(effort, roundLevels[index], roundReference),
     }));
 
     /* One point per distance band: the fastest CREDIBLE effort there. A band
@@ -273,7 +283,7 @@ export function fitnessCurve(efforts: Effort[], todayIso: string, confirmed: Set
        is evidence about the athlete's Sundays and not about their range. */
     const bins = new Map<number, typeof weighed[number]>();
     for (const item of weighed) {
-      if (item.weight < CREDIBLE) continue;
+      if (!item.credible) continue;
       const bin = Math.round(Math.log(item.effort.miles) / BIN_WIDTH_LOG);
       const held = bins.get(bin);
       if (!held || item.level < held.level) bins.set(bin, item);
@@ -298,10 +308,10 @@ export function fitnessCurve(efforts: Effort[], todayIso: string, confirmed: Set
   const levels = inWindow.map(effort => levelAt(effort, exponent));
   const reference = referenceOf(levels.filter((_, index) => !setAside.has(inWindow[index])));
   const ranked = inWindow
-    .map((effort, index) => ({ effort, level: levels[index], weight: recency(effort.date, todayIso) * credence(effort, levels[index], reference) }))
-    .filter(item => item.weight >= CREDIBLE)
+    .map((effort, index) => ({ effort, level: levels[index], weight: recency(effort.date, todayIso) * credence(effort, levels[index], reference), credible: admitted(effort, levels[index], reference) }))
+    .filter(item => item.credible)
     .sort((a, b) => a.level - b.level);
-  const pool = ranked.length ? ranked : [{ effort: inWindow[0], level: levels[0], weight: 1 }];
+  const pool = ranked.length ? ranked : [{ effort: inWindow[0], level: levels[0], weight: 1, credible: true }];
   const top = pool.slice(0, LEVEL_BLEND.length);
   const weights = top.map((item, index) => LEVEL_BLEND[index] * item.weight);
   const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
