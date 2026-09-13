@@ -53,7 +53,7 @@ check('two runs of similar length are not compared at all',
 console.log('\nSo Forge asks — about the one effort that is actually driving the numbers');
 const ask = standoutEffort([...REAL, BAD_LONG]);
 check('it asks about the standout', ask?.effort.date === BAD_LONG.date, ask?.effort.date);
-check('and says how far clear of the rest it is', ask.aheadBy > 10, `${Math.round(ask.aheadBy)} s/mi`);
+check('and says how far clear of the rest it is', ask.aheadBy >= 2, `${ask.aheadBy}% clear`);
 check('and says why it matters', /every training pace/i.test(ask.question), ask.question);
 check('a genuine short PR is never queried — there is nothing shorter to doubt it against',
   standoutEffort(REAL) === null, standoutEffort(REAL)?.effort.date || 'no question');

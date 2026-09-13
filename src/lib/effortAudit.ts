@@ -28,31 +28,46 @@
    the one effort that is actually driving the numbers, and then it remembers. */
 
 import { isRaceEvidence } from './runQuality';
+import { leaveOneOutGap } from './fitnessCurve';
+import { localDayIso } from './time';
 
-/* WHAT MAKES A RESULT WORTH CONFIRMING — and the first attempt at this was
-   wrong in an instructive way. "Better than the next-best effort by 3%" fires
-   on a genuine personal best just as readily as on a bad record: Preston's
-   real 5:19 mile is 5% clear of his 5:28, and being interrogated about a PR
-   you are proud of is exactly how a question gets trained out of somebody.
+/* WHAT MAKES A RESULT WORTH CONFIRMING — and the first two attempts at this
+   were wrong in instructive ways.
 
-   The suspicious shape is narrower than "very good". It is a LONG effort that
-   beats the athlete's best SHORT one. A short time trial is the most direct
-   measurement of fitness there is and there is nothing to doubt about it; a
-   long run that implies better fitness than that time trial is either a
-   breakthrough or a bad GPS lock, and those are worth telling apart. */
+   "Better than the next-best effort by 3%" fires on a genuine personal best
+   just as readily as on a bad record: Preston's real 5:19 mile is 5% clear of
+   his 5:28, and being interrogated about a PR you are proud of is exactly how
+   a question gets trained out of somebody.
+
+   Narrowing it to "a LONG effort that beats the athlete's best SHORT one"
+   fixed that and left a hole you could drive a bus through: a fake fast MILE
+   is not long, so nothing looked at it at all. Every mislog Forge had actually
+   seen happened to be a long one, which is not a reason to believe the next
+   one will be.
+
+   The right comparison is against the athlete's own distance-time curve, fitted
+   WITHOUT the effort in question so it cannot vote for itself. That works at
+   any distance and it separates cleanly on every case on file: genuine
+   personal bests land 2-4% clear of the curve their own log describes, and the
+   records Preston confirmed were false land at 12% and 22%. Six percent is the
+   line between them, with room on both sides. */
+export const ASK_GAP = 0.06;
+
+/* AND THE OLD RULE STAYS, BECAUSE IT CATCHES SOMETHING THE NEW ONE CANNOT.
+
+   Preston's actual log is the awkward case. Fitted to his own curve, the false
+   5.47-mile at 5:29/mi stands only 4.8% clear of his genuine 5:19 mile —
+   inside any threshold loose enough to leave real personal bests alone. It is
+   not a statistical outlier at all. What it IS, unmistakably, is a long effort
+   that implies better fitness than the athlete's best short time trial, and a
+   short time trial is the most direct measurement of fitness there is.
+
+   So there are two questions, and either can fire. The curve gap catches a
+   record that is implausible at ANY distance, including a fake fast mile that
+   the shape rule cannot see. The shape rule catches the specific thing that
+   keeps happening in real logs: a GPS-mismeasured long run. Neither alone
+   covers both, and between them nothing on file gets through. */
 export const STANDOUT_MARGIN = 0.02;
-/* A longer effort faster per mile than a shorter one READS like a
-   contradiction, and for a while this excluded such efforts outright. That was
-   wrong, and a test caught it: if the only shorter run on file is a warm-up
-   jog at 9:00/mi, then a perfectly ordinary 3-mile tempo at 7:00/mi is "faster
-   per mile than a shorter effort" and was silently thrown away.
-
-   The comparison is only meaningful against the athlete's BEST short effort,
-   and nothing can tell from the data whether the short effort on file was a
-   time trial or a jog. So self-comparison no longer excludes anything by
-   itself — it decides what is worth ASKING about. The only automatic exclusion
-   left is the world-record floor in runQuality, which is about the human race
-   rather than about this athlete and cannot produce a false positive. */
 export const CONTRADICTION_MARGIN = 0.01;
 export const DISTANCE_RATIO = 1.5;
 export const CONFIRMED_PREFIX = 'ok:';
@@ -87,47 +102,61 @@ export type StandoutAsk = {
   key: string;
   /* The next best effort it is being measured against. */
   runnerUp: Effort;
-  /* Seconds per mile of headroom between them, at mile-equivalent. */
+  /* How far clear of the athlete's own curve it sits, in percent. */
   aheadBy: number;
   say: string;
   question: string;
 };
 
-/* THE ONE EFFORT WORTH ASKING ABOUT: the best one, when it stands clear of
-   everything else the athlete has done. If it is only marginally the best it
-   is not interesting — whichever of the top two is right, the answer is
-   almost the same. */
-export function standoutEffort(efforts: Effort[], answered: string[] = []): StandoutAsk | null {
+/* THE ONE EFFORT WORTH ASKING ABOUT. Two independent reasons to doubt a
+   record; whichever is more sure of itself is the one that gets asked. */
+export function standoutEffort(efforts: Effort[], answered: string[] = [], todayIso = localDayIso()): StandoutAsk | null {
   /* BOTH ANSWERS COUNT AS ANSWERED. A confirmed effort is stored with an "ok:"
      prefix so it is remembered without being excluded — recording only the
      rejections would mean a genuine personal best got queried again on every
      open, which teaches people to dismiss the question without reading it. */
   const seen = new Set(answered.map(key => key.startsWith(CONFIRMED_PREFIX) ? key.slice(CONFIRMED_PREFIX.length) : key));
-  const real = efforts
-    .filter(effort => isRaceEvidence(effort.miles, effort.seconds))
-    .filter(effort => !seen.has(effortKey(effort)));
-  const usable = real;
-  if (usable.length < 2) return null;
+  const real = efforts.filter(effort => isRaceEvidence(effort.miles, effort.seconds));
+  const unanswered = real.filter(effort => !seen.has(effortKey(effort)));
+  if (real.length < 2 || !unanswered.length) return null;
 
-  const ranked = [...usable].sort((a, b) => mileEquivalent(a) - mileEquivalent(b));
-  const best = ranked[0];
-  const bestEquivalent = mileEquivalent(best);
-  /* The best SHORTER effort — the direct measurement this one has to beat
-     before it is worth querying. With nothing shorter to check against there
-     is no question to ask: a short time trial stands on its own. */
-  const shorter = usable.filter(effort => best.miles / effort.miles >= DISTANCE_RATIO);
-  if (!shorter.length) return null;
-  const runnerUp = shorter.reduce((winner, effort) =>
-    mileEquivalent(effort) < mileEquivalent(winner) ? effort : winner, shorter[0]);
-  const nextEquivalent = mileEquivalent(runnerUp);
-  if (bestEquivalent >= nextEquivalent * (1 - STANDOUT_MARGIN)) return null;
-
-  const aheadBy = nextEquivalent - bestEquivalent;
-  return {
-    effort: best, key: effortKey(best), runnerUp, aheadBy,
-    say: `Your ${best.miles.toFixed(2)} mi on ${best.date} at ${clock(best.seconds / best.miles)}/mi is worth more than your best short effort — ${runnerUp.miles.toFixed(2)} mi at ${clock(runnerUp.seconds / runnerUp.miles)}/mi — by ${Math.round(aheadBy)} seconds a mile.`,
+  const ask = (effort: Effort, runnerUp: Effort, gap: number, why: string): StandoutAsk => ({
+    effort, key: effortKey(effort), runnerUp, aheadBy: Math.round(gap * 1000) / 10,
+    say: `Your ${effort.miles.toFixed(2)} mi on ${effort.date} at ${clock(effort.seconds / effort.miles)}/mi is about ${Math.max(1, Math.round(gap * 100))}% ${why} — your ${runnerUp.miles.toFixed(2)} mi at ${clock(runnerUp.seconds / runnerUp.miles)}/mi.`,
     question: 'Every goal and every training pace is built on it. Was that a real effort?',
-  };
+  });
+
+  type Candidate = { ask: StandoutAsk; gap: number };
+  const found: Candidate[] = [];
+  const offer = (candidate: Candidate) => { found.push(candidate); };
+
+  /* ONE: A RECORD THAT BEATS THE ATHLETE'S WHOLE LOG. Works at any distance,
+     including a fake fast mile, because the comparison is the athlete's own
+     fitted curve rather than a fixed idea of what a suspicious shape is. */
+  if (real.length >= 3) {
+    for (const effort of unanswered) {
+      const gap = leaveOneOutGap(real, effort, todayIso);
+      if (gap === null || gap < ASK_GAP) continue;
+      const others = real.filter(other => other !== effort);
+      const runnerUp = others.reduce((winner, other) => mileEquivalent(other) < mileEquivalent(winner) ? other : winner, others[0]);
+      offer({ gap, ask: ask(effort, runnerUp, gap, 'faster than everything else in your log, including') });
+    }
+  }
+
+  /* TWO: A LONG EFFORT THAT BEATS A SHORT TIME TRIAL. There is nothing to
+     doubt about a hard mile; a five-miler implying a better mile than the mile
+     did is either a breakthrough or a bad GPS lock. */
+  const ranked = [...unanswered].sort((a, b) => mileEquivalent(a) - mileEquivalent(b));
+  const standout = ranked[0];
+  const shorter = real.filter(effort => standout.miles / effort.miles >= DISTANCE_RATIO);
+  if (shorter.length) {
+    const runnerUp = shorter.reduce((winner, effort) => mileEquivalent(effort) < mileEquivalent(winner) ? effort : winner, shorter[0]);
+    const gap = 1 - mileEquivalent(standout) / mileEquivalent(runnerUp);
+    if (gap >= STANDOUT_MARGIN) offer({ gap, ask: ask(standout, runnerUp, gap, 'worth more per mile than your best short effort') });
+  }
+
+  if (!found.length) return null;
+  return found.reduce((winner, candidate) => candidate.gap > winner.gap ? candidate : winner).ask;
 }
 
 /* What a prediction is allowed to use: everything real, minus what the athlete
