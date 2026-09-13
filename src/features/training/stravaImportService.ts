@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { cardioMiles, type CardioLogDraft } from '../../lib/cardioSession';
+import { cardioMiles, summarizeCardioDraft, type CardioLogDraft } from '../../lib/cardioSession';
 import type { WorkoutRecord } from './WorkoutHistoryProvider';
 import { localDayIso } from '../../lib/time';
 
@@ -81,6 +81,18 @@ export const runShapedActivity = (activity: string) => !/bike|ride|swim|row|elli
    presence, and a Strava ride on the day of a hand-logged run was never
    touched — it is a real second session. */
 const COVERAGE_TOLERANCE_MILES = 0.5;
+/* AND THE HAND LOG WINS THE TIME IT COVERS, WHICH CATCHES WHAT MILES CANNOT.
+
+   Preston's August 9th sat in his account twice: a typed "Base · 5.15 mi ·
+   45.5 min" and a Strava row saying 7.91 mi in 45:00. One run, two distances —
+   and the miles test kept both, because 5.15 does not cover 7.91. So the day
+   counted 13 miles he did not run, and the phantom 5:41/mi pace became the
+   fastest thing in his log and the question Forge asked him about.
+
+   Distance is the unreliable half of a GPS record; elapsed time is not. Two
+   sessions of the same sport on the same day that took the same length of
+   time are one session recorded twice, whatever the distances say. */
+const COVERAGE_TOLERANCE_MINUTES = 2;
 const classOfPart = (part: string): string => {
   const name = part.toLowerCase();
   /* THE SPORT IS DECIDED BEFORE THE INTENSITY. Forge's run names are mostly
@@ -115,16 +127,17 @@ export const cardioClasses = (activity: string): Set<string> =>
 /* The entry's leading class, for callers that need exactly one. */
 export const cardioClass = (activity: string): string =>
   classOfPart(String(activity || '').split('+')[0] || '');
-type DayCoverage = { classes: Set<string>; miles: Map<string, number> };
+type DayCoverage = { classes: Set<string>; miles: Map<string, number>; minutes: Map<string, number> };
 const handLoggedCoverage = (records: WorkoutRecord[]): Map<string, DayCoverage> => {
   const byDate = new Map<string, DayCoverage>();
   for (const record of records) {
     for (const session of record.cardioSessions || []) {
       /* Imported sessions carry a strava- id; anything else the athlete typed. */
       if (String(session.id || '').startsWith('strava-')) continue;
-      const day = byDate.get(record.date) || { classes: new Set<string>(), miles: new Map<string, number>() };
+      const day = byDate.get(record.date) || { classes: new Set<string>(), miles: new Map<string, number>(), minutes: new Map<string, number>() };
       const classes = [...cardioClasses(session.activity || '')];
       const miles = cardioMiles(session);
+      const minutes = summarizeCardioDraft(session as never).minutes || 0;
       classes.forEach(name => day.classes.add(name));
       /* A combined entry's distance is not split between its parts — Forge
          does not know how much of "Walk + Easy" was the run. Crediting the
@@ -132,24 +145,40 @@ const handLoggedCoverage = (records: WorkoutRecord[]): Map<string, DayCoverage> 
          the right direction here: it errs toward trusting what the athlete
          typed, which is the rule they asked for. */
       if (miles > 0) classes.forEach(name => day.miles.set(name, (day.miles.get(name) || 0) + miles));
+      if (minutes > 0) classes.forEach(name => day.minutes.set(name, (day.minutes.get(name) || 0) + minutes));
       byDate.set(record.date, day);
     }
   }
   return byDate;
 };
-/* What the watch recorded per class per day, so coverage can be compared. */
-const stravaMilesByDay = (rows: ExternalRow[]): Map<string, Map<string, number>> => {
-  const byDate = new Map<string, Map<string, number>>();
+/* What the watch recorded per class per day, so coverage can be compared —
+   miles and minutes, because either can be the honest one. */
+type WatchDay = { miles: Map<string, number>; minutes: Map<string, number> };
+const stravaTotalsByDay = (rows: ExternalRow[]): Map<string, WatchDay> => {
+  const byDate = new Map<string, WatchDay>();
   for (const row of rows) {
     const mapped = externalToSession(row);
     const miles = cardioMiles(mapped.session);
-    if (!(miles > 0)) continue;
-    const day = byDate.get(mapped.date) || new Map<string, number>();
+    const minutes = summarizeCardioDraft(mapped.session as never).minutes || 0;
+    if (!(miles > 0) && !(minutes > 0)) continue;
+    const day = byDate.get(mapped.date) || { miles: new Map<string, number>(), minutes: new Map<string, number>() };
     const name = cardioClass(mapped.session.activity || '');
-    day.set(name, (day.get(name) || 0) + miles);
+    if (miles > 0) day.miles.set(name, (day.miles.get(name) || 0) + miles);
+    if (minutes > 0) day.minutes.set(name, (day.minutes.get(name) || 0) + minutes);
     byDate.set(mapped.date, day);
   }
   return byDate;
+};
+
+/* Whether the athlete's own entry accounts for what the watch saw. */
+export const coversWatch = (
+  typed: { miles: number; minutes: number },
+  watched: { miles: number; minutes: number },
+) => {
+  if (!(watched.miles > 0) && !(watched.minutes > 0)) return true;
+  if (watched.miles > 0 && typed.miles + COVERAGE_TOLERANCE_MILES >= watched.miles) return true;
+  return watched.minutes > 0 && typed.minutes > 0
+    && typed.minutes + COVERAGE_TOLERANCE_MINUTES >= watched.minutes;
 };
 /* Strava sport types → Forge activity names. Unknown types pass through with
    spaces ("TrailRun" → "Trail Run") so nothing is dropped. */
@@ -214,7 +243,7 @@ export async function importStravaActivities(
   if (!rows.length) return { imported: 0, skipped: 0 };
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
   const handLogged = handLoggedCoverage(records);
-  const watchMiles = stravaMilesByDay(rows);
+  const watchTotals = stravaTotalsByDay(rows);
   const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[]; strength: boolean }>();
   let skipped = 0;
   /* Superseded rows are marked imported like any other, so a day the athlete
@@ -229,9 +258,11 @@ export async function importStravaActivities(
     const group = cardioClass(mapped.session.activity || '');
     const day = handLogged.get(mapped.date);
     if (day?.classes.has(group)) {
-      const watched = watchMiles.get(mapped.date)?.get(group) || 0;
-      const typed = day.miles.get(group) || 0;
-      const covered = watched === 0 || typed + COVERAGE_TOLERANCE_MILES >= watched;
+      const watch = watchTotals.get(mapped.date);
+      const covered = coversWatch(
+        { miles: day.miles.get(group) || 0, minutes: day.minutes.get(group) || 0 },
+        { miles: watch?.miles.get(group) || 0, minutes: watch?.minutes.get(group) || 0 },
+      );
       if (covered) { skipped++; supersededRowIds.push(row.id); continue; }
     }
     const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [], strength: false };

@@ -1,7 +1,6 @@
 /* Split is the sole source of truth for muscles on plan days; exercises'
    PRIMARY movers drive custom days; Session Details has no muscle picker. */
 import { chromium } from 'playwright';
-import { setDial, setWeightDial } from './dialdriver.mjs';
 import { days, setup, goals } from './seed.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const seedPlan = ([d, s, g]) => {
@@ -14,16 +13,23 @@ const seedPlan = ([d, s, g]) => {
   ]}));
 };
 const todayIso = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; };
-const fillLift = async (p, lift, w, r) => {
-  /* Numbers are picked from a wheel now, not typed. */
+import { logTopSet } from './dialdriver.mjs';
+const fillLift = (p, lift, w, r) => logTopSet(p, lift, w, r);
+
+/* A FRESH DAY ASKS WHAT YOU TRAINED BEFORE IT WILL SAVE A SET — a set with no
+   day behind it has nothing to count toward, and the sheet says so rather than
+   saving into the void. So the cases below name one muscle first, and the
+   assertion is unchanged in spirit: the LIFT contributes its primaries and
+   nothing else. Naming Back and logging a pulldown must still not credit
+   biceps and forearms. */
+const nameDayMuscle = async (p, muscle) => {
   await p.evaluate(name => {
-    const sel = [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.text === name));
-    if (sel) { const d = Object.getOwnPropertyDescriptor(sel.constructor.prototype, 'value').set; d.call(sel, name); sel.dispatchEvent(new Event('change', { bubbles: true })); }
-  }, lift);
+    [...document.querySelectorAll('.muscle-chip')]
+      .find(el => (el.textContent || '').trim() === name && !el.classList.contains('active'))?.click();
+  }, muscle);
   await p.waitForTimeout(400);
-  await setWeightDial(p, 'Weight', w);
-  await setDial(p, 'Reps', r);
 };
+
 let fails = 0;
 const check = (label, cond, detail) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${label}${cond ? '' : '  ' + detail}`); if (!cond) fails++; };
 
@@ -52,6 +58,7 @@ const check = (label, cond, detail) => { console.log(`${cond ? 'PASS' : 'FAIL'} 
   await p.waitForTimeout(1900);
   await p.evaluate(() => { [...document.querySelectorAll('button')].find(x => /FRESH|Start fresh/i.test(x.textContent) && x.textContent.length < 24)?.click(); });
   await p.waitForTimeout(600);
+  await nameDayMuscle(p, 'Back');
   await fillLift(p, 'Lat Pulldown', '160', '8');
   await p.waitForTimeout(400);
   await (await p.$('button.save-workout')).click();
@@ -68,6 +75,7 @@ const check = (label, cond, detail) => { console.log(`${cond ? 'PASS' : 'FAIL'} 
   await p.waitForTimeout(1900);
   await p.evaluate(() => { [...document.querySelectorAll('button')].find(x => /FRESH|Start fresh/i.test(x.textContent) && x.textContent.length < 24)?.click(); });
   await p.waitForTimeout(600);
+  await nameDayMuscle(p, 'Quads');
   await fillLift(p, 'Back Squat', '315', '3');
   await p.waitForTimeout(400);
   await (await p.$('button.save-workout')).click();

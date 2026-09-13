@@ -88,3 +88,34 @@ export async function setDistanceDial(page, label, whole, hundredths) {
   await page.evaluate(() => document.querySelector('.dial-ok').click());
   await page.waitForTimeout(350);
 }
+
+/* LOGGING A TOP SET THE WAY THE APP ASKS FOR ONE.
+
+   Four suites each carried their own version of this, written against whatever
+   the screen looked like the week it was added: a pair of dropdowns, then a
+   select plus two dials, then a search sheet. Every rename broke all of them
+   separately and each rotted in its own way. One helper, so the next rename is
+   one edit. */
+export async function logTopSet(page, lift, weight, reps) {
+  await page.evaluate(() => {
+    const open = [...document.querySelectorAll('button')]
+      .find(el => /Add a top set|Add top set|Log a top set/i.test(el.textContent || ''));
+    open?.click();
+  });
+  await page.waitForTimeout(700);
+  const sheet = await page.$('.top-set-sheet');
+  if (sheet) {
+    await page.fill('.top-set-sheet-search input', lift);
+    await page.waitForTimeout(400);
+    await page.evaluate(() =>
+      (document.querySelector('.top-set-sheet-result') || document.querySelector('.top-set-sheet-new'))?.click());
+    await page.waitForTimeout(400);
+  }
+  await setWeightDial(page, 'Weight', weight);
+  await setDial(page, 'Reps', reps);
+  await page.waitForTimeout(200);
+  /* The sheet saves on its own button; an inline row is already saved. */
+  await page.evaluate(() => [...document.querySelectorAll('.top-set-sheet footer button')]
+    .find(el => /Save top set/i.test(el.textContent || ''))?.click());
+  await page.waitForTimeout(700);
+}

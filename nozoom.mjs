@@ -16,7 +16,11 @@ const check = (l, c, d = '') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${c ?
 /* Pinch-zoom must stay available: the fix is the font size, never disabling
    the viewport, which would lock out anyone who needs to magnify. */
 const html = readFileSync('index.html', 'utf8');
-check('pinch zoom is not disabled to achieve this', !/maximum-scale|user-scalable/.test(html), html.match(/<meta name="viewport"[^>]*>/)?.[0] || '');
+/* Read the TAG, not the file — the file also explains why the tag does not
+   carry these, and a check that cannot tell a rule from its rationale fails
+   on its own documentation. */
+const viewportTag = html.match(/<meta name="viewport"[^>]*>/)?.[0] || '';
+check('pinch zoom is not disabled to achieve this', !/maximum-scale|user-scalable/.test(viewportTag), viewportTag);
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const p = await b.newPage({ viewport: { width: 390, height: 950 }, deviceScaleFactor: 2 });

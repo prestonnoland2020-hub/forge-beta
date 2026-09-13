@@ -34,6 +34,20 @@ type Props = {
 
 const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${set.weight}::${set.reps}`;
 
+/* WHICH ROW IS OPEN CANNOT DEPEND ON WHAT IS TYPED INTO IT.
+
+   setKey identifies a SET — lift, weight and reps — which is right for asking
+   "has this exact set been logged" and catastrophic for remembering which row
+   the athlete has open. A planned set arrives with no id, so its key was the
+   values; the moment a weight was chosen the key changed, the open-row list no
+   longer matched anything, and the row collapsed mid-entry. Tapping a lift and
+   setting a number closed the editor every single time — a top set could not
+   be logged from the day screen at all.
+
+   A ROW is identified by where it sits and what lift is on it, which is stable
+   while its numbers are being filled in. */
+const rowKey = (set: LoggedTopSet, index: number) => set.id || `${set.muscle}::${set.lift}::${index}`;
+
 
 /* A SAVED SET IS A LINE, NOT A CARD. Every set rendered as a full card whether
    it was still being filled in or already logged, so a day with four lifts on
@@ -86,8 +100,8 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
     const exercise = exercises.find(item => item.name === exerciseName);
     return exercise?.muscles.find(muscle => muscles.includes(muscle)) || exercise?.muscles[0] || fallback || 'Primary';
   };
-  const startCorrection = (set: LoggedTopSet) => {
-    setEditingKey(setKey(set));
+  const startCorrection = (set: LoggedTopSet, index: number) => {
+    setEditingKey(rowKey(set, index));
     setEditDraft({ ...set });
   };
   const cancelCorrection = () => {
@@ -109,8 +123,8 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
     setCreateError('');
   };
 
-  const isOpen = (set: LoggedTopSet) => {
-    const key = setKey(set);
+  const isOpen = (set: LoggedTopSet, index: number) => {
+    const key = rowKey(set, index);
     if (openKeys.includes(key)) return true;
     if (closedKeys.includes(key)) return false;
     /* Default: EVERY named set is a closed one-line row — the screen stays
@@ -118,9 +132,9 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
        with no lift yet opens, because a blank line has nothing to show. */
     return !set.lift;
   };
-  const toggle = (set: LoggedTopSet) => {
-    const key = setKey(set);
-    const open = isOpen(set);
+  const toggle = (set: LoggedTopSet, index: number) => {
+    const key = rowKey(set, index);
+    const open = isOpen(set, index);
     setOpenKeys(current => open ? current.filter(item => item !== key) : [...current, key]);
     setClosedKeys(current => open ? [...current, key] : current.filter(item => item !== key));
   };
@@ -136,7 +150,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
     </section>}
     {sets.map((set, index) => {
       const logged = Boolean(set.lift && loggedKeys.includes(setKey(set)));
-      const isCorrecting = logged && editingKey === setKey(set) && editDraft;
+      const isCorrecting = logged && editingKey === rowKey(set, index) && editDraft;
       const displayedSet = isCorrecting ? editDraft : set;
       const previous = displayedSet.lift ? lastCompletedSet(records.filter(record => record.date < date), displayedSet.lift) : undefined;
       const max = displayedSet.weight && displayedSet.reps ? calculateEstimatedOneRepMax(displayedSet.weight, displayedSet.reps) : null;
@@ -155,7 +169,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
         if (onEditLogged(index, set, corrected)) cancelCorrection();
       };
 
-      const open = isOpen(set) || Boolean(isCorrecting);
+      const open = isOpen(set, index) || Boolean(isCorrecting);
 
       /* Closed: the whole set is one line of text — saved sets read as their
          result, still-to-log sets read as the prescription with LOG waiting. */
@@ -169,7 +183,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
             onTouchStart={event => beginSwipe(key, event.touches[0])}
             onTouchMove={event => moveSwipe(key, event.touches[0])}
             onTouchEnd={endSwipe}>
-            <button type="button" className="top-set-row" aria-expanded="false" onClick={() => (offset ? closeSwipe() : toggle(set))}>
+            <button type="button" className="top-set-row" aria-expanded="false" onClick={() => (offset ? closeSwipe() : toggle(set, index))}>
               <span className="top-set-row-name">{set.lift}</span>
               {logged
                 ? <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
@@ -183,9 +197,9 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
       return <article className={`card top-set-entry ${logged ? 'logged' : ''}`} key={set.id || `set-${index}`}>
         <div className="top-set-entry-head">
           {logged
-            ? <button type="button" className="top-set-entry-toggle" aria-expanded="true" onClick={() => toggle(set)}><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></button>
+            ? <button type="button" className="top-set-entry-toggle" aria-expanded="true" onClick={() => toggle(set, index)}><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></button>
             : <div><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></div>}
-          {logged && !isCorrecting ? <div className="logged-top-set-actions"><strong className="logged-badge">Saved ✓</strong><button type="button" className="text-button" onClick={() => startCorrection(set)}>Edit</button><button type="button" className="text-button danger" onClick={() => onDeleteLogged(index, set)}>Delete</button></div> : <button type="button" className="text-button" onClick={isCorrecting ? cancelCorrection : () => onRemove(index)}>{isCorrecting ? 'Cancel' : 'Remove'}</button>}
+          {logged && !isCorrecting ? <div className="logged-top-set-actions"><strong className="logged-badge">Saved ✓</strong><button type="button" className="text-button" onClick={() => startCorrection(set, index)}>Edit</button><button type="button" className="text-button danger" onClick={() => onDeleteLogged(index, set)}>Delete</button></div> : <button type="button" className="text-button" onClick={isCorrecting ? cancelCorrection : () => onRemove(index)}>{isCorrecting ? 'Cancel' : 'Remove'}</button>}
         </div>
         {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} ×{set.reps}</strong><small>Calculated max {max ?? '—'} {unit}</small></div> : <>
           <label className="top-set-exercise-field">Exercise<select value={displayedSet.lift} onChange={event => { if (event.target.value === '__new__') { setCreatingExercise(true); setCreateError(''); return; } chooseExercise(event.target.value); }}><option value="">Choose exercise</option>{options.map(exercise => <option key={exercise.id}>{exercise.name}</option>)}<option value="__new__">＋ Add a new exercise…</option></select></label>

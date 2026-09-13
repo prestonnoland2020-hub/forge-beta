@@ -163,9 +163,25 @@
 }
 
 /* -------------------------------------------------------------------- inputs */
+/* A PHONE MUST NOT ZOOM TO TYPE. iOS Safari zooms the page whenever a focused
+   form control is set smaller than 16px, and then leaves the athlete panned
+   into the middle of a field they have to pinch back out of. It is a hard
+   platform rule, not a preference.
+
+   Forge sets type in the 10-13px range throughout, which is right for labels
+   and wrong for anything you type into — so three controls (the exercise
+   search, the session-effort select, the workout notes) zoomed the logger
+   every time they were tapped. The app had answered that with
+   `user-scalable=no` in the viewport tag, which stops the zoom by taking pinch
+   zoom away from everybody, including anyone who needs to magnify to read at
+   all. That trade is not ours to make.
+
+   16px on the control itself is the actual fix. Anything that genuinely needs
+   to be smaller says so for itself below. */
 input,select,textarea{
   background:var(--surface-sunken);color:var(--ink);
   border:1px solid var(--hairline);border-radius:var(--r-sm);
+  font-size:16px;
   transition:border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease);
 }
 input:hover,select:hover,textarea:hover{border-color:var(--hairline-strong)}
