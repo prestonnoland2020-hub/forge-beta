@@ -53,7 +53,8 @@ for (const [route, name] of [['/', 'today'], ['/plan', 'plan'], ['/goals', 'goal
     await page.locator('.dial-ok').click();
     await page.waitForTimeout(150);
   };
-  await page.locator('button:has-text("Add top set|Log a top set"), button:has-text("Log a top set")').first().click();
+  /* has-text takes a string or a regex, never a pipe inside a string. */
+await page.locator('button').filter({ hasText: /Add top set|Log a top set/ }).first().click();
   await page.waitForTimeout(400);
   await page.fill('.top-set-sheet-search input', 'Bench Press');
   await page.waitForTimeout(300);
