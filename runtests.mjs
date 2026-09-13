@@ -35,12 +35,25 @@ const portsOf = source => [...new Set([...source.matchAll(/localhost:(\d{4})/g)]
 const BUILDS = { '4194': { outDir: 'dist-auth', env: { VITE_DEMO_MODE: 'false', VITE_SUPABASE_URL: 'https://test.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_testtesttesttesttest' } } };
 const defaultBuild = { outDir: 'dist', env: { VITE_DEMO_MODE: 'true' } };
 
-const run = (command, commandArgs, env = {}) => new Promise(resolve => {
-  const child = spawn(command, commandArgs, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+/* A SUITE THAT HANGS IS NOT A SUITE THAT IS STILL THINKING. plancontrast sat
+   on a selector that no longer exists and held the entire run for twenty
+   minutes with nothing on the screen — every suite after it unreported. A
+   suite gets SUITE_TIMEOUT_MS and is then killed and recorded as errored. */
+const SUITE_TIMEOUT_MS = 600000;
+const run = (command, commandArgs, env = {}, timeoutMs = 0) => new Promise(resolve => {
+  const child = spawn(command, commandArgs, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let out = '';
+  let timedOut = false;
+  const timer = timeoutMs ? setTimeout(() => {
+    timedOut = true;
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+  }, timeoutMs) : null;
   child.stdout.on('data', chunk => { out += chunk; });
   child.stderr.on('data', chunk => { out += chunk; });
-  child.on('close', code => resolve({ code, out }));
+  child.on('close', code => {
+    if (timer) clearTimeout(timer);
+    resolve({ code: timedOut ? 1 : code, out: timedOut ? `${out}\nError: timed out after ${Math.round(timeoutMs / 1000)}s` : out });
+  });
 });
 
 const wanted = [...new Set(suites.flatMap(name => portsOf(readFileSync(name, 'utf8'))))].sort();
@@ -80,7 +93,7 @@ for (const name of suites) {
   const extra = name === 'rlscheck.mjs' && existsSync('.forge-policies.json') ? [readFileSync('.forge-policies.json', 'utf8')] : [];
   if (name === 'rlscheck.mjs' && !extra.length) { results.push({ name, state: 'skipped', detail: 'needs the live policy list in .forge-policies.json' }); continue; }
   const started = Date.now();
-  const result = await run('npx', ['vite-node', name, ...extra]);
+  const result = await run('npx', ['vite-node', name, ...extra], {}, SUITE_TIMEOUT_MS);
   const seconds = ((Date.now() - started) / 1000).toFixed(0);
   /* A SUITE THAT THREW IS NOT A SUITE THAT PASSED. A thrown page.goto or a
      missing selector exits non-zero with no check lines at all, and reading

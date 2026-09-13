@@ -53,6 +53,10 @@ async function shoot(name, theme, extra, route = '/plan') {
   }, [setup, goals, history, splitDays, theme, extra || {}]);
   await page.goto(`${BASE}/#${route}?t=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2600);
+  /* The effort question opens over everything on a fresh profile — answer it
+     so the shot is of the screen, not of the dialog. */
+  const ask = page.locator('[aria-label="Confirm this effort"] .button').first();
+  if (await ask.count()) { await ask.click(); await page.waitForTimeout(600); }
   writeFileSync(`/tmp/tour/${name}.png`, await page.screenshot({ fullPage: true }));
   return page;
 }
@@ -60,10 +64,11 @@ async function shoot(name, theme, extra, route = '/plan') {
 for (const theme of ['dark', 'light']) {
   /* Mid-block, nothing logged today. */
   const p1 = await shoot(`plan-${theme}`, theme, { 'forge-ai-plan-v1': plan });
-  /* Open the block and a week inside it. */
-  await p1.locator('.pv-block-toggle').click(); await p1.waitForTimeout(300);
-  await p1.locator('.pv-block-row').nth(4).click(); await p1.waitForTimeout(300);
-  await p1.locator('.pv-row-main').first().click().catch(() => {}); await p1.waitForTimeout(300);
+  /* Open a day that has something to show. The block/week accordion this used
+     to click through (.pv-block-toggle, .pv-block-row) no longer exists — the
+     week is the screen now, and the rows expand in place. */
+  const expandable = p1.locator('.pv-row-main:not([disabled])').first();
+  if (await expandable.count()) { await expandable.click(); await p1.waitForTimeout(400); }
   writeFileSync(`/tmp/tour/plan-${theme}-open.png`, await p1.screenshot({ fullPage: true }));
   await p1.close();
   /* Today logged. */

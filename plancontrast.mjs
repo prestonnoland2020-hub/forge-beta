@@ -118,9 +118,16 @@ for (const { accent, theme, ground } of PASSES) {
     /* The block used to live in an accordion at the bottom; a week is reached
        from the pips at the top now, so the surfaces to audit are a week ahead
        (with its projection note) and the way back. */
-    await page.locator('.pv-dot').nth(7).click().catch(() => {}); await page.waitForTimeout(300);
-    await page.locator('.pv-row-main').first().click().catch(() => {}); await page.waitForTimeout(200);
-    await page.locator('.pv-request .text-button').click().catch(() => {}); await page.waitForTimeout(200);
+    /* EVERY OPTIONAL CLICK CARRIES ITS OWN TIMEOUT. These are .catch()ed
+       because the control may not be on the screen in this pass — but the
+       default wait is thirty seconds each, so three missing controls cost 90
+       seconds a page and forty pages of that held the whole run for an hour
+       with nothing printed. If it is not there in a second and a half, it is
+       not there. */
+    const tap = async (sel, nth = 0) => { await page.locator(sel).nth(nth).click({ timeout: 1500 }).catch(() => {}); await page.waitForTimeout(250); };
+    await tap('.pv-dot', 7);
+    await tap('.pv-row-main');
+    await tap('.pv-request .text-button');
     for (const hit of await page.evaluate(AUDIT)) {
       const key = `${hit.sel}|${hit.text}`;
       const prev = seen.get(key);

@@ -11,6 +11,7 @@
    point. This pins which alert fires, what it offers, and that accepting it
    never writes an unsafe number. */
 import { mileageGap, applyMileageGap, applyMileageRamp, CEILING_HEADROOM } from './src/lib/mileageGap.ts';
+import { goalFeasibility } from './src/lib/goalFeasibility.ts';
 
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
@@ -172,11 +173,18 @@ check('and then it is SILENT — the thing it asked for has been done',
   mileageGap(HIS_GOALS, hisLog, accepted) === null,
   JSON.stringify(mileageGap(HIS_GOALS, hisLog, accepted)?.kind));
 
-console.log('\nBut it still speaks when the ramp genuinely cannot arrive');
+console.log('\nAnd a ramp that cannot arrive is the DATE\'s problem, not the floor\'s');
+/* Four weeks to find 45 miles a week does not arrive — and no floor Forge can
+   offer changes that. Offering one more step is the same furniture by another
+   name. The goal card already says the true thing in its own words: "Not by
+   October 4 — you are worth about 9:36 today, and 3 weeks of good training
+   buys about 3%." The mileage card asks for the one thing it can get, a plan
+   configured to climb, and is silent once it has it. */
 const soon = [{ id: 's', title: 'Mile goal', type: 'Endurance', target: '4:59', metric: 'Mile time', date: ahead(3) }];
 const rushed = mileageGap(soon, hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 50 });
-check('three weeks to find 45 miles a week does not arrive', Boolean(rushed), `${rushed?.kind} → ${rushed?.target}`);
-check('and it says so rather than pretending', rushed?.arrives === false);
+check('it does not offer a floor it knows will not arrive', rushed === null, `${rushed?.kind} → ${rushed?.target}`);
+check('and the goal verdict is the one that speaks instead',
+  goalFeasibility(soon, hisLog, { maxWeeklyMileage: 50 })[0]?.verdict === 'out-of-reach');
 check('a ceiling below the goal still outranks everything',
   mileageGap(HIS_GOALS, hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 30 })?.kind === 'ceiling');
 check('and a goal with room and time says nothing at all',

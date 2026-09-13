@@ -128,7 +128,14 @@ export function mileageGap(goals: CreatedGoal[], records: WorkoutRecord[], bound
      athlete already running more than the goal needs is not short of
      anything, whatever their floor is set to. */
   const short = base < needed * ARRIVAL_SHARE;
-  if (base > 0 && short && (!arrival.arrives || !onTheRamp)) {
+  /* AND ONCE THEY ARE ON THE RAMP, IT IS SILENT EVEN IF THE RAMP IS TOO SLOW.
+
+     A ramp that cannot reach the number before the date is a problem with the
+     DATE, and the goal card already says so in those words. Raising the floor
+     another single step does not fix it — it just brings the same card back
+     tomorrow, which is the hand-cranking Preston hit. The mileage card asks
+     for the one thing it can actually get: a plan configured to climb. */
+  if (base > 0 && short && !onTheRamp) {
     const step = Math.max(Math.ceil(base * SAFE_STEP), base + 1);
     const target = ceiling ? Math.min(step, ceiling) : step;
     if (target <= floor || target <= base) return null;
