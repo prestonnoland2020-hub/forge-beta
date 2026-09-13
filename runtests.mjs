@@ -31,6 +31,11 @@ const suites = readdirSync('.').filter(name => name.endsWith('.mjs') && !SELF.in
 /* Which ports a suite talks to, read out of the suite itself — so adding a
    suite on a new port does not mean remembering to update a list here. */
 const portsOf = source => [...new Set([...source.matchAll(/localhost:(\d{4})/g)].map(match => match[1]))];
+/* WHAT MAKES A SUITE A BROWSER SUITE IS A BROWSER, not a port. --logic used to
+   skip whatever mentioned a localhost port, so a suite that starts its own
+   server on its own address — planrebuild builds a double and serves it — read
+   as pure logic and was run without a display anywhere near it. */
+const needsBrowser = source => /from 'playwright'/.test(source);
 /* 4194 is the signed-in build; everything else is the preview build. */
 const BUILDS = { '4194': { outDir: 'dist-auth', env: { VITE_DEMO_MODE: 'false', VITE_SUPABASE_URL: 'https://test.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_testtesttesttesttest' } } };
 const defaultBuild = { outDir: 'dist', env: { VITE_DEMO_MODE: 'true' } };
@@ -88,7 +93,7 @@ const results = [];
 for (const name of suites) {
   const source = readFileSync(name, 'utf8');
   const ports = portsOf(source);
-  if (logicOnly && ports.length) { results.push({ name, state: 'skipped', detail: 'needs a browser' }); continue; }
+  if (logicOnly && (ports.length || needsBrowser(source))) { results.push({ name, state: 'skipped', detail: 'needs a browser' }); continue; }
   /* rlscheck reads the live policy list from its first argument. */
   const extra = name === 'rlscheck.mjs' && existsSync('.forge-policies.json') ? [readFileSync('.forge-policies.json', 'utf8')] : [];
   if (name === 'rlscheck.mjs' && !extra.length) { results.push({ name, state: 'skipped', detail: 'needs the live policy list in .forge-policies.json' }); continue; }

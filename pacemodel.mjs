@@ -7,7 +7,7 @@
    have never run — three different athletes' training on one card.
 
    This pins the replacement: one performance, one hierarchy, every pace. */
-import { paceModel, easyBand, easyTooFast, volumeShortfall, hardestEffort,
+import { paceModel, easyBand, easyTooFast, loggedEasyPace, volumeShortfall, hardestEffort,
   EASY_MULTIPLE_FAST, RECENT_EVIDENCE_DAYS } from './src/lib/paceModel.ts';
 
 let fails = 0;
@@ -87,5 +87,29 @@ check('with no model there is nothing to say', !easyTooFast({ threshold: 0 }, 40
 check('the fast end is a real multiple of threshold',
   Math.abs(p.easyFast - p.threshold * EASY_MULTIPLE_FAST) < 0.001);
 
-console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
+
+
+console.log('\nAnd what their easy running actually is, so the band can be checked');
+/* THE WARNING THAT WAS COMPUTED AND SHOWN NOWHERE. Running easy days at tempo
+   pace is the most common error in self-coached training, and it is the one a
+   plan cannot fix by prescribing anything — the session already says "easy".
+   easyTooFast could detect it for months and said it on no screen; the plan
+   tab names it now, which needs a number for what the athlete is doing. */
+const easyRun = (daysAgo, miles, secondsPerMile) => run(daysAgo, miles, miles * secondsPerMile);
+const model = paceModel([run(13, 1, 348)], goal, TODAY, 28);
+const slowLog = [easyRun(2, 5, model.easySlow + 20), easyRun(5, 4, model.easySlow + 40), easyRun(9, 6, model.easySlow + 10)];
+const fastLog = [easyRun(2, 5, model.easyFast - 30), easyRun(5, 4, model.easyFast - 20), easyRun(9, 6, model.easyFast - 40)];
+check('easy running is read from the days run slower than threshold',
+  loggedEasyPace(slowLog, model, TODAY) > model.easySlow, clock(loggedEasyPace(slowLog, model, TODAY)));
+check('and someone running them properly easy is told nothing',
+  !easyTooFast(model, loggedEasyPace(slowLog, model, TODAY)));
+check('someone running every easy day at tempo is told once',
+  easyTooFast(model, loggedEasyPace(fastLog, model, TODAY)), clock(loggedEasyPace(fastLog, model, TODAY)));
+check('one hard finish does not move it — the median is taken, not the mean',
+  Math.abs(loggedEasyPace([...slowLog, easyRun(3, 3, model.easyFast - 90)], model, TODAY)
+    - loggedEasyPace(slowLog, model, TODAY)) < 25);
+check('with nothing logged there is nothing to say', loggedEasyPace([], model, TODAY) === 0);
+check('and with no model at all, nothing either', loggedEasyPace(slowLog, { threshold: 0 }, TODAY) === 0);
+
+console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

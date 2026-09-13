@@ -230,3 +230,24 @@ export function easyBand(model: PaceModel, loggedEasySecondsPerMile = 0): { fast
    naming it once rather than by prescribing anything new. */
 export const easyTooFast = (model: PaceModel, loggedEasySecondsPerMile: number) =>
   Boolean(model.threshold && loggedEasySecondsPerMile > 0 && loggedEasySecondsPerMile < model.easyFast);
+
+/* WHAT THEIR EASY RUNNING ACTUALLY IS, so the band above can be checked
+   against it. Easy days are the ones run slower than threshold — a tempo is
+   not an easy run that went well — and the median is taken rather than the
+   mean so one hard finish does not move it. */
+export const EASY_WINDOW_DAYS = 28;
+export function loggedEasyPace(records: CardioRecord[], model: PaceModel, today = new Date().toISOString().slice(0, 10)): number {
+  if (!model.threshold) return 0;
+  const cutoff = new Date(`${today}T12:00:00`);
+  cutoff.setDate(cutoff.getDate() - EASY_WINDOW_DAYS);
+  const since = cutoff.toISOString().slice(0, 10);
+  const paces: number[] = [];
+  for (const effort of continuousEfforts(records, since)) {
+    const pace = effort.seconds / effort.miles;
+    if (pace > model.threshold) paces.push(pace);
+  }
+  if (!paces.length) return 0;
+  paces.sort((a, b) => a - b);
+  const middle = paces.length >> 1;
+  return paces.length % 2 ? paces[middle] : (paces[middle - 1] + paces[middle]) / 2;
+}

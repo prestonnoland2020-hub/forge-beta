@@ -6,6 +6,7 @@ import { predictRaceFromLegacyMethod } from './cardioPrediction';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
 import { countsAsRunVolume, isRaceEvidence, anchorsPace } from './runQuality';
+import { weeklyMilesFrom } from './runVolume';
 
 /* WHAT THE COACH WAS NEVER TOLD.
 
@@ -347,21 +348,18 @@ const isBodyGoal = (goal: CreatedGoal) =>
    weeks rather than a mean over all of them — one big week or one sick week
    should not decide what gets prescribed. Stated setup mileage is a guess that
    goes stale the week after setup; this does not. */
-export function medianWeeklyMiles(records: WorkoutRecord[], weeks = 8): number {
-  const finished = weeklyRunning(records, weeks).filter(week => !week.partial);
-  /* THE WEEKS BEFORE THEY STARTED ARE NOT WEEKS THEY RAN NOTHING. An athlete
-     three weeks into using Forge has five empty buckets in an eight-week
-     window, and the median of that is zero — so the floor that is supposed to
-     stop the plan prescribing under them did nothing for exactly the athletes
-     who are new. Leading empty weeks are dropped; an off week INSIDE their
-     training counts, because that is part of what they actually do. */
-  const firstRan = finished.findIndex(week => week.miles > 0);
-  const since = firstRan < 0 ? [] : finished.slice(firstRan);
-  if (!since.length) return 0;
-  const values = since.map(week => week.miles).sort((a, b) => a - b);
-  const middle = values.length >> 1;
-  return round1(values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2);
+/* ONE DEFINITION OF WEEKLY MILEAGE, AND THIS IS NOT A SECOND ONE.
+
+   This was a median of finished weeks since the athlete's first running week,
+   over a ten-week window — a fifth answer to "how much do you run", sitting
+   behind every training pace while the goal card, the planner, the race
+   predictor and the cardio engine each had their own. Its one real insight,
+   that leading empty weeks are not weeks somebody ran nothing, lives in
+   runVolume now and applies everywhere rather than here alone. */
+export function medianWeeklyMiles(records: WorkoutRecord[]): number {
+  return weeklyMilesFrom(runs(records).map(run => ({ date: run.date, miles: run.miles })));
 }
+
 
 /* The longest single continuous run on file. A long run the athlete is already
    doing every week is the floor for the plan's long run, not a stretch. */

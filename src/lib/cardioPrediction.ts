@@ -3,6 +3,7 @@ import { continuousRunEfforts } from './cardioSession';
 import { localDayIso } from './time';
 import { isRaceEvidence, countsAsRunVolume } from './runQuality';
 import { volumeForPace } from './riegel';
+import { weeklyMilesFrom, type DatedMiles } from './runVolume';
 import { trustedEfforts, CONFIRMED_PREFIX } from './effortAudit';
 import { fitnessCurve, predictFromCurve } from './fitnessCurve';
 
@@ -64,21 +65,26 @@ export const EXTRAPOLATION_PENALTY = 0.10;
    conversion is not really a stretch at all. */
 export const NEAR_ENOUGH = 0.25;
 
-/* Running actually covered in the last four weeks, per week — everything that
-   counts as running, not only the pieces good enough to predict a race from. */
-const VOLUME_WINDOW_DAYS = 28;
-export function weeklyRunVolume(records: WorkoutRecord[]): number {
-  let miles = 0;
+/* Every run the athlete has actually covered — everything that counts as
+   running, not only the pieces good enough to predict a race from. */
+export function runVolumeEntries(records: WorkoutRecord[]): DatedMiles[] {
+  const out: DatedMiles[] = [];
   for (const record of records) {
-    if (daysAgo(record.date) > VOLUME_WINDOW_DAYS) continue;
     for (const session of record.cardioSessions || []) {
       if (nonRunning(`${session.activity} ${session.summary}`)) continue;
       for (const effort of continuousRunEfforts(session)) {
-        if (countsAsRunVolume(effort.miles, effort.minutes * 60)) miles += effort.miles;
+        if (countsAsRunVolume(effort.miles, effort.minutes * 60)) out.push({ date: record.date, miles: effort.miles });
       }
     }
   }
-  return (miles / VOLUME_WINDOW_DAYS) * 7;
+  return out;
+}
+
+/* WHAT THE ATHLETE RUNS IN A WEEK, from the one definition in runVolume — see
+   the note there for why there used to be four of these and why they
+   disagreed with each other on the same card. */
+export function weeklyRunVolume(records: WorkoutRecord[]): number {
+  return weeklyMilesFrom(runVolumeEntries(records), today());
 }
 const volumeShortfallFor = (secondsPerMile: number, weeklyMiles: number) => {
   const needed = volumeForPace(secondsPerMile);

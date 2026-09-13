@@ -3,6 +3,7 @@ import type { PlannedCardio } from '../components/CardioPlanBuilder';
 import type { AdaptiveProfile,RunResult } from '../features/training/AdaptiveTrainingProvider';
 import { LONG_RUN_MAX_SHARE } from '../features/training/aiPlanService';
 import { daysUntil } from './time';
+import { weeklyMilesFrom } from './runVolume';
 
 export type RunEvent='Mile'|'5K'|'10K'|'Half Marathon'|'Marathon'|'HYROX'|'Custom Run';
 export type EventProfile={event:RunEvent;distanceMeters:number;durationWeeks:number;qualityFocus:string;longRunPeak:number;surface:string;demands:string[]};
@@ -28,7 +29,12 @@ const splitAt=(seconds:number,distance:number,rep:number)=>formatClock(seconds*r
 const pacePerMile=(seconds:number,meters:number)=>formatClock(seconds*1609.344/meters);
 const plan=(id:number,activity:string,structure:PlannedCardio['structure'],extra:Partial<PlannedCardio>):PlannedCardio=>({id,activity,structure,targetSource:'Goal generated',...extra});
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
-function adaptiveState(input?:Partial<AdaptiveInput>){const history=input?.history||[];const ordered=history.slice().sort((a,b)=>b.date.localeCompare(a.date));const anchor=ordered[0]?new Date(ordered[0].date).getTime():Date.now();const rolling=ordered.filter(run=>anchor-new Date(run.date).getTime()<=28*86400000);const observedWeekly=rolling.reduce((sum,run)=>sum+run.distanceMiles,0)/4;const observedLongest=rolling.reduce((max,run)=>Math.max(max,run.distanceMiles),0);const profile={...fallbackProfile,...input?.profile,...(rolling.length>=3?{weeklyMileage:Number(observedWeekly.toFixed(1)),longestRunMiles:Number(observedLongest.toFixed(1))}:{})};const recent=ordered.slice(0,4);const failed=recent.some(run=>!run.completed||(run.plannedReps&&Number(run.completedReps)<run.plannedReps*.8));const poorRecovery=(profile.watchConnected&&(profile.readiness<60||profile.sleepHours<6||profile.soreness>=4))||profile.injuryConstraint;const fatigue=profile.strengthFatigue==='High';const experienceScale={New:.72,Recreational:.88,Experienced:1,Competitive:1.08}[profile.experience];const capacityScale=clamp(profile.weeklyMileage/20,.6,1.15);const reduction=poorRecovery?.65:failed?.82:fatigue?.88:1;return{profile,history,failed,poorRecovery,fatigue,volumeScale:experienceScale*capacityScale*reduction,status:poorRecovery?'Reduced':failed?'Repeat':'Scheduled' as GeneratedSession['status']}};
+function adaptiveState(input?:Partial<AdaptiveInput>){const history=input?.history||[];const ordered=history.slice().sort((a,b)=>b.date.localeCompare(a.date));const anchor=ordered[0]?new Date(ordered[0].date).getTime():Date.now();/* ANCHORED ON TODAY, NOT ON THE LAST RUN. This window started from the most
+     recent logged run, so an athlete who stopped running a month ago still
+     read as running their old mileage — the one case where the number most
+     needs to fall. And it was a fourth definition of weekly volume besides;
+     runVolume holds the only one now. */
+  const rolling=ordered.filter(run=>anchor-new Date(run.date).getTime()<=28*86400000);const observedWeekly=weeklyMilesFrom(history.map(run=>({date:run.date,miles:run.distanceMiles})));const observedLongest=rolling.reduce((max,run)=>Math.max(max,run.distanceMiles),0);const profile={...fallbackProfile,...input?.profile,...(rolling.length>=3?{weeklyMileage:Number(observedWeekly.toFixed(1)),longestRunMiles:Number(observedLongest.toFixed(1))}:{})};const recent=ordered.slice(0,4);const failed=recent.some(run=>!run.completed||(run.plannedReps&&Number(run.completedReps)<run.plannedReps*.8));const poorRecovery=(profile.watchConnected&&(profile.readiness<60||profile.sleepHours<6||profile.soreness>=4))||profile.injuryConstraint;const fatigue=profile.strengthFatigue==='High';const experienceScale={New:.72,Recreational:.88,Experienced:1,Competitive:1.08}[profile.experience];const capacityScale=clamp(profile.weeklyMileage/20,.6,1.15);const reduction=poorRecovery?.65:failed?.82:fatigue?.88:1;return{profile,history,failed,poorRecovery,fatigue,volumeScale:experienceScale*capacityScale*reduction,status:poorRecovery?'Reduced':failed?'Repeat':'Scheduled' as GeneratedSession['status']}};
 /* Local days between today and the race, so the plan week does not advance at
    whatever hour UTC happens to roll over. */
 function daysTo(date:string){return daysUntil(date)}
