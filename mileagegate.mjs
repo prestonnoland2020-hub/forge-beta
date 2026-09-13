@@ -148,5 +148,40 @@ check('and it is the ceiling, not the ramp', his?.kind === 'ceiling', `${his?.ne
 check('the hungriest goal is the one that speaks', /Mile/.test(his?.goal || ''), his?.goal);
 check('and the offer clears what the goal needs', his.target > his.ceiling, `${his.ceiling} → ${his.target}`);
 
+console.log('\nAnd doing what it asks turns it off');
+/* "I already clicked into it and changed it — why is it still here?"
+
+   Because the floor test was "base is under 85% of what the goal needs", which
+   is true of every week of a climb by construction. Preston raised his ceiling
+   to 50 and built the ramp exactly as asked; the card came straight back
+   offering 22, and would have come back at 25, and at 27, one step at a time
+   until he had hand-cranked the floor to 39. An alert you cannot turn off by
+   doing what it says is furniture, and it teaches people to ignore the ones
+   that matter. */
+const HIS_GOALS = [
+  { id: 'm', title: 'Mile goal', type: 'Endurance', target: '4:59', metric: 'Mile time', date: ahead(15) },
+  { id: 'k', title: '5K goal', type: 'Endurance', target: '18:59', metric: '5K time', date: ahead(15) },
+];
+const hisLog = running(4);
+const first = mileageGap(HIS_GOALS, hisLog, { weeklyMileage: 17, minWeeklyMileage: 2, maxWeeklyMileage: 40 });
+check('it speaks the first time', Boolean(first), `${first?.kind} → ${first?.target}`);
+const accepted = applyMileageRamp({ weeklyMileage: 17, minWeeklyMileage: 2, maxWeeklyMileage: 40 }, first);
+check('accepting raises the ceiling clear of the goal', accepted.maxWeeklyMileage >= first.needed,
+  `${accepted.minWeeklyMileage} / ${accepted.maxWeeklyMileage}`);
+check('and then it is SILENT — the thing it asked for has been done',
+  mileageGap(HIS_GOALS, hisLog, accepted) === null,
+  JSON.stringify(mileageGap(HIS_GOALS, hisLog, accepted)?.kind));
+
+console.log('\nBut it still speaks when the ramp genuinely cannot arrive');
+const soon = [{ id: 's', title: 'Mile goal', type: 'Endurance', target: '4:59', metric: 'Mile time', date: ahead(3) }];
+const rushed = mileageGap(soon, hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 50 });
+check('three weeks to find 45 miles a week does not arrive', Boolean(rushed), `${rushed?.kind} → ${rushed?.target}`);
+check('and it says so rather than pretending', rushed?.arrives === false);
+check('a ceiling below the goal still outranks everything',
+  mileageGap(HIS_GOALS, hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 30 })?.kind === 'ceiling');
+check('and a goal with room and time says nothing at all',
+  mileageGap([{ id: 'e', title: 'Easy 5K', type: 'Endurance', target: '30:00', metric: '5K time', date: ahead(30) }],
+    hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 50 }) === null);
+
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);

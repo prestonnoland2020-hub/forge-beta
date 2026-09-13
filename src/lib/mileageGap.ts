@@ -104,8 +104,31 @@ export function mileageGap(goals: CreatedGoal[], records: WorkoutRecord[], bound
 
      The step is measured from the BASE — what the plan will actually start
      from, which is the highest of logged running, stated mileage and the floor
-     — so it is always a real increase on what is already guaranteed. */
-  if (base > 0 && base < needed * ARRIVAL_SHARE) {
+     — so it is always a real increase on what is already guaranteed.
+
+     AND IT ASKS WHETHER THE RAMP ARRIVES, NOT WHETHER THE BASE IS LOW. The
+     test used to be "base is under 85% of what the goal needs", which is true
+     of every single week of a climb by construction — so the card could not be
+     satisfied. Preston raised his ceiling to 50 and built the ramp exactly as
+     asked; the card came straight back offering 22, and would have come back
+     at 25, and at 27, one step at a time until he had hand-cranked the floor
+     to 39. An alert you cannot turn off by doing what it says is not an alert,
+     it is furniture, and it teaches people to ignore the ones that matter.
+
+     The honest question is whether the plan is CONFIGURED TO CLIMB and whether
+     the climb lands in time. Once the athlete's floor sits on the ramp's first
+     week — which is exactly what accepting the ramp writes — the plan is
+     already going where it was told to go, and there is nothing left to ask
+     for. An athlete with no floor set is not on any ramp yet and still needs
+     telling; so does one whose ramp cannot reach the number before the date,
+     however the floor is set. */
+  const rampStart = Math.round(ramp.weeks[0]?.miles || 0);
+  const onTheRamp = floor > 0 && rampStart > 0 && floor >= rampStart;
+  /* There has to be a real shortfall before any of this is worth saying — an
+     athlete already running more than the goal needs is not short of
+     anything, whatever their floor is set to. */
+  const short = base < needed * ARRIVAL_SHARE;
+  if (base > 0 && short && (!arrival.arrives || !onTheRamp)) {
     const step = Math.max(Math.ceil(base * SAFE_STEP), base + 1);
     const target = ceiling ? Math.min(step, ceiling) : step;
     if (target <= floor || target <= base) return null;
