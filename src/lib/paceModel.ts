@@ -23,8 +23,10 @@
 
 import { equivalentSeconds, volumeForPace } from './goalFeasibility';
 import { isRaceEvidence } from './runQuality';
+import { RIEGEL as RIEGEL_EXPONENT } from './riegel';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
-import { effortKey } from './effortAudit';
+import { effortKey, CONFIRMED_PREFIX } from './effortAudit';
+import { fitnessCurve, predictFromCurve, type Effort } from './fitnessCurve';
 
 /* Canonical race durations the training paces are anchored to. These are the
    standard physiological anchors, not arbitrary distances: threshold is about
@@ -62,6 +64,10 @@ export type PaceModel = {
   threshold: number;
   interval: number;
   repetition: number;
+  /* The fade rate the paces were carried at, and whether it is the athlete's
+     own or the 1.06 population average. */
+  exponent: number;
+  fittedExponent: boolean;
 };
 
 type CardioRecord = { date: string; cardioSessions?: Array<Record<string, unknown>> };
@@ -70,6 +76,30 @@ type CardioRecord = { date: string; cardioSessions?: Array<Record<string, unknow
    An interval session logged as many lines is not one effort and cannot be
    carried to a race distance; runQuality decides what is a run at all, so
    this file cannot drift from the rest of the app. */
+export function continuousEfforts(records: CardioRecord[], sinceIso?: string, excluded: string[] = []): Effort[] {
+  const blocked = new Set(excluded);
+  const out: Effort[] = [];
+  for (const record of records || []) {
+    if (sinceIso && String(record.date) < sinceIso) continue;
+    for (const raw of record.cardioSessions || []) {
+      const session = raw as { activity?: string; prescription?: { legacyIntervals?: unknown[] } };
+      if (!/run/i.test(session.activity || '')) continue;
+      const intervals = session.prescription?.legacyIntervals;
+      if (Array.isArray(intervals) && intervals.length > 1) continue;
+      const miles = cardioMiles(raw as never);
+      const minutes = summarizeCardioDraft(raw as never).minutes;
+      if (miles < 0.75 || !minutes) continue;
+      const seconds = minutes * 60;
+      if (!isRaceEvidence(miles, seconds)) continue;
+      /* An effort the athlete has told Forge was not real cannot quietly come
+         back as the source of every training pace. */
+      if (blocked.has(effortKey({ date: record.date, miles, seconds }))) continue;
+      out.push({ date: record.date, miles, seconds });
+    }
+  }
+  return out;
+}
+
 export function hardestEffort(records: CardioRecord[], sinceIso?: string, excluded: string[] = []): PerformanceEvidence | null {
   const blocked = new Set(excluded);
   let best: (PerformanceEvidence & { mileEquivalent: number }) | null = null;
@@ -119,7 +149,7 @@ export const volumeShortfall = (weeklyMiles: number, secondsPerMile: number) => 
 };
 
 export const emptyPaceModel: PaceModel = {
-  source: 'none', supported: false, from: null,
+  source: 'none', supported: false, from: null, exponent: RIEGEL_EXPONENT, fittedExponent: false,
   easyFast: 0, easySlow: 0, marathon: 0, threshold: 0, interval: 0, repetition: 0,
 };
 
@@ -145,19 +175,41 @@ export function paceModel(
   if (!evidence) return emptyPaceModel;
 
   const source: PaceSource = recent ? 'recent-run' : older ? 'older-run' : 'goal';
+
+  /* THE SAME CURVE THE GOAL CARD USES, so the plan and the verdict cannot
+     disagree about the athlete. Paces used to be carried off the single
+     hardest run at a fixed 1.06; they are now read off the athlete's own
+     fitted distance-time curve, which is set by their best few efforts and
+     their own fade rate. With no logged running at all there is nothing to fit
+     and the goal is carried across as before — still labelled unsupported. */
+  const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
+  const curve = source === 'goal' ? null : fitnessCurve(continuousEfforts(records, undefined, excluded), today, confirmed);
+
   /* Measured against the effort's own pace, so the correction is about the gap
      between this athlete's speed and this athlete's base — not about the
      distance they happened to run that day. */
   const shortfall = volumeShortfall(weeklyMiles, evidence.seconds / evidence.miles);
-  const threshold = paceAt(evidence, THRESHOLD_MILES, shortfall);
+  const at = (miles: number) => {
+    const fromCurve = curve ? predictFromCurve(curve, miles, shortfall) : null;
+    return fromCurve ? fromCurve.seconds / miles : paceAt(evidence, miles, shortfall);
+  };
+  const threshold = at(THRESHOLD_MILES);
   return {
     source, supported: source !== 'goal', from: recent || older,
+    exponent: curve ? curve.exponent : RIEGEL_EXPONENT,
+    fittedExponent: Boolean(curve?.fitted),
     easyFast: threshold * EASY_MULTIPLE_FAST,
     easySlow: threshold * EASY_MULTIPLE_SLOW,
-    marathon: paceAt(evidence, MARATHON_MILES, shortfall),
+    /* AND MARATHON PACE STAYS A TRAINING PACE. Carried out to 26 miles on a
+       steepening curve, an athlete with a sharp mile and eight miles a week
+       gets a "marathon pace" slower than their easy run — which is a true
+       statement about racing a marathon they should not enter, and a useless
+       one to print on a workout. The ladder holds: marathon pace is never
+       slower than a shade inside easy. */
+    marathon: Math.min(at(MARATHON_MILES), threshold * EASY_MULTIPLE_FAST * 0.98),
     threshold,
-    interval: paceAt(evidence, INTERVAL_MILES, shortfall),
-    repetition: paceAt(evidence, REPETITION_MILES, shortfall) * 0.97,
+    interval: at(INTERVAL_MILES),
+    repetition: at(REPETITION_MILES) * 0.97,
   };
 }
 

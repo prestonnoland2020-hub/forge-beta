@@ -11,6 +11,7 @@ import { requestForgeCoach } from '../features/training/coachService';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
 import { localDayIso } from '../lib/time';
 import { goalFeasibility } from '../lib/goalFeasibility';
+import { raceDayOutlook } from '../lib/raceDay';
 
 type GoalEvidence = { date: string; value: number; label: string };
 type GoalCoachTurn = { question: string; answer: string; source: 'ai' | 'local' | 'limit' };
@@ -184,7 +185,13 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const shownProgress=recentProgress.length>=3?recentProgress:mergedProgress.slice(-6);
   const aiEvidenceKey=JSON.stringify(datedDemonstrated.map(item=>[item.date,Math.round(item.value)]));
   const aiEvidence=useMemo(()=>JSON.parse(aiEvidenceKey) as Array<[string,number]>,[aiEvidenceKey]);
-  const legacyPrediction=useMemo(()=>goal.type==='Endurance'&&expectedMiles?predictRaceFromLegacyMethod(records,expectedMiles):null,[goal.type,expectedMiles,records]);
+  /* THE ANSWERS THE ATHLETE GAVE COUNT HERE TOO. This call left `excluded`
+     off, so the verdict strip — which passes it — and the tiles underneath
+     were predicting from different evidence and printing two different times
+     for the same question on the same card: "you are worth about 23:26 today"
+     over a PROJECTED tile reading 24:02. */
+  const excludedEfforts=useMemo(()=>setup?.excludedEfforts||[],[setup]);
+  const legacyPrediction=useMemo(()=>goal.type==='Endurance'&&expectedMiles?predictRaceFromLegacyMethod(records,expectedMiles,excludedEfforts):null,[goal.type,expectedMiles,records,excludedEfforts]);
   useEffect(() => {
     if (goal.type !== 'Endurance' || !expectedMiles) {
       setAiEstimate(null); setAiEstimateError(''); return;
@@ -227,6 +234,15 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      goal that number is the wrong kind and the wrong unit — shown through the
      pace formatter it read "24:02:00 /mi". A pace goal takes no assessment. */
   const calculated = goal.type==='Endurance'?(paceGoal?0:aiEstimate?.seconds||0):(calculatedEvidence?.value || 0);
+  /* THE WIDTH OF THE NUMBER AND THE DAY IT IS FOR. The card printed a single
+     time with no range and made it stand for race day as well as for today —
+     two different questions with two different answers. legacyPrediction now
+     carries the band its own fit produced, and raceDayOutlook carries the
+     number forward to the goal date. */
+  const band = goal.type==='Endurance' && !paceGoal && legacyPrediction
+    ? { low: legacyPrediction.low, high: legacyPrediction.high } : null;
+  const outlook = goal.type==='Endurance' && !paceGoal && calculated
+    ? raceDayOutlook(calculated, roadmap.weeksRemaining) : null;
   /* WHY THE GAP FALLS BACK TO THE PROJECTION. An endurance goal only counts a
      run AT the goal distance as "current", so a card could read CURRENT: Not
      logged, GAP TO TARGET: —, and FORGE ASSESSMENT: On track all at once — the
@@ -281,7 +297,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const projectionRun=legacyPrediction?.source;
   const projectedSource=goal.type==='Endurance'
     ?(aiEstimate&&projectionRun
-      ?`From your fastest qualifying run — ${projectionRun.miles} mi in ${formatClock(projectionRun.seconds)} on ${formatDate(projectionRun.date)} — converted to ${goal.exercise||'this'} distance. It holds until you beat that effort, so a steady number means nothing faster has been logged yet. ${aiEstimate.confidence} confidence from ${legacyPrediction?.supportingRuns||0} qualifying run${(legacyPrediction?.supportingRuns||0)===1?'':'s'}${aiEstimate.reason?` · ${aiEstimate.reason}`:''}`
+      ?`${legacyPrediction?.reason || ''} Your best of those is ${projectionRun.miles} mi in ${formatClock(projectionRun.seconds)} on ${formatDate(projectionRun.date)}. The number holds until you beat that curve, so a steady figure means nothing faster has been logged yet. ${aiEstimate.confidence} confidence${aiEstimate.reason?` · ${aiEstimate.reason}`:''}`
       :aiEstimate?`Best qualifying effort in the last 180 days, converted to the goal distance · ${aiEstimate.confidence} confidence${aiEstimate.reason?` · ${aiEstimate.reason}`:''}`
       :aiEstimateLoading?'Reading your qualifying runs…'
       :aiEstimateError||(enduranceProjection?`Trend across ${shownProgress.length} logged efforts`:`No qualifying run yet — log a continuous effort within 80–125% of the goal distance and this fills in`))
@@ -324,9 +340,9 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     </div>}
     <section className="goal-stat-tiles">
       <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{currentEvidence?.date?formatDate(currentEvidence.date):'Best logged evidence'}</small></div>
-      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?(projectionRun?`From your ${projectionRun.miles} mi on ${formatDate(projectionRun.date)}`:'Best qualifying effort'):'At goal date'}</small></div>
+      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?(band?`${formatValue(band.low)}–${formatValue(band.high)}`:'Off your logged running'):'At goal date'}</small></div>
       <div className="gst"><span>TARGET</span><strong>{formatGoalTarget(goal.target,goal.metric,goal.unit)}</strong><small>{formatDate(goal.date)}</small></div>
-      <div className={`gst difference ${differenceStatus}`}><span>TO GO</span><strong>{differenceText}</strong><small>{projectedOnly?'Projected · ':''}{roadmap.weeksRemaining} weeks remaining</small></div>
+      <div className={`gst difference ${differenceStatus}`}><span>TO GO</span><strong>{differenceText.replace(/ to go$/, '')}</strong><small>{projectedOnly?'Projected · ':''}{roadmap.weeksRemaining} weeks left</small></div>
     </section>
     <details className="goal-sources-details"><summary>Where these numbers come from</summary>
       <div><span>CURRENT</span><p>{currentSource}{currentEvidence?.date ? ` · ${formatDate(currentEvidence.date)}` : ''}. The best performance your logged data demonstrates.</p></div>
@@ -336,7 +352,8 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     {(()=>{const statusOk=['Goal reached','On track','Progressing','AI assessed'].includes(trajectoryStatus);const projText=goal.type==='Endurance'?(calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText);return <section className="goal-assessment"><header><span>FORGE ASSESSMENT</span><b className={statusOk?'on-track':'behind'}>{trajectoryStatus}</b></header>
       <div className="ga-rows">
         <div><span>Where you are</span><b>{actualCurrent?`${currentText}${currentEvidence?.date?` · ${formatDate(currentEvidence.date)}`:''}`:projectedOnly&&projectionRun?`Nothing logged at this distance — projected from your ${projectionRun.miles} mi on ${formatDate(projectionRun.date)}`:currentText}</b></div>
-        <div><span>Tracking toward</span><b>{projText} by {formatDate(goal.date)}</b></div>
+        <div><span>Worth today</span><b>{projText}{band?` · ${formatValue(band.low)}–${formatValue(band.high)}`:''}</b></div>
+        {outlook?<div><span>On race day</span><b>{formatValue(outlook.best)}–{formatValue(outlook.likely)} by {formatDate(goal.date)}</b></div>:null}
         {strengthForecast?<div><span>Likely range</span><b>{formatValue(strengthForecast.low)}–{formatValue(strengthForecast.high)} · {strengthForecast.confidence.toLowerCase()} confidence</b></div>:null}
         <div><span>{projectedOnly?'Projected gap':'Gap to target'}</span><b>{differenceText}</b></div>
       </div>

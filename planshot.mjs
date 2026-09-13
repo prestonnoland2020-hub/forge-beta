@@ -56,7 +56,8 @@ async function shoot(name, theme, extra, route = '/plan') {
   /* The effort question opens over everything on a fresh profile — answer it
      so the shot is of the screen, not of the dialog. */
   const ask = page.locator('[aria-label="Confirm this effort"] .button').first();
-  if (await ask.count()) { await ask.click(); await page.waitForTimeout(600); }
+  await ask.click({ timeout: 1500 }).catch(() => {});
+  await page.waitForTimeout(400);
   writeFileSync(`/tmp/tour/${name}.png`, await page.screenshot({ fullPage: true }));
   return page;
 }
@@ -68,7 +69,10 @@ for (const theme of ['dark', 'light']) {
      to click through (.pv-block-toggle, .pv-block-row) no longer exists — the
      week is the screen now, and the rows expand in place. */
   const expandable = p1.locator('.pv-row-main:not([disabled])').first();
-  if (await expandable.count()) { await expandable.click(); await p1.waitForTimeout(400); }
+  /* Bounded, like every other optional tap: an unclickable row should cost a
+     second and a half, not Playwright's default thirty. */
+  await expandable.click({ timeout: 1500 }).catch(() => {});
+  await p1.waitForTimeout(400);
   writeFileSync(`/tmp/tour/plan-${theme}-open.png`, await p1.screenshot({ fullPage: true }));
   await p1.close();
   /* Today logged. */

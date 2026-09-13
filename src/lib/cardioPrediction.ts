@@ -2,11 +2,20 @@ import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider'
 import { continuousRunEfforts } from './cardioSession';
 import { localDayIso } from './time';
 import { isRaceEvidence, countsAsRunVolume } from './runQuality';
-import { equivalentSeconds as riegel, volumeForPace } from './riegel';
-import { trustedEfforts } from './effortAudit';
+import { volumeForPace } from './riegel';
+import { trustedEfforts, CONFIRMED_PREFIX } from './effortAudit';
+import { fitnessCurve, predictFromCurve } from './fitnessCurve';
 
 export type RacePrediction = {
   seconds: number;
+  /* THE HONEST WIDTH OF IT. "19:00" reads as a measurement; it is an estimate
+     off two or three runs, and a card that cannot say so invites an athlete to
+     plan around a precision that does not exist. */
+  low: number;
+  high: number;
+  /* The athlete's own fade rate, or 1.06 when their log cannot support one. */
+  exponent: number;
+  fittedExponent: boolean;
   confidence: 'low' | 'medium' | 'high';
   reason: string;
   supportingRuns: number;
@@ -16,6 +25,9 @@ export type RacePrediction = {
      is unfalsifiable on screen: it sits there unchanged for weeks and the
      athlete has no way to tell whether it is stale or simply un-beaten. */
   source?: { date: string; miles: number; seconds: number };
+  /* Every effort the level was blended from, best first — the answer to "which
+     run is this off?" when the answer is no longer a single run. */
+  sources?: Array<{ date: string; miles: number; seconds: number }>;
 };
 
 type Run = { date: string; miles: number; seconds: number };
@@ -123,37 +135,52 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      causes a wrong plan. */
   const qualifying = trustedEfforts(runs.filter(run => daysAgo(run.date) <= windowDays), excluded);
   if (!qualifying.length) return null;
-  const near = (run: Run) => Math.abs(Math.log(goalMiles / run.miles));
 
-  /* AND THE VOLUME BEHIND IT COUNTS. A 17:42 5K carried straight to a marathon
-     is a 2:37 marathon, and this predictor said so about an athlete running
-     thirteen miles a week — "On track" on his goal card, while the banner
-     beside it, which did apply the correction, said the volume was not there.
-     Going UP in distance is stretched by how far the athlete's running falls
-     short of what the pace is normally built on; going down needs no help. */
+  /* THE CURVE, NOT THE SINGLE BEST RUN. What used to happen here was a
+     tournament: score every effort by its Riegel-converted time with a penalty
+     for how far it had to be stretched, and let the winner be the answer. That
+     made one row load-bearing — Preston's fake 5.47-mile at 5:29/mi won it
+     outright and paced his whole block — and it had no way to say how sure it
+     was.
+
+     fitnessCurve fits the athlete's own ln(time) = level + exponent·ln(distance)
+     through the frontier of what they have actually run, with easy days and
+     records that stand implausibly clear of the rest weighted out of it. The
+     prediction is read off the curve, the range comes from the scatter around
+     it, and the exponent is theirs rather than the population's. */
+  const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
+  const curve = fitnessCurve(qualifying, today(), confirmed);
+  if (!curve) return null;
+
+  /* AND THE VOLUME BEHIND IT COUNTS, but only past the distances the athlete
+     has actually covered. A 17:42 5K carried straight to a marathon is a 2:37
+     marathon, and this predictor said so about an athlete running thirteen
+     miles a week. Inside their own range there is nothing to correct — the
+     runs happened. */
   const weeklyMiles = weeklyRunVolume(records);
-  const best = qualifying.reduce((winner, run) => {
-    const shortfall = volumeShortfallFor(run.seconds / run.miles, weeklyMiles);
-    const equivalentSeconds = riegel(run.seconds, run.miles, goalMiles, shortfall);
-    const score = equivalentSeconds * (1 + EXTRAPOLATION_PENALTY * near(run));
-    return !winner || score < winner.score ? { ...run, equivalentSeconds, score } : winner;
-  }, null as (Run & { equivalentSeconds: number; score: number }) | null)!;
-  /* Confidence is about the effort that actually won, not about how many were
-     considered: one time trial at the goal distance is worth more than five
-     easy runs near it. */
+  const provisional = predictFromCurve(curve, goalMiles, 0)!;
+  const shortfall = volumeShortfallFor(provisional.seconds / goalMiles, weeklyMiles);
+  const prediction = predictFromCurve(curve, goalMiles, shortfall)!;
+
+  const near = (run: Run) => Math.abs(Math.log(goalMiles / run.miles));
   const supporting = qualifying.filter(run => near(run) <= NEAR_ENOUGH).length;
   const recent = runs.filter(run => daysAgo(run.date) <= 28);
   const recentMiles = recent.reduce((sum, run) => sum + run.miles, 0);
   const recentRunDays = new Set(recent.map(run => run.date)).size;
-  const confidence: RacePrediction['confidence'] = near(best) > NEAR_ENOUGH ? 'low'
-    : supporting >= 3 ? 'high' : supporting >= 2 ? 'medium' : 'low';
+  const best = curve.sources[0];
+  const round2 = (value: number) => Math.round(value * 100) / 100;
   return {
-    seconds: Math.round(best.equivalentSeconds),
-    confidence,
-    reason: `Best single continuous effort in the last 180 days, carried to the goal distance (Riegel) and discounted for how far it had to be stretched. Interval repeats and untimed pieces are not efforts.`,
+    seconds: prediction.seconds,
+    low: prediction.low,
+    high: prediction.high,
+    exponent: Math.round(prediction.exponent * 1000) / 1000,
+    fittedExponent: curve.fitted,
+    confidence: prediction.confidence,
+    reason: `Fitted to your best ${curve.sources.length === 1 ? 'continuous effort' : `${curve.sources.length} continuous efforts`} in the last 180 days${curve.fitted ? `, carried at your own fade rate of ${curve.exponent.toFixed(2)} rather than the 1.06 average` : ' — not enough spread of distances yet to read your own fade rate, so the 1.06 average is used'}. Interval repeats and untimed pieces are not efforts.`,
     supportingRuns: supporting,
     recentRunMiles: Math.round(recentMiles * 10) / 10,
     recentRunDays,
-    source: { date: best.date, miles: Math.round(best.miles * 100) / 100, seconds: Math.round(best.seconds) },
+    source: { date: best.date, miles: round2(best.miles), seconds: Math.round(best.seconds) },
+    sources: curve.sources.map(item => ({ date: item.date, miles: round2(item.miles), seconds: Math.round(item.seconds) })),
   };
 }
