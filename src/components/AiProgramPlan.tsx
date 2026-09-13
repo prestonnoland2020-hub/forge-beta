@@ -343,7 +343,26 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         units: metric ? 'metric' : 'imperial',
         today: localDayIso(),
         goals: goals.map(goal => ({ type: goal.type, title: goal.title, exercise: goal.exercise, metric: goal.metric, target: goal.target, current: goal.current, deadline: goal.date })),
-        profile: { weeklyMileage: profile.weeklyMileage, minWeeklyMileage, maxWeeklyMileage, runningDays: profile.runningDays, longestRunMiles: profile.longestRunMiles, readiness: profile.readiness },
+        /* THE SAME ATHLETE THE RESOLVER SEES. These read profile.* alone, and
+           AdaptiveTrainingProvider's profile is loaded from a localStorage
+           preferences blob that onboarding never writes to — so runningDays
+           fell back to its hardcoded default of 3 for an athlete whose setup
+           says 7. The planner spent every rebuild designing for a three-day
+           runner: Preston raised his ceiling from 40 to 50 miles, regenerated,
+           and got a block that peaked at 26 with the note "as quickly as your
+           three-run-day schedule safely allow". Nothing he changed could move
+           it, because the number that was wrong was not one he had been shown.
+
+           The resolver a few hundred lines below has always preferred setup —
+           which is why the rendered week and the generated week disagreed
+           about the same athlete. One reading, in both places. */
+        profile: {
+          weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage,
+          minWeeklyMileage, maxWeeklyMileage,
+          runningDays: Number(setup?.runningDays) || profile.runningDays,
+          longestRunMiles: Number(setup?.longestRun) || profile.longestRunMiles,
+          readiness: profile.readiness,
+        },
         splitDays: splitDays.map((day, index) => ({ position: index + 1, name: day.name, type: day.dayType, muscles: day.muscles || [], exercises: day.exercises || [] })),
         /* Two distinct numbers, named so the model cannot conflate them: a
            calc max is an Epley estimate from any rep count, a real 1RM is an

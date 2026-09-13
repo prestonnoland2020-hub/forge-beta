@@ -121,7 +121,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppErrorBoundary><HashRouter>
       <AuthProvider>
-        <SyncStatusProvider><BillingProvider><AppearanceProvider><GoalsProvider><WorkoutHistoryProvider><CheckInProvider><AdaptiveTrainingProvider><ProfileSetupProvider><TrainingLibraryProvider><CoachingStrategyProvider><DailyRecommendationProvider><App /></DailyRecommendationProvider></CoachingStrategyProvider></TrainingLibraryProvider></ProfileSetupProvider></AdaptiveTrainingProvider></CheckInProvider></WorkoutHistoryProvider></GoalsProvider></AppearanceProvider></BillingProvider></SyncStatusProvider>
+        <SyncStatusProvider><BillingProvider><AppearanceProvider><GoalsProvider><WorkoutHistoryProvider><CheckInProvider><ProfileSetupProvider><AdaptiveTrainingProvider><TrainingLibraryProvider><CoachingStrategyProvider><DailyRecommendationProvider><App /></DailyRecommendationProvider></CoachingStrategyProvider></TrainingLibraryProvider></AdaptiveTrainingProvider></ProfileSetupProvider></CheckInProvider></WorkoutHistoryProvider></GoalsProvider></AppearanceProvider></BillingProvider></SyncStatusProvider>
       </AuthProvider>
     </HashRouter></AppErrorBoundary>
   </StrictMode>,

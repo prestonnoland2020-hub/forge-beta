@@ -3,6 +3,7 @@ import { deriveRecoveryState,type DailyHealthSnapshot,type RecoveryState } from 
 import { applyCheckIn } from '../../lib/readiness';
 import { useCheckIns } from './CheckInProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
+import { useProfileSetup } from '../profile/ProfileSetupProvider';
 import { cardioMiles,isRunningCardio,summarizeCardioDraft } from '../../lib/cardioSession';
 import { countsAsRunVolume } from '../../lib/runQuality';
 
@@ -28,7 +29,20 @@ export type AdaptiveProfile={weeklyMileage:number;longestRunMiles:number;running
    0 as "no bound", so nothing downstream collapses to zero miles.
 
    runningDays stays: it is a stated preference set during onboarding — what
-   the athlete intends to do — not a claim about what they have done. */
+   the athlete intends to do — not a claim about what they have done.
+
+   AND IT HAS TO COME FROM WHERE ONBOARDING ACTUALLY WROTE IT. That sentence
+   was true and the code did not honour it: these preferences load from a
+   localStorage blob that onboarding never writes to, while onboarding saves
+   runningDays into athlete settings. So the default below — three — was the
+   number every planner saw, for an athlete whose setup said seven.
+
+   It was not a cosmetic drift. The AI planner builds from this profile, and
+   the week resolver reads athlete settings, so the two designed for different
+   people: Preston raised his weekly ceiling from 40 to 50, regenerated, and
+   got a block peaking at 26 miles with the note "as quickly as your
+   three-run-day schedule safely allow". Nothing he could change would move it,
+   because the number that was wrong was not one he had been shown. */
 const preferences={weeklyMileage:0,longestRunMiles:0,runningDays:3,experience:'Recreational' as RunningExperience,soreness:2,injuryConstraint:false,environment:'Road' as Environment,heatAdjusted:true,easyHrMin:135,easyHrMax:150,thresholdHrMin:165,thresholdHrMax:178};
 const localDateIso=(value=new Date())=>`${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`;
 const today=localDateIso();
@@ -40,6 +54,7 @@ const Context=createContext<Value|null>(null);
 
 export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
   const {records}=useWorkoutHistory();
+  const {setup}=useProfileSetup();
   const [prefs,setPrefs]=useState<StoredPrefs>(()=>{try{return{...preferences,...JSON.parse(localStorage.getItem('forge-training-preferences')||'{}')}}catch{return preferences}});
   const [health,setHealth]=useState<DailyHealthSnapshot[]>(()=>{try{const saved=JSON.parse(localStorage.getItem('forge-health-snapshots')||'null');const wearable=Array.isArray(saved)?saved.filter(item=>item?.provider&&item.provider!=='Manual'&&item.provider!=='Unavailable'):[];return wearable.length?wearable:[unavailableHealth()]}catch{return[unavailableHealth()]}});
   const [history,setHistory]=useState<RunResult[]>(()=>{try{const saved=JSON.parse(localStorage.getItem('forge-run-history')||'null');return Array.isArray(saved)?saved:initialHistory}catch{return initialHistory}});
@@ -60,7 +75,12 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
      day of every athlete's life. */
   const {checkIns}=useCheckIns();
   const recovery=useMemo(()=>applyCheckIn(deriveRecoveryState(latest,health,strengthLoad,prefs.injuryConstraint),checkIns,localDateIso(new Date())),[latest,health,strengthLoad,prefs.injuryConstraint,checkIns]);
-  const profile=useMemo<AdaptiveProfile>(()=>{const cutoff=new Date();cutoff.setHours(0,0,0,0);cutoff.setDate(cutoff.getDate()-6);const cutoffIso=localDateIso(cutoff);const observedWeekly=loggedRunHistory.filter(run=>run.date>=cutoffIso&&run.date<=today).reduce((sum,run)=>sum+run.distanceMiles,0);const observedLongest=loggedRunHistory.reduce((longest,run)=>Math.max(longest,run.distanceMiles),0);return{...prefs,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):prefs.weeklyMileage,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):prefs.longestRunMiles,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected:latest.provider!=='Unavailable'}},[prefs,recovery,latest,loggedRunHistory]);
+  const profile=useMemo<AdaptiveProfile>(()=>{const cutoff=new Date();cutoff.setHours(0,0,0,0);cutoff.setDate(cutoff.getDate()-6);const cutoffIso=localDateIso(cutoff);const observedWeekly=loggedRunHistory.filter(run=>run.date>=cutoffIso&&run.date<=today).reduce((sum,run)=>sum+run.distanceMiles,0);const observedLongest=loggedRunHistory.reduce((longest,run)=>Math.max(longest,run.distanceMiles),0);/* Stated preferences come from onboarding, which saves them to athlete
+       settings — not to the preferences blob these defaults load from. Observed
+       running still overrides the stated figures where there is any, because
+       what someone has actually run outranks what they once typed. */
+    const stated={runningDays:Number(setup?.runningDays)||prefs.runningDays,statedWeekly:Number(setup?.weeklyMileage)||prefs.weeklyMileage,statedLongest:Number(setup?.longestRun)||prefs.longestRunMiles};
+    return{...prefs,runningDays:stated.runningDays,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):stated.statedWeekly,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):stated.statedLongest,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected:latest.provider!=='Unavailable'}},[prefs,recovery,latest,loggedRunHistory,setup]);
   useEffect(()=>localStorage.setItem('forge-training-preferences',JSON.stringify(prefs)),[prefs]);
   useEffect(()=>localStorage.setItem('forge-run-history',JSON.stringify(history)),[history]);
   const syncWearableHealth=(snapshots:DailyHealthSnapshot[])=>{const verified=snapshots.filter(item=>item.provider!=='Unavailable');const next=verified.length?verified.sort((a,b)=>a.date.localeCompare(b.date)):[unavailableHealth()];setHealth(next);if(verified.length)localStorage.setItem('forge-health-snapshots',JSON.stringify(next));else localStorage.removeItem('forge-health-snapshots')};
