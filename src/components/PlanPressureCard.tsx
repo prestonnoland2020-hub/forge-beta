@@ -49,7 +49,7 @@ export function PlanPressureCard({ onReshape }: { onReshape: (instruction: strin
     const expected = perWeek * 2;
     const missedSessions = expected ? Math.max(0, expected - trained) : 0;
 
-    const goalsBehind = goalFeasibility(goals, records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0 })
+    const goalsBehind = goalFeasibility(goals, records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] })
       .some(verdict => verdict.verdict !== 'reachable');
 
     /* HOW THE HARD SESSIONS ACTUALLY WENT. Prescribed against run, for every
@@ -67,7 +67,7 @@ export function PlanPressureCard({ onReshape }: { onReshape: (instruction: strin
       recentLongestRun: longestContinuousRun(records),
       goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
       goalMiles: runGoal?.miles,
-      paces: paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records, 10)),
+      paces: paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records, 10), setup?.excludedEfforts || []),
     }, localDayIso()));
 
     return planPressure({ checkIns, backedOffLifts, missedSessions, goalsBehind, sessions });

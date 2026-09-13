@@ -112,7 +112,7 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
         recentLongestRun: longestContinuousRun(records),
         goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
         goalMiles: runGoal?.miles,
-        paces: paceModel(records, runGoal, today, weekly),
+        paces: paceModel(records, runGoal, today, weekly, setup?.excludedEfforts || []),
       }, today);
     const byRecord = new Map(judged.map(verdict => [verdict.recordId, verdict]));
     return (recordId: string) => byRecord.get(recordId) || null;

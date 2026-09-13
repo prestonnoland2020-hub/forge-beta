@@ -103,7 +103,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const [aiEstimateError,setAiEstimateError]=useState('');
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
-  const verdict = useMemo(() => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0 })[0], [goal, records, setup?.maxWeeklyMileage]);
+  const verdict = useMemo(() => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] })[0], [goal, records, setup?.maxWeeklyMileage]);
 
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const goalText = `${goal.exercise || ''} ${goal.title}`.toLowerCase();

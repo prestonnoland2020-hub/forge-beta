@@ -151,7 +151,7 @@ const recentWeeklyMiles = (records: WorkoutRecord[]) => {
   return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
 };
 
-function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibility | null {
+function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: string[] = []): Feasibility | null {
   const distance = milesOf(goal);
   if (!distance) return null;
   const targetSeconds = clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss'));
@@ -173,7 +173,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
      predictRaceFromLegacyMethod is now the only answer to "what are you worth
      at this distance", and it weighs every effort with a penalty for how far
      it had to be stretched rather than accepting only near-distance ones. */
-  const prediction = predictRaceFromLegacyMethod(records, distance);
+  const prediction = predictRaceFromLegacyMethod(records, distance, excluded);
   const best = prediction?.source || null;
 
   if (!best) {
@@ -265,10 +265,11 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
     say: `On the numbers this holds: ${Math.round(best)} today, ${Math.round(target)} needed, ${Math.round(weeks)} weeks to find ${Math.round(needed * 100)}%.` };
 }
 
-export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], cap?: { maxWeeklyMileage?: number }): Feasibility[] {
+export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], cap?: { maxWeeklyMileage?: number; excludedEfforts?: string[] }): Feasibility[] {
   const ceiling = Number(cap?.maxWeeklyMileage) || 0;
+  const excluded = cap?.excludedEfforts || [];
   return goals.flatMap(goal => {
-    const result = goal.type === 'Endurance' ? raceFeasibility(goal, records)
+    const result = goal.type === 'Endurance' ? raceFeasibility(goal, records, excluded)
       : goal.type === 'Strength' ? liftFeasibility(goal, records)
       : null;
     if (!result) return [];

@@ -24,6 +24,7 @@
 import { equivalentSeconds, volumeForPace } from './goalFeasibility';
 import { isRaceEvidence } from './runQuality';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
+import { effortKey } from './effortAudit';
 
 /* Canonical race durations the training paces are anchored to. These are the
    standard physiological anchors, not arbitrary distances: threshold is about
@@ -69,7 +70,8 @@ type CardioRecord = { date: string; cardioSessions?: Array<Record<string, unknow
    An interval session logged as many lines is not one effort and cannot be
    carried to a race distance; runQuality decides what is a run at all, so
    this file cannot drift from the rest of the app. */
-export function hardestEffort(records: CardioRecord[], sinceIso?: string): PerformanceEvidence | null {
+export function hardestEffort(records: CardioRecord[], sinceIso?: string, excluded: string[] = []): PerformanceEvidence | null {
+  const blocked = new Set(excluded);
   let best: (PerformanceEvidence & { mileEquivalent: number }) | null = null;
   for (const record of records || []) {
     if (sinceIso && String(record.date) < sinceIso) continue;
@@ -83,6 +85,9 @@ export function hardestEffort(records: CardioRecord[], sinceIso?: string): Perfo
       if (miles < 0.75 || !minutes) continue;
       const seconds = minutes * 60;
       if (!isRaceEvidence(miles, seconds)) continue;
+      /* An effort the athlete has told Forge was not real cannot quietly come
+         back as the source of every training pace. */
+      if (blocked.has(effortKey({ date: record.date, miles, seconds }))) continue;
       const mileEquivalent = equivalentSeconds(seconds, miles, 1);
       if (!best || mileEquivalent < best.mileEquivalent) best = { miles, seconds, date: record.date, mileEquivalent };
     }
@@ -125,13 +130,14 @@ export function paceModel(
   goal?: { paceSecondsPerMile: number; miles: number } | null,
   today = new Date().toISOString().slice(0, 10),
   weeklyMiles = 0,
+  excluded: string[] = [],
 ): PaceModel {
   const cutoff = new Date(`${today}T12:00:00`);
   cutoff.setDate(cutoff.getDate() - RECENT_EVIDENCE_DAYS);
   const sinceIso = cutoff.toISOString().slice(0, 10);
 
-  const recent = hardestEffort(records, sinceIso);
-  const older = recent ? null : hardestEffort(records);
+  const recent = hardestEffort(records, sinceIso, excluded);
+  const older = recent ? null : hardestEffort(records, undefined, excluded);
   const evidence = recent || older
     || (goal && goal.paceSecondsPerMile > 0
       ? { miles: goal.miles, seconds: goal.paceSecondsPerMile * goal.miles, date: today }

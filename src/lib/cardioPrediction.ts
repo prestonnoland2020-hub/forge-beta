@@ -3,6 +3,7 @@ import { continuousRunEfforts } from './cardioSession';
 import { localDayIso } from './time';
 import { isRaceEvidence, countsAsRunVolume } from './runQuality';
 import { equivalentSeconds as riegel, volumeForPace } from './riegel';
+import { trustedEfforts } from './effortAudit';
 
 export type RacePrediction = {
   seconds: number;
@@ -73,7 +74,7 @@ const volumeShortfallFor = (secondsPerMile: number, weeklyMiles: number) => {
   return Math.max(0, Math.min(1, 1 - weeklyMiles / needed));
 };
 
-export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number): RacePrediction | null {
+export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number, excluded: string[] = []): RacePrediction | null {
   if (!goalMiles) return null;
   /* ONE PIECE, RUN IN ONE GO — never a session's totals.
 
@@ -116,7 +117,11 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      that grows with the size of the extrapolation. A near-distance effort
      wins on a tie, a genuinely better effort at a distant one can still win,
      and an easy jog never beats a time trial just for being the right length. */
-  const qualifying = runs.filter(run => daysAgo(run.date) <= windowDays);
+  /* MINUS WHAT THE ATHLETE HAS SAID IS NOT REAL, and minus what contradicts
+     itself. One bad record does not cause a small error here — every goal
+     verdict and every training pace is built on the single best effort, so it
+     causes a wrong plan. */
+  const qualifying = trustedEfforts(runs.filter(run => daysAgo(run.date) <= windowDays), excluded);
   if (!qualifying.length) return null;
   const near = (run: Run) => Math.abs(Math.log(goalMiles / run.miles));
 

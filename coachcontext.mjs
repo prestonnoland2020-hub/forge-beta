@@ -33,8 +33,22 @@ const WEIGHTS = [
   [32, 195], [36, 190], [39, 193], [43, 193], [50, 190], [57, 192], [64, 187], [71, 192],
   [78, 190], [85, 189.5], [92, 188], [99, 191], [106, 189.5], [113, 191], [120, 189.7],
 ];
-/* Running, by week: 11.2, 12.3, 13.9 and then a part-finished week. */
-const RUNS = [[22, 5.6], [20, 5.6], [15, 6.2], [13, 6.1], [8, 7.0], [6, 6.9], [1, 4.0]];
+/* Running, by week: 11.2, 12.3, 13.9 and then a part-finished week.
+
+   ANCHORED TO THE WEEK, NOT TO TODAY. These were plain day-offsets, so which
+   calendar week a run landed in depended on what weekday it happened to be
+   when the suite ran — the test passed all day on a Saturday and failed on the
+   Sunday, reporting 5.6 → 11.8 → 13.1 instead of 11.2 → 12.3 → 13.9, with
+   nothing about the code having changed. weeklyRunning buckets from Monday, so
+   the fixture places its runs from Monday too. */
+const mondayOffset = () => { const d = new Date(); return (d.getDay() + 6) % 7; };
+const inWeek = (weeksAgo, dayOfWeek) => mondayOffset() + weeksAgo * 7 - dayOfWeek;
+const RUNS = [
+  [inWeek(3, 1), 5.6], [inWeek(3, 3), 5.6],
+  [inWeek(2, 1), 6.2], [inWeek(2, 3), 6.1],
+  [inWeek(1, 1), 7.0], [inWeek(1, 3), 6.9],
+  [inWeek(0, 0), 4.0],
+];
 
 const byDate = new Map();
 const record = date => {

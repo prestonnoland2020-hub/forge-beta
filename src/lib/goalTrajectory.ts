@@ -224,11 +224,11 @@ function strengthTrajectory(goal: CreatedGoal, records: WorkoutRecord[]): GoalTr
   };
 }
 
-function raceTrajectory(goal: CreatedGoal, records: WorkoutRecord[]): GoalTrajectory {
+function raceTrajectory(goal: CreatedGoal, records: WorkoutRecord[], excluded: string[] = []): GoalTrajectory {
   const miles = raceMiles(goal);
   const targetSeconds = clockToSeconds(String(goal.target || '')) || Number(goal.target) * 60 || 0;
   const weeks = weeksUntil(goal.date);
-  const model = miles ? predictRaceFromLegacyMethod(records, miles) : null;
+  const model = miles ? predictRaceFromLegacyMethod(records, miles, excluded) : null;
   const base = {
     goal: goal.title, type: goal.type,
     target: targetSeconds ? clock(targetSeconds) : String(goal.target || ''),
@@ -380,10 +380,10 @@ export function longestContinuousRun(records: WorkoutRecord[]): number {
   return round1(longest);
 }
 
-export function goalTrajectories(goals: CreatedGoal[], records: WorkoutRecord[]): GoalTrajectory[] {
+export function goalTrajectories(goals: CreatedGoal[], records: WorkoutRecord[], excluded: string[] = []): GoalTrajectory[] {
   return goals.map(goal => isBodyGoal(goal)
     ? bodyTrajectory(goal, records)
     : goal.type === 'Endurance' || raceMiles(goal) !== null
-      ? raceTrajectory(goal, records)
+      ? raceTrajectory(goal, records, excluded)
       : strengthTrajectory(goal, records));
 }

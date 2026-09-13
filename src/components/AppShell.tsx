@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { MileageStartupCheck } from './MileageGate';
+import { EffortCheck } from './EffortCheck';
 import { CoachCheckIn } from './CoachCheckIn';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
@@ -265,6 +266,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     {/* ONE CONVERSATION AT A TIME. The check-in asks about the body and is
         answered in seconds; the mileage question asks about the program and
         deserves a clear head. The body goes first. */}
+    {/* The effort question goes first: the mileage gate and the check-in are
+        both computed from the evidence it is asking about. */}
+    <EffortCheck />
     <CoachCheckIn />
     <MileageStartupCheck />
     {coachOpen && coachExpanded && <button className="coach-bubble-backdrop" type="button" aria-label="Close expanded Forge coach" onClick={() => setCoachExpanded(false)} />}

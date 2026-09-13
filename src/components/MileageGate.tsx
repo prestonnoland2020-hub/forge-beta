@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { useEffortCheckPending } from './EffortCheck';
 import { mileageGap, applyMileageGap, applyMileageRamp, type MileageGap } from '../lib/mileageGap';
 import type { CreatedGoal } from './GoalBuilder';
 import { useCheckIns } from '../features/training/CheckInProvider';
@@ -165,12 +166,13 @@ const rememberAsked = (fingerprint: string) => {
    deciding whether to show itself, so the two can never stack — one place
    decides, rather than each component guessing about the other. */
 export function useMileageCheckPending(): boolean {
+  const effortAsking = useEffortCheckPending();
   const { goals } = useGoals();
   const { records } = useWorkoutHistory();
   const { setup, loading } = useProfileSetup();
   const gap = useMemo(() => mileageGap(goals, records, setup), [goals, records, setup]);
   const [seenBefore] = useState(() => (gap ? alreadyAsked(fingerprintOf(gap)) : false));
-  return Boolean(!loading && setup?.completedAt && goals.length > 0 && gap && !seenBefore);
+  return Boolean(!effortAsking && !loading && setup?.completedAt && goals.length > 0 && gap && !seenBefore);
 }
 
 export function MileageStartupCheck() {
@@ -179,6 +181,7 @@ export function MileageStartupCheck() {
   const { checkIns } = useCheckIns();
   const { setup, saveSetup, loading } = useProfileSetup();
   const [closed, setClosed] = useState(false);
+  const effortPending = useEffortCheckPending();
   const metric = setup?.units === 'Metric';
   const unit = metric ? 'km' : 'mi';
   const show = (miles: number) => Math.round(metric ? miles * 1.609344 : miles);
@@ -201,7 +204,7 @@ export function MileageStartupCheck() {
      Priority goes to the rarer message. The check-in recurs on its own and
      loses nothing by waiting a day; this one is keyed to a specific gap and
      goes quiet again the moment it is answered. */
-  const ready = !loading && Boolean(setup?.completedAt) && goals.length > 0;
+  const ready = !effortPending && !loading && Boolean(setup?.completedAt) && goals.length > 0;
   const fingerprint = gap ? fingerprintOf(gap) : '';
   /* Read once, on mount. Reading it every render would hide the dialog the
      instant the answer is written, before the athlete's press has been acted

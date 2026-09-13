@@ -34,7 +34,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      ones it cannot judge and an index into a shortened list points at the
      wrong goal. */
   const verdicts = useMemo(
-    () => goals.map(goal => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0 })[0]),
+    () => goals.map(goal => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] })[0]),
     [goals, records, setup?.maxWeeklyMileage],
   );
   const [open, setOpen] = useState(false);

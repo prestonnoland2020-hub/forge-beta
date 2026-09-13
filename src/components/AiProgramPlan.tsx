@@ -245,7 +245,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      falls short of what that pace is normally built on — so a fast mile off
      eight miles a week does not become a marathon pace nobody can hold. */
   const paces = useMemo(
-    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records, 10)),
+    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records, 10), setup?.excludedEfforts || []),
     [records, runGoal],
   );
   /* Which set each number came from. A calc max of 380 is a conclusion drawn

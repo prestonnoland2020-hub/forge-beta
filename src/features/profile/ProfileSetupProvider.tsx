@@ -13,6 +13,13 @@ export type AthleteSetup = {
   strengthExperience:'Beginner'|'Intermediate'|'Advanced'|'Competitive'; runningExperience:'New'|'Recreational'|'Experienced'|'Competitive';
   trainingDays:number; runningDays:number; weeklyMileage:number; longestRun:number; strengthSessionMinutes:number; cardioSessionMinutes:number; combinedSessionMinutes:number;
   minWeeklyMileage?:number; maxWeeklyMileage?:number;
+  /* Efforts the athlete has told Forge were not real — a bad GPS lock, an
+     activity logged as the wrong sport, a time typed wrong. They still count
+     as mileage, because the athlete did cover the ground; they just stop being
+     allowed to predict a race or set a training pace. Kept in settings rather
+     than on the device, because it is a statement about the athlete's history
+     and it has to follow them to their phone. */
+  excludedEfforts?:string[];
   scheduleStyle:'Rolling cycle'|'Weekly schedule'; equipment:string; environment:'Road'|'Track'|'Trail'|'Treadmill'|'Mixed';
   splitSource:'Recommended'|'Custom'; splitDays:Array<{name:string;type:'Strength'|'Cardio'|'Mixed'|'Rest';muscles?:string[];exercises?:string[]}>;
   injuryConstraint:boolean; limitationNotes:string; wearableIntent:'Connect now'|'Connect later'|'Manual only';
