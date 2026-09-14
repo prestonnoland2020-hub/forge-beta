@@ -30,6 +30,9 @@ import {
 } from '../features/training/aiPlanService';
 import { liftPositions, rungFor } from '../lib/liftProgression';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
+import { progressionLevels, levelNote, zoneOfPrescription } from '../lib/progressionLevels';
+import { sessionVerdicts } from '../features/training/sessionVerdicts';
+import { QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../lib/qualitySession';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
 /* The prose `detail` stays for the coach and the roadmap; `lifts` and `run`
@@ -262,6 +265,39 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      than the render before and threw, and the error boundary ate the whole
      Plan tab. "Something went wrong. Forge hit a snag on this screen." */
   const easyPace = useMemo(() => loggedEasyPace(records as never[], paces, localDayIso()), [records, paces]);
+
+  /* WHERE THE ATHLETE IS ON EACH LADDER — the plan's memory of how the last
+     hard sessions went. Derived, never stored: sessionVerdicts reads what was
+     prescribed against what was logged, and progressionLevels turns that into
+     a dose.
+
+     THE VERDICTS ARE READ AT THE BASE RAMP, NOT AT THESE LEVELS, and that is
+     deliberate: sessionVerdicts resolves the week to know what was asked for,
+     so feeding the levels back into it would make the levels depend on
+     themselves. What a verdict is mostly about — did the work come in at the
+     pace it was written at — does not depend on the dose at all. The one thing
+     that does is whether a session counts as SHORT, which is judged against
+     the base rep count rather than the one on the card. Worth knowing; not
+     worth a fixed point. */
+  const levels = useMemo(() => {
+    const split = (setup?.splitDays || []).map(day => ({ name: day.name, dayType: day.type }));
+    const judged = sessionVerdicts(records, stored, split, {
+      runningDays: Number(setup?.runningDays) || 0,
+      minWeeklyMileage: Number(setup?.minWeeklyMileage) || 0,
+      maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0,
+      weeklyMileage: Number(setup?.weeklyMileage) || 0,
+      goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
+      goalMiles: runGoal?.miles,
+      paces,
+    }, localDayIso()).map(verdict => ({ date: verdict.date, outcome: verdict.outcome, text: verdict.text }));
+    return progressionLevels({
+      weeklyMiles: medianWeeklyMiles(records),
+      qualityShare: QUALITY_MAX_SHARE,
+      warmupMiles: WARMUP_COOLDOWN_MILES,
+      thresholdPaceSecondsPerMile: paces.threshold,
+      provenQuality: judged.length > 0,
+    }, judged);
+  }, [records, stored, setup, runGoal, paces]);
   const easyWarning = easyTooFast(paces, easyPace)
     ? `Your easy runs are averaging ${clockText(easyPace)}/mi. Easy is ${clockText(paces.easyFast)}–${clockText(paces.easySlow)}/mi — running them harder than that costs the hard days, which is where the progress is.`
     : '';
@@ -553,7 +589,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored), liftingMaxWeek: waveSlot(waveIndexOf(stored, index)).isMax, weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces, levels: levels.levels}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored), liftingMaxWeek: waveSlot(waveIndexOf(stored, index)).isMax, weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),
@@ -572,6 +608,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     runningPeakWeek: ['Race', 'Taper', 'Specific'].includes(normalizePhase(week.phase)),
     weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal,
   })[0];
+  /* Which ladder this week's hard run is on, so the card explains the dose it
+     is actually showing rather than all four. */
+  const hardZone = zoneOfPrescription(weekPlan.sessions.find(session => session.run?.kind && /hard|threshold|interval|rep|race/i.test(session.run.kind))?.run?.text
+    || week.quality);
 
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
      of them, not whichever goal happened to be created first — falling back to
@@ -667,6 +707,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {weekIndex === currentIndex && <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />}
     {collision ? <p className="pv-collision">{collision.say}</p> : null}
     {easyWarning ? <p className="pv-collision">{easyWarning}</p> : null}
+    {/* WHY THE HARD RUN IS THE SIZE IT IS. A dose that moved because a session
+        went well is a dose the athlete will trust; a number that changed
+        silently is the one they screenshot and ask about. */}
+    {hardZone ? <p className="pv-collision">{levelNote(hardZone, levels.levels, levels.moves)}</p> : null}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />

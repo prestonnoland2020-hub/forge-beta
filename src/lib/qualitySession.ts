@@ -24,6 +24,7 @@
 import type { PaceModel } from './paceModel';
 import { normalizePhase, type TrainingPhase } from './trainingPhase';
 import { eventProfileFor, sessionKindFor, type SessionKind } from './eventProfile';
+import { thresholdWorkMinutes, intervalWorkMetres, repetitionWorkMetres, INTERVAL_REPS, REPETITION_REPS, type Levels } from './progressionLevels';
 
 /* Kept as aliases so nothing that already speaks these names has to change. */
 export type QualityPhase = TrainingPhase | 'Test';
@@ -44,6 +45,11 @@ export type QualityContext = {
   /* Goal distance in miles. Picks the event profile, which decides the whole
      shape of the session — not just how long the reps are. */
   goalMiles?: number;
+  /* WHERE THE ATHLETE IS ON EACH LADDER, so the dose is what their last
+     sessions earned rather than a function of the week number. Absent — a
+     block generated before levels existed, or an athlete with no judged
+     sessions — the sizing falls back to the old week-indexed ramp. */
+  levels?: Levels;
   /* The most of the week this session may be. Defaults to the usual third;
      an athlete who runs twice a week has a bigger share available because
      there are fewer runs to spread it over. */
@@ -97,6 +103,36 @@ export const clockText = (seconds: number) => {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 };
 
+/* HOW LONG THE REST IS, WRITTEN THE WAY A COACH SAYS IT.
+
+   Every hard session on the card named a pace and left the recovery to the
+   athlete's imagination — "6 × 1 min brisk, easy between" and "5 × 1200 m @
+   5:08/rep" with nothing after it. The recovery is not a detail; it is what
+   decides which system a session trains. Twelve hundreds with ninety seconds
+   are VO2max work and the same reps with four minutes are repetitions, and an
+   athlete guessing between them is running a different session from the one
+   Forge judged them on the following week. */
+const restText = (seconds: number) => {
+  const value = Math.max(15, seconds);
+  /* Under two minutes a rest is counted in seconds on a watch, so it is
+     rounded to fifteen; past that nobody times a jog recovery to the second,
+     and a card reading "2:05" invites a precision the session does not have. */
+  if (value < 120) return `${Math.round(value / 15) * 15} s`;
+  const rounded = Math.round(value / 30) * 30;
+  return rounded % 60 === 0 ? `${rounded / 60} min` : clockText(rounded);
+};
+
+/* VO2max recovery is roughly the length of the repeat — long enough to run the
+   next one at pace, short enough that oxygen uptake never comes back down,
+   which is the entire point of the session. Held between a minute and four so
+   a short rep does not get a token twenty seconds and a long one does not turn
+   the session into a rest day. */
+export const intervalRest = (repSeconds: number) => Math.round(clamp(repSeconds, 60, 240));
+/* Repetition work is the opposite: the dose is movement quality, so the rest
+   is whatever it takes to run the next one as fast, which is two to three
+   times the repeat. */
+export const repetitionRest = (repSeconds: number) => Math.round(clamp(repSeconds * 2.5, 90, 300));
+
 /* Rep distance walks up as the block goes on: short and sharp early is a way
    to get hurt before the aerobic work is done.
 
@@ -129,8 +165,12 @@ const repDistanceFor = (weekIndex: number, goalMiles = 3.107) => {
 
 /* How long a threshold effort runs, growing through the block and capped by
    what the week can actually hold. */
-export function thresholdMinutes(weekIndex: number, weeklyMiles: number, paceSecondsPerMile: number, maxShare = QUALITY_MAX_SHARE): number {
-  const wanted = clamp(12 + weekIndex * 1.5, 12, 30);
+/* THE OLD RAMP, kept for blocks with no level history behind them. It opens at
+   twelve minutes for everybody — a 5:19 miler and a twelve-minute miler get
+   the same first session — and grows by the calendar rather than by how any of
+   it went. progressionLevels replaces it wherever there is anything to read. */
+export function thresholdMinutes(weekIndex: number, weeklyMiles: number, paceSecondsPerMile: number, maxShare = QUALITY_MAX_SHARE, level?: number): number {
+  const wanted = level ? thresholdWorkMinutes(level) : clamp(12 + weekIndex * 1.5, 12, 30);
   if (!paceSecondsPerMile || !weeklyMiles) return Math.round(wanted);
   const budgetMiles = Math.max(0, weeklyMiles * maxShare - WARMUP_COOLDOWN_MILES);
   const budgetMinutes = (budgetMiles * paceSecondsPerMile) / 60;
@@ -145,7 +185,7 @@ export function qualityKindFor(phase: QualityPhase, weekIndex: number): QualityK
 }
 
 export function qualitySession(context: QualityContext): QualitySession {
-  const { phase, weekIndex, goalPaceSecondsPerMile: goalPace, weeklyMiles, readiness, hasBaseline = true, goalMiles = 3.107, paces, maxShare } = context;
+  const { phase, weekIndex, goalPaceSecondsPerMile: goalPace, weeklyMiles, readiness, hasBaseline = true, goalMiles = 3.107, paces, maxShare, levels } = context;
   const share = maxShare && maxShare > 0 ? maxShare : QUALITY_MAX_SHARE;
   if (!goalPace) return { kind: 'none', text: 'No goal-driven cardio', miles: 0 };
   if (!hasBaseline) return { kind: 'baseline', text: 'Establish a comfortable running baseline', miles: 0 };
@@ -198,18 +238,26 @@ export function qualitySession(context: QualityContext): QualitySession {
     return { kind, text: `Goal effort assessment${goalMiles ? ` over ${goalMiles < 2 ? goalMiles.toFixed(1) : goalMiles.toFixed(goalMiles % 1 ? 1 : 0)} mi` : ''}`, miles: round1(goalMiles + warmup) };
   }
   if (kind === 'strides') {
-    return { kind, text: '4–6 × 20 s strides at goal effort, full recovery', miles: round1(Math.min(3, weeklyMiles * share)) };
+    return { kind, text: '4–6 × 20 s strides at goal effort · walk 60 s between', miles: round1(Math.min(3, weeklyMiles * share)) };
   }
   if (kind === 'fartlek') {
     /* The two-mile floor was written for a normal week and kept for a deload,
        where it became forty percent of a five-mile week — a "stop while fresh"
        session that was the largest run of the week. The share cap wins. */
     const miles = Math.min(4, Math.max(2, weeklyMiles * 0.22), weeklyMiles * share || Infinity);
-    return { kind, text: 'Short fartlek — 6 × 1 min brisk, easy between. Stop while fresh', miles: round1(miles) };
+    /* AND A DELOAD SESSION STILL GETS A NUMBER. "Brisk" was the only pace on
+       the whole card that was a word rather than a figure, which meant the one
+       week the athlete is meant to hold back was the one week Forge told them
+       nothing about how hard to go. A minute is an interval-length piece, so
+       it is run at interval pace, and the float between it is a jog of the
+       same length rather than "easy". */
+    const brisk = intervalPace || thresholdPace;
+    const at = brisk ? ` @ ${clockText(brisk)}/mi` : '';
+    return { kind, text: `Short fartlek — 6 × 1 min${at} · 1 min easy jog between. Stop while fresh`, miles: round1(miles) };
   }
 
   if (kind === 'threshold') {
-    const minutes = Math.max(8, thresholdMinutes(weekIndex, weeklyMiles, thresholdPace, share) - (soften ? 5 : 0));
+    const minutes = Math.max(8, thresholdMinutes(weekIndex, weeklyMiles, thresholdPace, share, levels?.threshold) - (soften ? 5 : 0));
     const paceText = `${clockText(thresholdPace)}/mi`;
     /* Past twenty minutes the effort is broken into cruise intervals — the
        physiology is the same and it is far likelier to be run at the right
@@ -254,14 +302,21 @@ export function qualitySession(context: QualityContext): QualitySession {
      marathoner does not, and the event profiles never ask for them. */
   if (kind === 'reps') {
     const distance = clamp(snapToTrack(goalMiles * 1609.344 * 0.2), 150, 600);
-    const reps = Math.max(4, (soften ? 6 : 8) - (distance > 400 ? 2 : 0));
+    /* The rep DISTANCE is the event's; how many of them is the athlete's
+       level, because the total metres of fast running is the dose. */
+    const earned = levels ? clamp(Math.round(repetitionWorkMetres(levels.repetition) / distance), REPETITION_REPS.min, REPETITION_REPS.max) : 0;
+    const reps = Math.max(4, (earned || (soften ? 6 : 8)) - (soften ? 2 : 0) - (!earned && distance > 400 ? 2 : 0));
     const seconds = Math.ceil(repPace / 1609.344 * distance);
     const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
-    return { kind, text: `${reps} × ${distance} m @ ${clockText(seconds)}/rep · full recovery`, miles: round1(Math.min(miles, weeklyMiles * share || miles)) };
+    return { kind, text: `${reps} × ${distance} m @ ${clockText(seconds)}/rep · full recovery (~${restText(repetitionRest(seconds))})`, miles: round1(Math.min(miles, weeklyMiles * share || miles)) };
   }
 
   const distance = repDistanceFor(weekIndex, goalMiles);
-  const baseReps = distance <= 400 ? 8 : distance <= 800 ? 6 : distance <= 1200 ? 5 : distance <= 2400 ? 4 : 3;
+  /* VO2 work is the same way round: the rep length is physiological and comes
+     off the event, the NUMBER of them is the dose and comes off the ladder. */
+  const baseReps = levels
+    ? clamp(Math.round(intervalWorkMetres(levels.interval) / distance), INTERVAL_REPS.min, INTERVAL_REPS.max)
+    : distance <= 400 ? 8 : distance <= 800 ? 6 : distance <= 1200 ? 5 : distance <= 2400 ? 4 : 3;
   const reps = Math.max(3, baseReps - (soften ? 2 : 0));
   /* Rounded UP, always. To the nearest second a 1200 m rep can land a shade
      under the intended pace, and "never faster than prescribed" is a rule about
@@ -270,7 +325,7 @@ export function qualitySession(context: QualityContext): QualitySession {
   const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
   return {
     kind: 'intervals',
-    text: `${reps} × ${distance >= 1600 ? `${round1(distance / 1609.344)} mi` : `${distance} m`} @ ${clockText(repSeconds)}/rep`,
+    text: `${reps} × ${distance >= 1600 ? `${round1(distance / 1609.344)} mi` : `${distance} m`} @ ${clockText(repSeconds)}/rep · ${restText(intervalRest(repSeconds))} jog between`,
     miles: round1(Math.min(miles, weeklyMiles * share || miles)),
   };
 }
