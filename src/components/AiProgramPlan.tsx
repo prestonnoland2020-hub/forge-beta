@@ -32,6 +32,7 @@ import { liftPositions, rungFor } from '../lib/liftProgression';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
 import { progressionLevels, levelNote, zoneOfPrescription } from '../lib/progressionLevels';
 import { sessionVerdicts } from '../features/training/sessionVerdicts';
+import { workoutEfforts } from '../lib/workoutEvidence';
 import { QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../lib/qualitySession';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -247,9 +248,41 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      hardest recent continuous run, corrected for how far their weekly running
      falls short of what that pace is normally built on — so a fast mile off
      eight miles a week does not become a marathon pace nobody can hold. */
-  const paces = useMemo(
+  const basePaces = useMemo(
     () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || []),
-    [records, runGoal],
+    [records, runGoal, setup?.excludedEfforts],
+  );
+
+  /* EVERY HARD SESSION IN THE BLOCK, JUDGED — and it is read ONCE, here,
+     because three different things downstream need it: the ladder the plan
+     prescribes off, the training paces, and the projections. */
+  const judged = useMemo(() => {
+    const split = (setup?.splitDays || []).map(day => ({ name: day.name, dayType: day.type }));
+    return sessionVerdicts(records, stored, split, {
+      runningDays: Number(setup?.runningDays) || 0,
+      minWeeklyMileage: Number(setup?.minWeeklyMileage) || 0,
+      maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0,
+      weeklyMileage: Number(setup?.weeklyMileage) || 0,
+      goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
+      goalMiles: runGoal?.miles,
+      paces: basePaces,
+    }, localDayIso());
+  }, [records, stored, setup, runGoal, basePaces]);
+
+  /* AND THE SESSIONS THE ATHLETE COMPLETED ARE EVIDENCE ABOUT THEM, not only
+     the races they ran. See workoutEvidence: a judged session becomes a dated
+     effort on the same curve, so training that goes in moves the paces instead
+     of the paces only ever decaying between races.
+
+     IT IS ONE REFINEMENT PASS, NOT A FIXED POINT, and the order is deliberate.
+     basePaces is built from races alone and is used only to decide whether a
+     logged run was an attempt at the session at all (the easy-pace floor in
+     sessionVerdicts). The paces everything else reads are then rebuilt with
+     the workouts included. Feeding these back round would let a session help
+     decide whether it was a session. */
+  const paces = useMemo(
+    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || [], workoutEfforts(judged)),
+    [records, runGoal, setup?.excludedEfforts, judged],
   );
   /* AND THE MOST COMMON ERROR IN SELF-COACHED TRAINING, NAMED ONCE.
 
@@ -280,24 +313,15 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      the base rep count rather than the one on the card. Worth knowing; not
      worth a fixed point. */
   const levels = useMemo(() => {
-    const split = (setup?.splitDays || []).map(day => ({ name: day.name, dayType: day.type }));
-    const judged = sessionVerdicts(records, stored, split, {
-      runningDays: Number(setup?.runningDays) || 0,
-      minWeeklyMileage: Number(setup?.minWeeklyMileage) || 0,
-      maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0,
-      weeklyMileage: Number(setup?.weeklyMileage) || 0,
-      goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
-      goalMiles: runGoal?.miles,
-      paces,
-    }, localDayIso()).map(verdict => ({ date: verdict.date, outcome: verdict.outcome, text: verdict.text }));
+    const moves = judged.map(verdict => ({ date: verdict.date, outcome: verdict.outcome, text: verdict.text }));
     return progressionLevels({
       weeklyMiles: medianWeeklyMiles(records),
       qualityShare: QUALITY_MAX_SHARE,
       warmupMiles: WARMUP_COOLDOWN_MILES,
       thresholdPaceSecondsPerMile: paces.threshold,
-      provenQuality: judged.length > 0,
-    }, judged);
-  }, [records, stored, setup, runGoal, paces]);
+      provenQuality: moves.length > 0,
+    }, moves);
+  }, [records, judged, paces]);
   const easyWarning = easyTooFast(paces, easyPace)
     ? `Your easy runs are averaging ${clockText(easyPace)}/mi. Easy is ${clockText(paces.easyFast)}–${clockText(paces.easySlow)}/mi — running them harder than that costs the hard days, which is where the progress is.`
     : '';

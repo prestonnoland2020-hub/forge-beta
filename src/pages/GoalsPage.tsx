@@ -7,6 +7,7 @@ import { formatGoalTarget } from '../lib/time';
 import { competingRaces, goalFeasibility } from '../lib/goalFeasibility';
 import { enduranceTarget } from '../lib/qualitySession';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
+import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { MileageGate, MileageCheckOnGoal } from '../components/MileageGate';
 
@@ -27,6 +28,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { goals, saveGoal, deleteGoal, syncError } = useGoals();
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
+  const workouts = useWorkoutEvidence();
   const roadmaps = useMemo(() => buildGoalRoadmaps(goals), [goals]);
   const clash = useMemo(() => competingRaces(goals), [goals]);
   const built = useMemo(() => enduranceTarget(goals), [goals]);
@@ -34,8 +36,8 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      ones it cannot judge and an index into a shortened list points at the
      wrong goal. */
   const verdicts = useMemo(
-    () => goals.map(goal => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] })[0]),
-    [goals, records, setup?.maxWeeklyMileage],
+    () => goals.map(goal => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts })[0]),
+    [goals, records, setup?.maxWeeklyMileage, workouts],
   );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);

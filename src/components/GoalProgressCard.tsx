@@ -9,6 +9,7 @@ import { sameLift } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { requestForgeCoach } from '../features/training/coachService';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
+import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { localDayIso } from '../lib/time';
 import { goalFeasibility } from '../lib/goalFeasibility';
 import { raceDayOutlook } from '../lib/raceDay';
@@ -93,6 +94,10 @@ function CardioGoalChart({efforts,target,assessment,projection=0,goalDate,event,
 }
 
 export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap: GoalRoadmap }) {
+  /* THE SESSIONS HE COMPLETED, not only the races he ran. Without these the
+     projection on this card only ever decays between time trials, while the
+     athlete does the work that should be moving it. */
+  const workouts = useWorkoutEvidence();
   const coachKey=goalCoachStorageKey(goal);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -104,7 +109,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const [aiEstimateError,setAiEstimateError]=useState('');
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
-  const verdict = useMemo(() => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] })[0], [goal, records, setup?.maxWeeklyMileage]);
+  const verdict = useMemo(() => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts })[0], [goal, records, setup?.maxWeeklyMileage, workouts]);
 
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const goalText = `${goal.exercise || ''} ${goal.title}`.toLowerCase();
@@ -191,7 +196,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      for the same question on the same card: "you are worth about 23:26 today"
      over a PROJECTED tile reading 24:02. */
   const excludedEfforts=useMemo(()=>setup?.excludedEfforts||[],[setup]);
-  const legacyPrediction=useMemo(()=>goal.type==='Endurance'&&expectedMiles?predictRaceFromLegacyMethod(records,expectedMiles,excludedEfforts):null,[goal.type,expectedMiles,records,excludedEfforts]);
+  const legacyPrediction=useMemo(()=>goal.type==='Endurance'&&expectedMiles?predictRaceFromLegacyMethod(records,expectedMiles,excludedEfforts,workouts):null,[goal.type,expectedMiles,records,excludedEfforts,workouts]);
   useEffect(() => {
     if (goal.type !== 'Endurance' || !expectedMiles) {
       setAiEstimate(null); setAiEstimateError(''); return;

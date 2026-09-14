@@ -26,7 +26,7 @@ import { isRaceEvidence } from './runQuality';
 import { RIEGEL as RIEGEL_EXPONENT } from './riegel';
 import { cardioMiles, summarizeCardioDraft, continuousRunEfforts } from './cardioSession';
 import { effortKey, CONFIRMED_PREFIX } from './effortAudit';
-import { fitnessCurve, predictFromCurve, type Effort } from './fitnessCurve';
+import { fitnessCurve, predictFromCurve, type Effort, type Effort as CurveEffort } from './fitnessCurve';
 
 /* Canonical race durations the training paces are anchored to. These are the
    standard physiological anchors, not arbitrary distances: threshold is about
@@ -163,6 +163,11 @@ export function paceModel(
   today = new Date().toISOString().slice(0, 10),
   weeklyMiles = 0,
   excluded: string[] = [],
+  /* Judged sessions, already converted to dated efforts by workoutEvidence.
+     Training paces built only from races go stale between races; this is the
+     same fix as on the goal card and it has to be the same evidence, or the
+     plan and the prediction start disagreeing about the athlete again. */
+  workouts: CurveEffort[] = [],
 ): PaceModel {
   const cutoff = new Date(`${today}T12:00:00`);
   cutoff.setDate(cutoff.getDate() - RECENT_EVIDENCE_DAYS);
@@ -185,7 +190,7 @@ export function paceModel(
      their own fade rate. With no logged running at all there is nothing to fit
      and the goal is carried across as before — still labelled unsupported. */
   const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
-  const curve = source === 'goal' ? null : fitnessCurve(continuousEfforts(records, undefined, excluded), today, confirmed);
+  const curve = source === 'goal' ? null : fitnessCurve([...continuousEfforts(records, undefined, excluded), ...workouts], today, confirmed);
 
   /* Measured against the effort's own pace, so the correction is about the gap
      between this athlete's speed and this athlete's base — not about the

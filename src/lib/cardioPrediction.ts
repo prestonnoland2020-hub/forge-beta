@@ -5,7 +5,7 @@ import { isRaceEvidence, countsAsRunVolume } from './runQuality';
 import { volumeForPace } from './riegel';
 import { weeklyMilesFrom, type DatedMiles } from './runVolume';
 import { trustedEfforts, CONFIRMED_PREFIX } from './effortAudit';
-import { fitnessCurve, predictFromCurve } from './fitnessCurve';
+import { fitnessCurve, predictFromCurve, type Effort as CurveEffort } from './fitnessCurve';
 
 export type RacePrediction = {
   seconds: number;
@@ -92,7 +92,7 @@ const volumeShortfallFor = (secondsPerMile: number, weeklyMiles: number) => {
   return Math.max(0, Math.min(1, 1 - weeklyMiles / needed));
 };
 
-export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number, excluded: string[] = []): RacePrediction | null {
+export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number, excluded: string[] = [], workouts: CurveEffort[] = []): RacePrediction | null {
   if (!goalMiles) return null;
   /* ONE PIECE, RUN IN ONE GO — never a session's totals.
 
@@ -140,7 +140,14 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      verdict and every training pace is built on the single best effort, so it
      causes a wrong plan. */
   const qualifying = trustedEfforts(runs.filter(run => daysAgo(run.date) <= windowDays), excluded);
-  if (!qualifying.length) return null;
+  /* AND THE WORKOUTS COUNT TOO. An athlete who trains hard and races twice a
+     year had a projection that only ever decayed — see workoutEvidence for
+     what a judged session is worth as a continuous effort, and for why hitting
+     the pace on the card cannot inflate it. They are appended AFTER the trust
+     filter because they are not log rows: there is nothing for the athlete to
+     mark false, and effortAudit has nothing to ask about them. */
+  const evidence = [...qualifying, ...workouts.filter(run => daysAgo(run.date) <= windowDays)];
+  if (!evidence.length) return null;
 
   /* THE CURVE, NOT THE SINGLE BEST RUN. What used to happen here was a
      tournament: score every effort by its Riegel-converted time with a penalty
@@ -155,7 +162,7 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      prediction is read off the curve, the range comes from the scatter around
      it, and the exponent is theirs rather than the population's. */
   const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
-  const curve = fitnessCurve(qualifying, today(), confirmed);
+  const curve = fitnessCurve(evidence, today(), confirmed);
   if (!curve) return null;
 
   /* AND THE VOLUME BEHIND IT COUNTS, but only past the distances the athlete
@@ -169,7 +176,7 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   const prediction = predictFromCurve(curve, goalMiles, shortfall)!;
 
   const near = (run: Run) => Math.abs(Math.log(goalMiles / run.miles));
-  const supporting = qualifying.filter(run => near(run) <= NEAR_ENOUGH).length;
+  const supporting = evidence.filter(run => near(run) <= NEAR_ENOUGH).length;
   const recent = runs.filter(run => daysAgo(run.date) <= 28);
   const recentMiles = recent.reduce((sum, run) => sum + run.miles, 0);
   const recentRunDays = new Set(recent.map(run => run.date)).size;
