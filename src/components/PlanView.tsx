@@ -51,10 +51,15 @@ export function waveLabel(waveIndex: number): string {
 export function waveSentence(waveIndex: number): string {
   const slot = ((waveIndex % WAVE_LENGTH) + WAVE_LENGTH) % WAVE_LENGTH;
   const reps = WAVE_REPS[slot];
-  if (slot === WAVE_LENGTH - 1) return 'Max week — your goal lifts get a true single.';
-  if (slot === WAVE_LENGTH - 2) return 'Heavy doubles, and the running eases off before max week.';
-  if (slot === 0) return `Top sets of ${reps} — the lightest loads of the wave, the most reps.`;
-  return `Top sets of ${reps} — heavier than last week, fewer reps.`;
+  /* SAY IT IN A LINE. These were sentences — "the lightest loads of the wave,
+     the most reps", "and the running eases off before max week" — and they sat
+     under a heading that already says WEEK 1 and 8-REP WEEK. Three ways of
+     telling the athlete the same thing, and the one that costs the most
+     screen was the one repeating the other two. */
+  if (slot === WAVE_LENGTH - 1) return 'Max week — goal lifts get a true single.';
+  if (slot === WAVE_LENGTH - 2) return 'Heavy doubles. The running eases off.';
+  if (slot === 0) return `Top sets of ${reps} — lightest loads, most reps.`;
+  return `Top sets of ${reps} — heavier, fewer reps.`;
 }
 export const isMaxWeek = (waveIndex: number) => ((waveIndex % WAVE_LENGTH) + WAVE_LENGTH) % WAVE_LENGTH === WAVE_LENGTH - 1;
 /* The running deload lands on the 2-rep week — the lighter week before max. */
