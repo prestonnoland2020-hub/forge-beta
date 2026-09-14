@@ -1,0 +1,81 @@
+/* THE APP ON A DEVICE THAT IS NEITHER A PHONE NOR A DESKTOP.
+
+   Forge had two layouts and no third. Under 760px the calm phone treatment
+   caps the content at a 560px reading column and centres it; over 900px the
+   sidebar appears and the page opens out to 1280. Between those two numbers
+   sat every iPad in portrait — 744, 820, 834 — and the band belonged to
+   nobody: the shell had already dropped the sidebar at 900, the content's own
+   multi-column breakpoints had already collapsed to one column at 900, and
+   nothing put a ceiling on the column's width. So an iPad got the phone
+   layout stretched edge to edge: charts as thin ribbons eight hundred pixels
+   wide, a select the width of the screen, one card per row all the way down.
+
+   Preston screenshotted it. The fix is two rules, and they are opposite ones,
+   because the two problems are opposite.
+
+   IN THE BAND, LESS WIDTH. A stretched phone layout does not become a tablet
+   layout by having more pixels; it just gets worse. So the band gets the same
+   capped, centred column the phone gets, a little wider. That reads as a
+   deliberate choice rather than a broken one, which is what every well-made
+   iPad app does with a single-column screen.
+
+   ABOVE IT, MORE COLUMNS. Past 900 the sidebar is back and the page has 1280
+   to work with, and a stack of cards one-per-row wastes all of it — the same
+   thin-ribbon chart, just with a sidebar next to it. Pages that are genuinely
+   a LIST OF CARDS tile instead. Only those: pages with a tuned multi-column
+   layout of their own are left alone, because a grid inside a grid is how you
+   get a 200px column with a chart in it. */
+
+/* ── The band nobody owned ─────────────────────────────────────────────── */
+@media (min-width: 761px) and (max-width: 900px) {
+  /* Wider than the phone's 560 — a 744px iPad would otherwise show more gutter
+     than content — and far short of the 820 that made the charts ribbons. */
+  .app-main .page { width: min(100%, 680px); margin-inline: auto; }
+  /* The type scale is set in vw for phones, where 6vw of a 390px screen is
+     23px. At 820px the same expression is 49px, so every heading on the screen
+     arrived a third larger than the design and the page read as zoomed. Capped
+     to what it reaches at the top of the phone range. */
+  .page-intro h2 { font-size: 28px; }
+  .kpi-tile b { font-size: 24px; }
+}
+
+/* ── And above it, columns ─────────────────────────────────────────────── */
+@media (min-width: 901px) {
+  /* 380px is the floor a chart card still reads at; auto-fill rather than a
+     fixed count so 1024, 1180 and 1440 each get the number they can hold
+     instead of the number one of them was measured at. align-items:start so a
+     tall card does not stretch the short one beside it. */
+  .insights-classic { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); align-items: start; }
+  /* The season strip is eight small tiles. Two-up inside half the page is a
+     column of pairs, so it spans instead — and at four across it is two tidy
+     rows of four at every width. auto-fit was tried and gives whatever the
+     viewport happens to afford: five and then a lone sixth, with the floating
+     coach button sitting on it. A count that divides eight is worth more here
+     than one that fills the row to the pixel. */
+  .insights-classic > .kpi-grid { grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* THE PILL SAT ON THE TITLE. A fixed "Forge updated · tap to refresh" centred
+   at the top of the viewport lands exactly on the screen name in the sticky
+   top bar — on a phone the bar is short enough to miss, on anything wider it
+   does not. It belongs under the chrome it is announcing. */
+.update-ready-pill { top: calc(var(--topbar-h, 88px) + 10px + env(safe-area-inset-top)); }
+
+/* AND THE COACH BUTTON STOPPED SITTING ON THINGS.
+
+   The floating "Ask Forge" launcher was pinned bottom-LEFT, which is the one
+   corner of this app that is never empty. On a phone it landed on the label of
+   whatever card was at the bottom of the screen — Preston's screenshot has it
+   over "LATEST WEEK". On a desktop it landed on the sidebar's own profile row.
+   Bottom-right is where a floating action button goes in every app anyone has
+   used, and here it is also the only corner with nothing permanent in it: the
+   sidebar is on the left, the bottom nav is full width but shorter than the
+   button's offset, and the page's own right gutter is empty.
+
+   The panel is anchored and scaled from the same corner, or it would open off
+   the right edge and animate from the wrong side. */
+.coach-bubble-shell { left: auto; right: 18px; }
+.coach-bubble-panel { left: auto; right: 0; transform-origin: bottom right; }
+@media (max-width: 900px) {
+  .coach-bubble-shell { left: auto; right: 12px; }
+}

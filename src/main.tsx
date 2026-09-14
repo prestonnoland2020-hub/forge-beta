@@ -75,6 +75,10 @@ import './forge-system.css';
 import './plan-simple.css';
 import './header.css';
 import './partners.css';
+/* Last of all: the size the screen actually is. Everything above is written
+   phone-first with a desktop counterpart, and the band between them — every
+   iPad in portrait — belonged to neither. This owns it, so it has to win. */
+import './device-fit.css';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.
