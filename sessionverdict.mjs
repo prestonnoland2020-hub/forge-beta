@@ -38,8 +38,12 @@ for (const goalMiles of EVENTS) {
 check(`every hard session is machine-readable (${parsed}/${generated})`, parsed === generated, unparsed.slice(0, 2).join(' | '));
 check('and the soft ones are correctly left unjudged',
   [null, '', 'No goal-driven cardio', 'Easy only — the hard run moves to when you have recovered',
-   'Short fartlek — 6 × 1 min brisk, easy between. Stop while fresh',
-   '4–6 × 20 s strides at goal effort, full recovery',
+   /* Both of these now carry a pace and a recovery, and both must STILL be
+      left unjudged: a fartlek has no prescribed repeat to measure against and
+      strides are not a workout with a target. See sessionrest.mjs — the risk
+      of writing a more specific card is that the parser starts reading one. */
+   'Short fartlek — 6 × 1 min @ 5:43/mi · 1 min easy jog between. Stop while fresh',
+   '4–6 × 20 s strides at goal effort · walk 60 s between',
    'Easy — your max attempt is this week and owns it'].every(text => parsePrescription(text) === null));
 
 console.log('\nThe numbers come back out the way they went in');
@@ -51,7 +55,7 @@ check('a broken threshold run', tempo.kind === 'threshold' && tempo.reps === 3 &
 check('and a continuous one', parsePrescription('20 min continuous @ 7:23/mi · threshold')?.reps === 1);
 check('race-pace miles', parsePrescription('3 × 1.5 mi @ 7:00/mi · race pace · 3 min jog between')?.kind === 'racepace');
 check('and race-pace metres', parsePrescription('3 × 400 m @ 1:24/rep · race pace')?.kind === 'racepace');
-check('repetition work is its own kind', parsePrescription('8 × 300 m @ 1:03/rep · full recovery')?.kind === 'reps');
+check('repetition work is its own kind', parsePrescription('8 × 300 m @ 1:03/rep · full recovery (~2:30)')?.kind === 'reps');
 
 console.log('\nThe warm-up is not the session');
 const logged = (rows) => workEfforts(rows);

@@ -103,6 +103,36 @@ export const clockText = (seconds: number) => {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 };
 
+/* HOW LONG THE REST IS, WRITTEN THE WAY A COACH SAYS IT.
+
+   Every hard session on the card named a pace and left the recovery to the
+   athlete's imagination — "6 × 1 min brisk, easy between" and "5 × 1200 m @
+   5:08/rep" with nothing after it. The recovery is not a detail; it is what
+   decides which system a session trains. Twelve hundreds with ninety seconds
+   are VO2max work and the same reps with four minutes are repetitions, and an
+   athlete guessing between them is running a different session from the one
+   Forge judged them on the following week. */
+const restText = (seconds: number) => {
+  const value = Math.max(15, seconds);
+  /* Under two minutes a rest is counted in seconds on a watch, so it is
+     rounded to fifteen; past that nobody times a jog recovery to the second,
+     and a card reading "2:05" invites a precision the session does not have. */
+  if (value < 120) return `${Math.round(value / 15) * 15} s`;
+  const rounded = Math.round(value / 30) * 30;
+  return rounded % 60 === 0 ? `${rounded / 60} min` : clockText(rounded);
+};
+
+/* VO2max recovery is roughly the length of the repeat — long enough to run the
+   next one at pace, short enough that oxygen uptake never comes back down,
+   which is the entire point of the session. Held between a minute and four so
+   a short rep does not get a token twenty seconds and a long one does not turn
+   the session into a rest day. */
+export const intervalRest = (repSeconds: number) => Math.round(clamp(repSeconds, 60, 240));
+/* Repetition work is the opposite: the dose is movement quality, so the rest
+   is whatever it takes to run the next one as fast, which is two to three
+   times the repeat. */
+export const repetitionRest = (repSeconds: number) => Math.round(clamp(repSeconds * 2.5, 90, 300));
+
 /* Rep distance walks up as the block goes on: short and sharp early is a way
    to get hurt before the aerobic work is done.
 
@@ -208,14 +238,22 @@ export function qualitySession(context: QualityContext): QualitySession {
     return { kind, text: `Goal effort assessment${goalMiles ? ` over ${goalMiles < 2 ? goalMiles.toFixed(1) : goalMiles.toFixed(goalMiles % 1 ? 1 : 0)} mi` : ''}`, miles: round1(goalMiles + warmup) };
   }
   if (kind === 'strides') {
-    return { kind, text: '4–6 × 20 s strides at goal effort, full recovery', miles: round1(Math.min(3, weeklyMiles * share)) };
+    return { kind, text: '4–6 × 20 s strides at goal effort · walk 60 s between', miles: round1(Math.min(3, weeklyMiles * share)) };
   }
   if (kind === 'fartlek') {
     /* The two-mile floor was written for a normal week and kept for a deload,
        where it became forty percent of a five-mile week — a "stop while fresh"
        session that was the largest run of the week. The share cap wins. */
     const miles = Math.min(4, Math.max(2, weeklyMiles * 0.22), weeklyMiles * share || Infinity);
-    return { kind, text: 'Short fartlek — 6 × 1 min brisk, easy between. Stop while fresh', miles: round1(miles) };
+    /* AND A DELOAD SESSION STILL GETS A NUMBER. "Brisk" was the only pace on
+       the whole card that was a word rather than a figure, which meant the one
+       week the athlete is meant to hold back was the one week Forge told them
+       nothing about how hard to go. A minute is an interval-length piece, so
+       it is run at interval pace, and the float between it is a jog of the
+       same length rather than "easy". */
+    const brisk = intervalPace || thresholdPace;
+    const at = brisk ? ` @ ${clockText(brisk)}/mi` : '';
+    return { kind, text: `Short fartlek — 6 × 1 min${at} · 1 min easy jog between. Stop while fresh`, miles: round1(miles) };
   }
 
   if (kind === 'threshold') {
@@ -270,7 +308,7 @@ export function qualitySession(context: QualityContext): QualitySession {
     const reps = Math.max(4, (earned || (soften ? 6 : 8)) - (soften ? 2 : 0) - (!earned && distance > 400 ? 2 : 0));
     const seconds = Math.ceil(repPace / 1609.344 * distance);
     const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
-    return { kind, text: `${reps} × ${distance} m @ ${clockText(seconds)}/rep · full recovery`, miles: round1(Math.min(miles, weeklyMiles * share || miles)) };
+    return { kind, text: `${reps} × ${distance} m @ ${clockText(seconds)}/rep · full recovery (~${restText(repetitionRest(seconds))})`, miles: round1(Math.min(miles, weeklyMiles * share || miles)) };
   }
 
   const distance = repDistanceFor(weekIndex, goalMiles);
@@ -287,7 +325,7 @@ export function qualitySession(context: QualityContext): QualitySession {
   const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
   return {
     kind: 'intervals',
-    text: `${reps} × ${distance >= 1600 ? `${round1(distance / 1609.344)} mi` : `${distance} m`} @ ${clockText(repSeconds)}/rep`,
+    text: `${reps} × ${distance >= 1600 ? `${round1(distance / 1609.344)} mi` : `${distance} m`} @ ${clockText(repSeconds)}/rep · ${restText(intervalRest(repSeconds))} jog between`,
     miles: round1(Math.min(miles, weeklyMiles * share || miles)),
   };
 }
