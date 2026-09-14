@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { isDemoMode } from '../../lib/env';
 import { useAuth } from '../auth/AuthProvider';
 import { loadAthleteSettings, saveAthleteSettings, reportSettingsSyncTo } from './settingsSync';
+import { freshestSetup } from './setupFreshness';
 import { useSyncStatus } from '../sync/SyncStatusProvider';
 
 export type AthleteSetup = {
@@ -35,6 +36,12 @@ const Context=createContext<Value|null>(null);
 
 type ProfileRow={username:string|null;display_name:string|null;birth_date:string|null;height_cm:number|null;starting_weight:number|null;current_weight:number|null;unit_system:'imperial'|'metric';experience_level:'beginner'|'intermediate'|'advanced'|'competitive';primary_goal:'strength'|'muscle'|'endurance'|'general_fitness'|'weight_change';equipment:string[]|null;preferred_training_days:number[]|null;onboarding_completed:boolean;updated_at:string};
 const readStored=(key:string)=>{try{return normalizeSetup(JSON.parse(localStorage.getItem(key)||'null'))}catch{return null}};
+/* WHEN THIS DEVICE LAST WROTE ITS CACHE, kept beside the cache rather than
+   inside it so the setup shape does not have to carry a sync field. Without it
+   a cache of unknown age outranked the server for ever — see setupFreshness. */
+const stampKey=(id:string)=>`forge-athlete-setup-saved-at:${id}`;
+const readStamp=(id:string)=>{try{return localStorage.getItem(stampKey(id))}catch{return null}};
+const writeStamp=(id:string)=>{try{localStorage.setItem(stampKey(id),new Date().toISOString())}catch{/* full */}};
 const sameAthlete=(saved:AthleteSetup|null,profile:ProfileRow,userName:string)=>{const a=saved?.displayName.trim().toLowerCase();const b=(profile.display_name||userName).trim().toLowerCase();return Boolean(a&&b&&(a===b||a.split(' ')[0]===b.split(' ')[0]))};
 const focusFromProfile=(value:ProfileRow['primary_goal']):AthleteSetup['primaryFocus']=>value==='strength'||value==='muscle'?'Strength':value==='endurance'?'Endurance':value==='weight_change'?'Body composition':'Hybrid';
 const experienceFromProfile=(value:ProfileRow['experience_level']):AthleteSetup['strengthExperience']=>`${value[0].toUpperCase()}${value.slice(1)}` as AthleteSetup['strengthExperience'];
@@ -51,14 +58,19 @@ export function ProfileSetupProvider({children}:{children:ReactNode}){
   const [setup,setSetup]=useState<AthleteSetup|null>(null);
   const [loadedUserId,setLoadedUserId]=useState<string|null>(null);
   const loading=Boolean(user)&&loadedUserId!==user?.id;
-  const saveSetup=(next:AthleteSetup)=>{if(user)localStorage.setItem(storageKey(user.id),JSON.stringify(next));saveAthleteSettings({setup:next});setSetup(next)};
-  const clearSetup=()=>{if(user)localStorage.removeItem(storageKey(user.id));setSetup(null)};
+  const saveSetup=(next:AthleteSetup)=>{if(user){localStorage.setItem(storageKey(user.id),JSON.stringify(next));writeStamp(user.id)}saveAthleteSettings({setup:next});setSetup(next)};
+  const clearSetup=()=>{if(user){localStorage.removeItem(storageKey(user.id));try{localStorage.removeItem(stampKey(user.id))}catch{/* full */}}setSetup(null)};
   useEffect(()=>{let active=true;if(!user){setSetup(null);setLoadedUserId(null);return()=>{active=false}}if(isDemoMode){const cached=readStored(storageKey(user.id))||readStored(legacyStorageKey);setSetup(cached?.completedAt?cached:null);setLoadedUserId(user.id);return()=>{active=false}}setSetup(null);setLoadedUserId(null);void Promise.resolve(supabase.from('profiles').select('username,display_name,birth_date,height_cm,starting_weight,current_weight,unit_system,experience_level,primary_goal,equipment,preferred_training_days,onboarding_completed,updated_at').eq('id',user.id).maybeSingle()).then(async({data,error})=>{if(!active)return;/* A MISSING PROFILE ROW IS NOT PROOF OF A NEW ATHLETE. maybeSingle answers
        null data with no error when RLS hides the row or the row was never
        written, and treating that as "not set up" threw athletes with a finished
        local profile back into onboarding. The cache is scoped to this user id,
        so it can only ever be this athlete's own setup. */
-      if(error||!data){const cached=readStored(storageKey(user.id));setSetup(cached?.completedAt?cached:null);setLoadedUserId(user.id);return}const profile=data as ProfileRow;const scoped=readStored(storageKey(user.id));const legacy=readStored(legacyStorageKey);const matchingLegacy=sameAthlete(legacy,profile,String(user.user_metadata?.full_name||''))?legacy:null;const remoteSettings=await loadAthleteSettings();const remoteSetup=normalizeSetup(remoteSettings?.setup);const local=scoped||remoteSetup||matchingLegacy;if(!scoped&&remoteSettings?.plan){try{localStorage.setItem('forge-training-plan-v1',JSON.stringify(remoteSettings.plan))}catch{/* full */}}if(!profile.onboarding_completed&&local?.completedAt){await supabase.from('profiles').update({onboarding_completed:true}).eq('id',user.id);profile.onboarding_completed=true}if(!active)return;const next=setupFromProfile(profile,local);if(next.completedAt){localStorage.setItem(storageKey(user.id),JSON.stringify(next));if(matchingLegacy)localStorage.removeItem(legacyStorageKey)}setSetup(next.completedAt?next:null);setLoadedUserId(user.id)}).catch(()=>{if(!active)return;const cached=readStored(storageKey(user.id));setSetup(cached?.completedAt?cached:null);setLoadedUserId(user.id)});return()=>{active=false}},[user]);
+      if(error||!data){const cached=readStored(storageKey(user.id));setSetup(cached?.completedAt?cached:null);setLoadedUserId(user.id);return}const profile=data as ProfileRow;const scoped=readStored(storageKey(user.id));const legacy=readStored(legacyStorageKey);const matchingLegacy=sameAthlete(legacy,profile,String(user.user_metadata?.full_name||''))?legacy:null;const remoteSettings=await loadAthleteSettings();const remoteSetup=normalizeSetup(remoteSettings?.setup);const choice=freshestSetup({hasLocal:Boolean(scoped),localSavedAt:readStamp(user.id),hasRemote:Boolean(remoteSetup),remoteUpdatedAt:remoteSettings?.updated_at,hasLegacy:Boolean(matchingLegacy)});
+      /* THE NEWER OF THE TWO, not "local always". A cache written before an
+         answer the athlete gave on another device — or before a correction
+         written straight to their account — used to outrank it permanently;
+         see setupFreshness for the case that exposed it. */
+      const local=choice==='local'?scoped:choice==='remote'?remoteSetup:choice==='legacy'?matchingLegacy:null;if(!scoped&&remoteSettings?.plan){try{localStorage.setItem('forge-training-plan-v1',JSON.stringify(remoteSettings.plan))}catch{/* full */}}if(!profile.onboarding_completed&&local?.completedAt){await supabase.from('profiles').update({onboarding_completed:true}).eq('id',user.id);profile.onboarding_completed=true}if(!active)return;const next=setupFromProfile(profile,local);if(next.completedAt){localStorage.setItem(storageKey(user.id),JSON.stringify(next));if(choice!=='local')writeStamp(user.id);if(matchingLegacy)localStorage.removeItem(legacyStorageKey)}setSetup(next.completedAt?next:null);setLoadedUserId(user.id)}).catch(()=>{if(!active)return;const cached=readStored(storageKey(user.id));setSetup(cached?.completedAt?cached:null);setLoadedUserId(user.id)});return()=>{active=false}},[user]);
   useEffect(()=>{if(isDemoMode||!user||loading)return;let active=true;void supabase.from('training_splits').select('name,training_split_days(position,name,muscle_groups,goal_lifts,cardio_types)').eq('owner_id',user.id).eq('is_active',true).maybeSingle().then(({data,error})=>{if(!active||error||!data)return;const rows=[...(data.training_split_days||[])].sort((a,b)=>a.position-b.position);setSetup(current=>{if(!current)return current;const days=rows.map((day,index)=>{const muscles=normalizeMuscleGroups(day.muscle_groups);const exercises=Array.isArray(day.goal_lifts)?day.goal_lifts:[];const cardio=Array.isArray(day.cardio_types)?day.cardio_types:[];const hasStrength=muscles.length>0||exercises.length>0;const hasCardio=cardio.length>0;const dayName=day.name||`Day ${index+1}`;const dayType=isRestDay({name:dayName})?'rest':hasStrength&&hasCardio?'mixed':hasStrength?'strength':hasCardio?'cardio':'rest';const strengthDuration=String(current.strengthSessionMinutes||60);return{name:dayName,weekday:['MON','TUE','WED','THU','FRI','SAT','SUN'][index%7],dayType,muscles,exercises,cardioPolicy:dayType==='rest'?'none':'forge',cardio:[],recoveryStyle:'Full rest',strengthDuration,maxDuration:dayType==='cardio'?String(current.cardioSessionMinutes||45):strengthDuration}});/* The synced athlete_settings.plan (durations, cardio policies, mileage
        bounds) is richer than this rebuild — only fill the local plan when the
        device has none, never clobber an existing or freshly hydrated copy. */
