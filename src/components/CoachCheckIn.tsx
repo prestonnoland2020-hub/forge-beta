@@ -101,7 +101,7 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
     const stored = readLocalAiPlan();
     if (!stored) return undefined;
     const runGoal = enduranceTarget(goals);
-    const weekly = medianWeeklyMiles(records, 10);
+    const weekly = medianWeeklyMiles(records);
     const judged = sessionVerdicts(records, stored,
       (setup?.splitDays || []).map(day => ({ name: day.name, dayType: day.type })), {
         runningDays: Number(setup?.runningDays) || 0,

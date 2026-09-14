@@ -70,7 +70,29 @@ check('four short watch runs totalling 3.38 mi against 3 mi typed is still one s
 check('a 4.86 mi entry against 8 mi of watch runs keeps them', !supersedes(4.86, 8.0));
 check('a class with no distance still goes on presence', supersedes(0, 0));
 check('the tolerance is stated once in the source', /COVERAGE_TOLERANCE_MILES = 0\.5/.test(src));
-check('coverage is compared per class per day', /watchMiles\.get\(mapped\.date\)\?\.get\(group\)/.test(src));
+
+/* AND THE HAND LOG WINS THE TIME IT COVERS, WHICH CATCHES WHAT MILES CANNOT.
+
+   August 9th sat in Preston's account twice: a typed "Base · 5.15 mi · 45.5
+   min" and a Strava row saying 7.91 mi in 45:00. One run, two distances — and
+   the miles test kept both, so the day counted 13 miles he never ran and the
+   phantom 5:41/mi became the fastest thing in his log. Distance is the
+   unreliable half of a GPS record; elapsed time is not. */
+const covers = (typedMiles, typedMinutes, watchedMiles, watchedMinutes) =>
+  ((watchedMiles === 0 && watchedMinutes === 0)
+    || (watchedMiles > 0 && typedMiles + TOLERANCE >= watchedMiles)
+    || (watchedMinutes > 0 && typedMinutes > 0 && typedMinutes + 2 >= watchedMinutes));
+check('a 45-minute typed run covers a 45-minute watch run of another distance',
+  covers(5.15, 45.5, 7.91, 45));
+check('the same run at a plausible distance is covered too', covers(5.15, 45.5, 5.2, 45));
+check('two genuinely different sessions are both kept',
+  !covers(3, 24, 8, 62), 'a 24-minute tempo does not swallow an hour-long run');
+check('a longer watch run on a day with a short typed one is kept',
+  !covers(4.86, 40, 8, 61));
+check('and a typed entry with no time still falls back to miles', covers(8, 0, 7.9, 58));
+check('the minute tolerance is stated once in the source', /COVERAGE_TOLERANCE_MINUTES = 2/.test(src));
+check('coverage is one function, not two rules in a condition', /export const coversWatch/.test(src));
+check('coverage is compared per class per day', /watchTotals\.get\(mapped\.date\)/.test(src) && /\.miles\.get\(group\)/.test(src));
 check('a combined entry credits its distance to each part', /classes\.forEach\(name => day\.miles\.set/.test(src));
 
 /* A LIFT IS NOT CARDIO. Strava calls a gym session WeightTraining, and

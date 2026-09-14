@@ -54,7 +54,7 @@ const clickText = re => p.evaluate(src => { const rx = new RegExp(src, 'i'); con
 check('the log shows the top sets it already has', await has('.top-set-card-stack'));
 check('nothing takes over the screen unprompted', !(await has('.top-set-sheet-backdrop')));
 
-check('add top set is offered', await clickText('Add top set'));
+check('add top set is offered', await clickText('Add top set|Log a top set'));
 await p.waitForTimeout(600);
 check('it takes over the screen', await has('.top-set-sheet-backdrop') && await has('.top-set-sheet'));
 check('it asks for the exercise by typing, not by dropdown', await has('.top-set-sheet-search input') && !(await has('.top-set-sheet select')));
@@ -140,9 +140,46 @@ await p.waitForTimeout(2600);
    shows them as logged lines — that is the whole point of the log knowing
    what today holds. */
 check('a fresh sheet on a logged day shows its saved lines', await p.evaluate(() => document.querySelectorAll('.top-set-entry.closed').length > 0));
-check('and still offers the sheet', await clickText('Add top set'));
+check('and still offers the sheet', await clickText('Add top set|Log a top set'));
 await p.waitForTimeout(600);
 check('which opens the same takeover', await has('.top-set-sheet-backdrop') && await has('.top-set-sheet-search input'));
+
+/* AND THE ROW STAYS OPEN WHILE YOU FILL IT IN.
+
+   A planned set has no id, so the row's identity was its own values — lift,
+   weight, reps. Choosing a weight changed the identity, the open-row list
+   stopped matching, and the editor collapsed mid-entry. Tapping a lift and
+   setting a number closed it every time, which meant a top set could not be
+   logged from the day screen at all. */
+{
+  const q = await b.newPage({ viewport: { width: 390, height: 950 } });
+  await q.addInitScript(([athlete, goalList]) => {
+    localStorage.setItem('forge-athlete-setup-v1:preview-user', JSON.stringify(athlete));
+    localStorage.setItem('forge-goals', JSON.stringify(goalList));
+    localStorage.setItem('forge-training-plan-v1', JSON.stringify({ name: 'Split', rhythm: 'weekly', minWeeklyMileage: 10, maxWeeklyMileage: 25, days: [
+      { name: 'Chest Day', weekday: 'MON', dayType: 'strength', muscles: ['Chest'], exercises: ['Bench Press'], cardioPolicy: 'none', cardio: [], recoveryStyle: 'Full rest', strengthDuration: '60', maxDuration: '60' },
+    ] }));
+  }, [setup, goals]);
+  await q.goto('http://localhost:4191/#/workout', { waitUntil: 'domcontentloaded' });
+  await q.waitForTimeout(2600);
+  const dials = () => q.evaluate(() => [...document.querySelectorAll('.dial-field')].map(el => el.querySelector('.dial-field-label')?.textContent));
+  const opened = await q.evaluate(() => {
+    const row = [...document.querySelectorAll('button')].find(el => /tap to log/i.test(el.textContent || ''));
+    if (!row) return false;
+    row.click();
+    return true;
+  });
+  check('a planned lift opens when it is tapped', opened);
+  await q.waitForTimeout(700);
+  check('and offers weight and reps', (await dials()).includes('Weight') && (await dials()).includes('Reps'), JSON.stringify(await dials()));
+  await setWeightDial(q, 'Weight', '245');
+  check('setting the weight does not close it', (await dials()).includes('Reps'), JSON.stringify(await dials()));
+  await setDial(q, 'Reps', '5');
+  check('nor does setting the reps', (await dials()).includes('Weight'), JSON.stringify(await dials()));
+  const shown = await q.evaluate(() => document.body.innerText.replace(/\n/g, ' '));
+  check('and the numbers it was given are on the screen', /245/.test(shown) && /5/.test(shown));
+  await q.close();
+}
 
 await b.close();
 console.log(fails ? `\n${fails} FAILURES` : '\nALL PASS');

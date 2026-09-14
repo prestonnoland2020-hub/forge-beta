@@ -1,4 +1,5 @@
 import { createContext,useContext,useEffect,useMemo,useState,type ReactNode } from 'react';
+import { weeklyMilesFrom } from '../../lib/runVolume';
 import { deriveRecoveryState,type DailyHealthSnapshot,type RecoveryState } from '../../lib/recoveryEngine';
 import { applyCheckIn } from '../../lib/readiness';
 import { useCheckIns } from './CheckInProvider';
@@ -75,7 +76,14 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
      day of every athlete's life. */
   const {checkIns}=useCheckIns();
   const recovery=useMemo(()=>applyCheckIn(deriveRecoveryState(latest,health,strengthLoad,prefs.injuryConstraint),checkIns,localDateIso(new Date())),[latest,health,strengthLoad,prefs.injuryConstraint,checkIns]);
-  const profile=useMemo<AdaptiveProfile>(()=>{const cutoff=new Date();cutoff.setHours(0,0,0,0);cutoff.setDate(cutoff.getDate()-6);const cutoffIso=localDateIso(cutoff);const observedWeekly=loggedRunHistory.filter(run=>run.date>=cutoffIso&&run.date<=today).reduce((sum,run)=>sum+run.distanceMiles,0);const observedLongest=loggedRunHistory.reduce((longest,run)=>Math.max(longest,run.distanceMiles),0);/* Stated preferences come from onboarding, which saves them to athlete
+  const profile=useMemo<AdaptiveProfile>(()=>{/* WHAT THE ATHLETE RUNS IN A WEEK, FROM THE ONE DEFINITION.
+
+     This summed the last SEVEN DAYS, which is not a weekly average, it is one
+     sample of it — so a deload week told the planner the athlete runs half
+     what they run, and it built the next block to match. Meanwhile the goal
+     card was taking a median of eight weeks and the race predictor a 28-day
+     mean, and the athlete read all three on the same screen. See runVolume. */
+    const observedWeekly=weeklyMilesFrom(loggedRunHistory.map(run=>({date:run.date,miles:run.distanceMiles})),today);const observedLongest=loggedRunHistory.reduce((longest,run)=>Math.max(longest,run.distanceMiles),0);/* Stated preferences come from onboarding, which saves them to athlete
        settings — not to the preferences blob these defaults load from. Observed
        running still overrides the stated figures where there is any, because
        what someone has actually run outranks what they once typed. */

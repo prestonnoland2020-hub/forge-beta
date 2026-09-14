@@ -11,7 +11,7 @@
    day now arrives with a real bench prescription, and the athlete has to
    actually decline it. */
 import { chromium } from 'playwright';
-import { setDial, setWeightDial } from './dialdriver.mjs';
+import { logTopSet } from './dialdriver.mjs';
 import { days, setup, goals } from './seed.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const p = await b.newPage({ viewport: { width: 390, height: 950 } });
@@ -43,20 +43,10 @@ const removed = await p.evaluate(() => {
 console.log('planned set removed:', removed);
 await p.waitForTimeout(700);
 // Then logs a squat through the add-a-top-set flow.
-await p.evaluate(() => {
-  const set = (el, v) => { const d = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set; d.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
-  window.__set = set;
-  const sel = [...document.querySelectorAll('select')].find(x => [...x.options].some(o => o.text === 'Back Squat'));
-  if (sel) set(sel, 'Back Squat');
-});
-await p.waitForTimeout(500);
-await setWeightDial(p, 'Weight', '225');
-await setDial(p, 'Reps', '3');
-await p.waitForTimeout(400);
-await p.evaluate(() => {
-  const add = [...document.querySelectorAll('button')].find(b => /add completed top set|save top set/i.test(b.textContent));
-  if (add && !add.disabled) add.click();
-});
+/* This drove a select and two bare dials, which is what the screen looked like
+   two rewrites ago: the lift is chosen by typing in the sheet now, and the
+   sheet has its own save. One helper, shared with every other suite. */
+await logTopSet(p, 'Back Squat', '225', '3');
 await p.waitForTimeout(600);
 const before = await p.evaluate(() => ({
   cards: [...document.querySelectorAll('button')].filter(b=>/^FROM /i.test(b.textContent)).map(b=>b.textContent.trim().slice(0,60)),

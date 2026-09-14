@@ -69,33 +69,47 @@ await page.addInitScript(s => {
   splitDays: [{ name: 'Legs', type: 'Strength', muscles: ['Quads'], exercises: ['Squat'] },
               { name: 'Chest & Back', type: 'Strength', muscles: ['Chest', 'Back'], exercises: ['Bench', 'Pull Ups'] }] });
 await page.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
+/* THE GATE JUDGES BEFORE THE ACCOUNT HAS ANSWERED. Asking for /goals in the
+   first moments of a signed-in load lands on onboarding: the profile fetch has
+   not returned, so nothing is "completed" yet, and once the gate has
+   redirected it does not bounce back on its own. Let the account load, then
+   ask for the page. */
+await page.waitForTimeout(3500);
 await page.evaluate(() => { location.hash = '#/goals'; });
-await page.waitForTimeout(4000);
+await page.waitForTimeout(3500);
+if (page.url().includes('/onboarding')) {
+  await page.evaluate(() => { location.hash = '#/goals'; });
+  await page.waitForTimeout(2500);
+}
 
 const list = await page.evaluate(() => ({
-  count: document.querySelector('.compact-goal-list h2')?.textContent || '',
-  rows: [...document.querySelectorAll('.compact-goal-row')].map(row => ({
+  count: document.querySelector('.goals-workspace h2, .compact-goal-list h2')?.textContent || '',
+  /* The list was rewritten from compact rows to cards; the shape of what is
+     asserted is unchanged — a tag, a title and a target per goal. */
+  rows: [...document.querySelectorAll('.goal-card-face')].map(row => ({
     tag: row.querySelector('.goal-type-tag')?.textContent || '',
-    title: row.querySelector('.goal-row-name strong')?.textContent || '',
-    target: row.querySelector('.goal-row-target')?.textContent || '',
+    title: row.querySelector('.goal-card-title')?.textContent || '',
+    target: row.querySelector('.goal-card-target')?.textContent || '',
   })),
 }));
 console.log('\n  the list');
 console.log('   ', JSON.stringify(list, null, 1).replace(/\n\s*/g, ' '));
 check('it counts seven', /7 goals/i.test(list.count), list.count);
 check('and it draws seven rows', list.rows.length === 7, `${list.rows.length} rows`);
-const body = list.rows.find(row => row.tag === 'BODY');
+/* The tag reads "Body" now rather than "BODY" — the label is title-cased in
+   the card, and uppercase is the stylesheet's business. */
+const body = list.rows.find(row => /^body/i.test(row.tag));
 check('one of them is the body-weight goal', Boolean(body), list.rows.map(r => r.tag).join(','));
 check('and it arrives with the other six, not on a later fetch of its own',
   Boolean(body), 'athlete_settings answered empty');
 check('with its target on it', body?.target?.includes('200'), body?.target || '');
 
 if (body) {
-  const index = list.rows.findIndex(row => row.tag === 'BODY');
-  await page.evaluate(i => document.querySelectorAll('.compact-goal-select')[i].click(), index);
+  const index = list.rows.findIndex(row => /^body/i.test(row.tag));
+  await page.evaluate(i => document.querySelectorAll('.goal-card-face')[i].click(), index);
   await page.waitForTimeout(1200);
   const card = await page.evaluate(() => {
-    const detail = document.querySelector('.goal-row-detail');
+    const detail = document.querySelector('.goal-card-detail');
     return detail ? detail.innerText.replace(/\n+/g, ' | ').slice(0, 400) : '';
   });
   console.log('\n  and what opening it shows');

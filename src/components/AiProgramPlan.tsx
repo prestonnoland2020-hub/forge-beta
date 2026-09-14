@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bestRunDay, interferenceNotes, type PlannedDay } from '../lib/interference';
-import { paceModel } from '../lib/paceModel';
+import { paceModel, easyTooFast, loggedEasyPace } from '../lib/paceModel';
 import { normalizePhase } from '../lib/trainingPhase';
 import { weeksUntil } from '../lib/goalFeasibility';
-import { enduranceTarget } from '../lib/qualitySession';
+import { enduranceTarget, clockText } from '../lib/qualitySession';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import type { PlannedCardio } from './CardioPlanBuilder';
@@ -245,9 +245,26 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      falls short of what that pace is normally built on — so a fast mile off
      eight miles a week does not become a marathon pace nobody can hold. */
   const paces = useMemo(
-    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records, 10), setup?.excludedEfforts || []),
+    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || []),
     [records, runGoal],
   );
+  /* AND THE MOST COMMON ERROR IN SELF-COACHED TRAINING, NAMED ONCE.
+
+     Running easy days at tempo pace is the mistake almost everybody makes, and
+     it is the one a plan cannot fix by prescribing anything — the session is
+     already written "easy". Forge has been able to detect it for months
+     (easyTooFast, with its own tests) and said it nowhere. It is one line,
+     under the interference note, and only when it is true.
+
+     IT LIVES UP HERE WITH THE OTHER HOOKS. Its first home was beside the line
+     that renders it, four hundred lines down and past two early returns — so
+     on any screen that took one of those returns React counted fewer hooks
+     than the render before and threw, and the error boundary ate the whole
+     Plan tab. "Something went wrong. Forge hit a snag on this screen." */
+  const easyPace = useMemo(() => loggedEasyPace(records as never[], paces, localDayIso()), [records, paces]);
+  const easyWarning = easyTooFast(paces, easyPace)
+    ? `Your easy runs are averaging ${clockText(easyPace)}/mi. Easy is ${clockText(paces.easyFast)}–${clockText(paces.easySlow)}/mi — running them harder than that costs the hard days, which is where the progress is.`
+    : '';
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */
@@ -555,6 +572,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     runningPeakWeek: ['Race', 'Taper', 'Specific'].includes(normalizePhase(week.phase)),
     weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal,
   })[0];
+
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
      of them, not whichever goal happened to be created first — falling back to
      the heaviest set of the week when no goal lift is on the calendar. */
@@ -648,6 +666,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         and a card headed TODAY over a week in October would be a lie. */}
     {weekIndex === currentIndex && <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />}
     {collision ? <p className="pv-collision">{collision.say}</p> : null}
+    {easyWarning ? <p className="pv-collision">{easyWarning}</p> : null}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />

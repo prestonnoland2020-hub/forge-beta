@@ -91,7 +91,7 @@ const liftAndRuns = { id: 'd1', date: iso, title: 'Morning Weight Training', mus
   }, [setup, goals, splitDays]);
   await p.goto('http://localhost:4191/#/workout', { waitUntil: 'domcontentloaded' });
   await p.waitForTimeout(2800);
-  const opened = await p.evaluate(() => { const el = [...document.querySelectorAll('button')].find(x => /Add a top set|Add top set/i.test(x.textContent)); if (!el) return false; el.click(); return true; });
+  const opened = await p.evaluate(() => { const el = [...document.querySelectorAll('button')].find(x => /Add a top set|Add top set|Log a top set/i.test(x.textContent)); if (!el) return false; el.click(); return true; });
   check('the log offers the top-set sheet', opened);
   await p.waitForTimeout(700);
   await p.fill('.top-set-sheet-search input', 'Bench');
@@ -106,17 +106,37 @@ const liftAndRuns = { id: 'd1', date: iso, title: 'Morning Weight Training', mus
   const day = await p.evaluate(d => JSON.parse(localStorage.getItem('forge-workout-history-v1') || '[]').find(x => x.date === d), iso);
   check('the day is named after the split day, not the lift', day?.title === 'Chest & Back', day?.title);
   check('it is not named after the lift any more', !/^Top set ·/.test(day?.title || ''), day?.title);
-  check("it carries the day's muscles", ['Chest', 'Back'].every(muscle => (day?.muscles || []).includes(muscle)), JSON.stringify(day?.muscles));
+  /* THE NAME IS THE ATHLETE'S; THE MUSCLES ARE THE LOG'S. This asserted that
+     the day also inherited the split day's muscle list, and the app changed
+     its mind for a good reason: naming a session "Chest & Back" must not
+     credit BACK for a day that was one bench press. Insights and muscle
+     frequency read this field, and a phantom back session is a back session
+     that never happened. The day takes the split day's NAME and the lift's
+     muscles. */
+  check('it carries the muscles the lift actually trained', (day?.muscles || []).includes('Chest'), JSON.stringify(day?.muscles));
+  check('and not a muscle group nothing on the day touched', !(day?.muscles || []).includes('Quads'), JSON.stringify(day?.muscles));
   check('and the set that was logged', day?.topSets?.[0]?.lift === 'Bench Press' || day?.topSets?.[0]?.lift === 'Bench', JSON.stringify(day?.topSets?.map(s => s.lift)));
   await p.close();
 }
 
-/* 3. The two numbers explain themselves. */
+/* 3. THE LEDGER THAT EXPLAINED THE TWO NUMBERS IS GONE, AND SO IS THE SCREEN
+   IT EXPLAINED.
+
+   "Calc max 517 → max week 485 × 1" read as the plan asking for less than the
+   athlete can do, and a per-lift ledger on the plan tab said why: 517 is
+   Epley's estimate from a rep set, 475 is what he has actually held, 485 is
+   the next real single. The plan rewrite ("The app as a user finds it") took
+   the ledger out along with the card it lived on, and the plan no longer
+   prints a calculated max anywhere — so there is no contradiction on screen
+   left to explain, and four assertions against deleted markup were reporting
+   a missing feature nobody had asked for.
+
+   What is still true is that the LOG shows "Calc max 517" and the PLAN shows
+   "485 × 1", on different screens, with nothing joining them. That is a
+   design question, not a broken feature, and it is written down here rather
+   than asserted as a bug. */
 const plan = readFileSync('src/components/AiProgramPlan.tsx', 'utf8');
-check('the attempt says why it sits below the calc max', /max-ledger-why/.test(plan));
-check('it names the real single it is built on', /over your real \{single\.weight\} single/.test(plan));
-check('and says the calc max was estimated, not lifted', /estimated from reps, not lifted/.test(plan));
-check('a lift with no single says so instead', /first true attempt/.test(plan));
+check('the plan does not print a calculated max it cannot explain', !/Calc max/.test(plan));
 
 await b.close();
 console.log(fails ? `\n${fails} FAILURES` : '\nALL PASS');

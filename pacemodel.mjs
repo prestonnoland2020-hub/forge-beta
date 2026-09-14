@@ -7,7 +7,7 @@
    have never run — three different athletes' training on one card.
 
    This pins the replacement: one performance, one hierarchy, every pace. */
-import { paceModel, easyBand, easyTooFast, volumeShortfall, hardestEffort,
+import { paceModel, easyBand, easyTooFast, loggedEasyPace, volumeShortfall, hardestEffort, continuousEfforts,
   EASY_MULTIPLE_FAST, RECENT_EVIDENCE_DAYS } from './src/lib/paceModel.ts';
 
 let fails = 0;
@@ -87,5 +87,65 @@ check('with no model there is nothing to say', !easyTooFast({ threshold: 0 }, 40
 check('the fast end is a real multiple of threshold',
   Math.abs(p.easyFast - p.threshold * EASY_MULTIPLE_FAST) < 0.001);
 
-console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
+
+
+console.log('\nA time trial is logged as three lines, and it still counts');
+/* THE BUG THIS PINS. A time trial is a warm-up, the effort, and a cool-down —
+   three lines — and this file threw away any session with more than one line
+   on the grounds that six times four hundred is not one effort. True, and it
+   took the time trials with it. Preston ran a 5:19 mile on 29 July and logged
+   it exactly that way; every training pace in his plan came off the 5:48 he
+   ran in August instead, and his threshold came out at 7:54/mi — a minute and
+   a half slower than his real threshold, which the plan then called a hard
+   run. The goal card could see the 5:19 the whole time, because the race
+   predictor takes a session apart and this did not. */
+const line = (distance, time, cardioType = 'Run', unit = 'miles') => ({ cardioType, unit, distance, time });
+const session = (id, activity, legacy) => ({ id, activity, structure: 'intervals', summary: '',
+  prescription: { legacyIntervals: legacy, distanceUnit: 'miles' } });
+const timeTrial = [{ date: back(20), cardioSessions: [session('tt', 'Easy + Speed Run',
+  [line(1, 10, 'Easy'), line(1, 5.32, 'Speed Run'), line(1, 10, 'Easy')])] }];
+const seen = continuousEfforts(timeTrial).map(e => `${e.miles}mi ${clock(e.seconds)}`);
+check('the mile inside the session is the effort', seen.includes('1mi 5:19'), JSON.stringify(seen));
+check('and the easy miles either side are not thrown away with it', seen.length === 3, JSON.stringify(seen));
+check('the hardest effort is the mile, not the average of the session',
+  Math.round(hardestEffort(timeTrial).seconds) === 319, String(hardestEffort(timeTrial)?.seconds));
+/* And the reason the rule existed still holds: a set of four-hundreds is not a
+   mile, and each piece is judged on its own rather than the session being
+   judged as a whole. */
+const repeats = [{ date: back(10), cardioSessions: [session('reps', 'Base + Speed Run',
+  [line(1, 10, 'Base'), ...Array.from({ length: 8 }, () => line(0.2, 1, 'Speed Run')), line(1, 10, 'Base')])] }];
+const repSeen = continuousEfforts(repeats);
+check('eight two-hundreds at 5:00 pace are not a 5:00 effort',
+  !repSeen.some(e => e.miles < 0.75), JSON.stringify(repSeen.map(e => e.miles)));
+check('and six four-hundreds are not a mile either',
+  continuousEfforts([{ date: back(8), cardioSessions: [session('q', 'Run',
+    Array.from({ length: 6 }, () => line(400, 1.333, 'Run', 'meters')))] }]).length === 0);
+check('a 5:19 mile sets the threshold pace, not the 5:48 three weeks later',
+  paceModel([...timeTrial, run(5, 1, 348)], goal, TODAY, 18).threshold
+    < paceModel([run(5, 1, 348)], goal, TODAY, 18).threshold,
+  `${clock(paceModel([...timeTrial, run(5, 1, 348)], goal, TODAY, 18).threshold)} vs ${clock(paceModel([run(5, 1, 348)], goal, TODAY, 18).threshold)}`);
+
+console.log('\nAnd what their easy running actually is, so the band can be checked');
+/* THE WARNING THAT WAS COMPUTED AND SHOWN NOWHERE. Running easy days at tempo
+   pace is the most common error in self-coached training, and it is the one a
+   plan cannot fix by prescribing anything — the session already says "easy".
+   easyTooFast could detect it for months and said it on no screen; the plan
+   tab names it now, which needs a number for what the athlete is doing. */
+const easyRun = (daysAgo, miles, secondsPerMile) => run(daysAgo, miles, miles * secondsPerMile);
+const model = paceModel([run(13, 1, 348)], goal, TODAY, 28);
+const slowLog = [easyRun(2, 5, model.easySlow + 20), easyRun(5, 4, model.easySlow + 40), easyRun(9, 6, model.easySlow + 10)];
+const fastLog = [easyRun(2, 5, model.easyFast - 30), easyRun(5, 4, model.easyFast - 20), easyRun(9, 6, model.easyFast - 40)];
+check('easy running is read from the days run slower than threshold',
+  loggedEasyPace(slowLog, model, TODAY) > model.easySlow, clock(loggedEasyPace(slowLog, model, TODAY)));
+check('and someone running them properly easy is told nothing',
+  !easyTooFast(model, loggedEasyPace(slowLog, model, TODAY)));
+check('someone running every easy day at tempo is told once',
+  easyTooFast(model, loggedEasyPace(fastLog, model, TODAY)), clock(loggedEasyPace(fastLog, model, TODAY)));
+check('one hard finish does not move it — the median is taken, not the mean',
+  Math.abs(loggedEasyPace([...slowLog, easyRun(3, 3, model.easyFast - 90)], model, TODAY)
+    - loggedEasyPace(slowLog, model, TODAY)) < 25);
+check('with nothing logged there is nothing to say', loggedEasyPace([], model, TODAY) === 0);
+check('and with no model at all, nothing either', loggedEasyPace(slowLog, { threshold: 0 }, TODAY) === 0);
+
+console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

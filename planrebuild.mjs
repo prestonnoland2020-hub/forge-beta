@@ -8,16 +8,20 @@
    as a standing instruction — so the silent rebuild Forge starts on its own
    does not quietly undo what it was told.
 
-   Run against a build where the plan button is visible without an account:
+   The Regenerate button only renders for a signed-in athlete, and the preview
+   build has no account — so the DOM half of this suite used to need a build
+   made by hand, with a sed against the source and a server started in another
+   terminal. Nobody did that, so it ran against the ordinary preview build,
+   found no button, and reported seven failures forever.
 
-     cp src/components/AiProgramPlan.tsx /tmp/plan.orig
-     sed -i "s|const canGenerate = !isDemoMode && Boolean(user);|const canGenerate = true;|" src/components/AiProgramPlan.tsx
-     npx vite build --outDir dist-test && cp /tmp/plan.orig src/components/AiProgramPlan.tsx
-     (npx serve -l 4193 dist-test &) ; sleep 3 ; node planrebuild.mjs
+   It builds its own double now: one copy of the source with canGenerate
+   forced, built to dist-rebuild and served on its own port. Costs a minute and
+   makes the suite mean something.
 
    The double only makes the button visible; the sheet, its copy and its wiring
    under test are the shipped code. */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { days, setup } from './seed.mjs';
 
@@ -50,6 +54,31 @@ const hist = [ mk('a','2026-08-20','Squat','Quads',405,3), ...days ];
 const goals = [{ type: 'Strength', title: 'Squat 500', exercise: 'Squat', metric: 'Real 1RM', target: '500', unit: 'lb', date: '2026-12-30', connection: '' }];
 const seedSetup = { ...setup, splitDays, completedAt: new Date().toISOString(), acceptedSafety: true };
 
+/* 127.0.0.1 rather than localhost, so the shared runner — which reads the
+   ports a suite needs out of its own source — does not try to start a server
+   on this one as well. */
+const PORT = 4198;
+const BASE = `http://127.0.0.1:${PORT}`;
+
+/* ── The double: the shipped source with the button made visible ─────────── */
+const PLAN_SOURCE = 'src/components/AiProgramPlan.tsx';
+const original = readFileSync(PLAN_SOURCE, 'utf8');
+const forced = original.replace('const canGenerate = !isDemoMode && Boolean(user);', 'const canGenerate = true;');
+if (forced === original) { console.log('FAIL  the double could not be built — canGenerate no longer reads as expected'); process.exit(1); }
+let server;
+const stopServer = () => { if (server) { try { process.kill(-server.pid); } catch { /* already gone */ } server = null; } };
+try {
+  writeFileSync(PLAN_SOURCE, forced);
+  const build = spawnSync('npx', ['vite', 'build', '--outDir', 'dist-rebuild'], { env: { ...process.env, VITE_DEMO_MODE: 'true' }, encoding: 'utf8' });
+  if (build.status !== 0) { console.log('FAIL  the double did not build\n' + String(build.stderr || build.stdout).slice(-600)); process.exit(1); }
+} finally {
+  writeFileSync(PLAN_SOURCE, original);
+}
+server = spawn('npx', ['vite', 'preview', '--outDir', 'dist-rebuild', '--port', String(PORT), '--host', '127.0.0.1'],
+  { stdio: 'ignore', detached: true });
+await new Promise(resolve => setTimeout(resolve, 4000));
+process.on('exit', stopServer);
+
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const open = async plan => {
   const p = await b.newPage({ viewport: { width: 390, height: 950 } });
@@ -69,8 +98,12 @@ const open = async plan => {
     localStorage.setItem('forge-training-plan-v1', JSON.stringify({ name: 'Split', rhythm: 'rolling', minWeeklyMileage: 0, maxWeeklyMileage: 0,
       days: sd.map(day => ({ name: day.name, weekday: 'MON', dayType: 'strength', muscles: day.muscles, exercises: day.exercises, cardioPolicy: 'none', cardio: [], recoveryStyle: 'Full rest', strengthDuration: '60', maxDuration: '60' })) }));
   }, [hist, seedSetup, goals, plan, splitDays]);
-  await p.goto('http://localhost:4193/#/plan', { waitUntil: 'domcontentloaded' });
-  await p.waitForTimeout(3800);
+  await p.goto(`${BASE}/#/plan`, { waitUntil: 'domcontentloaded' });
+  await p.waitForTimeout(1200);
+  /* The first paint can land on Today before the stored route is applied; ask
+     for the plan again once the app is up. */
+  if (!p.url().includes('/plan')) { await p.evaluate(() => { window.location.hash = '#/plan'; }); }
+  await p.waitForTimeout(3200);
   return p;
 };
 const click = (p, re) => p.evaluate(src => { const rx = new RegExp(src, 'i'); const el = [...document.querySelectorAll('button')].find(x => rx.test(x.textContent || '')); if (!el || el.disabled) return false; el.click(); return true; }, re);
@@ -89,7 +122,7 @@ const summary = p => p.evaluate(() => JSON.parse(localStorage.getItem('forge-ai-
   const sheet = await p.evaluate(() => document.querySelector('.plan-rebuild-sheet')?.innerText.replace(/\n/g, ' ') || '');
   check('it asks what should change', /What would you like to change\?/i.test(sheet), sheet.slice(0, 120));
   check('an AI box is offered like the log has', await has(p, '.plan-rebuild-sheet textarea'));
-  check('it warns a saved block is replaced', /replaces the block you saved/i.test(sheet), sheet.slice(0, 160));
+  check('it warns a saved block is replaced', /throws away the block you saved/i.test(sheet), sheet.slice(0, 160));
   check('both ways out are offered', /Rebuild with these changes/i.test(sheet) && /Just regenerate/i.test(sheet), sheet.slice(0, 240));
 
   /* Nothing can be rebuilt "with changes" until there are changes. */
@@ -119,9 +152,15 @@ const summary = p => p.evaluate(() => JSON.parse(localStorage.getItem('forge-ai-
   check('the sheet closes once the block is built', !(await has(p, '.plan-rebuild-backdrop')));
   check('the new block replaced the old one', await summary(p) === 'Rebuilt block.', String(await summary(p)));
   check('what was asked for is kept with the block', await askedFor(p) === 'Keep the long run on Sunday and go lighter on squats', String(await askedFor(p)));
-  const card = await p.evaluate(() => document.body.innerText);
-  check('the athlete can see what they asked for', /You asked:/.test(card) && /long run on Sunday/.test(card));
-  check("and what the builder did with it", /Heard: Keep the long run on Sunday/.test(card), card.slice(0, 200));
+  /* The request sits behind a disclosure on the plan header rather than in
+     the page body — it is a thing you check, not a thing you read every time
+     you open the tab. */
+  check('the plan offers what was asked for', await has(p, '.pv-request'));
+  await p.evaluate(() => document.querySelector('.pv-request .text-button')?.click());
+  await p.waitForTimeout(300);
+  const card = await p.evaluate(() => document.querySelector('.pv-request')?.innerText || '');
+  check('the athlete can see what they asked for', /long run on Sunday/.test(card), card.slice(0, 160));
+  check('and what the builder did with it', /Heard: Keep the long run on Sunday/.test(card), card.slice(0, 200));
   await p.close();
 }
 
@@ -159,5 +198,6 @@ const summary = p => p.evaluate(() => JSON.parse(localStorage.getItem('forge-ai-
 }
 
 await b.close();
+stopServer();
 console.log(fails ? `\n${fails} FAILURES` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

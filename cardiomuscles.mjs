@@ -40,11 +40,20 @@ check('rowing still carries its muscles', musclesOf('Rowing').join(',') === 'Bac
 console.log('\n  the frequency chart is what excludes them');
 /* The rule the chart applies, stated here so it cannot quietly change: a muscle
    drops out when nothing but cardio put it there that day; a muscle a lift also
-   trained stays; a day with no lifting counts nothing at all. */
+   trained stays; and nothing else comes off the list.
+
+   IT ALSO USED TO GATE — "no lifted top set, so the day trained nothing" —
+   and that was deleting real training. Forge knows only the one top set per
+   lift somebody bothered to type, and a full leg session can have none of
+   them. Preston's chart said 11 quad sessions in three months against 23 in
+   his log; the twelve it dropped were days tagged Quads + Hamstrings +
+   Glutes, several titled "Evening Weight Training" by Strava, that had a run
+   logged and no top set. A cardio session on a lifting day was erasing the
+   lifting. */
 const countedOn = ({ muscles = [], sets = [], hasCardio = false }) => {
+  void hasCardio;
   const completed = sets.filter(set => set.completed !== false);
   const lifted = completed.filter(set => !isCardioMovement(by(set.lift)));
-  if (!lifted.length && (hasCardio || completed.length)) return [];
   const fromLifts = new Set(lifted.flatMap(set => musclesOf(set.lift)));
   const cardioOnly = new Set(completed.filter(set => isCardioMovement(by(set.lift)))
     .flatMap(set => musclesOf(set.lift)).filter(m => !fromLifts.has(m)));
@@ -54,8 +63,20 @@ const countedOn = ({ muscles = [], sets = [], hasCardio = false }) => {
 const rowOnly = countedOn({ muscles: ['Back', 'Quads', 'Hamstrings', 'Glutes', 'Cardio'], sets: [{ lift: 'Rowing' }], hasCardio: true });
 check('a row counts toward nothing', rowOnly.length === 0, JSON.stringify(rowOnly));
 
+/* The row is not a back session, and the athlete's own Chest and Shoulders
+   tags are still their statement about the day. Subtracting what the rower
+   used is the whole of what the chart may do. */
 const rowOnALiftingDay = countedOn({ muscles: ['Chest', 'Back', 'Shoulders', 'Cardio'], sets: [{ lift: 'Rowing' }], hasCardio: true });
-check('and still nothing on a day named Chest & Back', rowOnALiftingDay.length === 0, JSON.stringify(rowOnALiftingDay));
+check('a row on a day named Chest & Back is not a back session', !rowOnALiftingDay.includes('Back'), JSON.stringify(rowOnALiftingDay));
+check('but the chest the athlete named still counts', rowOnALiftingDay.includes('Chest'), JSON.stringify(rowOnALiftingDay));
+
+/* HIS TWELVE MISSING LEG DAYS. Tagged as a leg session, a run on it, and not
+   one top set typed in. */
+const legDayWithARun = countedOn({ muscles: ['Quads', 'Hamstrings', 'Glutes', 'Cardio'], sets: [], hasCardio: true });
+check('a leg day with a run on it and no top set is still a leg day',
+  legDayWithARun.join(',') === 'Quads,Hamstrings,Glutes', JSON.stringify(legDayWithARun));
+const runOnly = countedOn({ muscles: ['Cardio'], sets: [], hasCardio: true });
+check('and a day that really was only a run counts nothing', runOnly.length === 0, JSON.stringify(runOnly));
 
 const squatThenRow = countedOn({ muscles: ['Quads', 'Glutes', 'Hamstrings', 'Back', 'Cardio'], sets: [{ lift: 'Back Squat' }, { lift: 'Rowing' }], hasCardio: true });
 check('a squat and then a row counts the squat', squatThenRow.includes('Quads') && squatThenRow.includes('Glutes'), JSON.stringify(squatThenRow));

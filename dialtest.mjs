@@ -25,7 +25,10 @@ await p.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(2200);
 check('the log button lives in the header', Boolean(await p.$('.top-log')));
 const headerOrder = await p.evaluate(() => [...document.querySelectorAll('.top-actions > *')].map(el => el.className.split(' ')[0]));
-check('it sits to the left of the avatar', headerOrder.indexOf('top-log') < headerOrder.indexOf('avatar'), JSON.stringify(headerOrder));
+/* The avatar became a settings control; what the check is about is that the
+   log button comes before the account one, so the thing you do every day is
+   not the last thing in the row. */
+check('it sits before the account control', headerOrder.indexOf('top-log') < headerOrder.indexOf('top-settings'), JSON.stringify(headerOrder));
 const navLabels = await p.evaluate(() => [...document.querySelectorAll('.bottom-nav a')].map(a => a.getAttribute('aria-label')));
 check('the bottom bar no longer carries it', !navLabels.includes('Log a workout'), JSON.stringify(navLabels));
 check('the bottom bar keeps its five destinations', navLabels.length === 5, JSON.stringify(navLabels));
@@ -45,6 +48,16 @@ const openField = label => p.evaluate(text => {
   return Boolean(field);
 }, label);
 
+/* The weight wheel lives where a set is entered — the top-set sheet — not
+   loose on the day screen. This looked for it on the page and found nothing,
+   then read `.dial-wheel[0]` of an empty list and threw. */
+await p.evaluate(() => [...document.querySelectorAll('button')]
+  .find(el => /Add a top set|Add top set|Log a top set/i.test(el.textContent || ''))?.click());
+await p.waitForTimeout(700);
+await p.fill('.top-set-sheet-search input', 'Bench').catch(() => {});
+await p.waitForTimeout(400);
+await p.evaluate(() => (document.querySelector('.top-set-sheet-result') || document.querySelector('.top-set-sheet-new'))?.click());
+await p.waitForTimeout(400);
 check('a weight field is offered', await openField('Weight'));
 await p.waitForTimeout(500);
 check('tapping it raises the dial', Boolean(await p.$('.dial-backdrop')));

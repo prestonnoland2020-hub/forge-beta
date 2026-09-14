@@ -38,7 +38,7 @@ const open = async route => {
   await p.waitForTimeout(2800);
   return p;
 };
-const openSheet = async p => { await p.evaluate(() => [...document.querySelectorAll('button')].find(x => /Add a top set|Add top set/i.test(x.textContent))?.click()); await p.waitForTimeout(700); };
+const openSheet = async p => { await p.evaluate(() => [...document.querySelectorAll('button')].find(x => /Add a top set|Add top set|Log a top set/i.test(x.textContent))?.click()); await p.waitForTimeout(700); };
 /* Scoped to the sheet: with no sets on the day yet, the log page behind it
    carries its own Weight and Reps fields, and an unscoped driver reaches those
    instead — filling the form nobody is looking at. */

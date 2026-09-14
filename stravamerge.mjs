@@ -3,6 +3,7 @@
    all survive; only the cardio is added. */
 import { chromium } from 'playwright';
 import { setup } from './seed.mjs';
+import { setDistanceDial, setClockDial } from './dialdriver.mjs';
 const today = new Date(); const iso = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 const loggedDay = { id: 'legs-day', date: iso, title: 'Legs', muscles: ['Quads','Hamstrings','Glutes'], splitPosition: 2, splitId: 'split-1',
   topSets: [{ id: 't1', muscle: 'Quads', lift: 'Squat', weight: 405, reps: 3, completed: true, calculatedMax: 446 }],
@@ -26,12 +27,12 @@ const check = (l, c, d = '') => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${c ?
 // log a run onto that day, the way an import does: cardio only, its own title
 await p.evaluate(() => [...document.querySelectorAll('button')].find(x => /Add cardio/i.test(x.textContent || ''))?.click());
 await p.waitForTimeout(700);
-await p.evaluate(() => {
-  const setV = (el, v) => { const d = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set; d.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
-  const labels = [...document.querySelectorAll('label')];
-  setV(labels.find(l => /Distance/i.test(l.textContent))?.querySelector('input'), '4.2');
-  setV(labels.find(l => /^Time/i.test(l.textContent.trim()))?.querySelector('input'), '36:00');
-});
+/* Distance and time are picked from a wheel, not typed — the same dial the
+   rest of the logger uses. This suite still drove them as text inputs, so it
+   threw on an undefined element before it asserted anything, and a suite that
+   throws reports no failures at all. */
+await setDistanceDial(p, 'Distance', 4, 20);
+await setClockDial(p, 'Time', 36, 0);
 await p.waitForTimeout(400);
 await p.evaluate(() => [...document.querySelectorAll('button')].find(x => /^Save cardio$/i.test(x.textContent.trim()))?.click());
 await p.waitForTimeout(1200);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { DialField } from './NumberDial';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -99,8 +99,23 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
   const max = Number(weight) && Number(reps) ? calculateEstimatedOneRepMax(Number(weight), Number(reps)) : null;
   const ready = Boolean(lift) && muscles.length > 0 && Number(weight) > 0 && Number(reps) > 0 && !blockedReason;
 
-  return <div className="top-set-sheet-backdrop" role="dialog" aria-modal="true" aria-label="Add a top set" onClick={onClose}>
-    <div className="top-set-sheet" onClick={event => event.stopPropagation()}>
+  /* CLOSE ONLY WHEN THE BACKDROP ITSELF IS CLICKED.
+
+     "Click anywhere outside to close" was implemented as a click handler on
+     the backdrop with a stopPropagation guard on the sheet inside it, which is
+     the usual pattern and is wrong the moment anything inside the sheet
+     unmounts on click. Tapping OK on the weight dial does exactly that: the
+     dial closes itself in its own handler, React then walks the rest of the
+     bubble path, finds the guard's fiber gone with it, and delivers the click
+     to the backdrop — so the sheet shut every time a number was set, and a top
+     set could not be logged from a lift row at all.
+
+     Comparing target to currentTarget cannot be undone by an unmount: a click
+     that started inside the sheet never reads as a click on the backdrop. */
+  const closeOnBackdrop = (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose(); };
+
+  return <div className="top-set-sheet-backdrop" role="dialog" aria-modal="true" aria-label="Add a top set" onClick={closeOnBackdrop}>
+    <div className="top-set-sheet">
       <header>
         <div><strong>Add a top set</strong><small>The one heaviest meaningful set. Forge measures progress from it.</small></div>
         <button type="button" className="top-set-sheet-close" aria-label="Close" onClick={onClose}>×</button>

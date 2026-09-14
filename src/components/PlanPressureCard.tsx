@@ -63,11 +63,11 @@ export function PlanPressureCard({ onReshape }: { onReshape: (instruction: strin
       minWeeklyMileage: Number(setup?.minWeeklyMileage) || 0,
       maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0,
       weeklyMileage: Number(setup?.weeklyMileage) || 0,
-      recentWeeklyMileage: medianWeeklyMiles(records, 10),
+      recentWeeklyMileage: medianWeeklyMiles(records),
       recentLongestRun: longestContinuousRun(records),
       goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
       goalMiles: runGoal?.miles,
-      paces: paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records, 10), setup?.excludedEfforts || []),
+      paces: paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || []),
     }, localDayIso()));
 
     return planPressure({ checkIns, backedOffLifts, missedSessions, goalsBehind, sessions });

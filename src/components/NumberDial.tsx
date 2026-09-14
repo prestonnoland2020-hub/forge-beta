@@ -155,8 +155,13 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
     : String(whole);
   const confirm = () => onConfirm(kind === 'distance' ? String(Number(shown)) : shown);
 
-  return <div className="dial-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onCancel}>
-    <div className="dial-sheet" onClick={event => event.stopPropagation()}>
+  /* Same rule as every other backdrop in the app: a click that started inside
+     the sheet is never a click on the backdrop, whatever unmounts along the
+     way. See the note in TopSetSheet for what the stopPropagation version
+     costs. */
+  return <div className="dial-backdrop" role="dialog" aria-modal="true" aria-label={title}
+    onClick={event => { if (event.target === event.currentTarget) onCancel(); }}>
+    <div className="dial-sheet">
       <header><strong>{title}</strong><span className="dial-preview">{shown}{unit && kind !== 'clock' ? ` ${unit}` : ''}</span></header>
       <div className="dial-columns">
         {/* The highlighted band is the selection, exactly as a picker reads. */}

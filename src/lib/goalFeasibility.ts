@@ -1,6 +1,6 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
-import { weeklyRunning } from './goalTrajectory';
+import { weeklyRunVolume } from './cardioPrediction';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
@@ -143,13 +143,13 @@ export function bestContinuousEffort(records: WorkoutRecord[], todayIso = localD
   return best as { miles: number; seconds: number; date: string; equivalentMile: number } | null;
 }
 
-const recentWeeklyMiles = (records: WorkoutRecord[]) => {
-  const weeks = weeklyRunning(records, 8).filter(week => !week.partial);
-  if (!weeks.length) return 0;
-  const values = weeks.map(week => week.miles).sort((a, b) => a - b);
-  const middle = values.length >> 1;
-  return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
-};
+/* ONE DEFINITION, SHARED. This took the median of eight complete weeks while
+   the race predictor took a 28-day mean and the planner took the last seven
+   days — three numbers for one quantity, printed next to each other. On
+   Preston's account the median read 0 ("you are running 0 miles a week") over
+   a plan budgeting from what he had actually run. See runVolume for the rule
+   they all use now. */
+const recentWeeklyMiles = (records: WorkoutRecord[]) => weeklyRunVolume(records);
 
 function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: string[] = []): Feasibility | null {
   const distance = milesOf(goal);

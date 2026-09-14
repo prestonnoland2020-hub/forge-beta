@@ -172,7 +172,13 @@
 /* TODAY IS ALREADY THE CARD ABOVE. Repeating its top set in the week list,
    inside the same screenful, is the same sentence twice. The row keeps its
    place in the week and gives the detail back to the card. */
-.pv-row.today .pv-row-body small{display:none}
+/* TODAY'S ROW HIDES THE PRESCRIPTION, NOT THE RECEIPT. The summary line is
+   suppressed on today because today's work is spelled out on the card above
+   it, so repeating it in the row is noise. Once the day is LOGGED that line is
+   no longer a prescription — it is what you did — and it is the one day you
+   most want to see confirmed back. Blanking it left today reading "Sharms ✓"
+   with no sign of the 225x9 that earned the tick. */
+.pv-row.today:not(.done) .pv-row-body small{display:none}
 
 /* One line saying why the week is shaped the way it is. Quiet by design: it is
    an explanation, not an alert, and it sits above the week it explains. */
