@@ -6,6 +6,7 @@ import { clockToSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
 import { isRaceEvidence } from './runQuality';
 import { predictRaceFromLegacyMethod } from './cardioPrediction';
+import type { Effort as CurveEffort } from './fitnessCurve';
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 import { sameLift } from './liftAliases';
@@ -151,7 +152,7 @@ export function bestContinuousEffort(records: WorkoutRecord[], todayIso = localD
    they all use now. */
 const recentWeeklyMiles = (records: WorkoutRecord[]) => weeklyRunVolume(records);
 
-function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: string[] = []): Feasibility | null {
+function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: string[] = [], workouts: CurveEffort[] = []): Feasibility | null {
   const distance = milesOf(goal);
   if (!distance) return null;
   const targetSeconds = clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss'));
@@ -173,7 +174,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
      predictRaceFromLegacyMethod is now the only answer to "what are you worth
      at this distance", and it weighs every effort with a penalty for how far
      it had to be stretched rather than accepting only near-distance ones. */
-  const prediction = predictRaceFromLegacyMethod(records, distance, excluded);
+  const prediction = predictRaceFromLegacyMethod(records, distance, excluded, workouts);
   const best = prediction?.source || null;
 
   if (!best) {
@@ -265,11 +266,15 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
     say: `On the numbers this holds: ${Math.round(best)} today, ${Math.round(target)} needed, ${Math.round(weeks)} weeks to find ${Math.round(needed * 100)}%.` };
 }
 
-export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], cap?: { maxWeeklyMileage?: number; excludedEfforts?: string[] }): Feasibility[] {
+export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], cap?: { maxWeeklyMileage?: number; excludedEfforts?: string[]; workoutEfforts?: CurveEffort[] }): Feasibility[] {
   const ceiling = Number(cap?.maxWeeklyMileage) || 0;
   const excluded = cap?.excludedEfforts || [];
+  /* Completed sessions count as evidence here too — see workoutEvidence. A
+     screen that judges a goal from races while the plan paces from races AND
+     workouts is the same split-brain this file's own note is about. */
+  const workouts = cap?.workoutEfforts || [];
   return goals.flatMap(goal => {
-    const result = goal.type === 'Endurance' ? raceFeasibility(goal, records, excluded)
+    const result = goal.type === 'Endurance' ? raceFeasibility(goal, records, excluded, workouts)
       : goal.type === 'Strength' ? liftFeasibility(goal, records)
       : null;
     if (!result) return [];
