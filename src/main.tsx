@@ -79,6 +79,7 @@ import './partners.css';
    phone-first with a desktop counterpart, and the band between them — every
    iPad in portrait — belonged to neither. This owns it, so it has to win. */
 import './device-fit.css';
+import { pinChromeToVisualViewport } from './features/shell/pinChrome';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.
@@ -120,6 +121,12 @@ if ((!launch || launch === 'navigate')
   && !/^\/(login|auth\/callback|workout|legal)/.test(launchPath)) {
   window.location.hash = '/';
 }
+
+/* THE BOTTOM BAR AND THE HEADER FOLLOW WHAT YOU CAN SEE, not what the page
+   thinks the window is. On iOS those are two different rectangles the moment
+   anyone pinches, double-taps a paragraph, or opens the keyboard — and a fixed
+   element is glued to the wrong one. See lib/visualViewportChrome. */
+pinChromeToVisualViewport();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

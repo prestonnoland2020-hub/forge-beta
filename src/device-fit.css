@@ -79,3 +79,33 @@
 @media (max-width: 900px) {
   .coach-bubble-shell { left: auto; right: 12px; }
 }
+
+/* ── The chrome follows the visible viewport ───────────────────────────── */
+/* WHY THIS EXISTS: see src/lib/visualViewportChrome.ts. Short version — a
+   `position: fixed` element is glued to the LAYOUT viewport, and on a phone
+   that stops being the part of the page you can see the moment anyone pinches,
+   double-taps a paragraph, or opens the keyboard. Preston screenshotted the
+   bottom bar two thirds of the way up the FAQ with content running on beneath
+   it, and no header at all; both had stopped tracking the screen at the same
+   moment, which is the tell that neither one's own CSS was wrong.
+
+   The transform is written by pinChrome once per frame and is the string
+   `none` whenever the two viewports agree — which is nearly always, so the
+   normal case carries no transform at all. */
+.bottom-nav { transform: var(--chrome-pin-bottom, none); transform-origin: 0 0; }
+.coach-bubble-shell { transform: var(--chrome-pin-bottom, none); transform-origin: 0 0; }
+.topbar { transform: var(--chrome-pin-top, none); transform-origin: 0 0; }
+/* The pill is left alone: its transform is what centres it, and composing a
+   translate with a var that is usually the keyword `none` produces an invalid
+   declaration rather than a centred pill. It is transient, and a transient
+   notice in the wrong place while the page is zoomed is not the bug. */
+
+/* Scaled down by a pinch, a one-pixel border is a fifth of a pixel and the bar
+   loses its edge against the page behind it. It is the one thing that has to
+   be drawn in screen pixels rather than page pixels, so it is re-stated at the
+   scale the bar is actually being drawn at. */
+.chrome-unpinned .bottom-nav,
+.chrome-unpinned .topbar { box-shadow: 0 0 0 1px var(--hairline-strong, rgba(127,127,127,.5)); }
+/* And the panel hanging off the coach button is positioned against its shell,
+   so it comes along for free — but its own scale must not compound. */
+.chrome-unpinned .coach-bubble-panel { transform: none; }
