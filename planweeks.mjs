@@ -34,6 +34,7 @@ const hist = [{ id: 'd1', date: today, title: 'Legs', muscles: ['Quads'],
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const page = await b.newPage({ viewport: { width: 390, height: 1200 }, hasTouch: true });
+page.on('pageerror', e => console.log('  PAGEERROR:', String(e).slice(0, 300)));
 await page.addInitScript(([s, h, sd, p]) => {
   localStorage.clear();
   localStorage.setItem('forge-athlete-setup-v1:preview-user', JSON.stringify(s));

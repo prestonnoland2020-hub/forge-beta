@@ -248,6 +248,23 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || []),
     [records, runGoal],
   );
+  /* AND THE MOST COMMON ERROR IN SELF-COACHED TRAINING, NAMED ONCE.
+
+     Running easy days at tempo pace is the mistake almost everybody makes, and
+     it is the one a plan cannot fix by prescribing anything — the session is
+     already written "easy". Forge has been able to detect it for months
+     (easyTooFast, with its own tests) and said it nowhere. It is one line,
+     under the interference note, and only when it is true.
+
+     IT LIVES UP HERE WITH THE OTHER HOOKS. Its first home was beside the line
+     that renders it, four hundred lines down and past two early returns — so
+     on any screen that took one of those returns React counted fewer hooks
+     than the render before and threw, and the error boundary ate the whole
+     Plan tab. "Something went wrong. Forge hit a snag on this screen." */
+  const easyPace = useMemo(() => loggedEasyPace(records as never[], paces, localDayIso()), [records, paces]);
+  const easyWarning = easyTooFast(paces, easyPace)
+    ? `Your easy runs are averaging ${clockText(easyPace)}/mi. Easy is ${clockText(paces.easyFast)}–${clockText(paces.easySlow)}/mi — running them harder than that costs the hard days, which is where the progress is.`
+    : '';
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */
@@ -555,17 +572,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     runningPeakWeek: ['Race', 'Taper', 'Specific'].includes(normalizePhase(week.phase)),
     weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal,
   })[0];
-  /* AND THE MOST COMMON ERROR IN SELF-COACHED TRAINING, NAMED ONCE.
 
-     Running easy days at tempo pace is the mistake almost everybody makes, and
-     it is the one a plan cannot fix by prescribing anything — the session is
-     already written "easy". Forge has been able to detect it for months
-     (easyTooFast, with its own tests) and said it nowhere. It is one line,
-     under the interference note, and only when it is true. */
-  const easyPace = useMemo(() => loggedEasyPace(records as never[], paces, localDayIso()), [records, paces]);
-  const easyWarning = easyTooFast(paces, easyPace)
-    ? `Your easy runs are averaging ${clockText(easyPace)}/mi. Easy is ${clockText(paces.easyFast)}–${clockText(paces.easySlow)}/mi — running them harder than that costs the hard days, which is where the progress is.`
-    : '';
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
      of them, not whichever goal happened to be created first — falling back to
      the heaviest set of the week when no goal lift is on the calendar. */
