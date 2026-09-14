@@ -8,6 +8,7 @@ import { peakConflict } from '../../lib/interference';
 import { eventProfileFor } from '../../lib/eventProfile';
 import type { PaceModel } from '../../lib/paceModel';
 import { normalizePhase, phaseFor, type TrainingPhase } from '../../lib/trainingPhase';
+import type { Levels } from '../../lib/progressionLevels';
 
 /* A running week is a peak when it is the race itself, the sharpening before
    it, or the specific phase where the race-pace work lives. */
@@ -459,7 +460,11 @@ export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; 
   /* Every training pace, derived from the athlete's own demonstrated fitness.
      Given, the hard run is paced off what they have run; absent, off the goal,
      which is the only thing Forge used to have. */
-  paces?: PaceModel };
+  paces?: PaceModel;
+  /* WHERE THE ATHLETE IS ON EACH LADDER. The dose of a hard session is what
+     their last sessions earned, not a function of the week number — see
+     progressionLevels. Absent, the sizing falls back to the old ramp. */
+  levels?: Levels };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
@@ -827,6 +832,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
         readiness: athlete.readiness,
         goalMiles: Number(athlete.goalMiles) || undefined,
         paces: athlete.paces,
+        levels: athlete.levels,
       })
     : null;
   const qualityText = written ? written.text

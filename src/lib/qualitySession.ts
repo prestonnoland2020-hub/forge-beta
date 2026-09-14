@@ -24,6 +24,7 @@
 import type { PaceModel } from './paceModel';
 import { normalizePhase, type TrainingPhase } from './trainingPhase';
 import { eventProfileFor, sessionKindFor, type SessionKind } from './eventProfile';
+import { thresholdWorkMinutes, intervalWorkMetres, repetitionWorkMetres, INTERVAL_REPS, REPETITION_REPS, type Levels } from './progressionLevels';
 
 /* Kept as aliases so nothing that already speaks these names has to change. */
 export type QualityPhase = TrainingPhase | 'Test';
@@ -44,6 +45,11 @@ export type QualityContext = {
   /* Goal distance in miles. Picks the event profile, which decides the whole
      shape of the session — not just how long the reps are. */
   goalMiles?: number;
+  /* WHERE THE ATHLETE IS ON EACH LADDER, so the dose is what their last
+     sessions earned rather than a function of the week number. Absent — a
+     block generated before levels existed, or an athlete with no judged
+     sessions — the sizing falls back to the old week-indexed ramp. */
+  levels?: Levels;
   /* The most of the week this session may be. Defaults to the usual third;
      an athlete who runs twice a week has a bigger share available because
      there are fewer runs to spread it over. */
@@ -129,8 +135,12 @@ const repDistanceFor = (weekIndex: number, goalMiles = 3.107) => {
 
 /* How long a threshold effort runs, growing through the block and capped by
    what the week can actually hold. */
-export function thresholdMinutes(weekIndex: number, weeklyMiles: number, paceSecondsPerMile: number, maxShare = QUALITY_MAX_SHARE): number {
-  const wanted = clamp(12 + weekIndex * 1.5, 12, 30);
+/* THE OLD RAMP, kept for blocks with no level history behind them. It opens at
+   twelve minutes for everybody — a 5:19 miler and a twelve-minute miler get
+   the same first session — and grows by the calendar rather than by how any of
+   it went. progressionLevels replaces it wherever there is anything to read. */
+export function thresholdMinutes(weekIndex: number, weeklyMiles: number, paceSecondsPerMile: number, maxShare = QUALITY_MAX_SHARE, level?: number): number {
+  const wanted = level ? thresholdWorkMinutes(level) : clamp(12 + weekIndex * 1.5, 12, 30);
   if (!paceSecondsPerMile || !weeklyMiles) return Math.round(wanted);
   const budgetMiles = Math.max(0, weeklyMiles * maxShare - WARMUP_COOLDOWN_MILES);
   const budgetMinutes = (budgetMiles * paceSecondsPerMile) / 60;
@@ -145,7 +155,7 @@ export function qualityKindFor(phase: QualityPhase, weekIndex: number): QualityK
 }
 
 export function qualitySession(context: QualityContext): QualitySession {
-  const { phase, weekIndex, goalPaceSecondsPerMile: goalPace, weeklyMiles, readiness, hasBaseline = true, goalMiles = 3.107, paces, maxShare } = context;
+  const { phase, weekIndex, goalPaceSecondsPerMile: goalPace, weeklyMiles, readiness, hasBaseline = true, goalMiles = 3.107, paces, maxShare, levels } = context;
   const share = maxShare && maxShare > 0 ? maxShare : QUALITY_MAX_SHARE;
   if (!goalPace) return { kind: 'none', text: 'No goal-driven cardio', miles: 0 };
   if (!hasBaseline) return { kind: 'baseline', text: 'Establish a comfortable running baseline', miles: 0 };
@@ -209,7 +219,7 @@ export function qualitySession(context: QualityContext): QualitySession {
   }
 
   if (kind === 'threshold') {
-    const minutes = Math.max(8, thresholdMinutes(weekIndex, weeklyMiles, thresholdPace, share) - (soften ? 5 : 0));
+    const minutes = Math.max(8, thresholdMinutes(weekIndex, weeklyMiles, thresholdPace, share, levels?.threshold) - (soften ? 5 : 0));
     const paceText = `${clockText(thresholdPace)}/mi`;
     /* Past twenty minutes the effort is broken into cruise intervals — the
        physiology is the same and it is far likelier to be run at the right
@@ -254,14 +264,21 @@ export function qualitySession(context: QualityContext): QualitySession {
      marathoner does not, and the event profiles never ask for them. */
   if (kind === 'reps') {
     const distance = clamp(snapToTrack(goalMiles * 1609.344 * 0.2), 150, 600);
-    const reps = Math.max(4, (soften ? 6 : 8) - (distance > 400 ? 2 : 0));
+    /* The rep DISTANCE is the event's; how many of them is the athlete's
+       level, because the total metres of fast running is the dose. */
+    const earned = levels ? clamp(Math.round(repetitionWorkMetres(levels.repetition) / distance), REPETITION_REPS.min, REPETITION_REPS.max) : 0;
+    const reps = Math.max(4, (earned || (soften ? 6 : 8)) - (soften ? 2 : 0) - (!earned && distance > 400 ? 2 : 0));
     const seconds = Math.ceil(repPace / 1609.344 * distance);
     const miles = round1(reps * distance / 1609.344 + WARMUP_COOLDOWN_MILES);
     return { kind, text: `${reps} × ${distance} m @ ${clockText(seconds)}/rep · full recovery`, miles: round1(Math.min(miles, weeklyMiles * share || miles)) };
   }
 
   const distance = repDistanceFor(weekIndex, goalMiles);
-  const baseReps = distance <= 400 ? 8 : distance <= 800 ? 6 : distance <= 1200 ? 5 : distance <= 2400 ? 4 : 3;
+  /* VO2 work is the same way round: the rep length is physiological and comes
+     off the event, the NUMBER of them is the dose and comes off the ladder. */
+  const baseReps = levels
+    ? clamp(Math.round(intervalWorkMetres(levels.interval) / distance), INTERVAL_REPS.min, INTERVAL_REPS.max)
+    : distance <= 400 ? 8 : distance <= 800 ? 6 : distance <= 1200 ? 5 : distance <= 2400 ? 4 : 3;
   const reps = Math.max(3, baseReps - (soften ? 2 : 0));
   /* Rounded UP, always. To the nearest second a 1200 m rep can land a shade
      under the intended pace, and "never faster than prescribed" is a rule about
