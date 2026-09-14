@@ -24,7 +24,7 @@
 import { equivalentSeconds, volumeForPace } from './goalFeasibility';
 import { isRaceEvidence } from './runQuality';
 import { RIEGEL as RIEGEL_EXPONENT } from './riegel';
-import { cardioMiles, summarizeCardioDraft } from './cardioSession';
+import { cardioMiles, summarizeCardioDraft, continuousRunEfforts } from './cardioSession';
 import { effortKey, CONFIRMED_PREFIX } from './effortAudit';
 import { fitnessCurve, predictFromCurve, type Effort } from './fitnessCurve';
 
@@ -72,55 +72,57 @@ export type PaceModel = {
 
 type CardioRecord = { date: string; cardioSessions?: Array<Record<string, unknown>> };
 
-/* THE HARDEST CONTINUOUS RUN, which is the only kind that predicts a race.
-   An interval session logged as many lines is not one effort and cannot be
-   carried to a race distance; runQuality decides what is a run at all, so
-   this file cannot drift from the rest of the app. */
+/* THE CONTINUOUS RUNNING IN THE LOG, PIECE BY PIECE.
+
+   This used to throw away any session logged as more than one line — the
+   reasoning being that six times four hundred metres is not one effort and
+   cannot be carried to a race distance. True, and it threw out the baby with
+   it: a time trial is almost always logged as three lines, because a time
+   trial is a warm-up, the effort, and a cool-down.
+
+   Preston ran a 5:19 mile on 29 July and logged it exactly that way — one
+   easy mile, the mile, one easy mile. Every training pace in his plan was
+   built off the 5:48 he ran in August instead, because the 5:19 sat inside a
+   three-line session and this refused to look. His threshold came out at
+   7:54/mi, which is a minute and a half slower than his actual threshold, and
+   the plan handed him a "hard run" at it.
+
+   continuousRunEfforts takes a session apart and hands over each continuous
+   piece on its own — which is what the race predictor has always used, and
+   why the goal card could see the 5:19 while the plan could not. The guards
+   that matter are per piece, not per session: runQuality rejects anything
+   under half a mile, so the four-hundreds and the 0.31-mile repeats are out
+   on their own merits, and the mile inside the session is in. */
 export function continuousEfforts(records: CardioRecord[], sinceIso?: string, excluded: string[] = []): Effort[] {
   const blocked = new Set(excluded);
   const out: Effort[] = [];
   for (const record of records || []) {
     if (sinceIso && String(record.date) < sinceIso) continue;
     for (const raw of record.cardioSessions || []) {
-      const session = raw as { activity?: string; prescription?: { legacyIntervals?: unknown[] } };
-      if (!/run/i.test(session.activity || '')) continue;
-      const intervals = session.prescription?.legacyIntervals;
-      if (Array.isArray(intervals) && intervals.length > 1) continue;
-      const miles = cardioMiles(raw as never);
-      const minutes = summarizeCardioDraft(raw as never).minutes;
-      if (miles < 0.75 || !minutes) continue;
-      const seconds = minutes * 60;
-      if (!isRaceEvidence(miles, seconds)) continue;
-      /* An effort the athlete has told Forge was not real cannot quietly come
-         back as the source of every training pace. */
-      if (blocked.has(effortKey({ date: record.date, miles, seconds }))) continue;
-      out.push({ date: record.date, miles, seconds });
+      const session = raw as { activity?: string };
+      if (!/run|jog|tempo|track|base|easy|speed|long/i.test(session.activity || '')) continue;
+      for (const piece of continuousRunEfforts(raw as never)) {
+        const seconds = piece.minutes * 60;
+        if (piece.miles < 0.75 || !piece.minutes) continue;
+        if (!isRaceEvidence(piece.miles, seconds)) continue;
+        /* An effort the athlete has told Forge was not real cannot quietly
+           come back as the source of every training pace. */
+        if (blocked.has(effortKey({ date: record.date, miles: piece.miles, seconds }))) continue;
+        out.push({ date: record.date, miles: piece.miles, seconds });
+      }
     }
   }
   return out;
 }
 
+/* THE HARDEST CONTINUOUS RUN, over the same pieces the model is fitted from.
+   It had its own copy of the filtering above, which is how the two came to
+   disagree about whether a mile inside a time trial counts. */
 export function hardestEffort(records: CardioRecord[], sinceIso?: string, excluded: string[] = []): PerformanceEvidence | null {
-  const blocked = new Set(excluded);
-  let best: (PerformanceEvidence & { mileEquivalent: number }) | null = null;
-  for (const record of records || []) {
-    if (sinceIso && String(record.date) < sinceIso) continue;
-    for (const raw of record.cardioSessions || []) {
-      const session = raw as { activity?: string; prescription?: { legacyIntervals?: unknown[] } };
-      if (!/run/i.test(session.activity || '')) continue;
-      const intervals = session.prescription?.legacyIntervals;
-      if (Array.isArray(intervals) && intervals.length > 1) continue;
-      const miles = cardioMiles(raw as never);
-      const minutes = summarizeCardioDraft(raw as never).minutes;
-      if (miles < 0.75 || !minutes) continue;
-      const seconds = minutes * 60;
-      if (!isRaceEvidence(miles, seconds)) continue;
-      /* An effort the athlete has told Forge was not real cannot quietly come
-         back as the source of every training pace. */
-      if (blocked.has(effortKey({ date: record.date, miles, seconds }))) continue;
-      const mileEquivalent = equivalentSeconds(seconds, miles, 1);
-      if (!best || mileEquivalent < best.mileEquivalent) best = { miles, seconds, date: record.date, mileEquivalent };
-    }
+  let best: (Effort & { mileEquivalent: number }) | null = null;
+  for (const effort of continuousEfforts(records, sinceIso, excluded)) {
+    const mileEquivalent = equivalentSeconds(effort.seconds, effort.miles, 1);
+    if (!best || mileEquivalent < best.mileEquivalent) best = { ...effort, mileEquivalent };
   }
   return best ? { miles: best.miles, seconds: best.seconds, date: best.date } : null;
 }
