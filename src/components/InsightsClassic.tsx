@@ -27,16 +27,28 @@ const hasCardioSession = (record: WorkoutRecord) => (record.cardioSessions || []
    not: it answers "what have I neglected", and crediting a 2k row as a back
    session is how that question gets the opposite of the right answer.
 
-   So this subtracts rather than gates. A muscle drops out of the count when
+   So this SUBTRACTS rather than gates. A muscle drops out of the count when
    nothing but cardio put it there on that day; a muscle a lift also trained
-   stays. A day with no lifting on it counts nothing at all. Both are decided
-   from the day's own sets, so days already saved count correctly too. */
+   stays.
+
+   IT USED TO GATE AS WELL, AND THE GATE WAS EATING REAL TRAINING. "No lifted
+   top set on this day, so the day trained no muscle group" sounds right and is
+   not: Forge only knows the ONE top set per lift that somebody bothered to
+   record, and a day can be a full leg session with none of them typed in.
+   Preston's chart said he had trained quads 11 times in three months. He had
+   trained them 23 times. The twelve it dropped are days tagged Quads +
+   Hamstrings + Glutes, several of them titled "Evening Weight Training" by
+   Strava, that happened to have a run logged and no top set — so a cardio
+   session on a lifting day silently deleted the lifting.
+
+   The day's muscle list is the athlete's own statement about what they
+   trained. The only thing a chart may take off it is what a CARDIO movement
+   put there, which is exactly what fromCardioOnly does and all it needs to
+   do. A day with nothing on it but a run carries ['Cardio'] and still counts
+   nothing, because that is the whole list. */
 const musclesTrainedOn = (record: WorkoutRecord, isCardioLift: (name: string) => boolean, musclesOf: (lift: string) => string[]) => {
   const completed = (record.topSets || []).filter(set => set.completed !== false && set.lift);
   const lifted = completed.filter(set => !isCardioLift(set.lift));
-  /* Cardio and nothing else: the day trained no muscle group, whatever its
-     movements are tagged with or whatever its split day was called. */
-  if (!lifted.length && (hasCardioSession(record) || completed.length)) return [];
   const fromLifts = new Set(lifted.flatMap(set => musclesOf(set.lift)));
   const fromCardioOnly = new Set(completed.filter(set => isCardioLift(set.lift))
     .flatMap(set => musclesOf(set.lift)).filter(muscle => !fromLifts.has(muscle)));
