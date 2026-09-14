@@ -98,7 +98,12 @@
 /* A DAY'S DESCRIPTION CUT MID-WORD IS WORSE THAN NO DESCRIPTION. One line
    with an ellipsis turned "Chest + Back strength · map an exercise for a
    prescription" into "Chest + Back strength · map …". Two lines fit it. */
-.pv-row-body small{color:var(--ink-2);font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+/* ONE LINE A DAY, COLLAPSED. At two lines a week of five training days was
+   ten lines of grey prose stacked under five headings, and the row that hit
+   the clamp ended in "..." while the ones that did not wrapped — so the list
+   had no rhythm to scan down at all. The summary is a glance, not a session:
+   one line, elided, and the whole session is one tap away. */
+.pv-row-body small{color:var(--ink-2);font-size:13px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pv-row-state{font-size:12px;font-weight:800;color:var(--ink-3);min-width:16px;text-align:right;white-space:nowrap}
 .pv-row.today{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .pv-row.today .pv-row-date b,.pv-row.today .pv-row-date small,.pv-row.today .pv-row-state{color:var(--accent-text)}
@@ -108,9 +113,22 @@
 .pv-row.rest .pv-row-body strong{color:var(--ink-3);font-weight:600}
 .pv-row.rest .pv-row-body small{color:var(--ink-3)}
 .pv-row.open .pv-row-main{padding-bottom:6px}
+/* AND AN OPEN ROW SAYS EACH THING ONCE. The elided teaser and the detail under
+   it are the same session — "Hard run Short fartlek …" sitting directly above
+   "Hard run / Short fartlek — 6 × 1 min …" is the row telling you twice, worse
+   the first time. Open it and the summary gives way to the real thing. */
+.pv-row.open .pv-row-body small{display:none}
 .pv-row-detail{padding:0 18px 14px 74px}
 .pv-row-detail .pv-line{padding:8px 0}
+/* AND THE EXPANSION IS DETAIL, NOT A SECOND SET OF HEADINGS. The value column
+   wears the display face at 800 because a lift load is the point of its row —
+   "475 lb × 2" should hit you. A prescription sentence in the same weight
+   wraps to three bold lines under a bold label and out-shouts the day it
+   belongs to, which is what made an opened row read as heavier than the five
+   closed ones around it. Lifts keep their weight; sentences read as prose. */
 .pv-row-detail .pv-line-value{font-size:15px}
+.pv-row-detail .pv-line-run .pv-line-name{color:var(--ink-2);font-weight:700;font-size:13px}
+.pv-row-detail .pv-line-run .pv-line-value{font:500 14px var(--body);color:var(--ink);line-height:1.45}
 .pv-row-detail p{margin:0;color:var(--ink-2);font-size:13px;line-height:1.5}
 
 /* ── The whole block ────────────────────────────────────────────────────── */
