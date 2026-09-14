@@ -31,17 +31,32 @@ const everySlot = Array.from({ length: 20 }, (_, sessions) => wavePrescription(2
 check('no 1-rep slot anywhere in twenty sessions', everySlot.every(set => set.reps > 1));
 check('and none of them is flagged a max', everySlot.every(set => !set.isMax));
 
-console.log('\n  the load steps up one plate every fifth completed session, compounding');
+console.log('\n  the raise proposes one plate every fifth session — and evidence decides');
+/* THESE THREE CHECKS USED TO PIN THE OPPOSITE, and the opposite was a bug.
+   The raise compounded on session count alone, so a lift whose calculated max
+   had not moved in two months still had its working max written up by a plate
+   every fifth time the athlete turned up — and the rung came out at a weight
+   nobody had been near. Attendance is not strength. The raise may still
+   propose; the cap below decides. */
 const at = sessions => wavePrescription(200, 0, { accessory: true, sessions }).weight;
-/* Compared on ONE rung of the cycle — every fourth session is the 12 again —
-   so the only thing moving between them is the working max. */
-const expected = sessions => Math.max(5, Math.ceil(weightForReps(200 + Math.floor(sessions / ACCESSORY_SESSIONS_PER_RAISE) * 5, 12) / 5) * 5);
 const sameRung = [0, 4, 8, 12, 16, 20];
-const wrong = sameRung.filter(sessions => at(sessions) !== expected(sessions));
-check('every twelve is written off 200 plus a plate per five sessions', wrong.length === 0,
-  sameRung.map(s => `${s}:${at(s)}`).join(' '));
-check('the fifth session is the first raise', at(4) === expected(4) && at(8) > at(4), `${at(4)} → ${at(8)}`);
-check('and the raises stack rather than repeating', at(20) === expected(20) && at(20) > at(8), `${at(8)} → ${at(20)}`);
+/* Compared on ONE rung of the cycle — every fourth session is the 12 again —
+   so the only thing that could move between them is the working max. */
+const ceiling = Math.max(5, Math.floor((weightForReps(200, 12) + 5) / 5) * 5);
+check(`every twelve is capped at what a 200 max is worth there, plus a plate (${ceiling})`,
+  sameRung.every(sessions => at(sessions) === ceiling), sameRung.map(s => `${s}:${at(s)}`).join(' '));
+check('so turning up twenty times does not add a pound to a max that has not moved',
+  at(20) === at(0), `${at(0)} → ${at(20)}`);
+/* And the raise is not dead — it is what carries the load up as soon as the
+   athlete gives it something to carry. */
+check('a better max raises every rung at once',
+  wavePrescription(240, 0, { accessory: true, sessions: 0 }).weight > at(0),
+  `${at(0)} → ${wavePrescription(240, 0, { accessory: true, sessions: 0 }).weight}`);
+/* The rung is read at the exact rep count it was run at — lastAt keeps
+   twelves as twelves, where the anchors clamp them to ten. */
+check('and a completed set at that rung raises it too',
+  wavePrescription(200, 0, { accessory: true, sessions: 0, lastAt: new Map([[12, ceiling]]) }).weight > ceiling,
+  String(wavePrescription(200, 0, { accessory: true, sessions: 0, lastAt: new Map([[12, ceiling]]) }).weight));
 check('the climb never goes backwards', sameRung.every((s, i) => i === 0 || at(s) >= at(sameRung[i - 1])), sameRung.map(at).join(' → '));
 
 console.log('\n  a 12-rep prescription is lighter than a 10-rep one');
@@ -102,6 +117,59 @@ const unpinned = wavePrescription(recovered.bests.get(key), 0, { accessory: true
 check('the 8 is back to what the max says', ladder(10).weight === unpinned.weight, `${ladder(10).weight} × 8`);
 check('and it is above the 100 he was pinned at', ladder(10).weight > 100, `${ladder(10).weight}`);
 check('while the 6 is still held at its last completed 105', ladder(11).weight === 105, `${ladder(11).weight} × 6`);
+
+
+console.log('\n  ATTENDANCE IS NOT STRENGTH');
+/* THE BUG THIS PINS, off his live account. Preston's Smith Machine Shoulder
+   Press had sat at a calculated max between 273 and 292 since July — twelve
+   sessions, no trend — and the "a plate every fifth session" raise had quietly
+   written the working max up to 302. The six-rep rung came out at 265 lb. His
+   best six is nothing at all; his best EIGHT is 235 and his best FIVE is 245.
+   A number twenty pounds over the heaviest five he has ever done, for six
+   reps, is not a progression, it is a different lift.
+
+   The back-off cannot catch it either: that fires after three failures at a
+   rung, and a rung the cycle has never asked for has no failures on it yet. */
+const press = [[235,8],[225,9],[230,8],[230,8],[205,10],[255,3],[230,8],[245,5],[235,7],[225,8],[225,7]];
+const pressAnchors = new Map();
+for (const [w, r] of press) if (w > (pressAnchors.get(r) || 0)) pressAnchors.set(r, w);
+const pressMax = Math.max(...press.map(([w, r]) => calculateEstimatedOneRepMax(w, r)));
+const pressRung = (sessions) => wavePrescription(pressMax, 0, { accessory: true, sessions, anchors: pressAnchors });
+const sixRep = pressRung(11);
+check('his calculated max is 292, off a 235 x 8', pressMax === 292, String(pressMax));
+check('the six-rep rung no longer asks for 265', sixRep.weight < 265, `${sixRep.weight} × ${sixRep.reps}`);
+check('it asks for a real personal best rather than a fictional one',
+  calculateEstimatedOneRepMax(sixRep.weight, sixRep.reps) > pressMax
+  && calculateEstimatedOneRepMax(sixRep.weight, sixRep.reps) < pressMax * 1.03,
+  `${sixRep.weight} × 6 implies ${calculateEstimatedOneRepMax(sixRep.weight, sixRep.reps)} against ${pressMax}`);
+check('and it is above the heaviest five he has done, not twenty pounds over it',
+  sixRep.weight > 245 && sixRep.weight <= 245 + 15, `${sixRep.weight} vs 245 × 5`);
+/* AND NO NUMBER OF SESSIONS BUYS ANYTHING. Turning up for another year does
+   not move a max that is not moving. */
+check('a hundred more sessions do not move the rung',
+  pressRung(111).reps === sixRep.reps ? pressRung(111).weight === sixRep.weight : true,
+  `${pressRung(111).weight} × ${pressRung(111).reps}`);
+for (const sessions of [11, 15, 19, 23]) {
+  const at = pressRung(sessions);
+  if (at.reps !== 6) continue;
+  check(`session ${sessions + 1} still asks ${sixRep.weight}`, at.weight === sixRep.weight, `${at.weight}`);
+}
+
+console.log('\n  but performance still ratchets it, which is the point');
+/* Hit the 255 and it becomes evidence: the max rises and every pressRung with it.
+   The cycle keeps its proportion; it just cannot run ahead of the athlete. */
+const hit = Math.max(pressMax, calculateEstimatedOneRepMax(sixRep.weight, 6));
+const afterHit = wavePrescription(hit, 0, { accessory: true, sessions: 11,
+  anchors: new Map([...pressAnchors, [6, sixRep.weight]]), lastAt: new Map([[6, sixRep.weight]]) });
+check('hitting it raises what the next six asks for', afterHit.weight > sixRep.weight,
+  `${sixRep.weight} → ${afterHit.weight}`);
+check('and the ladder is still a ladder underneath it',
+  pressRung(12).weight < pressRung(13).weight && pressRung(13).weight < pressRung(14).weight,
+  `${pressRung(12).weight} × 12, ${pressRung(13).weight} × 10, ${pressRung(14).weight} × 8`);
+/* A lift with no history at all has no fact to be disciplined by, and must
+   still produce a load rather than nothing. */
+const fresh = wavePrescription(0, 0, { accessory: true, sessions: 0 });
+check('a lift with no calculated max still gets a prescription', fresh.weight > 0, JSON.stringify(fresh));
 
 console.log(`\n  (one plate every ${ACCESSORY_SESSIONS_PER_RAISE} sessions)`);
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');

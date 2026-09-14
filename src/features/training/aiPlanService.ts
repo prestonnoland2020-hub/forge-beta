@@ -1012,8 +1012,54 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
        105 x 6 is not a ladder, it is four unrelated numbers that happen to sit
        on the same lift. The only thing that ever breaks the proportion is a
        rung the athlete has failed three times, which is handled above. */
-    const weight = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
-    return { weight, reps: accessoryReps, isMax: false };
+    const asked = Math.max(plateStep, Math.ceil(weightForReps(workingMax, accessoryReps) / plateStep) * plateStep);
+    /* AND ATTENDANCE IS NOT STRENGTH. The raise above compounds on every fifth
+       SESSION, which reads as progressive overload and is not: it adds a plate
+       for turning up. Preston's shoulder press has sat at a calculated max
+       between 273 and 292 since July — twelve sessions, no trend — and the
+       raises had quietly written it up to 302, so the six-rep rung came out at
+       265 lb. His best six is nothing; his best EIGHT is 235 and his best five
+       is 245. A number twenty pounds over the heaviest five he has ever done,
+       for six reps, is not a progression, it is a different lift.
+
+       The back-off above cannot catch this, because it only fires after three
+       failures at that exact rung — and the rung the cycle has never asked for
+       has no failures on it yet.
+
+       So the load is capped at what the athlete's REAL calculated max is worth
+       at that rep count, plus one plate step: enough to be a progression
+       rather than a mirror, and no more. It still ratchets, and now it ratchets
+       off performance — his 235 × 8 makes 292, which allows 255 × 6, and 255 ×
+       6 makes 296, which allows the next one. The raise may propose; it may no
+       longer invent. */
+    /* ONE STEP ABOVE THE BEST OF TWO THINGS: the heaviest set the athlete has
+       actually completed at THIS rep count, and what their calculated max says
+       the rep count is worth. Whichever is higher, plus a plate.
+
+       Both halves are needed. Without the rung's own history it stalls — his
+       255 × 6 implies a 296 max, and one plate on a 250 lb lift is more than
+       296 is above 292, so the ceiling would never clear 255 again and the
+       rung would sit there for good. Without the max, an old light set at a
+       rep count holds back a lifter whose other work has moved on, which is
+       the same trap loadFromAnchors is written to avoid. */
+    /* READ AT THE EXACT REP COUNT, never through the ten-rep clamp the anchors
+       use. A twelve-rep set is stored under the anchor key 10, so reading the
+       floor through `anchors` gave the twelve and the ten the same number and
+       the ladder stopped being a ladder. `lastAt` keeps the rep count as it was
+       run, up to twelve, which is what this cycle needs. */
+    const slot = Math.min(Math.max(Math.round(accessoryReps), 1), PRESCRIPTION_REP_CAP);
+    const doneHere = lastAt?.get(slot) || 0;
+    const fromMax = best > 0 ? weightForReps(best, accessoryReps) : 0;
+    const plate = (value: number) => Math.max(plateStep, Math.floor(value / plateStep) * plateStep);
+    const ceiling = doneHere || fromMax ? plate(Math.max(doneHere, fromMax) + plateStep) : Infinity;
+    /* AND THE SAME EVIDENCE IS A FLOOR, because the cap alone would stall the
+       high rungs. A twelve is credited no higher than a ten-rep set (REP_MAX_CAP
+       refuses to believe a twelve as proof of a bigger max), so completing the
+       twelve never moves the max it was written from — and with the raise
+       capped, the rung would ask for the same bar for ever. One plate above
+       what the athlete last put up there, always. */
+    const floor = doneHere ? plate(doneHere + plateStep) : 0;
+    return { weight: Math.max(floor, Math.min(asked, ceiling)), reps: accessoryReps, isMax: false };
   }
   /* When the caller knows what the block is doing, the block decides the test
      and the lift's own rung only picks its place on the ramp. */

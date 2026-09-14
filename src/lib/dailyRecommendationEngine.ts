@@ -21,7 +21,14 @@ import { liftPositions, rungFor } from './liftProgression';
    it. v5 is the anchored loader — the logger writing its bar from the same
    evidence the Plan tab does. Completed rows are left alone; they are history,
    not a prescription. */
-export const DAILY_RECOMMENDATION_VERSION='anchored-loads-v5';
+/* v6 is the accessory cap: the 12/10/8/6 cycle used to add a plate to the
+   working max every fifth SESSION, so Preston's shoulder press — a calculated
+   max flat between 273 and 292 since July — came out at 265 x 6 against a best
+   eight of 235 and a best five of 245. Attendance is not strength. Bumping the
+   version is the whole point of having one: the stored row on his phone was
+   written by v5 and would otherwise keep showing 265 all day beside a build
+   that no longer produces it. */
+export const DAILY_RECOMMENDATION_VERSION='accessory-cap-v6';
 
 export type RecommendationSplitDay={
   id?:string;
