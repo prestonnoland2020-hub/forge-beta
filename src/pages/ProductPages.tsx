@@ -141,11 +141,17 @@ function WorkoutEditor() {
   const prescribeSplitDay=(index:number):LoggedTopSet[]=>{
     const day=savedDays[index];
     const built=recommendationFor(index+1,day?.name);
-    /* The row carries what it ASKED for as well as what it shows, so editing
-       the weight or reps before logging does not erase the prescription the
-       set is answering. */
+    /* THE WEIGHT FIELD STARTS EMPTY. It used to open holding the prescribed
+       load, and a pre-typed number is an answer the athlete did not give: the
+       fastest path through the row was to confirm a weight nobody lifted, and
+       the one time the wave asked for something wrong (265 x 6 off a 235 best)
+       the app was the one putting it in the box. The ask is still on the row —
+       labelled as the ask, in prescribedWeight / prescribedReps, which is what
+       progression reads — and the dial waits for what actually happened. The
+       rep target stays, because the slot IS the prescription: 8, 6, 4, 2, 1 is
+       the shape of the block, not a guess at a result. */
     const prescribed:LoggedTopSet[]=(built?.topSets||[]).filter(set=>set.selected)
-      .map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true,prescribedReps:set.reps||undefined,prescribedWeight:set.weight||undefined}));
+      .map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:0,reps:set.reps,calculatedMax:undefined,completed:true,prescribedReps:set.reps||undefined,prescribedWeight:set.weight||undefined}));
     if(prescribed.length)return prescribed;
     /* No prescription for this day yet — a lift with no logged history has
        nothing to wave off. The day's own mapped movements still stand as rows
@@ -168,7 +174,7 @@ function WorkoutEditor() {
      initial render and the day picker came to disagree about what a chosen day
      prescribes. */
   const splitDayTopSets:LoggedTopSet[]=prescribeSplitDay(selectedPlanDay);
-  const recommendationTopSets:LoggedTopSet[]=(recommendation?.topSets||[]).filter(set=>set.selected).map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax||undefined,completed:true,prescribedReps:set.reps||undefined,prescribedWeight:set.weight||undefined}));
+  const recommendationTopSets:LoggedTopSet[]=(recommendation?.topSets||[]).filter(set=>set.selected).map(set=>({recommendationTopSetId:set.id,muscle:set.muscle,lift:set.exercise,weight:0,reps:set.reps,calculatedMax:undefined,completed:true,prescribedReps:set.reps||undefined,prescribedWeight:set.weight||undefined}));
   /* Editing shows ONLY what the record actually holds — a day logged without
      top sets must never be back-filled with today's recommendation or the
      split day's template sets. */

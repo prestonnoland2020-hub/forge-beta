@@ -54,7 +54,9 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      than being told while you are still looking at it. */
   const [checking, setChecking] = useState<CreatedGoal | null>(null);
   const activeIndex = selected === null ? null : Math.min(selected, Math.max(0, goals.length - 1));
-  const toggleGoal = (index: number) => setSelected(current => (current === index ? null : index));
+  /* Collapsing takes a half-pressed Delete with it — reopening a goal must
+     not find it already asking "Sure?" about a tap made minutes ago. */
+  const toggleGoal = (index: number) => { setConfirming(null); setSelected(current => (current === index ? null : index)); };
   const openBuilder = (index: number | null = null) => { setEditing(index); setOpen(true); };
 
   return <div className={embedded ? 'stack-xl goals-workspace goals-single-page embedded' : 'stack-xl goals-workspace goals-single-page'}>
@@ -76,16 +78,13 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
         for one, so none of them gets one. The athlete is told to pick rather
         than quietly handed a compromise that serves nothing. */}
     {clash && <section className="card goal-clash">
-      <strong>{clash.races.length} races on the same date</strong>
-      {/* Three sentences said what one says: a block peaks for one race, so
-          move the others. The list and the date are the information. */}
-      <p>{clash.races.join(', ')} are all on {new Date(`${clash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. A block peaks for one — move the others out a few weeks, or all three get a compromise.</p>
-      {/* AND SAY WHICH ONE IT CHOSE. Telling someone to pick while quietly
-          picking for them is the same silence in a friendlier voice: the plan
-          is paced off one of these races today, and they cannot judge the
-          advice without knowing which. The longest race wins, because a build
-          for it gives the shorter ones a base and the reverse gives nothing. */}
-      {built && <p className="goal-clash-built">For now it is built for the <strong>{built.goal.title || built.goal.exercise}</strong>, the longest of them. The shorter ones train inside it.</p>}
+      <strong>{clash.races.length} races on {new Date(`${clash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</strong>
+      {/* TWO PARAGRAPHS SAID WHAT TWO LINES SAY. A block peaks for one race,
+          and it is already peaking for one of these — which one is the thing
+          the athlete cannot judge the advice without. Everything else was
+          explaining a rule they can see the effect of. */}
+      <p>{clash.races.join(', ')}. A block peaks for one — move the others out a few weeks.</p>
+      {built && <p className="goal-clash-built">Built for <strong>{built.goal.title || built.goal.exercise}</strong>, the longest. The others train inside it.</p>}
     </section>}
 
     <MileageGate />
@@ -114,7 +113,12 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               <span className="goal-card-target">{formatGoalTarget(goal.target, goal.metric, goal.unit)}<small>{goal.metric}</small></span>
               {verdict && <span className={`goal-card-verdict ${verdict.verdict}`}><i aria-hidden="true" />{verdictLabel(verdict.verdict)}</span>}
             </button>
-            <div className="goal-card-actions">
+            {/* EDIT AND DELETE BELONG TO THE GOAL YOU OPENED. A row of two
+                buttons under every goal is a row of two buttons the athlete
+                is not using: six goals paid for six of them, and the list —
+                the one thing the page is for — could not fit on a screen.
+                The card opens on a tap; its actions open with it. */}
+            {isOpen && <div className="goal-card-actions">
               <button onClick={() => openBuilder(index)} aria-label={`Edit ${goal.title}`}>Edit</button>
               <button
                 className={confirming === index ? 'danger confirming' : 'danger'}
@@ -123,7 +127,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
                 aria-label={confirming === index ? `Confirm deleting ${goal.title}` : `Delete ${goal.title}`}>
                 {confirming === index ? 'Sure?' : 'Delete'}
               </button>
-            </div>
+            </div>}
             {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
           </li>;
         })}

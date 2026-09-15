@@ -120,7 +120,10 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const todaySession=weekSessions.find(session=>localDayIso(session.date)===todayIso);
   const loggedToday=records.find(record=>record.date===todayIso&&((record.topSets||[]).some(set=>set.completed!==false)||(record.cardioSessions||[]).length>0));
   const unit='lb';
-  const sentence=`${waveSentence(0)}${active.mileage?` ${active.mileage} mi of running.`:''} Numbers firm up as you log.`;
+  /* "Numbers firm up as you log" was printed under the week heading AND on
+     every projected week below it. Once is enough, and the week it is about is
+     the place for it. */
+  const sentence=`${waveSentence(0)}${active.mileage?` ${active.mileage} mi of running.`:''}`;
   const short=(date:Date)=>date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const range=weekSessions.length?`${short(weekSessions[0].date)} – ${short(weekSessions[weekSessions.length-1].date)}`:'';
   swipeTo.current=direction=>setViewWeek(current=>Math.max(0,Math.min(current+direction,roadmap.length-1)));
@@ -132,6 +135,6 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
     {viewWeek===0&&<TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout"/>}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={viewWeek===0?'This week':`Week ${viewWeek+1} · ${range}`}
-      note={viewWeek>0?'Weeks past this one are a projection. Numbers firm up as you log.':undefined}/>
+      note={viewWeek>0?'A projection \u2014 numbers firm up as you log.':undefined}/>
   </div>;
 }
