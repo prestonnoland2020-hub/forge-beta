@@ -405,7 +405,14 @@ function WorkoutEditor() {
        would then stamp the NEXT split day's name onto the session that was
        just logged. */
     const existingDay=records.find(record=>record.date===sessionIso);
-    const title=editingRecord?.title||existingDay?.title||(usingSplit?(plannedDay?.name||'Planned Workout'):'Custom Workout');
+    /* EXCEPT WHEN THE ATHLETE HAS JUST SAID WHICH DAY IT IS. The stickiness
+       above is there so the split cursor advancing cannot restamp a finished
+       session — it is not a reason to keep a name the athlete has explicitly
+       overruled. Preston assigned a Strava import to Legs 2 and it stayed
+       titled "Afternoon Weight Training": "this should never be the case if
+       I'm choosing my split day". Choosing the day names the day. */
+    const assignedName=dayOverride?savedDays[selectedPlanDay]?.name:'';
+    const title=assignedName||editingRecord?.title||existingDay?.title||(usingSplit?(plannedDay?.name||'Planned Workout'):'Custom Workout');
     /* The sheet is the only way a set is entered, and it saves as completed —
        so the day's sets ARE the completed ones. There is no half-typed manual
        lift left on the screen to rescue at save time any more. */

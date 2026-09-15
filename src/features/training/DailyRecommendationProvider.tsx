@@ -24,7 +24,16 @@ type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:st
   recommendationFor:(position:number,name?:string)=>DailyRecommendation|null;
   /* The calendar date recommendation.splitDay belongs to — today, or tomorrow
      when today has already been trained. */
-  anchorDate:string};
+  anchorDate:string;
+  /* AND THE POSITION THAT DATE IS OWED, which is NOT always the position on
+     `recommendation`. Once today's session is logged the stored row stays on
+     screen as the completed day — that is the point of it — so its position is
+     the day just FINISHED while anchorDate has moved to tomorrow. Anything
+     drawing a calendar from the pair painted the finished day onto tomorrow:
+     Preston logged Sharms 2 on Monday and the plan offered Sharms 2 again on
+     Tuesday, with the rest day pushed to Wednesday and the whole week shifted
+     behind it. The cursor knows the answer; this is it. */
+  anchorPosition:number};
 const Context=createContext<Value|null>(null);
 const isoToday=()=>{const date=new Date();return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`};
 
@@ -349,7 +358,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      blank behind "Forge hit a snag". Fall back to the freshly built one rather
      than handing the app a recommendation with a hole in it. */
   const recommendation=(stored?.splitDay?stored:null)||generated;
-  const value=useMemo<Value>(()=>({recommendation,loading,syncError,recommendationFor,anchorDate,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist,recommendationFor]);
+  const value=useMemo<Value>(()=>({recommendation,loading,syncError,recommendationFor,anchorDate,anchorPosition:duePosition,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist,recommendationFor,anchorDate,duePosition]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
