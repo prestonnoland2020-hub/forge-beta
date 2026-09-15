@@ -636,6 +636,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      is actually showing rather than all four. */
   const hardZone = zoneOfPrescription(weekPlan.sessions.find(session => session.run?.kind && /hard|threshold|interval|rep|race/i.test(session.run.kind))?.run?.text
     || week.quality);
+  /* Everything the plan has to SAY about this week, as against everything it
+     has to show. Collected in one place so the screen can fold them into a
+     single line rather than stacking a paragraph each. */
+  const notes = [
+    collision?.say,
+    easyWarning,
+    hardZone ? levelNote(hardZone, levels.levels, levels.moves) : '',
+  ].filter((note): note is string => Boolean(note));
 
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
      of them, not whichever goal happened to be created first — falling back to
@@ -677,7 +685,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   /* A week that has not happened is a projection, and the screen says so where
      the week is rather than in a note at the bottom of the page. This is the
      sentence the folded "whole block" panel used to carry. */
-  const projection = `Weeks past this one are a projection: each time a rep count comes round it asks for one more step. Beat a set and the numbers rise; miss one and they hold.${records.length ? '' : ' Log a set and the first numbers appear.'}`;
+  const projection = `A projection — beat a set and the numbers rise, miss one and they hold.${records.length ? '' : ' Log a set and the first numbers appear.'}`;
   const workoutHref = recommendation ? `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}` : '/workout';
   swipeTo.current = direction => {
     const next = weekIndex + direction;
@@ -729,15 +737,25 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {/* Today belongs to today. Looking at week six, there is no "today" in it,
         and a card headed TODAY over a week in October would be a lie. */}
     {weekIndex === currentIndex && <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />}
-    {collision ? <p className="pv-collision">{collision.say}</p> : null}
-    {easyWarning ? <p className="pv-collision">{easyWarning}</p> : null}
-    {/* WHY THE HARD RUN IS THE SIZE IT IS. A dose that moved because a session
-        went well is a dose the athlete will trust; a number that changed
-        silently is the one they screenshot and ask about. */}
-    {hardZone ? <p className="pv-collision">{levelNote(hardZone, levels.levels, levels.moves)}</p> : null}
+    {/* THREE PARAGRAPHS OF ADVICE, FOLDED INTO ONE LINE.
+
+        Each of these earns its place — why the long run follows a leg day, that
+        the easy runs are being run too hard, why the hard run is the size it
+        is (a dose that moved because a session went well is a dose the athlete
+        will trust; a number that changed silently is the one they screenshot
+        and ask about). Each is also a paragraph, and stacked between the
+        today card and the week they were most of the screen: advice nobody
+        reads because there is too much of it to start.
+
+        They are notes ABOUT the week, not the week. One line that says how
+        many there are, open on a tap. */}
+    {notes.length > 0 && <details className="pv-notes">
+      <summary>{notes.length === 1 ? 'One note on this week' : `${notes.length} notes on this week`}</summary>
+      {notes.map(note => <p key={note}>{note}</p>)}
+    </details>}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />
-    {liveAdjusted ? <p className="pv-footnote">Loads on this screen follow your latest logged bests, so they can differ from the block as first written.</p> : null}
+    {liveAdjusted ? <p className="pv-footnote">Loads follow your latest logged bests.</p> : null}
   </div>;
 }

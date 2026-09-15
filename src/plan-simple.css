@@ -182,8 +182,29 @@
 
 /* ── Wider screens: today and the week side by side ─────────────────────── */
 @media(min-width:960px){
-  .pv{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);align-items:start;column-gap:18px}
-  .pv>.untrained-goal-banner,.pv>.pv-progress,.pv>.pv-actions,.pv>.pv-block,.pv>.pv-footnote,.pv>.pv-state,.pv>.pv{grid-column:1/-1}
+  /* Dense packing, because the week is the only item that asks for a column
+     it did not arrive at. Sparse placement leaves the grid cursor past the
+     today card by the time it reads the week, so the week started a row late
+     and the top of column two was blank. */
+  .pv{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);align-items:start;column-gap:18px;grid-auto-flow:row dense}
+  /* THE RIGHT HALF WAS EMPTY. The side-by-side was written by listing the bands
+     that span and letting auto-placement sort out the rest, and auto-placement
+     cannot: every card not on the list landed in whichever cell came next, so
+     the week ended up under the today card in column one and the whole right
+     half of a desktop was blank. The bands that span are listed in full now —
+     the pressure card and the mileage gate were missing, which is what pushed
+     the week off its row — and the two cards that are meant to sit beside each
+     other say which column they are in rather than hoping. */
+  .pv>.untrained-goal-banner,.pv>.pv-progress,.pv>.pv-actions,.pv>.pv-block,
+  .pv>.pv-footnote,.pv>.pv-state,.pv>.plan-pressure,
+  .pv>.mileage-gate,.pv>.pv{grid-column:1/-1}
+  /* The today card and the notes about the week stack in column one; the week
+     itself takes column two across both of their rows. The notes fold must NOT
+     span here — a band across both columns occupies the row, so the week could
+     only start below it and a desktop got a hole the height of the today card
+     under the today card. */
+  .pv>.pv-today,.pv>.pv-notes{grid-column:1}
+  .pv>.pv-week{grid-column:2;grid-row:span 2}
   .pv-today{position:sticky;top:12px}
 }
 
@@ -201,3 +222,20 @@
 /* One line saying why the week is shaped the way it is. Quiet by design: it is
    an explanation, not an alert, and it sits above the week it explains. */
 .pv-collision{margin:0 0 10px;padding:10px 12px;border-left:2px solid var(--accent,#2f6fd0);background:var(--surface-2,rgba(127,127,127,.06));border-radius:0 8px 8px 0;font-size:13px;line-height:1.5;color:var(--ink-2)}
+
+/* NOTES ABOUT THE WEEK, NOT THE WEEK.
+
+   Three of these used to stack between the today card and the week list, one
+   paragraph each, and together they were most of the screen — advice nobody
+   reads because there is too much of it to start. Folded into one line that
+   says how many there are, they cost nothing until the athlete wants them.
+   Closed by default: the week is what the screen is for. */
+.pv-notes{margin:0;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-2);overflow:hidden}
+.pv-notes>summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12.5px;font-weight:700}
+.pv-notes>summary::-webkit-details-marker{display:none}
+.pv-notes>summary::after{content:"›";color:var(--ink-3);font-weight:800;transition:transform .15s ease}
+.pv-notes[open]>summary::after{transform:rotate(90deg)}
+.pv-notes[open]>summary{border-bottom:1px solid var(--hairline)}
+.pv-notes p{margin:0;padding:11px 14px;border-top:1px solid var(--hairline);color:var(--ink-2);font-size:13px;line-height:1.5}
+.pv-notes p:first-of-type{border-top:0}
+@media(prefers-reduced-motion:reduce){.pv-notes>summary::after{transition:none}}

@@ -33,7 +33,12 @@ async function page(seed) {
   await p.waitForTimeout(2500);
   check('unmapped split is sent to the mapping step', p.url().includes('/onboarding'), p.url());
   const heading = await p.locator('.setup-heading h2').innerText().catch(() => '');
-  check('it opens ON the mapping step', /movements Forge programs/i.test(heading), heading);
+  /* Asserted on the step's NAME rather than its subtitle — the subtitle is
+     copy and got shortened ("the movements Forge programs on each day" became
+     "the movement Forge measures each day by"), which failed this line
+     instead of the routing it is here to test. */
+  const eyebrow = await p.locator('.setup-heading .eyebrow').innerText().catch(() => '');
+  check('it opens ON the mapping step', /what each day trains/i.test(eyebrow), `${eyebrow} / ${heading}`);
   await p.screenshot({ path: '/tmp/tour/setup-map.png', fullPage: true });
   /* Finish is refused while a day names nothing. */
   await p.locator('.setup-actions .button:not(.ghost)').click();

@@ -4,3 +4,15 @@
    layer as this sheet, and landed square on top of the Continue button — on
    the one step where the sheet is tall enough to need it. */
 body:has(.goal-builder-backdrop) .coach-bubble-shell{display:none}
+
+/* FOUR BUTTONS INSTEAD OF A MENU OF THIRTY-SEVEN. The lift is the first thing
+   anybody picks and it is almost always one of the same four; the rest of the
+   library sits in a select underneath and is not offered at all on a first
+   goal. See src/lib/coreLifts.ts. */
+.goal-lift-pick{border:0;padding:0;margin:0;display:grid;gap:8px}
+.goal-lift-pick legend{padding:0;font-size:12px;font-weight:700;color:var(--ink-2)}
+.goal-lift-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.goal-lift-chips button{min-height:46px;padding:10px 12px;border:1px solid var(--hairline-strong);border-radius:10px;background:var(--surface-2);color:var(--ink);font:700 14px var(--body);text-align:center}
+.goal-lift-chips button.active{border-color:var(--accent);background:color-mix(in srgb,var(--tint) 10%,var(--surface-2));color:var(--accent-text)}
+.goal-lift-other{font-size:12px}
+.goal-lift-pick>small{color:var(--ink-3);font-size:12px;line-height:1.45}

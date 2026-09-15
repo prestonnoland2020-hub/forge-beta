@@ -113,3 +113,32 @@
    below it is not, and inherited the label's uppercase warning styling. */
 .goal-clash .goal-clash-built{margin-top:8px;color:var(--text-muted,#6b6b6b)}
 .goal-clash .goal-clash-built strong{display:inline;font-size:inherit;letter-spacing:normal;text-transform:none;color:var(--text);margin:0}
+
+/* THE CARD SAID EVERYTHING TWICE. Under the four tiles sat a FORGE ASSESSMENT
+   block whose rows were "Where you are", "Worth today" and "Gap to target" —
+   the CURRENT, PROJECTED and TO GO tiles directly above it, in words instead
+   of numbers. The only thing that was ONLY in there is the pair of
+   forward-looking ranges, and each of those is one line. */
+.goal-outlook{display:grid;gap:3px;margin:0;padding:11px 22px 13px;border-top:1px solid var(--line);color:var(--ink-2);font-size:13px;line-height:1.5}
+.goal-outlook b{color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+
+/* FIT MORE OF A GOAL ON ONE SCREEN. Opening a goal used to be a scroll: a
+   verdict, four tiles, a disclosure and a second table of the same numbers,
+   each in a card with desktop padding. The duplicate table is gone (see
+   .goal-outlook above); the rest is the same information in less room —
+   tighter blocks, one line per stat label, and the header on one row. */
+.goal-card-detail .goal-tracker-simple > header{padding:14px 16px}
+.goal-card-detail .goal-tracker-simple > header h3{font-size:17px;margin:2px 0 0}
+.goal-card-detail .goal-verdict{padding:12px 16px}
+.goal-card-detail .goal-verdict p{margin:4px 0 0;font-size:13px;line-height:1.45}
+.goal-card-detail .goal-stat-tiles{gap:6px}
+.goal-card-detail .goal-stat-tiles .gst{padding:11px 14px}
+.goal-card-detail .goal-stat-tiles .gst strong{font-size:19px}
+.goal-card-detail .goal-outlook{padding:10px 16px 12px}
+.goal-card-detail .goal-sources-details summary{padding:10px 16px}
+/* FOUR ACROSS ONLY WHERE FOUR FIT. Tried at 430px and it was worse than the
+   scroll it saved: "Not logged" broke as "Not logge / d" and "7 ahead" as "7
+   ahea / d", because the tile value is allowed to break anywhere rather than
+   run off the edge. Two-up on a phone, four-up from a width where the words
+   survive. */
+@media (min-width:560px){.goal-card-detail .goal-stat-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}

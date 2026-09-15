@@ -341,7 +341,6 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
       <strong>{verdict.verdict === 'reachable' ? 'On the numbers, yes' : verdict.verdict === 'needs-more' ? 'Not on this training' : 'Not by this date'}</strong>
       <p>{verdict.say}</p>
       {verdict.insteadOf && <p className="goal-verdict-instead">{verdict.insteadOf}</p>}
-      {verdict.change && <p className="goal-verdict-change">{verdict.change}</p>}
     </div>}
     <section className="goal-stat-tiles">
       <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{currentEvidence?.date?formatDate(currentEvidence.date):'Best logged evidence'}</small></div>
@@ -352,17 +351,25 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     <details className="goal-sources-details"><summary>Where these numbers come from</summary>
       <div><span>CURRENT</span><p>{currentSource}{currentEvidence?.date ? ` · ${formatDate(currentEvidence.date)}` : ''}. The best performance your logged data demonstrates.</p></div>
       <div><span>PROJECTED</span><p>{projectedSource}. A goal-specific projection — it never substitutes unrelated workouts.</p></div>
+      {/* What the volume argument actually is. On the card it was a third
+          paragraph of verdict; here it is the answer to "why". */}
+      {verdict?.change ? <div><span>WHAT WOULD CHANGE IT</span><p>{verdict.change}</p></div> : null}
+      {strengthForecast?.reason ? <div><span>FORECAST</span><p>{strengthForecast.reason}</p></div> : null}
+      <div><span>STATUS</span><p>{trajectoryStatus}.</p></div>
     </details>
     
-    {(()=>{const statusOk=['Goal reached','On track','Progressing','AI assessed'].includes(trajectoryStatus);const projText=goal.type==='Endurance'?(calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText);return <section className="goal-assessment"><header><span>FORGE ASSESSMENT</span><b className={statusOk?'on-track':'behind'}>{trajectoryStatus}</b></header>
-      <div className="ga-rows">
-        <div><span>Where you are</span><b>{actualCurrent?`${currentText}${currentEvidence?.date?` · ${formatDate(currentEvidence.date)}`:''}`:projectedOnly&&projectionRun?`Nothing logged at this distance — projected from your ${projectionRun.miles} mi on ${formatDate(projectionRun.date)}`:currentText}</b></div>
-        <div><span>Worth today</span><b>{projText}{band?` · ${formatValue(band.low)}–${formatValue(band.high)}`:''}</b></div>
-        {outlook?<div><span>On race day</span><b>{formatValue(outlook.best)}–{formatValue(outlook.likely)} by {formatDate(goal.date)}</b></div>:null}
-        {strengthForecast?<div><span>Likely range</span><b>{formatValue(strengthForecast.low)}–{formatValue(strengthForecast.high)} · {strengthForecast.confidence.toLowerCase()} confidence</b></div>:null}
-        <div><span>{projectedOnly?'Projected gap':'Gap to target'}</span><b>{differenceText}</b></div>
-      </div>
-      {strengthForecast?<small>{strengthForecast.reason}</small>:null}</section>})()}
-    
+    {/* ONE LINE, NOT A SECOND TABLE. This card carried a FORGE ASSESSMENT
+        block underneath the tiles whose rows were "Where you are", "Worth
+        today" and "Gap to target" — which are the CURRENT, PROJECTED and TO GO
+        tiles directly above it, in words instead of numbers. It said the same
+        three things twice and made the card twice as tall.
+
+        What was only in that block, and is worth keeping, is the pair of
+        forward-looking ranges: what race day is worth as against today, and
+        how wide a lift forecast really is. Those are one line each. */}
+    {(outlook || strengthForecast) && <p className="goal-outlook">
+      {outlook ? <span><b>{formatValue(outlook.best)}–{formatValue(outlook.likely)}</b> on race day, {roadmap.weeksRemaining} weeks of training from here.</span> : null}
+      {strengthForecast ? <span><b>{formatValue(strengthForecast.low)}–{formatValue(strengthForecast.high)}</b> by {formatDate(goal.date)} · {strengthForecast.confidence.toLowerCase()} confidence.</span> : null}
+    </p>}
   </article>;
 }

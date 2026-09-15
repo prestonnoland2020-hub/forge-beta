@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
+import { coreFirst, coreOnly, isCoreLift, isWeightedBodyweight, CORE_LIFT_LABELS } from '../lib/coreLifts';
+import { canonicalLiftKey } from '../lib/liftAliases';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
 
@@ -17,7 +19,7 @@ const goalTypes = [
    dropdown offering nothing but "Cardio only" and "No fixed day", and saved
    with no muscle group attached. Onboarding passes the split it is about to
    create. */
-export function GoalBuilder({ onClose, onSave, initialGoal, splitDays }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal; splitDays?:{name:string;type:string}[] }) {
+export function GoalBuilder({ onClose, onSave, initialGoal, splitDays, coreLiftsOnly = false }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal; splitDays?:{name:string;type:string}[]; coreLiftsOnly?:boolean }) {
   const {setup}=useProfileSetup();
   const connectionDays=(splitDays?.length?splitDays:setup?.splitDays||[]).filter(day=>day.type!=='Rest');
   const initialType=goalTypes.find(item=>item.label===initialGoal?.type)?.id ?? 'strength';
@@ -27,15 +29,27 @@ export function GoalBuilder({ onClose, onSave, initialGoal, splitDays }: { onClo
      editing goal whose exercise predates the library stays selectable so old
      goals never silently re-point at a different lift. */
   const {exercises:libraryExercises}=useTrainingLibrary();
+  /* THE FOUR LIFTS FIRST, AND ON A FIRST GOAL ONLY THE FOUR. Thirty-seven
+     movements in alphabetical order put "Assault Bike" and "Burpee Broad
+     Jumps" above "Deadlift" for somebody ninety seconds into the app. See
+     lib/coreLifts. An athlete editing a goal on some other lift keeps it
+     either way — a picker that drops the thing you already chose is worse
+     than a long one. */
   const goalExerciseOptions=useMemo(()=>{
     const names=libraryExercises.filter(item=>item.enabled&&isProgrammableStrength(item)).map(item=>item.name).sort((a,b)=>a.localeCompare(b));
+    const shortlist=coreLiftsOnly?coreOnly(names):coreFirst(names);
     const current=initialGoal?.exercise;
-    return current&&!names.includes(current)?[current,...names]:names;
-  },[libraryExercises,initialGoal?.exercise]);
+    return current&&!shortlist.includes(current)?[current,...shortlist]:shortlist;
+  },[libraryExercises,initialGoal?.exercise,coreLiftsOnly]);
   /* A body-composition goal has no exercise. One saved before that was enforced
    carries whatever lift the builder happened to be showing, which rendered as
    "BODY COMPOSITION · Squat" — drop it on the way in so re-saving heals it. */
-const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':(initialGoal?.exercise ?? '')); const [metric,setMetric]=useState(initialGoal?.type==='Strength'?'Real 1RM':initialGoal?.type==='Body Composition'?'Body weight':initialGoal?.metric ?? 'Real 1RM');
+/* A STRENGTH GOAL OPENS ON A LIFT. The field started empty, so step two read
+   "STRENGTH GOAL / lb" over four unselected buttons until something was
+   pressed — a form telling you nothing is chosen while showing you a title
+   built from the nothing. The squat is the default the type picker already
+   used; it is just applied on arrival now as well as on a click. */
+const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':(initialGoal?.exercise ?? (initialType==='strength'?'Back Squat':initialType==='endurance'?'5K Run':''))); const [metric,setMetric]=useState(initialGoal?.type==='Strength'?'Real 1RM':initialGoal?.type==='Body Composition'?'Body weight':initialGoal?.metric ?? 'Real 1RM');
   const [current,setCurrent]=useState(initialGoal?.current ?? ''); const [target,setTarget]=useState(initialGoal?.target?.split(' ')[0] ?? ''); const [unit,setUnit]=useState(initialGoal?.unit ?? initialGoal?.target?.split(' ').slice(1).join(' ') ?? 'lb');
   const [targetDate,setTargetDate]=useState(initialGoal?.date ?? (()=>{const date=new Date();date.setDate(date.getDate()+84);return date.toISOString().slice(0,10)})());
   const [connection,setConnection]=useState(initialGoal?.connection ?? connectionDays[0]?.name ?? 'No fixed day');
@@ -48,6 +62,19 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
   const [eventSurface,setEventSurface]=useState(initialGoal?.eventSurface ?? 'Road');
   const [isCustomRun,setIsCustomRun]=useState(initialGoal?.eventTemplate==='custom-running-event');
   const muscleOptions=['Chest','Back','Shoulders','Quads','Glutes','Hamstrings','Biceps','Triceps','Forearms','Abs','Cardio'];
+  /* "Squat" and "Back Squat" are the same lift and the chip has to know it —
+     the default was set by one name and the library holds the other. */
+  const sameLift=(a:string,b:string)=>Boolean(a)&&canonicalLiftKey(a)===canonicalLiftKey(b);
+  const coreLiftOptions=useMemo(()=>goalExerciseOptions.filter(isCoreLift),[goalExerciseOptions]);
+  const otherLiftOptions=useMemo(()=>goalExerciseOptions.filter(name=>!isCoreLift(name)),[goalExerciseOptions]);
+  /* Picking a lift clears the numbers with it: a 405 lb target typed for a
+     deadlift is not a target for pull ups, and the unit may not even be the
+     same one. */
+  const chooseLift=(name:string)=>{
+    setExercise(name);
+    setCurrent('');setTarget('');
+    setUnit(isWeightedBodyweight(name)?'reps':setup?.units==='Metric'?'kg':'lb');
+  };
   const selectedType=goalTypes.find(item=>item.id===type)!;
   const enduranceUnits:Record<string,string[]>={
     'Finish time':['mm:ss','hh:mm:ss'],
@@ -61,9 +88,11 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
     'Completion':['yes/no','events completed']
   };
   const unitOptions=useMemo(()=>type==='strength'?['lb','kg','reps','seconds']:type==='endurance'?(enduranceUnits[metric] ?? ['minutes']):type==='muscle'?['inches','centimeters','lb lean mass','kg lean mass','photo check-in']:type==='body'?['lb','kg']:type==='consistency'?['sessions/week','workouts/month','days/week','days streak','minutes/week']:['bpm','reps','steps/day','calories/day','hours/night','nights/week','sessions/week','days/week','minutes','seconds','miles','kilometers','meters','yards','lb','kg','inches','centimeters','percent','yes/no'],[type,metric]);
-  const title=useMemo(()=>type==='strength'?`${target} ${unit} ${exercise}`:type==='endurance'?`${exercise} · ${target} ${unit}`:type==='muscle'?`Develop ${muscles.join(', ')}`:type==='body'?`${target} ${unit} body-weight goal`:type==='consistency'?`${target} sessions per week`:`${exercise}: ${target} ${unit}`,[type,target,unit,exercise,muscles]);
+  /* The banner is a preview, and a preview of an empty form should say so
+   rather than printing the punctuation between the blanks. */
+const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT_LABELS[exercise]||exercise}`:`${CORE_LIFT_LABELS[exercise]||exercise||'Pick a lift'} — set a target`):type==='endurance'?`${exercise} · ${target} ${unit}`:type==='muscle'?`Develop ${muscles.join(', ')}`:type==='body'?`${target} ${unit} body-weight goal`:type==='consistency'?`${target} sessions per week`:`${exercise}: ${target} ${unit}`,[type,target,unit,exercise,muscles]);
   const toggleMuscle=(muscle:string)=>setMuscles(items=>items.includes(muscle)?items.filter(item=>item!==muscle):[...items,muscle]);
-  const chooseType=(next:string)=>{setType(next);setCurrent('');setTarget('');if(next==='endurance'){setExercise('5K Run');setMetric('Finish time');setUnit('mm:ss')}else if(next==='body'){setExercise('');setMetric('Body weight');setUnit(setup?.units==='Metric'?'kg':'lb')}else{setExercise('Squat');setMetric('Real 1RM');setUnit(setup?.units==='Metric'?'kg':'lb')}};
+  const chooseType=(next:string)=>{setType(next);setCurrent('');setTarget('');if(next==='endurance'){setExercise('5K Run');setMetric('Finish time');setUnit('mm:ss')}else if(next==='body'){setExercise('');setMetric('Body weight');setUnit(setup?.units==='Metric'?'kg':'lb')}else{setExercise('Back Squat');setMetric('Real 1RM');setUnit(setup?.units==='Metric'?'kg':'lb')}};
   const chooseEnduranceEvent=(value:string)=>{if(value==='Custom event'||value==='Custom running event'){const running=value==='Custom running event';setIsCustomRun(running);setCustomEnduranceEvent(running?'My Running Event':'');setExercise(running?'My Running Event':'');if(running){setMetric('Finish time');setUnit('hh:mm:ss')}}else{setIsCustomRun(false);setCustomEnduranceEvent('');setExercise(value);if(['Half Marathon','Marathon'].includes(value)){setMetric('Finish time');setUnit('hh:mm:ss');setCurrent('');setTarget('')}if(value==='HYROX'){setMetric('Finish time');setUnit('hh:mm:ss');setCurrent('');setTarget('')}}};
   const chooseEnduranceMetric=(value:string)=>{setMetric(value);setUnit(enduranceUnits[value][0]);setCurrent('');setTarget('')};
   return <div className="goal-builder-backdrop" role="dialog" aria-modal="true" aria-label="Create a new goal">
@@ -87,12 +116,31 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
 <span>{selectedType.label.toUpperCase()} GOAL</span>
 <strong>{title}</strong>
 </div>{type==='strength'&&<div className="field-grid">
-<label>Goal exercise<select value={exercise} onChange={e=>setExercise(e.target.value)}>
-<option value="">Choose from your exercise library</option>
-{goalExerciseOptions.map(name=><option key={name}>{name}</option>)}
-</select>
-</label>
+{/* FOUR BUTTONS, NOT A MENU OF THIRTY-SEVEN. The lift is the first thing
+    anybody picks and it is almost always one of these; the rest of the
+    library is one line below, and on a first goal it is not offered at all.
+    See lib/coreLifts. */}
+<fieldset className="full goal-lift-pick"><legend>Which lift</legend>
+<div className="goal-lift-chips">{coreLiftOptions.map(name=>
+<button type="button" key={name} aria-pressed={sameLift(exercise,name)}
+  className={sameLift(exercise,name)?'active':''} onClick={()=>chooseLift(name)}>{CORE_LIFT_LABELS[name]||name}</button>)}</div>
+{otherLiftOptions.length>0&&<label className="goal-lift-other">Another lift
+<select value={isCoreLift(exercise)?'':exercise} onChange={e=>e.target.value&&chooseLift(e.target.value)}>
+<option value="">{exercise&&!isCoreLift(exercise)?exercise:'Something else…'}</option>
+{otherLiftOptions.map(name=><option key={name}>{name}</option>)}
+</select></label>}
 {!goalExerciseOptions.length&&<small className="goal-exercise-hint">Your library has no strength exercises yet — add one from the Log page and it appears here.</small>}
+</fieldset>
+{/* A PULL-UP GOAL IS TWO DIFFERENT GOALS. Most people mean a rep count at
+    their own body weight; a strong lifter means a plate hanging off a belt.
+    Assuming either one is wrong for half the people who pick it. */}
+{isWeightedBodyweight(exercise)&&<fieldset className="full goal-lift-pick"><legend>Measured how</legend>
+<div className="goal-lift-chips">
+<button type="button" aria-pressed={unit==='reps'} className={unit==='reps'?'active':''} onClick={()=>{setUnit('reps');setCurrent('');setTarget('')}}>Body weight · reps</button>
+<button type="button" aria-pressed={unit!=='reps'} className={unit!=='reps'?'active':''} onClick={()=>{setUnit(setup?.units==='Metric'?'kg':'lb');setCurrent('');setTarget('')}}>Added weight</button>
+</div>
+<small>{unit==='reps'?'How many you can do in one set at your own weight.':'The weight on the belt, not your body weight.'}</small>
+</fieldset>}
 <label>Progress metric<select value="Real 1RM" disabled aria-label="Strength progress metric">
 <option>Real 1RM</option>
 </select>

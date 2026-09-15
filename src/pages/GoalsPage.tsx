@@ -77,13 +77,15 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
         than quietly handed a compromise that serves nothing. */}
     {clash && <section className="card goal-clash">
       <strong>{clash.races.length} races on the same date</strong>
-      <p>{clash.races.join(', ')} are all set for {new Date(`${clash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. A block peaks for one race — pick the one that matters and move the others out by a few weeks, or they all get a compromise.</p>
+      {/* Three sentences said what one says: a block peaks for one race, so
+          move the others. The list and the date are the information. */}
+      <p>{clash.races.join(', ')} are all on {new Date(`${clash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. A block peaks for one — move the others out a few weeks, or all three get a compromise.</p>
       {/* AND SAY WHICH ONE IT CHOSE. Telling someone to pick while quietly
           picking for them is the same silence in a friendlier voice: the plan
           is paced off one of these races today, and they cannot judge the
           advice without knowing which. The longest race wins, because a build
           for it gives the shorter ones a base and the reverse gives nothing. */}
-      {built && <p className="goal-clash-built">Until you do, the plan is built for the <strong>{built.goal.title || built.goal.exercise}</strong> — the longest of them — and paced off it. The shorter races are trained inside that build.</p>}
+      {built && <p className="goal-clash-built">For now it is built for the <strong>{built.goal.title || built.goal.exercise}</strong>, the longest of them. The shorter ones train inside it.</p>}
     </section>}
 
     <MileageGate />
