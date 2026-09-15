@@ -34,3 +34,35 @@
 .setup-day-options{max-height:210px;overflow:auto}
 .setup-goal-flag{font-style:normal;color:var(--accent-text)}
 .setup-goal-warning strong{color:var(--warn-text,var(--ink))}
+
+/* ── Where you are now, and the first week ─────────────────────────────── */
+/* Two steps that did not exist. Setup never asked for weekly mileage or a
+   current best — both live in the setup shape and both were left at zero, so
+   the first block was written for somebody who runs nothing off lifts with no
+   evidence behind them — and it never showed what it had built. */
+.setup-baseline-lifts, .setup-baseline-running { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+.setup-baseline-lifts legend, .setup-baseline-running legend { padding: 0 0 2px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.setup-baseline-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: end; }
+.setup-baseline-row > span { grid-column: 1 / -1; font: 700 13px var(--body); color: var(--ink); }
+@media (min-width: 560px) { .setup-baseline-row { grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr); } .setup-baseline-row > span { grid-column: auto; } }
+.setup-baseline-running { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.setup-baseline-running legend { grid-column: 1 / -1; }
+
+.setup-preview-days { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
+.setup-preview-days li { display: grid; gap: 2px; padding: 11px 14px; border-top: 1px solid var(--hairline); background: var(--surface-2); }
+.setup-preview-days li:first-child { border-top: 0; }
+.setup-preview-days li.rest { background: transparent; }
+.setup-preview-days strong { font: 700 14px var(--body); color: var(--ink); }
+.setup-preview-days span { font-size: 13px; color: var(--ink-2); line-height: 1.45; font-variant-numeric: tabular-nums; }
+.setup-preview-days li.rest strong, .setup-preview-days li.rest span { color: var(--ink-3); font-weight: 600; }
+.setup-preview-note { margin: 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+
+/* THE STEP RAIL WAS BUILT FOR FIVE. `repeat(5,1fr)` was hardcoded for a flow
+   that had four steps and now has six, so on a phone the numbers wrapped into
+   a block of squares two wide — a progress indicator you cannot read as
+   progress. One row, however many steps there are. */
+@media (max-width: 800px) {
+  .onboarding-grid aside ol { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin: 16px 0; }
+  .onboarding-grid aside li { padding: 4px 0; }
+  .onboarding-grid > aside h1 { font-size: 34px; margin: 8px 0 0; }
+}

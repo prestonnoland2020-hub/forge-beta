@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
@@ -10,6 +10,11 @@ import { DialField } from '../components/NumberDial';
 import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { canonicalLiftKey } from '../lib/liftAliases';
+import { coreFirst, CORE_LIFT_LABELS } from '../lib/coreLifts';
+import { firstWeekPreview } from '../lib/firstWeekPreview';
+import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
+import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { localDayIso } from '../lib/time';
 
 /* THREE STEPS, AND THE GOAL IS ONE OF THEM. Forge programs toward a goal —
    the wave, the mileage ramp and max week all exist to move one. An athlete
@@ -22,14 +27,30 @@ import { canonicalLiftKey } from '../lib/liftAliases';
    lift could sit in the block's focus line while no day trained it, and Today
    asked for a lift it had never been told about. Setup is not finished until
    every strength day names at least one exercise. */
+/* AND TWO MORE, BECAUSE SETUP NEVER ASKED FOR THE TWO THINGS THE PLAN IS BUILT
+   FROM AND NEVER SHOWED WHAT IT BUILT.
+
+   Weekly mileage and the athlete's current bests both live in the setup shape
+   and neither was ever collected: weeklyMileage defaulted to 0 and the first
+   block was written for somebody who runs nothing, off lifts with no evidence
+   behind them. And the last screen of setup dropped them onto a home screen
+   without once showing what any of it was for.
+
+   Both are optional and both are quick. The baseline step fills the preview as
+   they type, which is the only argument for entering it that matters. */
 const steps = [
-  ['The essentials', 'Tell Forge what your training should serve.'],
-  ['Train safely', 'Add only the limits that can change a workout.'],
-  ['Your first goal', 'Name what the training is for.'],
-  ['What each day trains', 'Pick the movements Forge programs on each day.'],
+  ['The essentials', 'What your training should serve.'],
+  ['Train safely', 'Only the limits that change a workout.'],
+  ['Your first goal', 'What the training is for.'],
+  ['What each day trains', 'The movement Forge measures each day by.'],
+  ['Where you are now', 'Optional — it makes the first week real.'],
+  ['Your first week', 'Built from what you just entered.'],
 ] as const;
 const LAST_STEP = steps.length - 1;
 const GOAL_STEP = 2;
+const MAP_STEP = 3;
+const BASELINE_STEP = 4;
+const PREVIEW_STEP = 5;
 
 const blank: AthleteSetup = {
   displayName: '', username: '', birthDate: '', units: 'Imperial', height: '', startingWeight: '', currentWeight: '',
@@ -81,7 +102,7 @@ function OnboardingForm() {
   /* Sent back by the gate for a missing goal opens on the goal step; sent back
      for unmapped days opens on the day-mapping step. */
   const needsExercises = Boolean((location.state as { needsExercises?: boolean } | null)?.needsExercises);
-  const [step, setStep] = useState(needsExercises ? LAST_STEP : needsGoal ? GOAL_STEP : 0);
+  const [step, setStep] = useState(needsExercises ? MAP_STEP : needsGoal ? GOAL_STEP : 0);
   const [goalOpen, setGoalOpen] = useState(false);
   const [disclaimerChecked, setDisclaimerChecked] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
@@ -89,6 +110,7 @@ function OnboardingForm() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const { exercises: libraryExercises } = useTrainingLibrary();
+  const { addRecord } = useWorkoutHistory();
   const strengthLibrary = libraryExercises.filter(exercise => exercise.enabled && isProgrammableStrength(exercise));
   /* The days this step is about: the ones Forge prescribes lifting on. */
   const plannedDays = (data.splitDays?.length ? data.splitDays : starterSplit(data.primaryFocus, data.trainingDays));
@@ -121,12 +143,44 @@ function OnboardingForm() {
       || !muscles.length
       || exercise.muscles.some(muscle => muscles.includes(muscle)));
   };
+  /* THE FOUR LIFTS AT THE TOP OF EVERY DAY'S LIST. The options are filtered
+     by the day's muscles and then arrive in library order, which puts "Hack
+     Squat" above "Back Squat" on a leg day. See lib/coreLifts. */
+  const coreFirstOptions = <T extends { name: string }>(options: T[]): T[] => {
+    const ordered = coreFirst(options.map(item => item.name));
+    return ordered.map(name => options.find(item => item.name === name)!).filter(Boolean);
+  };
   const unmappedDays = strengthDayIndexes.filter(item => !(dayExercises[item.index] || []).length);
   /* A goal lift no day trains is a goal the block cannot move. */
   const untrainedGoalLifts = goals
     .filter(goal => goal.type === 'Strength' && goal.exercise)
     .map(goal => String(goal.exercise))
     .filter(name => !Object.values(dayExercises).some(list => list.some(item => canonicalLiftKey(item) === canonicalLiftKey(name))));
+  /* WHERE THEY ARE STARTING FROM, which setup never asked. Keyed by the
+     library's own name for the lift so the top set it becomes can be matched
+     against everything logged afterwards. */
+  const [baseline, setBaseline] = useState<Record<string, { weight: string; reps: string }>>({});
+  const setBase = (lift: string, field: 'weight' | 'reps', value: string) =>
+    setBaseline(current => ({ ...current, [lift]: { weight: current[lift]?.weight || '', reps: current[lift]?.reps || '', [field]: value } }));
+  /* Every movement they have put on a day, core lifts first — those are the
+     ones worth a baseline and the ones they can actually remember a number
+     for. A day nobody mapped contributes nothing to ask about. */
+  const baselineLifts = useMemo(() => {
+    const named = Array.from(new Set(Object.values(dayExercises).flat().filter(Boolean)));
+    return coreFirst(named).slice(0, 6);
+  }, [dayExercises]);
+  const enteredBaseline = baselineLifts
+    .map(lift => ({ lift, weight: Number(baseline[lift]?.weight), reps: Number(baseline[lift]?.reps) }))
+    .filter(item => item.weight > 0 && item.reps > 0);
+  const runningPlanned = plannedDays.some(day => /Cardio|Mixed/i.test(day.type));
+
+  const preview = useMemo(() => firstWeekPreview({
+    days: plannedDays.map((day, index) => ({ name: day.name, type: day.type, muscles: day.muscles, exercises: dayExercises[index] || [] })),
+    baseline: Object.fromEntries(enteredBaseline.map(item => [item.lift, { weight: item.weight, reps: item.reps }])),
+    weeklyMiles: Number(data.weeklyMileage) || 0,
+    unit: data.units === 'Metric' ? 'kg' : 'lb',
+  }), [plannedDays, dayExercises, baseline, data.weeklyMileage, data.units]);
+
   const set = <K extends keyof AthleteSetup>(key: K, value: AthleteSetup[K]) => setData(current => ({ ...current, [key]: value }));
   const isEditing = Boolean(setup?.completedAt);
 
@@ -137,6 +191,10 @@ function OnboardingForm() {
     }
     if (step === 1 && !data.acceptedSafety) return setError('Confirm the safety note to continue.');
     if (step === GOAL_STEP && !goals.length) return setError('Add one goal to continue. Forge builds the plan around it.');
+    /* The day map is now a step in the middle rather than the last one, so its
+       own rule has to be checked on the way past — otherwise an athlete walks
+       to the preview with empty days and the preview has nothing to show. */
+    if (step === MAP_STEP && unmappedDays.length) return setError(`Choose at least one exercise for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
     setError(''); setStep(current => Math.min(LAST_STEP, current + 1)); window.scrollTo(0, 0);
   };
 
@@ -213,6 +271,23 @@ function OnboardingForm() {
       });
       const completed = { ...data, username, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString() };
       saveSetup(completed);
+      /* A BASELINE HAS TO BE A LOGGED SET OR IT IS INVISIBLE. Every number in
+         Forge is derived from completed top sets — the wave, the calculated
+         max, the whole block — so a "current best" kept anywhere else would be
+         a number the plan could not see. It is written as one day, titled so
+         nobody mistakes it for training they did, and it is ordinary evidence
+         from then on: beat it and it stops mattering. */
+      if (enteredBaseline.length) {
+        addRecord({
+          date: localDayIso(), title: 'Baseline', muscles: [], hasCardio: false,
+          notes: 'Current bests entered during setup.',
+          topSets: enteredBaseline.map((item, index) => ({
+            id: `baseline-${index}`, muscle: 'Primary', lift: item.lift,
+            weight: item.weight, reps: item.reps,
+            calculatedMax: calculateEstimatedOneRepMax(item.weight, item.reps) || 0, completed: true,
+          })),
+        });
+      }
       updateProfile({ runningDays: Math.min(data.trainingDays, data.runningDays), injuryConstraint: data.injuryConstraint });
       const from = (location.state as { from?: string } | null)?.from;
       navigate(from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
@@ -246,7 +321,10 @@ function OnboardingForm() {
       {isEditing && !needsGoal && !needsExercises && <button type="button" className="onboarding-cancel" onClick={() => navigate('/profile')}>Cancel</button>}
     </header>
     <div className="onboarding-grid">
-      <aside><span className="eyebrow">START SIMPLE</span><h1>Ready in {steps.length === 4 ? 'four' : 'a few'} steps.</h1><p>Forge learns performance from completed workouts. You do not need to estimate maxes, pace, equipment, or recovery during setup.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
+      {/* The panel said, in four lines, that setup is short and that Forge
+          learns from logged work. The numbered list beside it already says the
+          first thing and the app says the second every day. One line. */}
+      <aside><span className="eyebrow">START SIMPLE</span><h1>Six short steps.</h1><p>Forge learns from what you log — nothing here has to be exact.</p><ol>{steps.map(([name], index) => <li className={index === step ? 'active' : index < step ? 'done' : ''} key={name}><i>{index < step ? '✓' : index + 1}</i><span>{name}</span></li>)}</ol></aside>
       <section className="onboarding-card">
         <div className="setup-heading"><span className="eyebrow">{steps[step][0]}</span><h2>{steps[step][1]}</h2></div>
         {step === 0 && <div className="setup-fields">
@@ -273,8 +351,12 @@ function OnboardingForm() {
                 <button type="button" className="button ghost" onClick={() => setGoalOpen(true)}>Add another goal</button>
               </div>
             : <div className="setup-note full setup-goal-empty">
-                <strong>One goal is all Forge needs.</strong>
-                <span>A lift you want to hit, or a race you want to run. The 8/6/4/2/1 wave, your weekly mileage and max week all exist to move it — without one, Forge has nothing to program toward.</span>
+                {/* HOW GOALS WORK, IN THREE LINES. The old copy was one long
+                    paragraph naming the wave, the mileage ramp and max week —
+                    three mechanisms nobody has met yet. What they need to know
+                    is that the goal drives everything and that one is enough. */}
+                <strong>One goal drives the whole plan.</strong>
+                <span>A lift to hit or a race to run. Forge writes every week backwards from it — the loads, the miles, and when you test.</span>
                 <button type="button" className="button" onClick={() => setGoalOpen(true)}>Set your first goal</button>
               </div>}
           {/* The split does not exist in the database yet — it is written by
@@ -282,18 +364,19 @@ function OnboardingForm() {
               create. Without this the first goal an athlete ever sets has an
               empty "training connection" list. */}
           {goalOpen && <GoalBuilder
+            coreLiftsOnly
             splitDays={setup?.splitDays?.length ? setup.splitDays : starterSplit(data.primaryFocus, data.trainingDays)}
             onClose={() => setGoalOpen(false)}
             onSave={(goal: CreatedGoal) => { saveGoal(goal, null); setGoalOpen(false); setError(''); }} />}
         </div>}
-        {step === LAST_STEP && <div className="setup-fields setup-day-map">
+        {step === MAP_STEP && <div className="setup-fields setup-day-map">
           <div className="setup-note full">
-            <strong>Forge programs the movements you name here.</strong>
-            <span>One is enough per day — the lift you measure that day by. You can add the rest later in Profile → Split.</span>
+            <strong>One movement per day is enough.</strong>
+            <span>The lift you measure that day by. Add the rest later in Profile → Split.</span>
           </div>
           {untrainedGoalLifts.length > 0 && <div className="setup-note full setup-goal-warning">
-            <strong>{untrainedGoalLifts.join(' and ')} {untrainedGoalLifts.length === 1 ? 'is a goal no day trains yet.' : 'are goals no day trains yet.'}</strong>
-            <span>A goal lift that no day prescribes never gets waved and never gets tested — add it to the day you train it on.</span>
+            <strong>No day trains {untrainedGoalLifts.join(' or ')} yet.</strong>
+            <span>A goal lift no day prescribes never gets waved or tested. Add it to the day you train it on.</span>
           </div>}
           {strengthDayIndexes.map(({ day, index }) => {
             const chosen = dayExercises[index] || [];
@@ -305,7 +388,7 @@ function OnboardingForm() {
               </button>
               {chosen.length > 0 && <div className="setup-day-chosen">{chosen.map(name => <button type="button" key={name} onClick={() => toggleDayExercise(index, name)}>{name}<span aria-hidden="true">×</span></button>)}</div>}
               {open && <div className="muscle-picker compact-muscle-picker setup-day-options">
-                {optionsForDay(index).map(exercise => {
+                {coreFirstOptions(optionsForDay(index)).map(exercise => {
                   const selected = chosen.includes(exercise.name);
                   const isGoal = goalLiftKeys.has(canonicalLiftKey(exercise.name));
                   return <button type="button" key={exercise.id} aria-pressed={selected}
@@ -317,6 +400,58 @@ function OnboardingForm() {
             </section>;
           })}
           {!strengthDayIndexes.length && <div className="setup-note full"><strong>Your split has no lifting days.</strong><span>Nothing to map — endurance days are programmed from your goals and logged runs.</span></div>}
+        </div>}
+        {step === BASELINE_STEP && <div className="setup-fields setup-baseline">
+          {/* NEITHER OF THESE WAS EVER ASKED, and the plan is built from both.
+              weeklyMileage sat at 0, so the first block was written for
+              somebody who runs nothing; the lifts had no evidence, so week one
+              opened at a number derived from nothing. Both optional, both
+              quick, and the preview on the next step fills in as they type —
+              which is the only argument for entering them that matters. */}
+          <div className="setup-note full">
+            <strong>Skip anything you are not sure of.</strong>
+            <span>Your first logged workouts replace all of it. This only decides where week one starts.</span>
+          </div>
+          {baselineLifts.length > 0 && <fieldset className="full setup-baseline-lifts">
+            <legend>Your best recent set</legend>
+            {baselineLifts.map(lift => <div className="setup-baseline-row" key={lift}>
+              <span>{CORE_LIFT_LABELS[lift] || lift}</span>
+              <DialField label="Weight" kind="weight" unit={data.units === 'Metric' ? 'kg' : 'lb'}
+                value={baseline[lift]?.weight || ''} onChange={next => setBase(lift, 'weight', next)} hint="Optional" />
+              <DialField label="Reps" kind="reps" value={baseline[lift]?.reps || ''} onChange={next => setBase(lift, 'reps', next)} hint="Optional" />
+            </div>)}
+          </fieldset>}
+          {runningPlanned && <fieldset className="full setup-baseline-running">
+            <legend>Your running now</legend>
+            <DialField label="Miles a week" kind="distance" unit="mi" value={data.weeklyMileage ? String(data.weeklyMileage) : ''} onChange={next => set('weeklyMileage', Number(next))} hint="Roughly" />
+            <DialField label="Longest recent run" kind="distance" unit="mi" value={data.longestRun ? String(data.longestRun) : ''} onChange={next => set('longestRun', Number(next))} hint="Optional" />
+            <DialField label="Run days a week" kind="days" value={String(data.runningDays || '')} onChange={next => set('runningDays', Number(next))} />
+          </fieldset>}
+          {!baselineLifts.length && !runningPlanned && <div className="setup-note full"><strong>Nothing to ask yet.</strong><span>Your split has no lifting or running days.</span></div>}
+        </div>}
+        {step === PREVIEW_STEP && <div className="setup-fields setup-preview">
+          {/* THE LAST SCREEN OF SETUP USED TO SHOW NOTHING. Everything the
+              athlete entered became a plan somewhere out of sight, and the
+              first block they ever saw was one they had no part in. This is
+              week one, from the real derivation — same wavePrescription, same
+              8-rep opening week. A flattering mock-up would be worse than
+              nothing: they would meet the real numbers on Monday. */}
+          <div className="setup-note full">
+            <strong>Week one, from what you just entered.</strong>
+            <span>Eight reps to start — the lightest week of the wave. It moves as you log.</span>
+          </div>
+          <ul className="setup-preview-days full">
+            {preview.map((day, index) => <li key={`${day.name}-${index}`} className={day.kind}>
+              <strong>{day.name}</strong>
+              <span>
+                {day.lift ? `${CORE_LIFT_LABELS[day.lift.exercise] || day.lift.exercise} ${day.lift.weight} × ${day.lift.reps}` : ''}
+                {day.unknownLift ? `${CORE_LIFT_LABELS[day.unknownLift] || day.unknownLift} — load set by your first session` : ''}
+                {day.run ? `${day.lift || day.unknownLift ? ' · ' : ''}${day.run}` : ''}
+                {day.kind === 'rest' ? 'Rest' : ''}
+              </span>
+            </li>)}
+          </ul>
+          {!enteredBaseline.length && <p className="setup-preview-note full">No loads yet because no bests were entered — your first session sets them. <button type="button" className="text-button" onClick={() => { setError(''); setStep(BASELINE_STEP); }}>Add them</button></p>}
         </div>}
         {error && <div className="setup-error">{error}</div>}
         <footer className="setup-actions">{step ? <button className="button ghost" disabled={saving} onClick={() => { setError(''); setStep(current => Math.max(0, current - 1)); }}>← Back</button> : <span />}<button className="button" disabled={saving} onClick={step === LAST_STEP ? finish : next}>{step === LAST_STEP ? saving ? 'Saving…' : isEditing ? 'Save profile' : 'Enter Forge' : 'Continue'} →</button></footer>

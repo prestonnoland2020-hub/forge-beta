@@ -33,7 +33,14 @@ if (/I understand and accept this/i.test(body)) {
   await p.waitForTimeout(700);
   body = await text(p);
 }
-check('setup is four steps, and the last one maps the days', /SETUP 1 OF 4/.test(body), body.slice(0, 90));
+/* SIX STEPS NOW, NOT FOUR. Two were added for the things setup was built from
+   and never asked: weekly mileage and a current best, both left at zero — and
+   a last step that shows the week it built, which setup never did. The count
+   is read off the flow rather than hardcoded, so the next one to be added does
+   not fail this line instead of the thing it is testing. */
+check('setup announces how many steps it has', /SETUP 1 OF \d/.test(body), body.slice(0, 90));
+const declared = Number((body.match(/SETUP 1 OF (\d)/) || [])[1] || 0);
+check('and it is more than the three questions it used to be', declared >= 4, String(declared));
 check('the third step is named for the goal', /Your first goal/i.test(body));
 
 /* 2. Walk to the goal step. */
@@ -54,8 +61,12 @@ await p.waitForTimeout(300);
 await clickText(p, /continue/);
 await p.waitForTimeout(800);
 body = await text(p);
-check('the goal step is reached', /SETUP 3 OF 4/.test(body), body.slice(0, 80));
-check('the goal step explains why a goal is required', /One goal is all Forge needs/i.test(body));
+check('the goal step is reached', /SETUP 3 OF \d/.test(body), body.slice(0, 80));
+/* The copy said "One goal is all Forge needs" over a paragraph naming the
+   wave, the mileage ramp and max week — three mechanisms nobody has met
+   ninety seconds in. What it has to convey is that the goal drives the plan
+   and that one is enough; the test asserts the meaning, not the sentence. */
+check('the goal step explains why a goal is required', /one goal/i.test(body) && /plan|program/i.test(body), body.slice(0, 200));
 
 /* 4. THE GATE: finishing with no goal is refused, and the app is not entered. */
 /* The goal step is step 3 of 4, so the button that tries to leave it is
@@ -93,7 +104,7 @@ await returning.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded'
 await returning.waitForTimeout(2200);
 check('a goal-less athlete is routed into the goal step', /#\/onboarding/.test(returning.url()), returning.url());
 const returningBody = await text(returning);
-check('they land on the goal step, not back at step one', /SETUP 3 OF 4|Your first goal/i.test(returningBody), returningBody.slice(0, 100));
+check('they land on the goal step, not back at step one', /SETUP 3 OF \d|Your first goal/i.test(returningBody), returningBody.slice(0, 100));
 
 /* 7. An athlete WITH a goal is never bounced. */
 const settled = await b.newPage({ viewport: { width: 1280, height: 950 } });
