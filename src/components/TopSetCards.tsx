@@ -171,6 +171,12 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
 
       const open = isOpen(set, index) || Boolean(isCorrecting);
 
+      /* WHAT THE PLAN ASKED FOR IS PRINTED, NOT PRE-TYPED. The weight dial
+         opens empty on an unlogged set; the ask reads as an ask. */
+      const askReps = logged ? 0 : displayedSet.prescribedReps || 0;
+      const askWeight = logged ? 0 : displayedSet.prescribedWeight || 0;
+      const askText = askReps ? (askWeight ? `${askWeight} ${unit} ×${askReps}` : `×${askReps}`) : '';
+
       /* Closed: the whole set is one line of text — saved sets read as their
          result, still-to-log sets read as the prescription with LOG waiting. */
       if (!open && set.lift) {
@@ -187,7 +193,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
               <span className="top-set-row-name">{set.lift}</span>
               {logged
                 ? <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
-                : <span className="top-set-row-figures pending">{set.weight > 0 ? `${set.weight} ${unit} ×${set.reps}` : 'Not logged'}<small>tap to log</small></span>}
+                : <span className="top-set-row-figures pending">{set.weight > 0 ? `${set.weight} ${unit} ×${set.reps}` : 'Not logged'}<small>{askText ? `asks ${askText} · tap to log` : 'tap to log'}</small></span>}
               <b aria-hidden="true">{logged ? '⌄' : '›'}</b>
             </button>
           </div>
@@ -204,6 +210,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
         {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} ×{set.reps}</strong><small>Calculated max {max ?? '—'} {unit}</small></div> : <>
           <label className="top-set-exercise-field">Exercise<select value={displayedSet.lift} onChange={event => { if (event.target.value === '__new__') { setCreatingExercise(true); setCreateError(''); return; } chooseExercise(event.target.value); }}><option value="">Choose exercise</option>{options.map(exercise => <option key={exercise.id}>{exercise.name}</option>)}<option value="__new__">＋ Add a new exercise…</option></select></label>
           {displayedSet.lift && <div className="inline-last-set"><span>LAST COMPLETED</span>{previous ? <><strong>{previous.weight} {unit} ×{previous.reps}</strong><small>Calculated max {calculateEstimatedOneRepMax(previous.weight, previous.reps) ?? previous.weight} {unit} · {new Date(`${previous.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small></> : <small>No earlier completed top set—this result establishes the baseline.</small>}</div>}
+          {askText && <div className="inline-last-set plan-ask"><span>PLAN ASKS</span><strong>{askText}</strong><small>Log what you actually lifted.</small></div>}
           <div className="field-grid dial-grid">
             <DialField label="Weight" kind="weight" unit={unit} value={displayedSet.weight ? String(displayedSet.weight) : ''} onChange={next => changeDisplayedSet({ weight: Number(next) })} />
             <DialField label="Reps" kind="reps" value={displayedSet.reps ? String(displayedSet.reps) : ''} onChange={next => changeDisplayedSet({ reps: Number(next) })} />
