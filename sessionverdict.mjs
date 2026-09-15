@@ -150,6 +150,36 @@ import('./src/features/training/sessionVerdicts.ts').then(async ({ sessionVerdic
   check('a rep session on a rep week is judged', judgedReps.length === 1, judgedReps[0]?.say?.slice(0, 46));
   check('and an easy run on the same day is not a slow set of 400s', judge([easyRun]).length === 0);
 
+  /* THE WARM-UP CAME OFF STRAVA AS ITS OWN ACTIVITY.
+
+     Preston was asked for 12 min continuous at 6:53/mi and ran 1.8 mi in
+     12:12 — the session exactly. His warm-up mile imported as a SEPARATE
+     activity on the same day, and the shape check summed the day: 20:30
+     against 12:00 asked is 71% off, past every tolerance, so the tempo got no
+     verdict, moved no level, and the one number he wanted to see move stayed
+     where it was. A warm-up is not part of a continuous effort. */
+  const withWarmup = log(WEEK1, [rep(1.01, 8.3), rep(1.63, 12)]);
+  const warmedUp = judge([withWarmup]);
+  check('a tempo with a separate warm-up on the same day is still judged',
+    warmedUp.length === 1, `${warmedUp.length} judged`);
+  check('and it is judged on the tempo, not on the pair',
+    warmedUp[0] && /12 min at 7:2\d\/mi/.test(warmedUp[0].say), warmedUp[0]?.say);
+  check('so it reads as the session it was', warmedUp[0]?.outcome === 'on', warmedUp[0]?.outcome);
+  /* And the piece it picks is the one that LOOKS like what was asked, not
+     simply the longest or the first. */
+  const warmupLast = log(WEEK1, [rep(1.63, 12), rep(1.01, 8.3)]);
+  check('whichever order they arrive in', judge([warmupLast])[0]?.outcome === 'on', judge([warmupLast])[0]?.outcome);
+  /* A JOG PLUS A JOG IS STILL NOT A TEMPO. Picking the nearest piece must not
+     become a way for any two easy runs to add up to a session. */
+  const twoJogs = log(WEEK1, [rep(1.2, 12), rep(1.1, 11)]);
+  check('but two easy runs are not one tempo between them', judge([twoJogs]).length === 0,
+    judge([twoJogs])[0]?.say);
+  /* AND A SET OF REPEATS IS STILL SUMMED. The pick above is for a CONTINUOUS
+     prescription only — applied to a rep session it would judge one repeat and
+     call eight of them done. */
+  check('a rep session is still read across all of its repeats',
+    judge([reps8])[0]?.completed === 8, String(judge([reps8])[0]?.completed));
+
   check('a day with no running at all is skipped',
     judge([{ id: 'x', date: WEEK1, cardioSessions: [] }]).length === 0);
   check('nothing logged before the block started counts',

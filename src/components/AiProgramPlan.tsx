@@ -160,7 +160,7 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
 export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', minWeeklyMileage, maxWeeklyMileage }: { goals: CreatedGoal[]; profile: AdaptiveProfile; splitDays: SplitDay[]; rhythm?: 'rolling' | 'weekly'; minWeeklyMileage: number; maxWeeklyMileage: number }) {
   const { records } = useWorkoutHistory();
   const { user } = useAuth();
-  const { recommendation, anchorDate } = useDailyRecommendation();
+  const { recommendation, anchorDate, anchorPosition } = useDailyRecommendation();
   const { setup } = useProfileSetup();
   const metric = setup?.units === 'Metric';
   /* A recommendation restored from an older cache can arrive without its split
@@ -170,7 +170,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   /* The anchor carries the date it is for. Without it the week is drawn one
      day early on any day the athlete has already trained, and the session that
      belongs to tomorrow is painted onto today behind the logged one. */
-  const anchor = recommendation?.splitDay ? { position: recommendation.splitDay.position, dateIso: anchorDate } : undefined;
+  /* THE POSITION THAT IS DUE, NOT THE ONE JUST FINISHED. This read the
+     position off `recommendation`, which after today's session is logged is
+     the completed day — while anchorDate has already moved to tomorrow. The
+     pair disagreed, so the rotation painted the day he had just done onto
+     tomorrow: Sharms 2 logged on Monday and Sharms 2 offered again on
+     Tuesday, rest pushed to Wednesday, and every day after it a day late.
+     anchorPosition is the cursor's own answer for anchorDate. */
+  const anchor = anchorPosition ? { position: anchorPosition, dateIso: anchorDate } : undefined;
   const [stored, setStored] = useState<StoredAiPlan | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [generating, setGenerating] = useState(false);

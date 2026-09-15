@@ -89,12 +89,34 @@ export function sessionVerdicts(
        five-mile Sunday came back judged as a twelve-minute tempo he had run
        four times too long. The total work is compared to the total asked for,
        in whichever unit the prescription was written in. */
-    const totalMetres = efforts.reduce((total, effort) => total + effort.metres, 0);
-    const totalSeconds = efforts.reduce((total, effort) => total + effort.seconds, 0);
     const off = (actual: number, asked: number) => (asked > 0 ? Math.abs(actual - asked) / asked : 0);
+    /* A CONTINUOUS PRESCRIPTION IS JUDGED ON ONE PIECE — the one that looks
+       like it.
+
+       Summing the day was right for a set of repeats and wrong for a tempo,
+       and it threw away the session it mattered most for. Preston was asked
+       for "12 min continuous @ 6:53/mi" and ran 1.8 mi in 12:12 — the session
+       exactly. His warm-up came off Strava as a SEPARATE activity on the same
+       day (1.01 mi, 8:18), so the day totalled 20:30 against 12:00 asked,
+       which is 71% off — past every tolerance — and the tempo was not judged
+       at all. No verdict, no level movement, and the one number he wanted to
+       see move stayed where it was.
+
+       A warm-up is not part of a continuous effort, so it is not summed into
+       one. The piece nearest what was asked is the piece that was asked for. */
+    const judged = prescription.reps === 1 && efforts.length > 1
+      ? [[...efforts].sort((a, b) => {
+          const asked = prescription.minutes
+            ? (candidate: typeof a) => off(candidate.seconds, prescription.minutes! * 60)
+            : (candidate: typeof a) => off(candidate.metres, prescription.metres || 0);
+          return asked(a) - asked(b);
+        })[0]]
+      : efforts;
+    const totalMetres = judged.reduce((total, effort) => total + effort.metres, 0);
+    const totalSeconds = judged.reduce((total, effort) => total + effort.seconds, 0);
 
     if (prescription.reps > 1 && prescription.metres) {
-      const typical = totalMetres / efforts.length;
+      const typical = totalMetres / judged.length;
       if (off(typical, prescription.metres) > SHAPE_TOLERANCE) continue;
     }
     if (prescription.metres && off(totalMetres, prescription.reps * prescription.metres) > SHAPE_TOLERANCE) continue;
@@ -103,7 +125,11 @@ export function sessionVerdicts(
        right amount of time is a different session that happens to total the
        same — and judged as the tempo it reports an average across recoveries
        the athlete never ran as one effort. */
-    if (prescription.reps === 1 && efforts.length > 2) continue;
+    /* And it is still ONE piece. Eight repeats adding up to roughly the right
+       amount of time is a different session that happens to total the same,
+       and the pick above would hand it whichever repeat was nearest — so the
+       count is checked against what was actually judged. */
+    if (prescription.reps === 1 && judged.length > 2) continue;
 
     /* AND IT HAS TO HAVE BEEN AN ATTEMPT AT THE SESSION AT ALL. A fourteen
        minute jog at ten minute pace is the same LENGTH as a fourteen minute
@@ -115,11 +141,11 @@ export function sessionVerdicts(
        Anything run at or slower than the athlete's own easy pace is easy
        running, whatever the calendar had pencilled in for that day. */
     const easyFloor = Number(athlete.paces?.easyFast) || 0;
-    const ranPace = (efforts.reduce((total, effort) => total + effort.seconds, 0)
-      / efforts.reduce((total, effort) => total + effort.metres, 0)) * 1609.344;
+    const ranPace = (judged.reduce((total, effort) => total + effort.seconds, 0)
+      / judged.reduce((total, effort) => total + effort.metres, 0)) * 1609.344;
     if (easyFloor && ranPace >= easyFloor * EASY_RUN_MARGIN) continue;
 
-    const verdict = sessionVerdict(prescription, efforts);
+    const verdict = sessionVerdict(prescription, judged);
     if (!verdict) continue;
     out.push({ ...verdict, date: record.date, recordId: record.id, text: String(week.quality) });
   }
