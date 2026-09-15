@@ -64,6 +64,21 @@
   --surface-3: #dbe1e1;         /* hover, active chip */
   --surface-sunken: #eaeeee;    /* an inset well: track, input */
 
+  /* --surface-0 IS THE CHROME GROUND, and until now it did not exist.
+     Three rules ask for it — the topbar's translucent ground, the phone tab
+     bar's opaque one, and the avatar ring — and an undefined custom property
+     does not fall back to the earlier cascade value: the declaration becomes
+     invalid at computed-value time and the property is unset. So the header
+     rendered with NO background at all (rgba(0,0,0,0) on a phone, measured),
+     leaving nothing but a blur between the title and whatever scrolled under
+     it, and the tab bar only looked right because a later rule happened to
+     repaint it.
+
+     It is surface-1's value: chrome sits above the ground the way a card does,
+     which keeps the tab bar exactly where it already looked and gives the
+     header the ground it was always asking for. */
+  --surface-0: #ffffff;
+
   /* ---- Lines ------------------------------------------------------------ */
   --hairline: #dce2e2;
   --hairline-strong: #bac3c3;
@@ -203,6 +218,7 @@
     --surface-2: #252e2f;
     --surface-3: #3f4849;
     --surface-sunken: #0d1213;
+    --surface-0: #1b2223;
 
     --hairline: #2c3435;
     --hairline-strong: #4a5556;
@@ -254,6 +270,7 @@
   --surface-2: #252e2f;
   --surface-3: #3f4849;
   --surface-sunken: #0d1213;
+  --surface-0: #1b2223;
 
   --hairline: #2c3435;
   --hairline-strong: #4a5556;
@@ -467,6 +484,20 @@
   --mint: var(--good);
   --accent-contrast: var(--accent-ink);
   --radius-ui: var(--r-md);
+
+  /* TWO MORE THAT WERE NEVER DECLARED AT ALL, and an undeclared custom
+     property does not fall back to anything — the declaration is dropped.
+
+       --surface        four live components paint their ground with it:
+                        .goal-stat-tiles .gst (the CURRENT / PROJECTED /
+                        TARGET / TO GO tiles on a goal), .goal-assessment
+                        .ga-rows, .baseline-items and .owner-tiles. All four
+                        rendered with no fill, which on a white card is an
+                        outline and nothing inside it.
+       --domain-color   the Insights domain filter's active dot and its glow.
+                        The dot was invisible and the glow invalid. */
+  --surface: var(--surface-sunken);
+  --domain-color: var(--accent);
 }
 
 /* The page itself. Painted explicitly so nothing inherits a browser default. */
