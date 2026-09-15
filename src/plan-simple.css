@@ -6,10 +6,10 @@
    (today), and everything else is a quiet row. Chips are gone; the only
    colour on the screen is the accent marking what is yours right now. */
 
-.pv{display:grid;gap:14px}
+.pv{display:grid;gap:12px}
 
 /* ── Where am I ─────────────────────────────────────────────────────────── */
-.pv-progress{display:grid;gap:10px;padding:4px 2px 2px}
+.pv-progress{display:grid;gap:8px;padding:2px 2px 0}
 .pv-progress-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .pv-progress-week{font:800 30px/1 var(--display);letter-spacing:-.01em;color:var(--ink)}
 .pv-progress-week small{font:700 14px var(--body);color:var(--ink-3);margin-left:4px;letter-spacing:0}
@@ -17,7 +17,7 @@
 /* THE PIPS ARE THE WEEK PICKER. They were 6px tall and untouchable; a control
    a thumb has to hit needs a target, so each is a button 34px tall whose visible
    bar is still 6px — the padding does the catching. */
-.pv-dots{display:flex;gap:6px;align-items:stretch;margin:-8px 0}
+.pv-dots{display:flex;gap:6px;align-items:stretch;margin:-11px 0}
 .pv-dot{flex:1;min-width:12px;border:0;background:none;padding:14px 0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pv-dot::before{content:"";display:block;height:6px;border-radius:999px;background:var(--surface-3)}
 .pv-dot.done::before{background:color-mix(in srgb,var(--accent) 45%,var(--surface-3))}
@@ -34,9 +34,9 @@
 .pv-progress-sentence{margin:0;color:var(--ink-2);font-size:14px;line-height:1.45}
 
 /* ── Save / Regenerate ──────────────────────────────────────────────────── */
-.pv-actions{display:grid;gap:8px}
+.pv-actions{display:grid;gap:6px}
 .pv-actions-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.pv-saved{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--good);padding:8px 12px;border:1px solid color-mix(in srgb,var(--good) 40%,var(--line));border-radius:999px}
+.pv-saved{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--good);padding:6px 11px;border:1px solid color-mix(in srgb,var(--good) 40%,var(--line));border-radius:999px}
 .pv-stamp{color:var(--ink-3);font-size:12px;margin-left:auto}
 .pv-request .text-button{font-size:13px;color:var(--ink-2)}
 .pv-request blockquote{margin:6px 0 0;padding:10px 14px;border-left:2px solid var(--line);color:var(--ink-2);font-size:13px;line-height:1.5}
@@ -44,7 +44,7 @@
 .pv-error{color:var(--bad);font-size:12px}
 
 /* ── Today ──────────────────────────────────────────────────────────────── */
-.pv-today{display:grid;gap:14px;padding:20px;border-left:4px solid var(--accent)}
+.pv-today{display:grid;gap:12px;padding:17px;border-left:4px solid var(--accent)}
 .pv-today header{display:grid;gap:2px}
 .pv-today h2{margin:2px 0 0;font:800 clamp(19px,5.2vw,26px)/1.15 var(--display);letter-spacing:-.01em;color:var(--ink);text-transform:none;overflow-wrap:anywhere}
 .pv-today header small{color:var(--ink-3);font-size:13px}
