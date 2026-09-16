@@ -79,12 +79,18 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
         than quietly handed a compromise that serves nothing. */}
     {clash && <section className="card goal-clash">
       <strong>{clash.races.length} races on {new Date(`${clash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</strong>
-      {/* TWO PARAGRAPHS SAID WHAT TWO LINES SAY. A block peaks for one race,
-          and it is already peaking for one of these — which one is the thing
-          the athlete cannot judge the advice without. Everything else was
-          explaining a rule they can see the effect of. */}
-      <p>{clash.races.join(', ')}. A block peaks for one — move the others out a few weeks.</p>
-      {built && <p className="goal-clash-built">Built for <strong>{built.goal.title || built.goal.exercise}</strong>, the longest. The others train inside it.</p>}
+      {/* TWO PARAGRAPHS, THEN ONE LINE. The card only has to carry two facts:
+          which race the block is actually peaking for, and what to do about
+          the rest. The list of clashing races was the third, and it is the one
+          the athlete can already see — they are in the list directly below,
+          each with its date on it. Naming them again above the list is the
+          card reading the screen out loud.
+
+          Without a chosen race there is nothing to name, so the line falls
+          back to the rule itself rather than disappearing. */}
+      {built
+        ? <p>Built for <strong>{built.goal.title || built.goal.exercise}</strong>, the longest. Move the others out a few weeks.</p>
+        : <p>A block peaks for one — move the others out a few weeks.</p>}
     </section>}
 
     <MileageGate />
