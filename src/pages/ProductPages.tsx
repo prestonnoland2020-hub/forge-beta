@@ -196,12 +196,18 @@ function WorkoutEditor() {
   const [saved,setSaved]=useState(false);
   const [quickLoggedKeys,setQuickLoggedKeys]=useState<string[]>([]);const [quickLogMessage,setQuickLogMessage]=useState('');
   const [saveMessage,setSaveMessage]=useState('');
-  /* The profile weight is a STARTING POINT for the dial, not a check-in. It
-     used to be saved on every Finish Day untouched, so an athlete who never
-     weighed in had a "check-in" on every training day and a flat body-weight
-     trend made of one number. Only a weight the athlete set (or an edited
-     record's own) is written; a dial confirmed at 0 is not a weight either. */
-  const [bodyWeight,setBodyWeightState]=useState(editingRecord?.bodyWeight?String(editingRecord.bodyWeight):(setup?.currentWeight||''));
+  /* NOBODY WANTS TO BE TOLD WHAT THEY WEIGH.
+
+     The dial opened holding the profile weight. It was careful about SAVING
+     it — an untouched dial writes nothing, so the body-weight trend was never
+     padded with a number the athlete had not stepped on a scale for — but
+     that was only half the problem. The other half is that the field answers
+     the question before it is asked, with a figure that is weeks old and
+     sitting there in the athlete's own log as though they had just weighed in.
+
+     It opens empty. The profile weight is still on the screen, as a hint
+     underneath — a reference you can read, not an answer put in your mouth. */
+  const [bodyWeight,setBodyWeightState]=useState(editingRecord?.bodyWeight?String(editingRecord.bodyWeight):'');
   const bodyWeightTouched=useRef(Boolean(editingRecord?.bodyWeight));
   const setBodyWeight=(value:string)=>{bodyWeightTouched.current=true;setBodyWeightState(value)};
   const bodyWeightToSave=bodyWeightTouched.current&&Number(bodyWeight)>0?Number(bodyWeight):undefined;
@@ -513,7 +519,7 @@ function WorkoutEditor() {
     {topSets.length>0&&<TopSetCards planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={loggedTopSetKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={openTopSetSheet} onRemove={removeTopSet} onDeleteLogged={deleteLoggedTopSet} onCreateExercise={createExerciseForTopSet} blockedReason={noDayReason}/>}
     {quickLogMessage&&<div className="quick-log-flash" role="status"><small>{quickLogMessage}</small></div>}
     <CardioBuilder onEntriesChange={(hasEntries,entries)=>{setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions??todayRecord?.cardioSessions} plannedSummary={workoutSource==='plan'&&recommendation?.cardio?.selected?recommendation.cardio.summary:undefined}/>
-    <section className="card form-card session-details"><div className="section-title compact-title"><div><h3>Session details</h3></div></div><div className="field-grid session-context"><DialField label="Today's body weight" kind="bodyweight" unit={weightUnit} value={bodyWeight} onChange={setBodyWeight} hint="Optional check-in used for body-weight trends" /><label>Session effort<select value={effort} onChange={e=>setEffort(e.target.value)}><option value="">Not recorded</option><option>Easy</option><option>Moderate</option><option>Hard</option><option>Max effort</option></select></label></div><label>Workout notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4} placeholder="How did the session feel? Add anything the numbers do not capture." /></label></section>
+    <section className="card form-card session-details"><div className="section-title compact-title"><div><h3>Session details</h3></div></div><div className="field-grid session-context"><DialField label="Today's body weight" kind="bodyweight" unit={weightUnit} value={bodyWeight} onChange={setBodyWeight} hint={setup?.currentWeight?`Optional · last on file ${setup.currentWeight} ${weightUnit}`:'Optional — used for body-weight trends'} /><label>Session effort<select value={effort} onChange={e=>setEffort(e.target.value)}><option value="">Not recorded</option><option>Easy</option><option>Moderate</option><option>Hard</option><option>Max effort</option></select></label></div><label>Workout notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4} placeholder="How did the session feel? Add anything the numbers do not capture." /></label></section>
     {saveMessage&&<div className={saved?'save-confirmation':'save-confirmation save-warning'} role="status">{saveMessage}{saved&&<> <Link to="/history">View day in History →</Link></>}</div>}<button className="button wide save-workout" onClick={saveWorkout}>{saved?'Day finished ✓':'Finish Day →'}</button></div>;
 }
 
