@@ -498,6 +498,19 @@
                         The dot was invisible and the glow invalid. */
   --surface: var(--surface-sunken);
   --domain-color: var(--accent);
+
+  /* THE BOTTOM INSET, WITH A FLOOR UNDER IT.
+
+     Every piece of bottom chrome measured its clearance straight from
+     env(safe-area-inset-bottom), which is right on a phone that reports one
+     and wrong everywhere it reports zero — a home-screen web app with a
+     translucent status bar, an in-app browser, a device iOS has no inset for.
+     There the tab bar sat flush on the screen edge with the home indicator
+     drawn through it, which reads as the bar being cut off.
+
+     max() keeps the real inset wherever there is one (34px on a modern
+     iPhone is still 34px) and puts 12px under it where there is not. */
+  --safe-b: max(env(safe-area-inset-bottom), 12px);
 }
 
 /* The page itself. Painted explicitly so nothing inherits a browser default. */

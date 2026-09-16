@@ -227,7 +227,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:.005em;text-wrap:balance}
   backdrop-filter:saturate(140%) blur(14px);
   -webkit-backdrop-filter:saturate(140%) blur(14px);
   border-top:1px solid var(--hairline);
-  padding-bottom:env(safe-area-inset-bottom);
+  padding-bottom:var(--safe-b);
   box-shadow:0 -1px 0 var(--shadow-color);
 }
 .bottom-nav a{
@@ -694,7 +694,7 @@ body{background-color:var(--bg);color:var(--text)}
    floating Ask Forge bubble could cover the last card on every page. */
 .week-pulse-card{padding:20px 22px}
 .page{padding-bottom:132px}
-@media(max-width:900px){.page{padding-bottom:calc(158px + env(safe-area-inset-bottom))}}
+@media(max-width:900px){.page{padding-bottom:calc(158px + var(--safe-b))}}
 @media(max-width:600px){.week-pulse-card{padding:15px}}
 
 /* ============================================================= phone polish
@@ -892,7 +892,7 @@ body{background-color:var(--bg);color:var(--text)}
    button is the rounded-square plus. Labels stay in the DOM for screen
    readers only. */
 @media(max-width:900px){
-  .bottom-nav{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);background:var(--surface-0);border-top:1px solid var(--hairline);padding:9px 2px calc(7px + env(safe-area-inset-bottom));align-items:center}
+  .bottom-nav{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);background:var(--surface-0);border-top:1px solid var(--hairline);padding:9px 2px calc(7px + var(--safe-b));align-items:center}
   .bottom-nav a{position:relative;display:grid;justify-items:center;color:var(--ink-3);min-height:40px;align-content:center}
   .bottom-nav a::before,.bottom-nav a::after{display:none}
   .bottom-nav a small{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -955,7 +955,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
     /* Opaque capsule, no blur: translucency over a scrolling list was half of
        what went wrong last time. */
     backdrop-filter:none;-webkit-backdrop-filter:none;
-    padding:5px 14px calc(15px + env(safe-area-inset-bottom));
+    padding:5px 14px calc(15px + var(--safe-b));
     /* SIX EQUAL COLUMNS FOR FIVE TABS left a sixth of the capsule empty and
        every icon pushed off-centre. The bar does not get to assume how many
        tabs the shell renders — the tracks are created by the children. */
@@ -963,7 +963,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
   }
   .bottom-nav::before{
     content:'';position:absolute;z-index:-1;pointer-events:none;
-    top:0;bottom:calc(10px + env(safe-area-inset-bottom));
+    top:0;bottom:calc(10px + var(--safe-b));
     left:max(14px,calc((100% - 430px) / 2));right:max(14px,calc((100% - 430px) / 2));
     border:1px solid var(--hairline);border-radius:var(--r-pill);
     background:var(--surface-0);
@@ -982,7 +982,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
   .bottom-nav a.active .nav-icon{background:color-mix(in srgb,var(--ink) 13%,transparent)}
   /* Clear of the capsule, measured from it rather than from a guess: 10px of
      lift, 50px of capsule, and the safe-area inset below all of it. */
-  .coach-bubble-shell{bottom:calc(88px + env(safe-area-inset-bottom))}
+  .coach-bubble-shell{bottom:calc(88px + var(--safe-b))}
 }
 
 /* No glow on the log flow: the editor cards lose the accent gradient stripe,
@@ -1260,7 +1260,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    token owns the number now, and the rule matches that selector so a later
    sheet cannot halve it again. */
 :root{--topbar-h:88px;--chrome-clear:132px}
-@media(max-width:900px){:root{--topbar-h:72px;--chrome-clear:calc(162px + env(safe-area-inset-bottom))}}
+@media(max-width:900px){:root{--topbar-h:72px;--chrome-clear:calc(162px + var(--safe-b))}}
 .page,.app-main .page{padding-bottom:var(--chrome-clear)}
 
 /* The block roadmap was a 440px window with its own scrollbar, so on a ten-week
