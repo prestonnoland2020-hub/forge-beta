@@ -84,15 +84,8 @@ body { background: transparent !important; }
   .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list { border-radius: 16px !important; }
   .card { padding: 16px; }
   .button { min-height: 48px; padding: 14px; font-size: 14px; }
-  /* THE BAND BEHIND THE CAPSULE WAS THIS LINE.
-
-     A full-width 97%-white ground with a top border, painted across the whole
-     screen with !important so nothing downstream could remove it. Correct for
-     the bar it was written for; fatal for a floating one — the capsule sat on
-     top of a bar-shaped band, the page's background stopped at its top edge,
-     and the whole thing read as the old design with rounded corners drawn on.
-     The capsule owns the nav's appearance now (forge-system.css), so this has
-     nothing left to say. */
+  /* The bar's own ground lives in forge-system.css now, with the rest of its
+     geometry, rather than being asserted over the top of it from here. */
   .coach-bubble-launcher { box-shadow: 0 0 0 5px var(--surface-sunken), 0 0 0 8px var(--accent); }
 
   .completed-day-card { grid-template-columns: 44px 1fr; gap: 14px; padding: 16px !important; border-left-width: 5px !important; }

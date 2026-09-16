@@ -1,26 +1,20 @@
-/* "MAKE THE NAVIGATION BAR LIKE INSTAGRAM AS A BUBBLE" —
-   "just make it work no matter what page you open."
+/* "JUST GO BACK TO OLD NAVIGATION BAR AND NO ZOOM THIS IS AWFUL."
 
-   A floating capsule was built once before and pulled, for three reasons
-   written into forge-system.css: content showed in the gap under it; a fixed,
-   backdrop-filtered layer drifts during iOS momentum scroll and left the pill
-   stranded mid-card; and a translucent bar over a scrolling list is busy where
-   the eye needs calm. Two of those are fixed elsewhere now (pinChrome pins to
-   the visual viewport; the capsule is opaque), and the third is answered by
-   fading the page into its own ground behind the bar.
+   The floating capsule is gone. It was tried twice and failed four different
+   ways on the way out: a band another stylesheet painted behind it, a
+   full-width shadow, a fade scrim of my own, and a safe-area inset this phone
+   reports as zero. Four causes, four deploys, still off the bottom of the
+   screen.
 
-   None of that is worth anything if it only holds on the route it was built
-   on. This walks every route, in both tones, at three phone widths, at the top
-   of the page and scrolled to the bottom, and asks the same questions of the
-   rendered pixels each time:
+   A bar clamped to the bottom edge does not care what the inset says. If the
+   home-indicator strip is reported, the inset pads the bar's inside and the
+   tabs sit above it. If it is not reported, the bar runs under the strip and
+   the tabs are still on the screen, because there is no gap below them for
+   the error to live in. That is why this shape survives phones that lie about
+   their own geometry.
 
-     it is pinned to the bottom of what the athlete can see;
-     the capsule is inside the screen, lifted off the edge, and centred;
-     its background is actually painted — an undefined token makes a
-       background vanish silently, which is exactly how the header shipped
-       with none;
-     the page ends far enough above it that nothing tappable hides behind it;
-     and every tab is still a 44px target. */
+   This suite used to assert a capsule; it asserts the bar now. Same sweep:
+   every route, both tones, three widths, top and bottom of the page. */
 import { chromium } from 'playwright';
 import { setup, goals, days } from './seed.mjs';
 
@@ -42,13 +36,8 @@ const measure = (page) => page.evaluate(() => {
   const nav = document.querySelector('.bottom-nav');
   if (!nav) return { missing: true };
   const bar = nav.getBoundingClientRect();
+  /* ::before is checked only to prove the capsule is NOT there any more. */
   const capsule = getComputedStyle(nav, '::before');
-  /* The capsule is a pseudo-element, so its box is derived: the nav's own box
-     inset by the pseudo's resolved left/right/bottom. */
-  const px = (value) => Number.parseFloat(value) || 0;
-  const left = bar.left + px(capsule.left);
-  const right = bar.right - px(capsule.right);
-  const bottom = bar.bottom - px(capsule.bottom);
   const links = [...nav.querySelectorAll('a')].map(a => a.getBoundingClientRect().height);
   /* WHAT MATTERS IS WHETHER ANYTHING IS TRAPPED UNDER THE BAR, and the honest
      way to ask that is to hit-test the pixels rather than to measure boxes:
@@ -69,8 +58,7 @@ const measure = (page) => page.evaluate(() => {
   return {
     viewport: { w: window.innerWidth, h: window.innerHeight },
     bar: { top: bar.top, bottom: bar.bottom, left: bar.left, right: bar.right },
-    capsule: { left, right, bottom, top: bar.top + px(capsule.top), radius: capsule.borderRadius,
-      background: capsule.backgroundColor, content: capsule.content },
+    capsule: { content: capsule.content },
     scrim: getComputedStyle(nav, '::after').backgroundImage,
     navBackground: getComputedStyle(nav).backgroundColor,
     links, clearance, blocked, scrollY: window.scrollY,
@@ -107,38 +95,29 @@ for (const theme of ['light', 'dark']) {
         if (Math.abs(m.bar.bottom - m.viewport.h) > 1) fail('pinned to the bottom of the screen', `${at}: bar bottom ${Math.round(m.bar.bottom)} vs viewport ${m.viewport.h}`);
         else note('pinned');
 
-        /* The capsule is drawn, inside the screen, lifted, and centred. */
-        if (!m.capsule.content || m.capsule.content === 'none') fail('the capsule is drawn', at);
-        else note('drawn');
-        const lift = m.viewport.h - m.capsule.bottom;
-        if (lift < LIFT_MIN) fail('the capsule is lifted off the bottom edge', `${at}: ${Math.round(lift)}px`);
-        else note('lifted');
-        if (m.capsule.left < GAP_MIN || m.viewport.w - m.capsule.right < GAP_MIN) fail('the capsule is inset from both sides', `${at}: ${Math.round(m.capsule.left)} / ${Math.round(m.viewport.w - m.capsule.right)}`);
-        else note('inset');
-        if (Math.abs(m.capsule.left - (m.viewport.w - m.capsule.right)) > 1) fail('the capsule is centred', `${at}: ${Math.round(m.capsule.left)} vs ${Math.round(m.viewport.w - m.capsule.right)}`);
-        else note('centred');
-        if (m.capsule.right - m.capsule.left > 431) fail('the capsule stops widening on a big phone', `${at}: ${Math.round(m.capsule.right - m.capsule.left)}px`);
-        else note('capped');
-
-        /* AN UNDEFINED TOKEN MAKES A BACKGROUND VANISH WITH NO ERROR. */
-        const alpha = (m.capsule.background.match(/[\d.]+\s*\)$/) || ['1)'])[0];
-        const transparent = /rgba?\([^)]*,\s*0\s*\)/.test(m.capsule.background) || m.capsule.background === 'transparent';
-        if (transparent) fail('the capsule is opaque', `${at}: ${m.capsule.background}`);
-        else note('opaque');
-        /* AND NO BAND BEHIND IT. A strip of flat ground under a floating bar
-           is a bar; its gradient edge crossing the capsule's rounded corners
-           is what read as chipped. The gap shows the page. */
-        if (/gradient|url\(/.test(m.scrim)) fail('nothing is painted behind the capsule', `${at}: ${m.scrim}`);
-        else note('floating');
-        if (!/rgba?\([^)]*,\s*0\s*\)/.test(m.navBackground)) fail('the bar itself paints no ground', `${at}: ${m.navBackground}`);
+        /* FULL BLEED, AND FLUSH WITH THE BOTTOM. No gap under it: a gap is
+           where every one of the capsule's failures lived. */
+        if (Math.abs(m.bar.left) > 0.5 || Math.abs(m.bar.right - m.viewport.w) > 0.5) {
+          fail('the bar spans the whole width', `${at}: ${Math.round(m.bar.left)}..${Math.round(m.bar.right)} of ${m.viewport.w}`);
+        } else note('full bleed');
+        if (m.capsule.content && m.capsule.content !== 'none') fail('no capsule is painted inside it', at);
+        else note('no capsule');
+        if (/gradient|url\(/.test(m.scrim)) fail('and nothing is painted behind it', `${at}: ${m.scrim}`);
         else note('no band');
 
-        /* Nothing tappable ends underneath it. */
+        /* ITS OWN GROUND IS OPAQUE. An undefined token makes a background
+           vanish silently, which is exactly how the header once shipped with
+           none — and a see-through bar over a scrolling list is the other half
+           of what went wrong with the capsule. */
+        const transparent = /rgba?\([^)]*,\s*0\s*\)/.test(m.navBackground) || m.navBackground === 'transparent';
+        if (transparent) fail('the bar paints an opaque ground', `${at}: ${m.navBackground}`);
+        else note('opaque');
+
         /* Nothing sits on top of the bar, and the page leaves room under its
            own content for the capsule to float over nothing but ground. */
         if (m.blocked) fail('every tab receives its own tap', `${at}: ${m.blocked} covered`);
         else note('tappable');
-        const needed = m.viewport.h - m.capsule.top + 8;
+        const needed = m.viewport.h - m.bar.top + 8;
         if (m.clearance !== null && m.clearance < needed) {
           fail('the page reserves room under its content', `${at}: ${Math.round(m.clearance)}px reserved, ${Math.round(needed)}px needed`);
         } else note('cleared');
@@ -154,7 +133,7 @@ for (const theme of ['light', 'dark']) {
 }
 await browser.close();
 
-console.log('\nThe capsule holds on every route, tone and width');
+console.log('\nThe bar holds on every route, tone and width');
 for (const [what, count] of seen) console.log(`  PASS  ${what} (${count} checks)`);
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);

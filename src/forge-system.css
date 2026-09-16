@@ -945,55 +945,39 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
      is a hard edge with half a row of text showing beneath it. So the page
      fades into its own ground behind and below the capsule, and what is in
      the gap is the ground, not a sliced card. */
-  /* THE ELEMENT STAYS FULL WIDTH; THE CAPSULE IS PAINTED INSIDE IT.
+  /* FULL-BLEED, CLAMPED TO THE BOTTOM EDGE. The floating capsule is gone.
 
-     An inset, centred element would have broken the pin. pinChrome corrects a
-     pinch-zoomed visual viewport with translate + scale from transform-origin
-     0 0, and that math assumes a layer as wide as the layout viewport: apply
-     it to a centred capsule and the capsule walks sideways as it scales.
-     So the nav keeps its full-bleed box and its padding, and ::before draws
-     the capsule inside that box. The pin math never learns the difference. */
+     It was tried twice. The reasons it failed the first time are still in the
+     block above; the second attempt failed for a different reason each round —
+     a band another stylesheet painted behind it, a full-width shadow, my own
+     fade scrim, and finally a safe-area inset this phone reports as zero. Four
+     causes, four deploys, and it was still sitting off the bottom of the
+     screen. Preston: "just go back to old navigation bar, this is awful."
+
+     A bar clamped to the edge does not care what the inset says. If the strip
+     is reported, the inset pads the bar's inside and the tabs sit above it; if
+     it is not, the bar simply runs under the strip and the tabs are still on
+     the screen, because there is no gap below them for the error to live in.
+     That is the whole reason this shape survives phones that lie about their
+     own geometry, and it is worth more than the look. */
   .bottom-nav{
     position:fixed;inset:auto 0 0;z-index:20;
-    border:0;border-radius:0;background:transparent;box-shadow:none;
-    /* Opaque capsule, no blur: translucency over a scrolling list was half of
-       what went wrong last time. */
+    border:0;border-top:1px solid var(--hairline);border-radius:0;
+    background:var(--surface-0);
+    /* Opaque. A translucent bar over a scrolling list is busy exactly where
+       the eye needs to be calm, and it was half of what went wrong before. */
     backdrop-filter:none;-webkit-backdrop-filter:none;
-    padding:5px 14px calc(17px + var(--safe-b));
-    /* SIX EQUAL COLUMNS FOR FIVE TABS left a sixth of the capsule empty and
-       every icon pushed off-centre. The bar does not get to assume how many
-       tabs the shell renders — the tracks are created by the children. */
+    box-shadow:0 -1px 0 var(--shadow-color);
+    padding:7px 2px calc(7px + var(--safe-b));
+    /* The tracks come from the children: six equal columns for five tabs left
+       a sixth of the bar empty and every icon pushed off-centre. */
     grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
   }
-  .bottom-nav::before{
-    content:'';position:absolute;z-index:-1;pointer-events:none;
-    top:0;bottom:calc(12px + var(--safe-b));
-    left:max(14px,calc((100% - 430px) / 2));right:max(14px,calc((100% - 430px) / 2));
-    border:1px solid var(--hairline);border-radius:var(--r-pill);
-    background:var(--surface-0);
-    /* The only thing separating the capsule from the page is its own shadow,
-       so the shadow has to do that job on its own. */
-    box-shadow:0 14px 34px -10px var(--shadow-color),0 3px 10px -3px var(--shadow-color);
-  }
-  /* NO BAND BEHIND IT. The first cut of this faded the page into its own
-     ground behind and below the capsule, to answer the old objection that
-     content showing in the gap reads as a rendering fault. It answered the
-     wrong question: a strip of flat ground with a gradient edge is a BAR, and
-     the edge of that gradient crossing the capsule's rounded corners is what
-     made it look chipped. Preston looked at it and said so — "the background
-     stops at the navigation bar, it ends up looking like the old way".
-
-     A floating bar floats over the page. The content runs under it, the gap
-     shows the page and not a painted band, and the capsule is opaque so the
-     tabs stay readable over whatever passes beneath. The page's own bottom
-     clearance (--chrome-clear) is what keeps anything from ENDING under
-     there; the gap is deliberately empty, not covered. */
   .bottom-nav a{min-height:44px}
   .bottom-nav .nav-icon{width:40px;height:40px;border-radius:50%;transition:background var(--dur) var(--ease)}
   .bottom-nav a.active .nav-icon{background:color-mix(in srgb,var(--ink) 13%,transparent)}
-  /* Clear of the capsule, measured from it rather than from a guess: 10px of
-     lift, 50px of capsule, and the safe-area inset below all of it. */
-  .coach-bubble-shell{bottom:calc(90px + var(--safe-b))}
+  /* Clear of the bar: its controls, its padding, and the inset inside it. */
+  .coach-bubble-shell{bottom:calc(78px + var(--safe-b))}
 }
 
 /* No glow on the log flow: the editor cards lose the accent gradient stripe,

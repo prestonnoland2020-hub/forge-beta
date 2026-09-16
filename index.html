@@ -10,7 +10,14 @@
          simply not make. The 16px rule on input/select/textarea is the fix,
          and nozoom.mjs walks every screen at phone width and fails the build
          if a control drops under it. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- NO ZOOM. Asked for twice: "I don't wanna be able to zoom on this app;
+         it's unprofessional." The counter-argument is real and was made — this
+         tag was removed once precisely because magnification is how some people
+         read a screen — and it is his app and his call. Worth knowing: iOS has
+         ignored user-scalable=no since iOS 10, so maximum-scale is what actually
+         holds there; touch-action: manipulation (native.css) kills the double-tap,
+         which is the gesture that fires by accident. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <!-- The browser paints its own chrome from this before any CSS runs, so it
          needs one value per scheme or the notch area fights the page. -->
     <meta name="theme-color" content="#f3f5f5" media="(prefers-color-scheme: light)" />
