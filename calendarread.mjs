@@ -61,7 +61,7 @@ check('and the detail half is what gives way',
   /\.simple-preview-results>div>span\{flex:1 1 auto;min-width:0/.test(history));
 
 console.log('\nThe bottom bar has a floor under the safe-area inset');
-check('--safe-b exists', /--safe-b: max\(env\(safe-area-inset-bottom\), 12px\);/.test(theme));
+check('--safe-b exists', /--safe-b: max\(env\(safe-area-inset-bottom\), var\(--safe-b-fallback, 12px\)\);/.test(theme));
 check('no bottom chrome reads the raw inset any more',
   !/env\(safe-area-inset-bottom\)/.test(system), 'forge-system.css still has a raw inset');
 check('the capsule is lifted by it', /bottom:calc\(12px \+ var\(--safe-b\)\)/.test(system));

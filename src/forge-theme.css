@@ -509,8 +509,16 @@
      drawn through it, which reads as the bar being cut off.
 
      max() keeps the real inset wherever there is one (34px on a modern
-     iPhone is still 34px) and puts 12px under it where there is not. */
-  --safe-b: max(env(safe-area-inset-bottom), 12px);
+     iPhone is still 34px) and puts a floor under it where there is not.
+
+     AND THE FLOOR IS 12px, EXCEPT ONCE. An iPhone running this from the home
+     screen puts the home-indicator strip inside the layout viewport and is
+     supposed to report it here; in standalone mode with a translucent status
+     bar it can report nothing at all, and then 12px is all the lift the bar
+     gets and its bottom hangs off the screen. --safe-b-fallback is set from
+     script ONLY in that case (lib/homeIndicatorFallback.ts) and is absent
+     everywhere else, so every device that answers keeps its own answer. */
+  --safe-b: max(env(safe-area-inset-bottom), var(--safe-b-fallback, 12px));
 }
 
 /* The page itself. Painted explicitly so nothing inherits a browser default. */
