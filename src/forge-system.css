@@ -1561,3 +1561,10 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .page .coach-page .coach-empty{flex:0 0 auto;display:grid;justify-items:start;gap:6px;border:0;background:none;padding:var(--s2) 0 var(--s3);text-align:left}
 .page .coach-page .coach-empty strong{font:800 16px var(--display);color:var(--ink-2)}
 .page .coach-page .coach-empty p{margin:0;max-width:34ch;color:var(--ink-3);font-size:13px;line-height:1.55}
+
+/* The display report: six numbers and no interpretation. Read on a phone, out
+   loud, when the tab bar is sitting wrong. */
+.display-diagnostics dl{display:grid;gap:1px;margin:0;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:hidden}
+.display-diagnostics dl>div{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:10px 13px;background:var(--surface-sunken)}
+.display-diagnostics dt{color:var(--ink-2);font-size:12.5px}
+.display-diagnostics dd{margin:0;color:var(--ink);font:800 13px var(--display);font-variant-numeric:tabular-nums;text-align:right}

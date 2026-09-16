@@ -54,3 +54,16 @@ input, textarea, select {
 @media (pointer: coarse) {
   button, .button { cursor: default; }
 }
+
+/* NO DOUBLE-TAP ZOOM. Preston: "I don't wanna be able to zoom on this app, it's
+   unprofessional." Accidental magnification on a phone is almost always a
+   double tap on a card, not a deliberate pinch, and that one is a real bug:
+   nobody double-taps a workout row meaning to zoom.
+
+   touch-action: manipulation removes the double-tap gesture and leaves pinch
+   alone. Pinch stays on purpose and not only because iOS ignores
+   user-scalable=no anyway: this app took magnification away once with that tag
+   and put it back deliberately, because it is how some people read a screen at
+   all. Removing the accident is the fix; removing the ability is a different
+   thing wearing the same words. */
+html { touch-action: manipulation; }
