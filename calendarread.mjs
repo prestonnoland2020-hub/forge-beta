@@ -64,7 +64,7 @@ console.log('\nThe bottom bar has a floor under the safe-area inset');
 check('--safe-b exists', /--safe-b: max\(env\(safe-area-inset-bottom\), var\(--safe-b-fallback, 12px\)\);/.test(theme));
 check('no bottom chrome reads the raw inset any more',
   !/env\(safe-area-inset-bottom\)/.test(system), 'forge-system.css still has a raw inset');
-check('the capsule is lifted by it', /bottom:calc\(12px \+ var\(--safe-b\)\)/.test(system));
+check('the bar pads its inside with it', /padding:7px 2px calc\(7px \+ var\(--safe-b\)\)/.test(system));
 check('and the page reserves room measured the same way',
   /--chrome-clear:calc\(162px \+ var\(--safe-b\)\)/.test(system));
 
