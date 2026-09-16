@@ -14,6 +14,7 @@
    in the one case that warrants it. These checks are that rule, and the
    guarantee that it stays confined to that case. */
 import { fallbackFor, HOME_INDICATOR, FALLBACK_VARIABLE } from './src/lib/homeIndicatorFallback.ts';
+const insets = (top, bottom) => ({ top, bottom });
 import { readFileSync } from 'node:fs';
 
 let fails = 0;
@@ -22,13 +23,29 @@ const check = (label, ok, detail = '') => {
   if (!ok) fails += 1;
 };
 
-console.log('\nThe fallback applies to one case and no other');
-check('standalone, and told nothing: stand in for the strip', fallbackFor(true, 0) === HOME_INDICATOR);
-check('standalone, and told something: believe it', fallbackFor(true, 34) === 0);
-check('even something small, because a device that answers knows', fallbackFor(true, 8) === 0);
-check('in a browser tab, told nothing: the 12px floor is right', fallbackFor(false, 0) === 0);
-check('in a browser tab, told something: also right', fallbackFor(false, 34) === 0);
-check('a sub-pixel answer counts as nothing', fallbackFor(true, 0.4) === HOME_INDICATOR);
+console.log('\nA reported bottom inset always wins');
+check('34 reported, standalone: believe it', fallbackFor(true, insets(47, 34)) === 0);
+check('34 reported, browser tab: believe it', fallbackFor(false, insets(47, 34)) === 0);
+check('even 8, because a device that answers knows', fallbackFor(true, insets(47, 8)) === 0);
+
+console.log('\nA top inset with no bottom inset is a strip left unmentioned');
+/* THE GATE THAT FAILED. The first version asked only whether the app was
+   standalone. Preston's phone reported it was not - whatever shell he launches
+   from answers to neither display-mode nor navigator.standalone - so the gate
+   never opened and the bar stayed off the bottom of the screen. A device with
+   a home indicator also has a notch, and reports a top inset for it. */
+check('notched and silent about the bottom: stand in for the strip',
+  fallbackFor(false, insets(47, 0)) === HOME_INDICATOR);
+check('and it does not need the standalone flag to do it',
+  fallbackFor(false, insets(59, 0)) === HOME_INDICATOR);
+check('standalone still triggers it on its own',
+  fallbackFor(true, insets(0, 0)) === HOME_INDICATOR);
+check('a sub-pixel bottom counts as silence',
+  fallbackFor(false, insets(47, 0.4)) === HOME_INDICATOR);
+
+console.log('\nA device with no safe areas at all has no strip to clear');
+check('no insets, no standalone: the 12px floor is right',
+  fallbackFor(false, insets(0, 0)) === 0);
 check('and the stand-in is the iPhone home indicator', HOME_INDICATOR === 34);
 
 console.log('\nThe CSS asks for it the same way');
@@ -42,6 +59,9 @@ check('a reported inset still wins, because max() takes the larger',
 console.log('\nIt is measured at startup and again when the phone turns');
 const pin = readFileSync('./src/features/shell/pinChrome.ts', 'utf8');
 check('measured before anything else', /if \(typeof window !== 'undefined'\) applyHomeIndicatorFallback\(\);/.test(pin));
+const lib = readFileSync('./src/lib/homeIndicatorFallback.ts', 'utf8');
+check('both insets are measured, from one probe', /probe\.style\.height = 'env\(safe-area-inset-bottom,0px\)';/.test(lib));
+check('and the top one is read first', lib.indexOf('safe-area-inset-top') < lib.indexOf("probe.style.height = 'env(safe-area-inset-bottom"));
 check('and re-measured on a rotation, because the strip moves',
   /const remeasure = \(\) => \{ applyHomeIndicatorFallback\(\); schedule\(\); \};/.test(pin)
   && /addEventListener\('orientationchange', remeasure\)/.test(pin));
