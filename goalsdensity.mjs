@@ -44,10 +44,14 @@ check('the date is in the heading, not repeated below',
 check('the advice is one sentence', /A block peaks for one — move the others out a few weeks\.<\/p>/.test(page));
 check('and it still names the race the block is built for',
   /Built for <strong>\{built\.goal\.title \|\| built\.goal\.exercise\}<\/strong>/.test(page));
+check('the clashing races are not listed above the list that shows them',
+  !/clash\.races\.join/.test(page));
+check('and with no race chosen the rule still stands in its place',
+  /\{built\s*\?[\s\S]{0,260}:\s*<p>A block peaks for one/.test(page));
 /* The word survives once, in the comment explaining why the card exists. What
    must not survive is a second paragraph of advice on the screen. */
 const clash = (page.match(/\{clash && <section[\s\S]*?<\/section>\}/) || [''])[0];
-check('the card is two short lines', (clash.match(/<p/g) || []).length === 2, `${(clash.match(/<p/g) || []).length} paragraphs`);
+check('the card is one heading and one line', (clash.match(/<p>/g) || []).length === 2, `${(clash.match(/<p>/g) || []).length} paragraph branches`);
 check('and none of them is the old three-sentence version', !/compromise/.test(clash));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');

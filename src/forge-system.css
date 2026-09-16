@@ -227,7 +227,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:.005em;text-wrap:balance}
   backdrop-filter:saturate(140%) blur(14px);
   -webkit-backdrop-filter:saturate(140%) blur(14px);
   border-top:1px solid var(--hairline);
-  padding-bottom:env(safe-area-inset-bottom);
+  padding-bottom:var(--safe-b);
   box-shadow:0 -1px 0 var(--shadow-color);
 }
 .bottom-nav a{
@@ -694,7 +694,7 @@ body{background-color:var(--bg);color:var(--text)}
    floating Ask Forge bubble could cover the last card on every page. */
 .week-pulse-card{padding:20px 22px}
 .page{padding-bottom:132px}
-@media(max-width:900px){.page{padding-bottom:calc(158px + env(safe-area-inset-bottom))}}
+@media(max-width:900px){.page{padding-bottom:calc(158px + var(--safe-b))}}
 @media(max-width:600px){.week-pulse-card{padding:15px}}
 
 /* ============================================================= phone polish
@@ -892,7 +892,7 @@ body{background-color:var(--bg);color:var(--text)}
    button is the rounded-square plus. Labels stay in the DOM for screen
    readers only. */
 @media(max-width:900px){
-  .bottom-nav{grid-template-columns:repeat(6,1fr);background:var(--surface-0);border-top:1px solid var(--hairline);padding:9px 2px calc(7px + env(safe-area-inset-bottom));align-items:center}
+  .bottom-nav{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);background:var(--surface-0);border-top:1px solid var(--hairline);padding:9px 2px calc(7px + var(--safe-b));align-items:center}
   .bottom-nav a{position:relative;display:grid;justify-items:center;color:var(--ink-3);min-height:40px;align-content:center}
   .bottom-nav a::before,.bottom-nav a::after{display:none}
   .bottom-nav a small{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -922,15 +922,67 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
      Full-bleed to the bottom edge, opaque, one hairline on top. There is no
      gap for content to appear in, nothing to composite against the page
      beneath it, and the safe-area inset is padding inside the bar rather than
-     a hole below it. */
-  .bottom-nav{position:fixed;inset:auto 0 0;z-index:20;border:0;border-top:1px solid var(--hairline);border-radius:0;background:var(--surface-1);padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -1px 0 var(--shadow-color);grid-template-columns:repeat(6,1fr)}
+     a hole below it.
+
+     AND IT IS BACK, BECAUSE TWO OF THOSE THREE WERE FIXED ELSEWHERE.
+
+     The drift was the serious one, and it was never about the pill: a fixed
+     layer on iOS drifts because the layout viewport and the visual viewport
+     disagree, which is the same fault that detached the full-bleed bar from
+     the bottom of the screen on the FAQ page. pinChrome now subscribes to
+     visualViewport and writes --chrome-pin-bottom, so the bar is pinned to
+     what the athlete can actually see, capsule or not.
+
+     The translucency was the second, and it is simply not required: the
+     capsule is opaque. Nothing composites against a scrolling list.
+
+     The gap was the third — content appearing under a floating bar reads as a
+     rendering fault. A floating bar has to have a gap; what it must not have
+     is a hard edge with half a row of text showing beneath it. So the page
+     fades into its own ground behind and below the capsule, and what is in
+     the gap is the ground, not a sliced card. */
+  /* THE ELEMENT STAYS FULL WIDTH; THE CAPSULE IS PAINTED INSIDE IT.
+
+     An inset, centred element would have broken the pin. pinChrome corrects a
+     pinch-zoomed visual viewport with translate + scale from transform-origin
+     0 0, and that math assumes a layer as wide as the layout viewport: apply
+     it to a centred capsule and the capsule walks sideways as it scales.
+     So the nav keeps its full-bleed box and its padding, and ::before draws
+     the capsule inside that box. The pin math never learns the difference. */
+  .bottom-nav{
+    position:fixed;inset:auto 0 0;z-index:20;
+    border:0;border-radius:0;background:transparent;box-shadow:none;
+    /* Opaque capsule, no blur: translucency over a scrolling list was half of
+       what went wrong last time. */
+    backdrop-filter:none;-webkit-backdrop-filter:none;
+    padding:5px 14px calc(15px + var(--safe-b));
+    /* SIX EQUAL COLUMNS FOR FIVE TABS left a sixth of the capsule empty and
+       every icon pushed off-centre. The bar does not get to assume how many
+       tabs the shell renders — the tracks are created by the children. */
+    grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
+  }
+  .bottom-nav::before{
+    content:'';position:absolute;z-index:-1;pointer-events:none;
+    top:0;bottom:calc(10px + var(--safe-b));
+    left:max(14px,calc((100% - 430px) / 2));right:max(14px,calc((100% - 430px) / 2));
+    border:1px solid var(--hairline);border-radius:var(--r-pill);
+    background:var(--surface-0);
+    box-shadow:0 10px 30px -8px var(--shadow-color),0 2px 6px -2px var(--shadow-color);
+  }
+  /* And the page fades into its own ground behind the capsule, so what shows
+     in the gap is the bottom of the screen rather than half a cut-off row —
+     which is what made the floating bar read as a rendering fault before. */
+  .bottom-nav::after{
+    content:'';position:absolute;z-index:-2;pointer-events:none;
+    left:0;right:0;top:-18px;bottom:-40px;
+    background:linear-gradient(to top,var(--bg) 58%,transparent);
+  }
   .bottom-nav a{min-height:44px}
-  .bottom-nav .nav-icon{width:42px;height:42px;border-radius:50%;transition:background var(--dur) var(--ease)}
+  .bottom-nav .nav-icon{width:40px;height:40px;border-radius:50%;transition:background var(--dur) var(--ease)}
   .bottom-nav a.active .nav-icon{background:color-mix(in srgb,var(--ink) 13%,transparent)}
-  /* Clear of the bar, measured from it rather than from a guess: the bar is
-     56px of controls plus 12px of padding, and the safe-area inset now lives
-     inside it. */
-  .coach-bubble-shell{bottom:calc(80px + env(safe-area-inset-bottom))}
+  /* Clear of the capsule, measured from it rather than from a guess: 10px of
+     lift, 50px of capsule, and the safe-area inset below all of it. */
+  .coach-bubble-shell{bottom:calc(88px + var(--safe-b))}
 }
 
 /* No glow on the log flow: the editor cards lose the accent gradient stripe,
@@ -1208,7 +1260,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
    token owns the number now, and the rule matches that selector so a later
    sheet cannot halve it again. */
 :root{--topbar-h:88px;--chrome-clear:132px}
-@media(max-width:900px){:root{--topbar-h:72px;--chrome-clear:calc(162px + env(safe-area-inset-bottom))}}
+@media(max-width:900px){:root{--topbar-h:72px;--chrome-clear:calc(162px + var(--safe-b))}}
 .page,.app-main .page{padding-bottom:var(--chrome-clear)}
 
 /* The block roadmap was a 440px window with its own scrollbar, so on a ten-week

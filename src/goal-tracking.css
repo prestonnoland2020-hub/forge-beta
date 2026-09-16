@@ -30,9 +30,9 @@
 .goal-verdict.needs-more strong{color:var(--warn,#c8922a)}
 .goal-verdict.out-of-reach{border-left-color:var(--bad)}
 .goal-verdict.out-of-reach strong{color:var(--bad)}
-.goal-clash{border-left:3px solid var(--warn,#c8922a);padding:14px 16px}
-.goal-clash strong{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--warn,#c8922a);margin-bottom:6px}
-.goal-clash p{margin:0;font-size:13px;line-height:1.55;color:var(--text)}
+.goal-clash{border-left:3px solid var(--warn,#c8922a);padding:12px 14px}
+.goal-clash strong{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--warn,#c8922a);margin-bottom:4px}
+.goal-clash p{margin:0;font-size:13px;line-height:1.5;color:var(--text)}
 
 /* THE GOAL LIST IS A LIST OF CARDS, NOT A TABLE. Six columns on a 390px
    phone turned "Bench 365" into "Be…". Each goal gets its own block now: the
