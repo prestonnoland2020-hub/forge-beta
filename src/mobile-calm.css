@@ -12,11 +12,24 @@
 .mobile-swipe-hint { display: none; }
 
 /* Old Forge visual language, backed by the new account and training engine. */
-body {
+/* THE GROUND BELONGS TO html, NOT body.
+
+   The grid was painted on body. html carries its own background, so body's
+   does not propagate to the canvas — it covers body's box and stops. body's
+   box is content-height, and the document scrolls past it, so on most screens
+   the grid ENDED partway down and html's flat --bg took over below: a hard
+   horizontal seam across the page. A bar clamped to the bottom edge hid it.
+   Put a floating capsule there and the seam runs straight behind it, which is
+   what made the whole thing read as a bar again.
+
+   html's background always covers the canvas, at any scroll position and any
+   content height. So the ground goes there and body carries none. */
+html {
   background-color: var(--surface-sunken) !important;
   background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) !important;
   background-size: 42px 42px !important;
 }
+body { background: transparent !important; }
 /* The ambient glow is a DARK-mode device: on a white ground the same wash
    reads as a green stain, which is exactly the olive cast this theme pass
    was undoing. --page-glow is transparent in light, so this line now costs
@@ -71,7 +84,15 @@ body {
   .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list { border-radius: 16px !important; }
   .card { padding: 16px; }
   .button { min-height: 48px; padding: 14px; font-size: 14px; }
-  .bottom-nav { background: color-mix(in srgb, var(--panel) 97%, transparent) !important; border-top-color: var(--hairline-strong) !important; backdrop-filter: blur(18px); }
+  /* THE BAND BEHIND THE CAPSULE WAS THIS LINE.
+
+     A full-width 97%-white ground with a top border, painted across the whole
+     screen with !important so nothing downstream could remove it. Correct for
+     the bar it was written for; fatal for a floating one — the capsule sat on
+     top of a bar-shaped band, the page's background stopped at its top edge,
+     and the whole thing read as the old design with rounded corners drawn on.
+     The capsule owns the nav's appearance now (forge-system.css), so this has
+     nothing left to say. */
   .coach-bubble-launcher { box-shadow: 0 0 0 5px var(--surface-sunken), 0 0 0 8px var(--accent); }
 
   .completed-day-card { grid-template-columns: 44px 1fr; gap: 14px; padding: 16px !important; border-left-width: 5px !important; }
