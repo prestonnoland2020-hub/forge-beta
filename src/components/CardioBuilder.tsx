@@ -263,7 +263,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
 
   return <section className="card form-card cardio-log">
     <div className="section-title compact-title">
-      <div><h3>Cardio</h3><p>Log what you actually did. Add a line for each interval.</p></div>
+      <div><h3>Cardio</h3></div>
     </div>
 
     {savedEntries.length > 0 && <div className="cardio-log-saved">

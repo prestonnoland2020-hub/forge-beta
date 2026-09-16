@@ -216,7 +216,14 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
             <DialField label="Reps" kind="reps" value={displayedSet.reps ? String(displayedSet.reps) : ''} onChange={next => changeDisplayedSet({ reps: Number(next) })} />
           </div>
           {max && <div className="top-set-card-result"><span>CALCULATED MAX</span><strong>{max} {unit}</strong></div>}
-          <footer><span>{isCorrecting ? 'This replaces the completed result everywhere it is used.' : blockedReason || 'This exercise supplies its muscle mapping automatically.'}</span><button type="button" className="button" disabled={!displayedSet.lift || !displayedSet.weight || !displayedSet.reps || Boolean(blockedReason && !isCorrecting)} onClick={isCorrecting ? saveCorrection : () => onQuickLog(set)}>{isCorrecting ? 'Save correction' : 'Save top set'}</button></footer>
+          {/* A FOOTER IS FOR WHAT THE ATHLETE NEEDS TO KNOW BEFORE TAPPING SAVE.
+              "This exercise supplies its muscle mapping automatically" is how
+              the record gets built, and it sat under every open card for
+              nobody: it asks for nothing, warns of nothing, and was the widest
+              thing in the row. A correction genuinely needs its warning, and a
+              blocked save genuinely needs its reason. Otherwise the footer is
+              just the button. */}
+          <footer className={isCorrecting || blockedReason ? undefined : 'bare'}><span>{isCorrecting ? 'This replaces the completed result everywhere it is used.' : blockedReason}</span><button type="button" className="button" disabled={!displayedSet.lift || !displayedSet.weight || !displayedSet.reps || Boolean(blockedReason && !isCorrecting)} onClick={isCorrecting ? saveCorrection : () => onQuickLog(set)}>{isCorrecting ? 'Save correction' : 'Save top set'}</button></footer>
         </>}
       </article>;
     })}
