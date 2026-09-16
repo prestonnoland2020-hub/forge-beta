@@ -72,6 +72,7 @@ const measure = (page) => page.evaluate(() => {
     capsule: { left, right, bottom, top: bar.top + px(capsule.top), radius: capsule.borderRadius,
       background: capsule.backgroundColor, content: capsule.content },
     scrim: getComputedStyle(nav, '::after').backgroundImage,
+    navBackground: getComputedStyle(nav).backgroundColor,
     links, clearance, blocked, scrollY: window.scrollY,
     docHeight: document.documentElement.scrollHeight,
   };
@@ -124,8 +125,13 @@ for (const theme of ['light', 'dark']) {
         const transparent = /rgba?\([^)]*,\s*0\s*\)/.test(m.capsule.background) || m.capsule.background === 'transparent';
         if (transparent) fail('the capsule is opaque', `${at}: ${m.capsule.background}`);
         else note('opaque');
-        if (!/linear-gradient/.test(m.scrim)) fail('the page fades into its ground behind it', `${at}: ${m.scrim}`);
-        else note('faded');
+        /* AND NO BAND BEHIND IT. A strip of flat ground under a floating bar
+           is a bar; its gradient edge crossing the capsule's rounded corners
+           is what read as chipped. The gap shows the page. */
+        if (/gradient|url\(/.test(m.scrim)) fail('nothing is painted behind the capsule', `${at}: ${m.scrim}`);
+        else note('floating');
+        if (!/rgba?\([^)]*,\s*0\s*\)/.test(m.navBackground)) fail('the bar itself paints no ground', `${at}: ${m.navBackground}`);
+        else note('no band');
 
         /* Nothing tappable ends underneath it. */
         /* Nothing sits on top of the bar, and the page leaves room under its

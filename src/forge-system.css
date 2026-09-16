@@ -959,7 +959,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
     /* Opaque capsule, no blur: translucency over a scrolling list was half of
        what went wrong last time. */
     backdrop-filter:none;-webkit-backdrop-filter:none;
-    padding:5px 14px calc(15px + var(--safe-b));
+    padding:5px 14px calc(17px + var(--safe-b));
     /* SIX EQUAL COLUMNS FOR FIVE TABS left a sixth of the capsule empty and
        every icon pushed off-centre. The bar does not get to assume how many
        tabs the shell renders — the tracks are created by the children. */
@@ -967,26 +967,33 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
   }
   .bottom-nav::before{
     content:'';position:absolute;z-index:-1;pointer-events:none;
-    top:0;bottom:calc(10px + var(--safe-b));
+    top:0;bottom:calc(12px + var(--safe-b));
     left:max(14px,calc((100% - 430px) / 2));right:max(14px,calc((100% - 430px) / 2));
     border:1px solid var(--hairline);border-radius:var(--r-pill);
     background:var(--surface-0);
-    box-shadow:0 10px 30px -8px var(--shadow-color),0 2px 6px -2px var(--shadow-color);
+    /* The only thing separating the capsule from the page is its own shadow,
+       so the shadow has to do that job on its own. */
+    box-shadow:0 14px 34px -10px var(--shadow-color),0 3px 10px -3px var(--shadow-color);
   }
-  /* And the page fades into its own ground behind the capsule, so what shows
-     in the gap is the bottom of the screen rather than half a cut-off row —
-     which is what made the floating bar read as a rendering fault before. */
-  .bottom-nav::after{
-    content:'';position:absolute;z-index:-2;pointer-events:none;
-    left:0;right:0;top:-18px;bottom:-40px;
-    background:linear-gradient(to top,var(--bg) 58%,transparent);
-  }
+  /* NO BAND BEHIND IT. The first cut of this faded the page into its own
+     ground behind and below the capsule, to answer the old objection that
+     content showing in the gap reads as a rendering fault. It answered the
+     wrong question: a strip of flat ground with a gradient edge is a BAR, and
+     the edge of that gradient crossing the capsule's rounded corners is what
+     made it look chipped. Preston looked at it and said so — "the background
+     stops at the navigation bar, it ends up looking like the old way".
+
+     A floating bar floats over the page. The content runs under it, the gap
+     shows the page and not a painted band, and the capsule is opaque so the
+     tabs stay readable over whatever passes beneath. The page's own bottom
+     clearance (--chrome-clear) is what keeps anything from ENDING under
+     there; the gap is deliberately empty, not covered. */
   .bottom-nav a{min-height:44px}
   .bottom-nav .nav-icon{width:40px;height:40px;border-radius:50%;transition:background var(--dur) var(--ease)}
   .bottom-nav a.active .nav-icon{background:color-mix(in srgb,var(--ink) 13%,transparent)}
   /* Clear of the capsule, measured from it rather than from a guess: 10px of
      lift, 50px of capsule, and the safe-area inset below all of it. */
-  .coach-bubble-shell{bottom:calc(88px + var(--safe-b))}
+  .coach-bubble-shell{bottom:calc(90px + var(--safe-b))}
 }
 
 /* No glow on the log flow: the editor cards lose the accent gradient stripe,
