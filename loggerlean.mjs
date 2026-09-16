@@ -64,5 +64,15 @@ check('nothing is saved from the sentence directly',
 check('an unreadable sentence leaves the fields alone',
   /if\(!shape\)\{setAiNote\(/.test(plan));
 
+console.log('\nAnd the body-weight dial opens empty');
+check('a fresh day starts with nothing in it',
+  /const \[bodyWeight,setBodyWeightState\]=useState\(editingRecord\?\.bodyWeight\?String\(editingRecord\.bodyWeight\):''\);/.test(page));
+check('the profile weight is not seeded into it', !/setup\?\.currentWeight\|\|''\)\);/.test(page));
+check('but it is still on screen as a reference', /last on file \$\{setup\.currentWeight\}/.test(page));
+check('editing a day that HAS a weight still shows it',
+  /useState\(editingRecord\?\.bodyWeight\?String\(editingRecord\.bodyWeight\)/.test(page));
+check('and an untouched dial still writes nothing',
+  /const bodyWeightToSave=bodyWeightTouched\.current&&Number\(bodyWeight\)>0/.test(page));
+
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);

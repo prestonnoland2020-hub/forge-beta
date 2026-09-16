@@ -1,4 +1,5 @@
 import { bottomChromeTransform, topChromeTransform } from '../../lib/visualViewportChrome';
+import { applyHomeIndicatorFallback } from '../../lib/homeIndicatorFallback';
 
 /* KEEP THE CHROME ON THE PART OF THE PAGE THE ATHLETE CAN SEE.
 
@@ -10,6 +11,11 @@ import { bottomChromeTransform, topChromeTransform } from '../../lib/visualViewp
    2019, and some embedded webviews — means no listeners and no transforms, and
    the app behaves exactly as it did. */
 export function pinChromeToVisualViewport(): () => void {
+  /* The home-indicator strip is measured once at startup and again on a
+     rotation, because it is reported per orientation. It is not part of the
+     viewport maths below — it is the number the CSS floor falls back to when
+     iOS does not report one at all. */
+  if (typeof window !== 'undefined') applyHomeIndicatorFallback();
   const viewport = typeof window !== 'undefined' ? window.visualViewport : undefined;
   if (!viewport) return () => undefined;
   const root = document.documentElement;
@@ -33,15 +39,16 @@ export function pinChromeToVisualViewport(): () => void {
      and a transform written from the event handler is a transform written
      mid-gesture — which is how this kind of code becomes the jank it fixed. */
   const schedule = () => { if (!queued) queued = requestAnimationFrame(apply); };
+  const remeasure = () => { applyHomeIndicatorFallback(); schedule(); };
 
   viewport.addEventListener('resize', schedule);
   viewport.addEventListener('scroll', schedule);
-  window.addEventListener('orientationchange', schedule);
+  window.addEventListener('orientationchange', remeasure);
   apply();
   return () => {
     viewport.removeEventListener('resize', schedule);
     viewport.removeEventListener('scroll', schedule);
-    window.removeEventListener('orientationchange', schedule);
+    window.removeEventListener('orientationchange', remeasure);
     if (queued) cancelAnimationFrame(queued);
     root.style.removeProperty('--chrome-pin-bottom');
     root.style.removeProperty('--chrome-pin-top');
