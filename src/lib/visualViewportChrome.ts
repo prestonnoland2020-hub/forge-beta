@@ -63,11 +63,34 @@ export const viewportsAgree = (viewport: ViewportShape, layoutHeight: number) =>
    appear at; the translation then carries that corner to the bottom-left of
    the visible region. Both are expressed in the element's own untransformed
    coordinates, which is why the scale divides into the offsets. */
+/* AND IT MAY NEVER PUSH THE BAR DOWN. This clamp is the whole bug.
+
+   The correction is offsetTop + height - layoutHeight, which is negative in
+   every case it was written for: a zoomed or keyboard-shrunk visual viewport
+   is SHORTER than the layout viewport, so the bar moves up to meet it. On
+   Preston's phone it came out POSITIVE. A home-screen web app on iOS reports a
+   documentElement.clientHeight that excludes the home-indicator strip while
+   visualViewport.height includes the whole window, so the two disagree by the
+   height of the strip in the other direction — and this function dutifully
+   translated the tab bar DOWN by exactly that much, off the bottom of the
+   screen.
+
+   Which is why every fix failed. The capsule was chopped, and so was the
+   full-bleed bar that replaced it, and so was every value of the safe-area
+   floor: none of them were wrong, they were all being moved down afterwards.
+   It also explains the one clue that made no sense — zoom in and the bar is
+   right, because zooming makes the term negative again.
+
+   A downward correction on bottom chrome is never right. The bar's job is to
+   sit on the bottom edge of what the athlete can see; moving it further down
+   than where CSS already put it can only hide it. So the correction may pull
+   the bar up and may leave it alone, and that is all. */
 export function bottomChromeTransform(viewport: ViewportShape, layoutHeight: number): string {
   if (viewportsAgree(viewport, layoutHeight)) return 'none';
   const scale = viewport.scale > 0 ? viewport.scale : 1;
   const x = viewport.offsetLeft;
-  const y = viewport.offsetTop + viewport.height - layoutHeight;
+  const y = Math.min(0, viewport.offsetTop + viewport.height - layoutHeight);
+  if (y === 0 && Math.abs(x) < OFFSET_EPSILON && Math.abs(scale - 1) < SCALE_EPSILON) return 'none';
   return `translate(${round(x)}px, ${round(y)}px) scale(${round(1 / scale, 4)})`;
 }
 
