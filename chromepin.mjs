@@ -82,6 +82,25 @@ const lifted = parse(bottomChromeTransform(keyboard, LAYOUT));
 check('the bar lifts clear of it', lifted.y === 480 - 844, String(lifted.y));
 check('and is not resized, because nothing is magnified', lifted.scale === 1, String(lifted.scale));
 
+console.log('\nAnd it may never push the bottom bar DOWN');
+/* THE BUG THAT SURVIVED FOUR REDESIGNS OF THIS BAR. A home-screen web app on
+   iOS reports a documentElement.clientHeight that excludes the home-indicator
+   strip while visualViewport.height includes the whole window. The correction
+   then came out POSITIVE and translated the tab bar down, off the bottom of
+   the screen — so the capsule was chopped, and the full-bleed bar that
+   replaced it was chopped, and every safe-area floor was chopped, because all
+   of them were being moved down afterwards. */
+{
+  const strip = bottomChromeTransform({ offsetLeft: 0, offsetTop: 0, height: 852, scale: 1 }, 814);
+  check('a visual viewport TALLER than the layout one moves nothing',
+    strip === 'none', strip);
+  const both = bottomChromeTransform({ offsetLeft: 0, offsetTop: 0, height: 852, scale: 2 }, 814);
+  check('and if it is also zoomed, it scales but still does not drop',
+    /translate\(0px, 0px\) scale\(0\.5\)/.test(both), both);
+  const up = bottomChromeTransform({ offsetLeft: 0, offsetTop: 0, height: 600, scale: 1 }, 844);
+  check('a shorter visual viewport still pulls it up', /translate\(0px, -244px\)/.test(up), up);
+}
+
 console.log('\nNothing it is handed can make it produce a broken transform');
 check('a scale of zero does not divide by zero',
   parse(bottomChromeTransform({ ...zoomed, scale: 0 }, LAYOUT)).scale === 1);
