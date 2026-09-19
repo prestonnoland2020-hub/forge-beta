@@ -1552,3 +1552,15 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .display-diagnostics dl>div{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:10px 13px;background:var(--surface-sunken)}
 .display-diagnostics dt{color:var(--ink-2);font-size:12.5px}
 .display-diagnostics dd{margin:0;color:var(--ink);font:800 13px var(--display);font-variant-numeric:tabular-nums;text-align:right}
+
+/* ------------------------------------------------------------ Forge noticed
+   The coach speaking first. One line with its number, one way to ask about
+   it, one way to say it has been seen. Accent hairline on the left because it
+   is the coach's voice, the same mark the coach's other cards carry. */
+.forge-noticed{display:grid;gap:6px;padding:13px 14px;border-left:3px solid var(--accent)}
+.forge-noticed-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.forge-noticed-head small{color:var(--ink-3);font-size:11px;font-weight:700}
+.forge-noticed-say{margin:0;font-size:15px;font-weight:700;line-height:1.4;color:var(--ink)}
+.forge-noticed-detail{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
+.forge-noticed-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:2px}
+.forge-noticed-actions .small-button{min-height:38px;padding:0 14px;font-size:13px}

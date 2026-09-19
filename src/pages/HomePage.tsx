@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { PartnersCard } from '../components/PartnersCard';
+import { ForgeNoticed } from '../components/ForgeNoticed';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { openCoachBubble } from '../features/training/coachService';
@@ -85,6 +86,12 @@ export function HomePage() {
       </div>
       <footer><Link className="button" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} →</Link><button className="feed-coach-button" onClick={() => openCoachBubble('Explain today’s workout briefly and tell me the one thing that matters most.')}>Ask Forge</button></footer>
     </section>}
+
+    {/* THE COACH SPEAKS FIRST. One fact the engine noticed, ranked, shown once.
+        It sits under today's workout because that is what it is usually about
+        — the session just done, the week this one is part of, the readiness
+        today's session is asking against. */}
+    <ForgeNoticed />
 
     {/* Under the workout, because this is the screen where you decide whether
         to train and a partner who has already trained is the one thing that
