@@ -17,7 +17,7 @@
 .day-editor-panel>header .day-order-actions button:disabled{opacity:.35;cursor:not-allowed}
 .day-editor-panel>header .day-order-actions button.danger{color:var(--bad)}
 .day-strength .cardio-policy-section,.day-rest .cardio-policy-section{display:none!important}
-.day-cardio .strength-config,.day-rest .strength-config{display:none!important}
+.day-cardio .strength-config,.day-rest .strength-config,.day-hyrox .strength-config,.day-hyrox .cardio-policy-section{display:none!important}
 .day-cardio .cardio-policy-options,.day-mixed .cardio-policy-options{grid-template-columns:1fr 1fr}
 .day-cardio .cardio-policy-options>button:first-child,.day-mixed .cardio-policy-options>button:first-child{display:grid}
 .day-rest .recovery-config{display:grid}

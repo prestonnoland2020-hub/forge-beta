@@ -162,7 +162,10 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
       const totals = summarizeCardioDraft(session);
       if (!totals.minutes) return;
       if (isHyrox) {
-        const hyroxSpecific = session.structure === 'circuit' && /hyrox/i.test(session.summary);
+        /* Only the whole race is evidence of the whole race. Forge's own
+           HYROX days log with their shape in the summary — a stations day or
+           a half simulation is training, not a result. */
+        const hyroxSpecific = session.structure === 'circuit' && /hyrox/i.test(session.summary) && !/stations|compromised|half simulation|sharpener/i.test(session.summary);
         if (hyroxSpecific) demonstrated.push({ date: record.date, value: totals.minutes * 60, label: 'Completed HYROX simulation' });
         return;
       }

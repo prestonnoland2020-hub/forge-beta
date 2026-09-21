@@ -38,7 +38,7 @@ const Context=createContext<Value|null>(null);
 const isoToday=()=>{const date=new Date();return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`};
 
 function localSplitDays():RecommendationSplitDay[]{
-  try{const saved=JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:Array<{name:string;dayType:string;muscles?:string[];exercises?:string[];cardio?:unknown[];cardioPolicy?:string}>}|null;return(saved?.days||[]).map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,type:['strength','cardio','mixed','rest'].includes(day.dayType)?day.dayType as RecommendationSplitDay['type']:'rest',muscles:day.muscles||[],exercises:day.exercises||[],cardioTypes:day.dayType==='cardio'||day.dayType==='mixed'?['Forge']:[]}))}catch{return[]}
+  try{const saved=JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:Array<{name:string;dayType:string;muscles?:string[];exercises?:string[];cardio?:unknown[];cardioPolicy?:string}>}|null;return(saved?.days||[]).map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,type:['strength','cardio','mixed','rest','hyrox'].includes(day.dayType)?day.dayType as RecommendationSplitDay['type']:'rest',muscles:day.muscles||[],exercises:day.exercises||[],cardioTypes:day.dayType==='hyrox'?['HYROX']:day.dayType==='cardio'||day.dayType==='mixed'?['Forge']:[]}))}catch{return[]}
 }
 
 export function DailyRecommendationProvider({children}:{children:ReactNode}){
@@ -49,7 +49,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      and the button hands back exactly the card it was asked to replace. */
   const forceRegenerate=useRef(false);
   useEffect(()=>{const refreshCycle=()=>setRefreshKey(key=>key+1);window.addEventListener('forge-training-cycle-changed',refreshCycle);window.addEventListener('forge-ai-plan-changed',refreshCycle);return()=>{window.removeEventListener('forge-training-cycle-changed',refreshCycle);window.removeEventListener('forge-ai-plan-changed',refreshCycle)}},[]);
-  const fallbackDays=useMemo(()=>{const local=localSplitDays();if(local.length)return local;return(setup?.splitDays||[]).map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,type:day.type.toLowerCase() as RecommendationSplitDay['type'],muscles:day.muscles||[],exercises:[],cardioTypes:day.type==='Cardio'||day.type==='Mixed'?['Forge']:[]}))},[setup,refreshKey]);
+  const fallbackDays=useMemo(()=>{const local=localSplitDays();if(local.length)return local;return(setup?.splitDays||[]).map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,type:day.type.toLowerCase() as RecommendationSplitDay['type'],muscles:day.muscles||[],exercises:[],cardioTypes:day.type==='Hyrox'?['HYROX']:day.type==='Cardio'||day.type==='Mixed'?['Forge']:[]}))},[setup,refreshKey]);
   useEffect(()=>{if(isDemoMode||!user){setCycle(current=>({...current,days:fallbackDays}));setLoading(false);return}let active=true;setLoading(true);void loadCycleSnapshot(user.id).then(next=>{if(active){setCycle(next);setSyncError(null)}}).catch(error=>{if(active){setCycle(current=>({...current,days:fallbackDays}));setSyncError(error instanceof Error?error.message:'Could not load your split position.')}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[user,fallbackDays,refreshKey]);
   const days=cycle.days.length?cycle.days:fallbackDays;const trainingDays=days.filter(day=>day.type!=='rest');
   /* Inference walks the WHOLE split, rest included. Matching the last logged
@@ -145,7 +145,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      shortcut left out. So the whole thing is a function of the day now, the due
      day is simply the argument Today passes, and the logger passes whichever
      day the athlete picked. */
-  const buildBase=useCallback((day:RecommendationSplitDay)=>buildDailyRecommendation({date,splitDay:day,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,inputFingerprint:recommendationFingerprint({date,splitDay:day,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp})}),[date,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,cycle.revision,aiPlanStamp,planInputsStamp]);
+  const buildBase=useCallback((day:RecommendationSplitDay)=>buildDailyRecommendation({date,splitDay:day,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,thresholdSecondsPerMile:day.type==='hyrox'?paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[]).threshold:undefined,metric:setup?.units==='Metric',inputFingerprint:recommendationFingerprint({date,splitDay:day,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp})}),[date,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,cycle.revision,aiPlanStamp,planInputsStamp]);
   /* The stored AI program is authoritative for today's numbers: when its
      current week prescribes a top set for this split day, that exercise,
      weight, and reps replace the engine's guess — so Today, Plan, and the
@@ -172,6 +172,8 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        is exactly the plan's placement for this split day: long run on
        longRunDay, quality on qualityDay (never on a lower-body day), the
        plan's easy run on its easy days, and NOTHING anywhere else. */
+    /* A HYROX day is Forge's own session; the plan's runs never land on it. */
+    if(generatedBase.splitDay.type==='hyrox')return generatedBase;
     const dayName=generatedBase.splitDay.name;
     const LOWER=['Quads','Hamstrings','Glutes','Calves'];
     const lowerBody=(generatedBase.splitDay.muscles||[]).some(muscle=>LOWER.includes(muscle))

@@ -148,6 +148,7 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
       : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · no exercise mapped yet` : '';
     const lifts = topSet ? [topSet, ...extraSets] : [];
     const run = runKind && runText ? { kind: runKind, text: runText } : undefined;
+    if (type === 'hyrox') return { date, kind: 'HYROX', title: day.name, detail: 'Forge writes the session on the day — stations, compromised running or a simulation, paced off your threshold.', stress: 'High' as const, lifts, run: undefined };
     if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const, lifts, run };
     if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const, lifts, run };
     if (strengthText) return { date, kind: type === 'mixed' ? 'Mixed' : 'Strength', title: day.name, detail: strengthText, stress: 'Moderate' as const, lifts, run };
