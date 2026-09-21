@@ -18,7 +18,7 @@ export async function loadCycleSnapshot(ownerId:string):Promise<CycleSnapshot>{
        across a different number of days on each screen. `isRestDay` is the
        one definition. */
     const name=day.name||`Day ${day.position}`;
-    const type=isRestDay({name})?'rest':hasStrength&&hasCardio?'mixed':hasStrength?'strength':hasCardio?'cardio':'rest';
+    const type=isRestDay({name})?'rest':cardioTypes.some(item=>/^hyrox$/i.test(String(item)))?'hyrox':hasStrength&&hasCardio?'mixed':hasStrength?'strength':hasCardio?'cardio':'rest';
     return{id:day.id,splitId:String(split.id),position:day.position,name,type,muscles,exercises,cardioTypes} as RecommendationSplitDay;
   });
   const matchesSplit=state?.split_id===split.id;

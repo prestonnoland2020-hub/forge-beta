@@ -5,6 +5,7 @@ import type { CardioLogDraft } from '../lib/cardioSession';
 import { parseCardioDescription } from '../lib/cardioParse';
 import { requestCardioParse } from '../features/training/coachService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { cardioPlanSummary, type PlannedCardio } from './CardioPlanBuilder';
 
 /* Cardio logging is manual, the way the original Apps Script CardioLog tab was:
    one row per line — type, distance, unit, time — and intervals are just more
@@ -119,11 +120,14 @@ const summarize = (lines: CardioLine[]) => {
   return [types.join(' + '), distanceText, minutes ? minutesToClock(minutes) : '', pace, count].filter(Boolean).join(' · ');
 };
 
-export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEntries = [], plannedSummary }: {
+export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEntries = [], plannedSummary, plannedCircuit }: {
   onEntriesChange?: (hasEntries: boolean, entries: CardioLogDraft[]) => void;
   initialOpen?: boolean;
   initialEntries?: CardioLogDraft[];
   plannedSummary?: string;
+  /* A circuit Forge prescribed for today (a HYROX day): its segments are
+     listed with their paces and loads, and one tap logs it as done. */
+  plannedCircuit?: { name: string; plan: PlannedCardio };
 } = {}) {
   const { setup: athleteSetup } = useProfileSetup();
   preferMetric = athleteSetup?.units === 'Metric';
@@ -142,6 +146,34 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       prescription: {},
       circuitStations: plan?.stationEntries?.map(station => ({ name: station.name, value: station.target, unit: station.unit })),
     }]);
+  };
+  /* The time is the result. A simulation's clock is what the HYROX goal
+     card reads as evidence, and a circuit draft with no time is worth zero
+     minutes to it — so the time is asked for here, before the tap, not
+     hidden behind Edit. Stored as one legacy line so the totals helpers read
+     it the way they read every other session. */
+  const [plannedTime, setPlannedTime] = useState('');
+  const plannedMinutes = (() => {
+    const parts = plannedTime.trim().split(':').map(Number);
+    if (!plannedTime.trim() || parts.some(part => !Number.isFinite(part))) return 0;
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2) return parts[0] + parts[1] / 60;
+    return parts[0] * 60 + parts[1] + parts[2] / 60;
+  })();
+  const logPlannedCircuit = () => {
+    if (!plannedCircuit) return;
+    const { name, plan } = plannedCircuit;
+    const runMiles = Number(((plan.stationEntries || []).filter(station => station.name === 'Run').reduce((total, station) => total + toMiles(Number(station.target) || 0, station.unit), 0)).toFixed(2));
+    const minutes = Number(plannedMinutes.toFixed(2));
+    setSavedEntries(items => [...items, {
+      id: crypto.randomUUID(),
+      structure: 'circuit',
+      activity: plan.activity === 'HYROX' ? 'HYROX' : name,
+      summary: `${name} · ${plan.customTarget || cardioPlanSummary(plan)}${minutes ? ` · ${minutesToClock(minutes)}` : ''}`,
+      prescription: { plannedMinutes: plan.duration || '', format: plan.circuitFormat || 'For time', ...(minutes ? { legacyIntervals: [{ cardioType: plan.activity === 'HYROX' ? 'HYROX' : name, distance: runMiles, unit: 'miles', time: minutes }] } : {}) },
+      circuitStations: (plan.stationEntries || []).map(station => ({ name: station.name, value: station.target, unit: station.unit })),
+    }]);
+    setPlannedTime('');
   };
   const [open, setOpen] = useState(initialOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -275,7 +307,11 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       </div>)}
     </div>}
 
-    {!open && plannedSummary && <p className="cardio-log-planned"><span>PLANNED</span>{plannedSummary}</p>}
+    {!open && plannedCircuit && plannedCircuit.plan.stationEntries?.length ? <div className="cardio-log-planned-circuit">
+      <p className="cardio-log-planned"><span>PLANNED</span>{plannedCircuit.name}</p>
+      <ol>{plannedCircuit.plan.stationEntries.map(station => <li key={station.id}><strong>{station.name}</strong><span>{station.target} {station.unit === 'meters' ? 'm' : station.unit}{station.pace ? ` @ ${station.pace}` : ''}{station.load ? ` · ${station.load}` : ''}</span></li>)}</ol>
+      <div className="cardio-planned-log-row"><label>Your time{plannedCircuit.plan.duration ? ` · about ${plannedCircuit.plan.duration} min` : ''}<input inputMode="numeric" placeholder="mm:ss" value={plannedTime} onChange={event => setPlannedTime(event.target.value)} /></label><button type="button" className="button secondary" onClick={logPlannedCircuit}>{plannedMinutes ? 'Log it' : 'Log without a time'}</button></div>
+    </div> : !open && plannedSummary && <p className="cardio-log-planned"><span>PLANNED</span>{plannedSummary}</p>}
     {!open && savedTemplates.length > 0 && <div className="cardio-template-row"><span className="field-caption">ONE-TAP FROM LIBRARY</span><div>{savedTemplates.slice(0, 6).map(workout => <button type="button" key={workout.id} onClick={() => logTemplate(workout)}>{workout.name}</button>)}</div></div>}
     {!open && <button type="button" className="button secondary wide" onClick={startNew}>＋ {savedEntries.length ? 'Add another cardio entry' : 'Add cardio'}</button>}
 

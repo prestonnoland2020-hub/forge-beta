@@ -556,11 +556,13 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   /* Which days run: the plan's long run and quality keep their days, and the
      rest of the athlete's stated run days are easy, never a rest day. */
   const isRest = (day: SplitDayRef) => isRestDay(day);
+  /* A HYROX day is Forge's own session — the plan's runs never land on it. */
+  const isHyrox = (day: SplitDayRef) => /hyrox/i.test(String(day.type ?? day.dayType ?? ''));
   /* A run only counts toward the week if its day is actually in the week. On a
      rolling cycle that is not 7 days long the days rotate, so the long run can
      sit outside a given week — counting it there is what made the header claim
      miles the schedule never showed. */
-  const present = (name?: string) => Boolean(name) && splitDays.some(day => day.name === name);
+  const present = (name?: string) => Boolean(name) && splitDays.some(day => day.name === name && !isHyrox(day));
   /* The race is the long run. Scheduling another one in the same seven days is
      how an athlete arrives at the start line already tired. */
   const raceWeek = phase === 'Race' && goalPaceForPhase > 0;
@@ -590,8 +592,8 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      opposite of what backing off is supposed to achieve. */
   const qualityStands = hasQuality && !(typeof athlete.readiness === 'number' && athlete.readiness < 55) ;
   const needed = Math.max(0, runningDays - (hasLong ? 1 : 0) - (qualityStands ? 1 : 0));
-  const kept = (week.easyDays || []).filter(name => splitDays.some(day => day.name === name) && !taken.has(name));
-  const fill = splitDays.filter(day => !isRest(day) && !taken.has(day.name) && !kept.includes(day.name)).map(day => day.name);
+  const kept = (week.easyDays || []).filter(name => splitDays.some(day => day.name === name && !isHyrox(day)) && !taken.has(name));
+  const fill = splitDays.filter(day => !isRest(day) && !isHyrox(day) && !taken.has(day.name) && !kept.includes(day.name)).map(day => day.name);
   const easyDays = [...kept, ...fill].slice(0, needed);
 
   /* The weekly target: start from what they actually run now and climb toward

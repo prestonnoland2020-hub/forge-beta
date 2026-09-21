@@ -30,7 +30,8 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
      screen the moment the athlete missed a day: "Legs" on Thursday in one
      panel, "Push" on Thursday in the other. */
   const weekDays=weekCycleDays(week.startDate,0,cycle as SplitDayRef[],rhythm,anchor).map((day,index)=>{const date=new Date(start);date.setDate(start.getDate()+index);return{date,day:day as unknown as SplitDay};});
-  const compatible=weekDays.map((entry,index)=>({entry,index})).filter(({entry})=>entry.day.dayType.toLowerCase()!=='rest'||entry.day.cardioPolicy!=='none');
+  /* A HYROX day is Forge's own session, never a slot for the week's runs. */
+  const compatible=weekDays.map((entry,index)=>({entry,index})).filter(({entry})=>entry.day.dayType.toLowerCase()!=='hyrox'&&(entry.day.dayType.toLowerCase()!=='rest'||entry.day.cardioPolicy!=='none'));
   const requestedRuns=enduranceGoal?Math.max(1,Math.min(profile.runningDays,compatible.length)):0;
   const cardioByDay=new Map<number,'quality'|'easy'|'long'>();
   /* A split day NAMED for a run role owns that role — a day called "Long Run"
@@ -65,6 +66,7 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     if(role==='quality'){cardioKind='FORGE · Quality';cardioText=week.quality;cardioStress='High'}else if(role==='long'){cardioKind='FORGE · Long run';cardioText=week.longRun;cardioStress='Moderate'}else if(role==='easy'){cardioKind='FORGE · Easy';cardioText=week.easy;cardioStress='Low'}else if(scaled){cardioKind='PLAN · Cardio';cardioText=scaled.summary;cardioStress=attached!.structure==='Steady'?'Low':'High'}
     /* The same facts as data, for the shared plan rows. */
     const run:PlanRun|undefined=cardioText?{kind:role==='quality'?'Hard run':role==='long'?'Long run':cardioStress==='High'?'Hard run':'Easy run',text:cardioText}:undefined;
+    if(type==='hyrox')return{date,kind:'HYROX',title:day.name,detail:'Forge writes the session on the day — stations, compromised running or a simulation, paced off your threshold.',goal:goals.find(goal=>/hyrox/i.test(`${goal.exercise||''} ${goal.title}`))?.title||'HYROX',stress:'High'};
     if(type==='rest'&&!cardioText)return{date,kind:'Recovery',title:day.name,detail:'No strength or cardio scheduled. Optional mobility or easy walking only.',goal:'Fatigue management',stress:'Rest'};
     if(type==='rest'&&cardioText)return{date,kind:cardioKind,title:day.name,detail:`No strength · ${cardioText}${scaled?` · ${scaled.reason}`:' · Scheduled from this calendar week’s cardio requirements.'}`,goal:enduranceGoal?.title||'Endurance development',stress:cardioStress||'Low',scaled:true,run};
     if(type==='strength'||type==='mixed'){const isPrimary=strengthIndex++===0;

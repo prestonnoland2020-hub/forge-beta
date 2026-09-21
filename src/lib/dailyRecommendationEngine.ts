@@ -8,6 +8,7 @@ import { normalizeMuscleGroups } from './muscleGroups';
 import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
 import { liftPositions, rungFor } from './liftProgression';
+import { hyroxSession,hyroxSessionsDone,weeksUntil } from './hyroxSession';
 
 /* Bump this whenever the engine's OUTPUT changes shape or policy — the daily
    card is snapshotted to Supabase, and a stale snapshot with a matching
@@ -28,14 +29,15 @@ import { liftPositions, rungFor } from './liftProgression';
    version is the whole point of having one: the stored row on his phone was
    written by v5 and would otherwise keep showing 265 all day beside a build
    that no longer produces it. */
-export const DAILY_RECOMMENDATION_VERSION='accessory-cap-v6';
+/* v7 adds the HYROX split day: Forge writes the session itself. */
+export const DAILY_RECOMMENDATION_VERSION='hyrox-v7';
 
 export type RecommendationSplitDay={
   id?:string;
   splitId?:string;
   position:number;
   name:string;
-  type:'strength'|'cardio'|'mixed'|'rest';
+  type:'strength'|'cardio'|'mixed'|'rest'|'hyrox';
   muscles:string[];
   exercises:string[];
   cardioTypes:string[];
@@ -88,6 +90,9 @@ type EngineInput={
   profile:AdaptiveProfile;
   runningHistory:RunResult[];
   loadBiasPercent:number;
+  /* Threshold pace in seconds per mile, when a run has established one. */
+  thresholdSecondsPerMile?:number;
+  metric?:boolean;
 };
 
 /* Alias-aware: a split day mapped to "Back Squat" on a phone that predates a
@@ -189,7 +194,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const intelligence=buildTrainingIntelligence({records:input.records,recovery:input.recovery,templates,goalMaxByLift,today:new Date(`${input.date}T12:00:00`),loadBiasPercent:input.loadBiasPercent});
   /* A cardio-only split day prescribes no strength: no top set appears on
      Today or in the workout log for that day. */
-  const topSets=input.splitDay.type==='cardio'?[]:selectedExercises.map(selection=>{
+  const topSets=input.splitDay.type==='cardio'||input.splitDay.type==='hyrox'?[]:selectedExercises.map(selection=>{
     const target=intelligence.topSets.find(item=>item.exercise===selection.exercise.name)!;
     return{id:`top-${selection.exercise.id}-${normalized(selection.muscle).replace(/[^a-z0-9]+/g,'-')}`,muscle:selection.muscle,exercise:target.exercise,weight:target.weight,reps:target.reps,calculatedMax:target.calculatedMax,stage:target.stage,rationale:target.rationale,source:target.source,selected:!selection.optional,optional:selection.optional};
   });
@@ -207,7 +212,16 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const lowerBodyDay=normalizeMuscleGroups(input.splitDay.muscles).some(muscle=>LOWER_MUSCLES.includes(muscle))
     ||selectedExercises.some(selection=>/squat|deadlift|lunge|leg press|rdl/i.test(selection.exercise.name))
     ||/\bleg/i.test(input.splitDay.name);
+  /* A HYROX day is written by Forge, not picked from the week's runs: the
+     course is fixed, so the session is arithmetic on how many HYROX days are
+     in the log, the athlete's threshold, and how close race day is. */
+  const hyrox=(()=>{
+    if(input.splitDay.type!=='hyrox')return undefined;
+    const goal=input.goals.find(goal=>/hyrox/i.test(`${goal.exercise||''} ${goal.title}`));
+    return hyroxSession({sessionIndex:hyroxSessionsDone(input.records,input.date),thresholdSecondsPerMile:input.thresholdSecondsPerMile||0,division:goal?.eventDivision,weeksToRace:weeksUntil(goal?.date,input.date),readiness:input.recovery?.readiness,metric:input.metric});
+  })();
   const cardioCandidate=(()=>{
+    if(hyrox)return{id:`hyrox-${hyrox.plan.id}`,goal:'HYROX',event:'HYROX',role:'Race specific',title:hyrox.title,phase:'Specific',week:0,plan:hyrox.plan,rationale:hyrox.rationale,placement:input.splitDay.name,stress:hyrox.shape==='race-week'?'Low':'High',progression:'Stations, compromised running and a simulation rotate; the simulation feeds the HYROX goal.',scaleNotes:[],status:'Scheduled'} as GeneratedSession;
     if(input.splitDay.type!=='cardio'&&input.splitDay.type!=='mixed')return undefined;
     const weekly=buildWeeklyCardio(input.goals,0,{profile:input.profile,history:input.runningHistory});
     const wanted=roleForDayName(input.splitDay.name);
@@ -225,7 +239,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
     }
     return weekly.scheduled[0];
   })();
-  const cardio=cardioCandidate?{id:`cardio-${cardioCandidate.id}`,title:cardioCandidate.title,summary:formatCardio(cardioCandidate),rationale:cardioCandidate.rationale,session:cardioCandidate,selected:true}:undefined;
+  const cardio=cardioCandidate?{id:`cardio-${cardioCandidate.id}`,title:cardioCandidate.title,summary:hyrox?hyrox.summary:formatCardio(cardioCandidate),rationale:cardioCandidate.rationale,session:cardioCandidate,selected:true}:undefined;
   const lastCompletedDate=input.records.map(record=>record.date).sort().at(-1);
   const selectedCount=topSets.filter(set=>set.selected).length;
   /* DAY ONE HAS NOT COMPLETED ANYTHING. This sentence used to assert that
@@ -237,6 +251,6 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const started=Boolean(lastCompletedDate);
   const explanation=input.splitDay.type==='rest'
     ?'The completed-workout cursor reached a rest day. No hard work is required; any displayed strength option is optional and does not replace recovery.'
-    :`${input.splitDay.name} is ${started?`next because the last completed recommendation advanced the split to position ${input.splitDay.position}`:`where your split starts — position ${input.splitDay.position}, with nothing completed yet`}. ${selectedCount?`${selectedCount} history-grounded top-set ${selectedCount===1?'option is':'options are'} ready.`:started?'':'Your first logged sets become the baseline everything after this is measured against.'}${cardio?' Cardio comes from the same goals, pace history, and recovery inputs.':''}`;
-  return{id:undefined,date:input.date,status:'active',algorithmVersion:DAILY_RECOMMENDATION_VERSION,inputFingerprint:input.inputFingerprint,splitDay:input.splitDay,topSets,cardio,headline:input.splitDay.type==='rest'?'Recovery is next':`${input.splitDay.name} is next`,explanation,evidence:{lastCompletedDate,activeDays7:intelligence.activeDays7,historyCount:input.records.length,goalNames:input.goals.map(goal=>goal.title)}};
+    :`${input.splitDay.name} is ${started?`next because the last completed recommendation advanced the split to position ${input.splitDay.position}`:`where your split starts — position ${input.splitDay.position}, with nothing completed yet`}. ${selectedCount?`${selectedCount} history-grounded top-set ${selectedCount===1?'option is':'options are'} ready.`:started?'':'Your first logged sets become the baseline everything after this is measured against.'}${hyrox?' Forge wrote today\'s HYROX session from your threshold pace and how many HYROX days are in the log.':cardio?' Cardio comes from the same goals, pace history, and recovery inputs.':''}`;
+  return{id:undefined,date:input.date,status:'active',algorithmVersion:DAILY_RECOMMENDATION_VERSION,inputFingerprint:input.inputFingerprint,splitDay:input.splitDay,topSets,cardio,headline:input.splitDay.type==='rest'?'Recovery is next':input.splitDay.type==='hyrox'?'HYROX day':`${input.splitDay.name} is next`,explanation,evidence:{lastCompletedDate,activeDays7:intelligence.activeDays7,historyCount:input.records.length,goalNames:input.goals.map(goal=>goal.title)}};
 }
