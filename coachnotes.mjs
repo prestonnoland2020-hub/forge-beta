@@ -45,16 +45,16 @@ check('its instruction is what the coach is asked', notes[0].ask === trend.instr
 console.log('\nThis week’s miles, only when the week is nearly gone and short');
 notes = coachNotes({ ...quiet(), week: { startIso: '2026-09-14', planned: 20, ran: 12, daysLeft: 2 } });
 check('12 of 20 with two days left fires', kinds(notes).includes('week-miles'));
-check('and says exactly that', notes[0].say === '12 of 20 mi this week, 2 days left.', notes[0].say);
-check('with the shortfall as the detail', notes[0].detail === '8 mi short of the plan.', notes[0].detail);
+check('and says exactly that', notes[0].say === '12 mi in the last 7 days — the plan wants 20.', notes[0].say);
+check('with the shortfall as the detail', notes[0].detail === '8 mi short of a plan week.', notes[0].detail);
 notes = coachNotes({ ...quiet(), week: { startIso: '2026-09-14', planned: 20, ran: 4, daysLeft: 5 } });
-check('Tuesday at 4 of 20 is just Tuesday', !kinds(notes).includes('week-miles'));
+check('4 in the last 7 days against 20 fires on any weekday — a rolling week is a whole week', kinds(notes).includes('week-miles'));
 notes = coachNotes({ ...quiet(), week: { startIso: '2026-09-14', planned: 20, ran: 15, daysLeft: 1 } });
 check('15 of 20 with a day left is fine', !kinds(notes).includes('week-miles'));
 notes = coachNotes({ ...quiet(), week: { startIso: '2026-09-14', planned: 0, ran: 0, daysLeft: 1 } });
 check('a week with no planned miles has nothing to be short of', !kinds(notes).includes('week-miles'));
 notes = coachNotes({ ...quiet(), week: { startIso: '2026-09-14', planned: 20, ran: 7.5, daysLeft: 1 } });
-check('a fraction keeps one decimal', /^7\.5 of 20 mi this week, 1 day left\.$/.test(notes[0].say), notes[0].say);
+check('a fraction keeps one decimal', /^7\.5 mi in the last 7 days — the plan wants 20\.$/.test(notes[0].say), notes[0].say);
 
 console.log('\nLast week, once it has closed');
 notes = coachNotes({ ...quiet(), closedWeek: { startIso: '2026-09-07', planned: 20, ran: 14 } });
