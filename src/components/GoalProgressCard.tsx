@@ -246,26 +246,57 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      number forward to the goal date. */
   const band = goal.type==='Endurance' && !paceGoal && legacyPrediction
     ? { low: legacyPrediction.low, high: legacyPrediction.high } : null;
-  const outlook = goal.type==='Endurance' && !paceGoal && calculated
-    ? raceDayOutlook(calculated, roadmap.weeksRemaining) : null;
+
   /* WHY THE GAP FALLS BACK TO THE PROJECTION. An endurance goal only counts a
      run AT the goal distance as "current", so a card could read CURRENT: Not
      logged, GAP TO TARGET: —, and FORGE ASSESSMENT: On track all at once — the
      verdict coming from a projection the other two tiles refused to look at.
      The gap now uses whatever the verdict used, and the assessment names the
      run behind it, so a projected gap is never mistaken for a logged one. */
-  const comparisonValue = actualCurrent || calculated;
-  const projectedOnly = !actualCurrent && Boolean(calculated);
+  /* CURRENT IS WHAT YOU ARE WORTH TODAY, NOT THE LAST TIME YOU RAN THE
+     DISTANCE. Preston's card read CURRENT: 30:00 — a 3.1-mile run logged that
+     morning at 10:00/mi, taken as his current 5K because it was the one run
+     in the window at exactly the goal distance. A jog is not a race result,
+     and every tile downstream (TO GO: 11:01) was built on it while the same
+     card's own predictor said 19:10.
+
+     So for an endurance goal CURRENT is the predictor's number — the same one
+     the feasibility verdict, the Plan tab and the Goals list already read —
+     and an exact-distance run replaces it only when it is FASTER. A real race
+     beats a conversion; a run slower than what the athlete is worth is
+     training, whatever the distance. */
+  const raceRun = goal.type==='Endurance' && !paceGoal && currentEvidence?.date && legacyPrediction && currentEvidence.value < legacyPrediction.seconds
+    ? currentEvidence : null;
+  const worthToday = goal.type==='Endurance' && !paceGoal && legacyPrediction
+    ? (raceRun ? raceRun.value : legacyPrediction.seconds)
+    : actualCurrent;
+  const worthSource = goal.type==='Endurance' && !paceGoal && legacyPrediction
+    ? (raceRun ? { date: raceRun.date, label: raceRun.label } : legacyPrediction.source
+        ? { date: legacyPrediction.source.date, label: `From your ${Math.round(legacyPrediction.source.miles * 10) / 10} mi in ${formatClock(legacyPrediction.source.seconds, false)}` }
+        : { date: '', label: 'From your recent hard running' })
+    : currentEvidence ? { date: currentEvidence.date, label: currentEvidence.label } : null;
+  /* And race day is carried forward from CURRENT — so a real race that beat
+     the conversion moves the projection too, instead of the projection
+     sitting behind a result the card has already accepted. */
+  const outlook = goal.type==='Endurance' && !paceGoal && worthToday
+    ? raceDayOutlook(worthToday, roadmap.weeksRemaining) : null;
+  /* PROJECTED IS RACE DAY. The tile used to show today's worth under the
+     word PROJECTED and put the race-day range in a footnote below the fold,
+     so the card carried two different projections that disagreed. The
+     race-day outlook is the projection; today's worth is CURRENT. */
+  const projectedValue = goal.type==='Endurance' && !paceGoal ? (outlook ? outlook.likely : calculated) : 0;
+  const comparisonValue = goal.type==='Endurance' && !paceGoal ? (projectedValue || worthToday) : (actualCurrent || calculated);
+  const projectedOnly = goal.type==='Endurance' && !paceGoal ? Boolean(projectedValue) : !actualCurrent && Boolean(calculated);
   const difference = comparisonValue && target ? comparisonValue - target : 0;
   const atTarget = Boolean(comparisonValue && target && (lowerIsBetter ? comparisonValue <= target : comparisonValue >= target));
   const goalReached = Boolean(actualCurrent && target && (lowerIsBetter ? actualCurrent <= target : actualCurrent >= target));
   const goalGapRatio = comparisonValue && target ? Math.abs(difference) / Math.abs(target) : null;
   const differenceStatus = goalGapRatio === null ? 'unknown' : atTarget || goalGapRatio <= 0.05 ? 'close' : goalGapRatio <= 0.15 ? 'within-reach' : 'far';
   const formatValue = (value: number) => timeGoal ? formatClock(value, hoursFirst) : paceGoal ? `${decimalMinutesToClock(value)} ${paceSuffix}` : `${Math.round(value * 10) / 10} ${goal.unit || ''}`.trim();
-  const currentText = actualCurrent ? formatValue(actualCurrent) : 'Not logged';
+  const currentText = worthToday ? formatValue(worthToday) : 'Not logged';
   const calculatedText = calculated ? formatValue(calculated) : '—';
   const differenceText = !comparisonValue ? '—' : timeGoal ? `${formatClock(Math.abs(difference), hoursFirst)} ${atTarget ? 'ahead' : 'to go'}` : paceGoal ? `${decimalMinutesToClock(Math.abs(difference))} ${paceSuffix} ${atTarget ? 'ahead' : 'to go'}` : `${Math.round(Math.abs(difference) * 10) / 10} ${goal.unit || ''} ${atTarget ? 'ahead' : 'to go'}`;
-  const currentSource = currentEvidence?.label || 'No valid event evidence yet';
+  const currentSource = worthSource?.label || 'No valid event evidence yet';
   const calculatedSource = goal.type==='Endurance'?(aiEstimate?`Legacy race assessment · ${aiEstimate.confidence} confidence`:aiEstimateLoading?'Legacy assessment in progress':aiEstimateError||'No legacy assessment available'):(calculatedEvidence?.label || (isHyrox ? 'Requires HYROX or simulation data' : 'No calculation available'));
   /* A ResizeObserver measuring a div, a width held in state, and ~40 lines of
      chart geometry (TW/TH/TL/TR/TSPAN, chartX, chartY, evidencePoints,
@@ -300,8 +331,13 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      as a broken estimate unless the screen names the run behind it and says
      plainly what would change it. "Legacy race assessment" said neither. */
   const projectionRun=legacyPrediction?.source;
+  /* Race day is today's worth carried forward: what the weeks left can
+     honestly buy, and a taper on top if there are enough of them. */
+  const raceDayNote = outlook
+    ? `Today’s ${formatValue(worthToday)} carried to ${formatDate(goal.date)}: ${outlook.weeks} week${outlook.weeks===1?'':'s'} of training could take it to ${formatValue(outlook.best)}${outlook.tapered?', tapered':''}; ${formatValue(outlook.likely)} is today’s fitness raced fresh. `
+    : '';
   const projectedSource=goal.type==='Endurance'
-    ?(aiEstimate&&projectionRun
+    ?raceDayNote+(aiEstimate&&projectionRun
       ?`${legacyPrediction?.reason || ''} Your best of those is ${projectionRun.miles} mi in ${formatClock(projectionRun.seconds)} on ${formatDate(projectionRun.date)}. The number holds until you beat that curve, so a steady figure means nothing faster has been logged yet. ${aiEstimate.confidence} confidence${aiEstimate.reason?` · ${aiEstimate.reason}`:''}`
       :aiEstimate?`Best qualifying effort in the last 180 days, converted to the goal distance · ${aiEstimate.confidence} confidence${aiEstimate.reason?` · ${aiEstimate.reason}`:''}`
       :aiEstimateLoading?'Reading your qualifying runs…'
@@ -343,13 +379,13 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
       {verdict.insteadOf && <p className="goal-verdict-instead">{verdict.insteadOf}</p>}
     </div>}
     <section className="goal-stat-tiles">
-      <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{currentEvidence?.date?formatDate(currentEvidence.date):'Best logged evidence'}</small></div>
-      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'?(band?`${formatValue(band.low)}–${formatValue(band.high)}`:'Off your logged running'):'At goal date'}</small></div>
+      <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{worthSource?.date?formatDate(worthSource.date):goal.type==='Endurance'&&worthToday?'Worth today':'Best logged evidence'}</small></div>
+      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(paceGoal?(calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):outlook?formatValue(outlook.likely):aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'&&!paceGoal&&outlook?`${formatValue(outlook.best)}–${formatValue(outlook.likely)} on race day`:goal.type==='Endurance'?(band?`${formatValue(band.low)}–${formatValue(band.high)}`:'Off your logged running'):`${trendPointCount} data points`}</small></div>
       <div className="gst"><span>TARGET</span><strong>{formatGoalTarget(goal.target,goal.metric,goal.unit)}</strong><small>{formatDate(goal.date)}</small></div>
       <div className={`gst difference ${differenceStatus}`}><span>TO GO</span><strong>{differenceText.replace(/ to go$/, '')}</strong><small>{projectedOnly?'Projected · ':''}{roadmap.weeksRemaining} weeks left</small></div>
     </section>
     <details className="goal-sources-details"><summary>Where these numbers come from</summary>
-      <div><span>CURRENT</span><p>{currentSource}{currentEvidence?.date ? ` · ${formatDate(currentEvidence.date)}` : ''}. The best performance your logged data demonstrates.</p></div>
+      <div><span>CURRENT</span><p>{currentSource}{worthSource?.date ? ` · ${formatDate(worthSource.date)}` : ''}. {goal.type==='Endurance'&&!paceGoal&&legacyPrediction?`What your best recent hard running is worth at this distance today${band?` (${formatValue(band.low)}–${formatValue(band.high)})`:''}. A run at exactly this distance replaces it only if it is faster.`:'The best performance your logged data demonstrates.'}</p></div>
       <div><span>PROJECTED</span><p>{projectedSource}. A goal-specific projection — it never substitutes unrelated workouts.</p></div>
       {/* What the volume argument actually is. On the card it was a third
           paragraph of verdict; here it is the answer to "why". */}
@@ -367,9 +403,10 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
         What was only in that block, and is worth keeping, is the pair of
         forward-looking ranges: what race day is worth as against today, and
         how wide a lift forecast really is. Those are one line each. */}
-    {(outlook || strengthForecast) && <p className="goal-outlook">
-      {outlook ? <span><b>{formatValue(outlook.best)}–{formatValue(outlook.likely)}</b> on race day, {roadmap.weeksRemaining} weeks of training from here.</span> : null}
-      {strengthForecast ? <span><b>{formatValue(strengthForecast.low)}–{formatValue(strengthForecast.high)}</b> by {formatDate(goal.date)} · {strengthForecast.confidence.toLowerCase()} confidence.</span> : null}
+    {/* The race-day range now lives under the PROJECTED tile, where it is the
+        projection rather than a second one. Only the lift forecast is left. */}
+    {strengthForecast && <p className="goal-outlook">
+      <span><b>{formatValue(strengthForecast.low)}–{formatValue(strengthForecast.high)}</b> by {formatDate(goal.date)} · {strengthForecast.confidence.toLowerCase()} confidence.</span>
     </p>}
   </article>;
 }
