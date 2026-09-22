@@ -68,6 +68,9 @@ export async function saveNote(note: AthleteNote): Promise<void> {
   const index = notes.findIndex(item => item.id === note.id);
   if (index >= 0) notes[index] = note; else notes.unshift(note);
   saveLocalNotes(notes);
+  /* Every reader of the body log hears about it — Today re-prescribes the
+     moment a knee goes in. */
+  try { window.dispatchEvent(new Event('forge-athlete-notes-changed')); } catch { /* not in a browser */ }
   if (isDemoMode) return;
   try {
     await supabase.from('athlete_health_notes').upsert({

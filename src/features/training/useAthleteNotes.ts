@@ -3,7 +3,7 @@ import { loadNotes, saveNote, loadLocalNotes, type AthleteNote } from './athlete
 
 export function useAthleteNotes() {
   const [notes, setNotes] = useState<AthleteNote[]>(() => loadLocalNotes());
-  useEffect(() => { let active = true; void loadNotes().then(loaded => { if (active) setNotes(loaded); }); return () => { active = false; }; }, []);
+  useEffect(() => { let active = true; void loadNotes().then(loaded => { if (active) setNotes(loaded); }); const onChange = () => setNotes(loadLocalNotes()); window.addEventListener('forge-athlete-notes-changed', onChange); return () => { active = false; window.removeEventListener('forge-athlete-notes-changed', onChange); }; }, []);
   const upsert = useCallback((note: AthleteNote) => {
     setNotes(current => {
       const index = current.findIndex(item => item.id === note.id);
