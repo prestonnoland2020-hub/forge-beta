@@ -99,5 +99,21 @@ check('but an athlete on track is left alone',
 check('and a quiet block says nothing at all',
   planPressure({ checkIns: [answer(0, 3, 3, 3)], backedOffLifts: [], missedSessions: 0, goalsBehind: true }) === null);
 
+/* The question says the true reason, and "Not now" holds for the day. */
+{
+  const { bigDayReason } = await import('./src/lib/checkInSchedule.ts');
+  const iso = n => { const d = new Date('2026-09-22T12:00:00'); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const usual = [7, 10, 14, 17, 21, 24].map((back, i) => ({ id: `u${i}`, date: iso(back), title: 'Legs', muscles: ['Quads'], hasCardio: true,
+    topSets: [{ lift: 'Smith Machine Squat', weight: 315, reps: 8, completed: true }], cardioSessions: [{ activity: 'Run', summary: 'Run · 3 miles · 30:00', prescription: { legacyIntervals: [{ cardioType: 'Run', distance: 3, unit: 'miles', time: 30 }] } }] }));
+  const heavy = { id: 'big', date: iso(1), title: 'Legs 2', muscles: ['Quads'], hasCardio: true,
+    topSets: [{ lift: 'Smith Machine Squat', weight: 405, reps: 8, completed: true }], cardioSessions: [{ activity: 'Run', summary: 'Run · 3.1 miles · 30:00', prescription: { legacyIntervals: [{ cardioType: 'Run', distance: 3.1, unit: 'miles', time: 30 }] } }] };
+  const history = [heavy, ...usual];
+  check('a 405 × 8 day with a normal 3.1-mile run is big for its tonnage, not its run', bigDayReason(heavy, history) === 'tonnage', String(bigDayReason(heavy, history)));
+  const ask = dueCheckIn(history, [], '2026-09-22');
+  check('so the question is about the squat', /Smith Machine Squat 405 × 8/.test(ask?.prompt || '') && !/longest run/.test(ask?.prompt || ''), ask?.prompt);
+  check('"Not now" today means nothing is asked again today', dueCheckIn(history, [], '2026-09-22', undefined, '2026-09-22') === null);
+  check('but tomorrow it can ask again', dueCheckIn(history, [], '2026-09-23', undefined, '2026-09-22') !== null);
+}
+
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);

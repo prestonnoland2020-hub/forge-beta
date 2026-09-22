@@ -14,6 +14,10 @@ import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
 import { readinessFromCheckIn, type CheckInScale } from '../lib/readiness';
 import { localDayIso } from '../lib/time';
 
+const SNOOZE_KEY = 'forge-checkin-snooze';
+const readSnooze = () => { try { return localStorage.getItem(SNOOZE_KEY) || undefined; } catch { return undefined; } };
+const writeSnooze = (iso: string) => { try { localStorage.setItem(SNOOZE_KEY, iso); } catch { /* private mode */ } };
+
 /* THE COACH ASKS, AND THE ANSWER CHANGES SOMETHING.
 
    Three questions, one tap each, and the next one appears as the last is
@@ -121,7 +125,7 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   const due = useMemo(
     () => (loading || historyLoading || !setup?.completedAt || interrupting || mileageAsking
       ? null
-      : dueCheckIn(records, checkIns, today, verdictFor)),
+      : dueCheckIn(records, checkIns, today, verdictFor, readSnooze())),
     [loading, historyLoading, setup?.completedAt, interrupting, mileageAsking, records, checkIns, today, verdictFor],
   );
   /* LATCHED THE MOMENT IT OPENS. Answering writes today's check-in, which makes
@@ -148,7 +152,7 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
     finish(value);
   };
 
-  const dismiss = () => { setClosed(true); onClose?.(); };
+  const dismiss = () => { setClosed(true); writeSnooze(today); onClose?.(); };
   const options = step === 'legs' ? LEGS : step === 'energy' ? ENERGY : SLEEP;
   const said = result === null ? null : outcome(result);
 

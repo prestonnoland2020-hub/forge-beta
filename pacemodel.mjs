@@ -147,5 +147,13 @@ check('one hard finish does not move it — the median is taken, not the mean',
 check('with nothing logged there is nothing to say', loggedEasyPace([], model, TODAY) === 0);
 check('and with no model at all, nothing either', loggedEasyPace(slowLog, { threshold: 0 }, TODAY) === 0);
 
+/* THE FAST END OF THE LADDER HOLDS. A curve fitted through one sharp short
+   effort put interval pace at 5:11/mi under a 6:52 threshold. */
+{
+  const { INTERVAL_MAX_GAP, REPETITION_MAX_GAP } = await import('./src/lib/paceModel.ts');
+  check('interval pace is never more than 45 s/mi inside threshold', p.threshold - p.interval <= INTERVAL_MAX_GAP + 0.01 || p.interval >= p.threshold - INTERVAL_MAX_GAP - 0.01, `${clock(p.threshold)} vs ${clock(p.interval)}`);
+  check('repetition pace is never more than 70 s/mi inside threshold', p.threshold - p.repetition <= REPETITION_MAX_GAP + 0.01, `${clock(p.threshold)} vs ${clock(p.repetition)}`);
+}
+
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);
