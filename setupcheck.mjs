@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import { setup, goals, days } from './seed.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
-const BASE = 'http://localhost:4193';
+const BASE = 'http://localhost:4191';
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 mkdirSync('/tmp/tour', { recursive: true });
 const browser = await chromium.launch({ executablePath: CHROME });
@@ -38,18 +38,24 @@ async function page(seed) {
      "the movement Forge measures each day by"), which failed this line
      instead of the routing it is here to test. */
   const eyebrow = await p.locator('.setup-heading .eyebrow').innerText().catch(() => '');
-  check('it opens ON the mapping step', /what each day trains/i.test(eyebrow), `${eyebrow} / ${heading}`);
+  check('it opens ON the week step', /your week/i.test(eyebrow), `${eyebrow} / ${heading}`);
   await p.screenshot({ path: '/tmp/tour/setup-map.png', fullPage: true });
-  /* Finish is refused while a day names nothing. */
+  /* FORGE FILLS THE EMPTY DAY ITSELF. Setup used to refuse to finish until
+     the athlete picked a movement; now the day arrives with one chosen and
+     the athlete changes it if they want to. */
+  const chosen = await p.locator('.setup-day-head small').first().innerText().catch(() => '');
+  check('the empty day arrives with a movement already on it', chosen && !/pick a movement/i.test(chosen), chosen);
+  await p.locator('.setup-day-head').first().click();
+  await p.waitForTimeout(300);
+  const count = await p.locator('.setup-day-options .muscle-chip').count();
+  check('and Change opens the alternatives', count > 1, `${count} options`);
+  /* Clearing it is still refused at Finish. */
+  await p.locator('.setup-day-options .muscle-chip[aria-pressed="true"]').first().click();
+  await p.waitForTimeout(200);
   await p.locator('.setup-actions .button:not(.ghost)').click();
   await p.waitForTimeout(500);
   const err = await p.locator('.setup-error').innerText().catch(() => '');
-  check('finishing is refused with an empty day', /at least one exercise/i.test(err), err);
-  /* Pick one and the error clears. */
-  await p.locator('.setup-day-options .muscle-chip').first().click();
-  await p.waitForTimeout(300);
-  const count = await p.locator('.setup-day-chosen button').count();
-  check('choosing a movement records it on the day', count > 0, `${count} chosen`);
+  check('finishing is refused once a day is cleared', /pick a movement/i.test(err), err);
   await p.screenshot({ path: '/tmp/tour/setup-map-filled.png', fullPage: true });
   await p.close();
 }

@@ -20,7 +20,12 @@ const goalTypes = [
    dropdown offering nothing but "Cardio only" and "No fixed day", and saved
    with no muscle group attached. Onboarding passes the split it is about to
    create. */
-export function GoalBuilder({ onClose, onSave, initialGoal, splitDays, coreLiftsOnly = false }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal; splitDays?:{name:string;type:string}[]; coreLiftsOnly?:boolean }) {
+/* INLINE: one screen, no modal. Setup embeds the builder as its goal step —
+   the type as three chips on top, the fields under them, one Save button.
+   The "training connection" step is skipped: the split that owns a goal lift
+   is decided where the lifts are mapped, and a race connects to cardio. */
+export const noop=()=>{};
+export function GoalBuilder({ onClose, onSave, initialGoal, splitDays, coreLiftsOnly = false, inline = false }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal; splitDays?:{name:string;type:string}[]; coreLiftsOnly?:boolean; inline?:boolean }) {
   const {setup}=useProfileSetup();
   const connectionDays=(splitDays?.length?splitDays:setup?.splitDays||[]).filter(day=>day.type!=='Rest');
   const initialType=goalTypes.find(item=>item.label===initialGoal?.type)?.id ?? 'strength';
@@ -54,13 +59,18 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
   const [current,setCurrent]=useState(initialGoal?.current ?? ''); const [target,setTarget]=useState(initialGoal?.target?.split(' ')[0] ?? ''); const [unit,setUnit]=useState(initialGoal?.unit ?? initialGoal?.target?.split(' ').slice(1).join(' ') ?? 'lb');
   /* Checked on Continue, not on every keystroke; the message sits under the field. */
   const [fieldErrors,setFieldErrors]=useState<{current?:string;target?:string}>({});
-  const checkValues=()=>{
+  /* Returns the NORMALISED values as well as whether they passed — a state
+     update is not visible to the same click handler, and a save that read
+     the raw field after this wrote "5K Run · 22 mm:ss" over a value the
+     check had already turned into 22:00. */
+  const checkValues=():{ok:boolean;target:string;current:string}=>{
     const errors:{current?:string;target?:string}={};
+    let nextTarget=target,nextCurrent=current;
     const targetResult=normalizeGoalValue(target,unit,String(metric));
-    if(!targetResult.ok)errors.target=targetResult.message;else setTarget(targetResult.value);
-    if(current.trim()){const currentResult=normalizeGoalValue(current,unit,String(metric));if(!currentResult.ok)errors.current=currentResult.message;else setCurrent(currentResult.value)}
+    if(!targetResult.ok)errors.target=targetResult.message;else{nextTarget=targetResult.value;setTarget(nextTarget)}
+    if(current.trim()){const currentResult=normalizeGoalValue(current,unit,String(metric));if(!currentResult.ok)errors.current=currentResult.message;else{nextCurrent=currentResult.value;setCurrent(nextCurrent)}}
     setFieldErrors(errors);
-    return !errors.target&&!errors.current;
+    return {ok:!errors.target&&!errors.current,target:nextTarget,current:nextCurrent};
   };
   const [targetDate,setTargetDate]=useState(initialGoal?.date ?? (()=>{const date=new Date();date.setDate(date.getDate()+84);return date.toISOString().slice(0,10)})());
   const [connection,setConnection]=useState(initialGoal?.connection ?? connectionDays[0]?.name ?? 'No fixed day');
@@ -101,28 +111,13 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
   const unitOptions=useMemo(()=>type==='strength'?['lb','kg','reps','seconds']:type==='endurance'?(enduranceUnits[metric] ?? ['minutes']):type==='muscle'?['inches','centimeters','lb lean mass','kg lean mass','photo check-in']:type==='body'?['lb','kg']:type==='consistency'?['sessions/week','workouts/month','days/week','days streak','minutes/week']:['bpm','reps','steps/day','calories/day','hours/night','nights/week','sessions/week','days/week','minutes','seconds','miles','kilometers','meters','yards','lb','kg','inches','centimeters','percent','yes/no'],[type,metric]);
   /* The banner is a preview, and a preview of an empty form should say so
    rather than printing the punctuation between the blanks. */
-const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT_LABELS[exercise]||exercise}`:`${CORE_LIFT_LABELS[exercise]||exercise||'Pick a lift'} — set a target`):type==='endurance'?`${exercise} · ${target} ${unit}`:type==='muscle'?`Develop ${muscles.join(', ')}`:type==='body'?`${target} ${unit} body-weight goal`:type==='consistency'?`${target} sessions per week`:`${exercise}: ${target} ${unit}`,[type,target,unit,exercise,muscles]);
+const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT_LABELS[exercise]||exercise}`:`${CORE_LIFT_LABELS[exercise]||exercise||'Pick a lift'} — set a target`):type==='endurance'?`${exercise} · ${target} ${unit}`:type==='muscle'?`Develop ${muscles.join(', ')}`:type==='body'?`${target} ${unit} body-weight goal`:type==='consistency'?`${target} sessions per week`:`${exercise}: ${target} ${unit}`;
+  const title=titleFor(target);
   const toggleMuscle=(muscle:string)=>setMuscles(items=>items.includes(muscle)?items.filter(item=>item!==muscle):[...items,muscle]);
   const chooseType=(next:string)=>{setType(next);setCurrent('');setTarget('');if(next==='endurance'){setExercise('5K Run');setMetric('Finish time');setUnit('mm:ss')}else if(next==='body'){setExercise('');setMetric('Body weight');setUnit(setup?.units==='Metric'?'kg':'lb')}else{setExercise('Back Squat');setMetric('Real 1RM');setUnit(setup?.units==='Metric'?'kg':'lb')}};
   const chooseEnduranceEvent=(value:string)=>{if(value==='Custom event'||value==='Custom running event'){const running=value==='Custom running event';setIsCustomRun(running);setCustomEnduranceEvent(running?'My Running Event':'');setExercise(running?'My Running Event':'');if(running){setMetric('Finish time');setUnit('hh:mm:ss')}}else{setIsCustomRun(false);setCustomEnduranceEvent('');setExercise(value);if(['Half Marathon','Marathon'].includes(value)){setMetric('Finish time');setUnit('hh:mm:ss');setCurrent('');setTarget('')}if(value==='HYROX'){setMetric('Finish time');setUnit('hh:mm:ss');setCurrent('');setTarget('')}}};
   const chooseEnduranceMetric=(value:string)=>{setMetric(value);setUnit(enduranceUnits[value][0]);setCurrent('');setTarget('')};
-  return <div className="goal-builder-backdrop" role="dialog" aria-modal="true" aria-label="Create a new goal">
-<section className="goal-builder">
-<header>
-<div>
-<span className="eyebrow">{initialGoal?'EDIT GOAL':'NEW GOAL'} · STEP {step} OF 3</span>
-<h2>{step===1?'Choose an outcome':step===2?'Define success':'Connect your training'}</h2>
-</div>
-<button onClick={onClose} aria-label="Close goal builder">×</button>
-</header>
-<div className="goal-builder-progress">{[1,2,3].map(value=>
-<i className={value<=step?'active':''} key={value}/>)}</div>
-    {step===1&&<div className="goal-type-grid">{goalTypes.map(item=>
-<button className={type===item.id?'active':''} onClick={()=>chooseType(item.id)} key={item.id}>
-<b>{item.label}</b>
-<span>{item.copy}</span>
-</button>)}</div>}
-    {step===2&&<div className="goal-fields">
+  const goalFields=(<div className="goal-fields">
 <div className="goal-selection-banner">
 <span>{selectedType.label.toUpperCase()} GOAL</span>
 <strong>{title}</strong>
@@ -152,10 +147,10 @@ const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT
 </div>
 <small>{unit==='reps'?'How many you can do in one set at your own weight.':'The weight on the belt, not your body weight.'}</small>
 </fieldset>}
-<label>Progress metric<select value="Real 1RM" disabled aria-label="Strength progress metric">
+{!inline&&<label>Progress metric<select value="Real 1RM" disabled aria-label="Strength progress metric">
 <option>Real 1RM</option>
 </select>
-<small>Only a completed one-rep set counts toward this goal.</small></label>
+<small>Only a completed one-rep set counts toward this goal.</small></label>}
 </div>}{type==='endurance'&&<div className="field-grid">
 <label>Activity or event<select value={isCustomRun?'Custom running event':customEnduranceEvent||!standardEnduranceEvents.includes(exercise)?'Custom event':exercise} onChange={e=>chooseEnduranceEvent(e.target.value)}>
 <option>1 Mile Run</option>
@@ -171,7 +166,7 @@ const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT
 <option>Custom event</option>
 </select>
 </label>
-<label>Progress metric<select value={metric} onChange={e=>chooseEnduranceMetric(e.target.value)}>
+{!inline&&<label>Progress metric<select value={metric} onChange={e=>chooseEnduranceMetric(e.target.value)}>
 <option>Finish time</option>
 <option>Distance</option>
 <option>Average pace</option>
@@ -182,7 +177,7 @@ const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT
 <option>Repetitions</option>
 <option>Completion</option>
 </select>
-</label>{(customEnduranceEvent!==''||!standardEnduranceEvents.includes(exercise))&&<label className="full-field">Event name<input autoFocus value={customEnduranceEvent} placeholder="e.g. Lakeside 15K, Trail Ultra, Stadium Stair Climb" onChange={e=>{setCustomEnduranceEvent(e.target.value);setExercise(e.target.value)}}/><small>Name the event your way; Forge will standardize how progress is measured.</small></label>}
+</label>}{(customEnduranceEvent!==''||!standardEnduranceEvents.includes(exercise))&&<label className="full-field">Event name<input autoFocus value={customEnduranceEvent} placeholder="e.g. Lakeside 15K, Trail Ultra, Stadium Stair Climb" onChange={e=>{setCustomEnduranceEvent(e.target.value);setExercise(e.target.value)}}/><small>Name the event your way; Forge will standardize how progress is measured.</small></label>}
 </div>}{type==='endurance'&&isCustomRun&&<div className="running-event-builder">
 <div><span className="field-caption">CUSTOM RUNNING EVENT</span><strong>Define the course</strong><small>The race distance describes the event. Your selected progress metric still determines the goal.</small></div>
 <div className="running-event-fields"><label>Race distance<input inputMode="decimal" value={eventDistance} onChange={e=>setEventDistance(e.target.value)} /></label><label>Distance unit<select value={eventDistanceUnit} onChange={e=>setEventDistanceUnit(e.target.value)}><option>miles</option><option>kilometers</option><option>meters</option></select></label><label>Surface<select value={eventSurface} onChange={e=>setEventSurface(e.target.value)}><option>Road</option><option>Track</option><option>Trail</option><option>Treadmill</option><option>Mixed terrain</option></select></label></div>
@@ -215,11 +210,35 @@ const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT
     and Strava data arrive AS logged sessions, so “connected” is not a
     different source — it is the same log filling itself in. The old six-way
     dropdown was a decision with one right answer. */}
-<div className="automatic-source wide"><span>AUTOMATIC</span><strong>Tracked from your logged data</strong><small>{type==='body'?'Body-weight check-ins on your training days feed this goal — connected wearables log them for you.':'Relevant logged workouts feed this goal automatically.'}</small></div>
+{!inline&&<div className="automatic-source wide"><span>AUTOMATIC</span><strong>Tracked from your logged data</strong><small>{type==='body'?'Body-weight check-ins on your training days feed this goal — connected wearables log them for you.':'Relevant logged workouts feed this goal automatically.'}</small></div>}
 <label>Target date<input type="date" value={targetDate} onChange={e=>setTargetDate(e.target.value)} />
 </label>
-<small className="goal-rule">Historical workouts remain unchanged if this goal is edited later.</small>
-</div>}
+{!inline&&<small className="goal-rule">Historical workouts remain unchanged if this goal is edited later.</small>}
+</div>);
+  const saveGoal=(values:{target:string;current:string}={target,current})=>onSave({type:selectedType.label,title:titleFor(values.target),target:`${values.target} ${unit}`.trim(),date:targetDate,connection:inline?(type==='endurance'?'Cardio only':'No fixed day'):connection,exercise,metric,current:values.current,unit,trackingSource:'Workout history',checkInFrequency:'Automatic',reminderEnabled:false,eventTemplate:exercise==='HYROX'?'hyrox-standard':isCustomRun?'custom-running-event':undefined,eventDivision:exercise==='HYROX'?eventDivision:undefined,eventDistance:isCustomRun?eventDistance:undefined,eventDistanceUnit:isCustomRun?eventDistanceUnit:undefined,eventSurface:isCustomRun?eventSurface:undefined});
+  const canSave=Boolean(target.trim()&&targetDate&&(type==='body'||exercise.trim()));
+  if(inline)return <section className="goal-builder goal-builder-inline">
+    <div className="goal-type-chips" role="radiogroup" aria-label="Goal type">{goalTypes.map(item=><button type="button" role="radio" aria-checked={type===item.id} className={type===item.id?'active':''} onClick={()=>chooseType(item.id)} key={item.id}>{item.label}</button>)}</div>
+    {goalFields}
+    <footer>{onClose!==noop&&<button type="button" className="button ghost" onClick={onClose}>Cancel</button>}<button type="button" className="button" disabled={!canSave} onClick={()=>{const checked=checkValues();if(!checked.ok)return;saveGoal(checked)}}>{initialGoal?'Update goal ✓':'Save goal ✓'}</button></footer>
+  </section>;
+  return <div className="goal-builder-backdrop" role="dialog" aria-modal="true" aria-label="Create a new goal">
+<section className="goal-builder">
+<header>
+<div>
+<span className="eyebrow">{initialGoal?'EDIT GOAL':'NEW GOAL'} · STEP {step} OF 3</span>
+<h2>{step===1?'Choose an outcome':step===2?'Define success':'Connect your training'}</h2>
+</div>
+<button onClick={onClose} aria-label="Close goal builder">×</button>
+</header>
+<div className="goal-builder-progress">{[1,2,3].map(value=>
+<i className={value<=step?'active':''} key={value}/>)}</div>
+    {step===1&&<div className="goal-type-grid">{goalTypes.map(item=>
+<button className={type===item.id?'active':''} onClick={()=>chooseType(item.id)} key={item.id}>
+<b>{item.label}</b>
+<span>{item.copy}</span>
+</button>)}</div>}
+    {step===2&&goalFields}
     {step===3&&<div className="goal-fields">
 <div className="goal-selection-banner">
 <span>GOAL SUMMARY</span>
@@ -239,8 +258,7 @@ const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT
 <span>Add disabled exercises, overwrite your split, or change completed workout history.</span>
 </div>
 </div>}
-    <footer>{step>1?<button className="button ghost" onClick={()=>setStep(step-1)}>Back</button>:<button className="button ghost" onClick={onClose}>Cancel</button>}<button className="button" disabled={step===2&&(!target.trim()||!targetDate||(type!=='body'&&!exercise.trim()))} onClick={()=>{if(step===2&&!checkValues())return;if(step<3){setStep(step+1);return}onSave({type:selectedType.label,title,target:`${target} ${unit}`.trim(),date:targetDate,connection,exercise,metric,current,unit,trackingSource:'Workout history',checkInFrequency:'Automatic',reminderEnabled:false,eventTemplate:exercise==='HYROX'?'hyrox-standard':isCustomRun?'custom-running-event':undefined,eventDivision:exercise==='HYROX'?eventDivision:undefined,eventDistance:isCustomRun?eventDistance:undefined,eventDistanceUnit:isCustomRun?eventDistanceUnit:undefined,eventSurface:isCustomRun?eventSurface:undefined})}}>{step<3?'Continue →':initialGoal?'Update Goal ✓':'Create Goal ✓'}</button>
-</footer>
+    <footer>{step>1?<button className="button ghost" onClick={()=>setStep(step-1)}>Back</button>:<button className="button ghost" onClick={onClose}>Cancel</button>}<button className="button" disabled={step===2&&!canSave} onClick={()=>{if(step===2&&!checkValues().ok)return;if(step<3){setStep(step+1);return}saveGoal()}}>{step<3?'Continue →':initialGoal?'Update Goal ✓':'Create Goal ✓'}</button></footer>
   </section>
 </div>;
 }

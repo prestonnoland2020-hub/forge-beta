@@ -20,7 +20,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
-const BASE = 'http://localhost:4193';
+const BASE = 'http://localhost:4191';
 mkdirSync('/tmp/tour', { recursive: true });
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
@@ -71,8 +71,11 @@ for (const theme of ['dark', 'light']) {
   await page.waitForTimeout(2600);
   check('an unmapped split opens on the mapping step', page.url().includes('/onboarding'), page.url());
 
-  /* Every day, opened in turn: not one of them may be a dead end. */
+  /* Every day, opened in turn: not one of them may be a dead end — and each
+     arrives with a movement already chosen. */
   for (let index = 0; index < MUSCLE_DAYS.length; index += 1) {
+    const prefilled = await page.locator('.setup-day-head small').nth(index).innerText();
+    check(`${MUSCLE_DAYS[index].name} arrives with a movement chosen`, !/pick a movement/i.test(prefilled), prefilled);
     const head = page.locator('.setup-day-head').nth(index);
     if (!(await page.locator('.setup-day').nth(index).getAttribute('class') || '').includes('open')) await head.click();
     await page.waitForTimeout(200);
@@ -86,12 +89,16 @@ for (const theme of ['dark', 'light']) {
     await page.waitForTimeout(150);
   }
 
-  /* Now the refusal, and whether it can be read. */
+  /* Now the refusal — after clearing a day on purpose — and whether it can be read. */
+  await page.locator('.setup-day-head').first().click();
+  await page.waitForTimeout(200);
+  await page.locator('.setup-day').first().locator('.setup-day-options .muscle-chip[aria-pressed="true"]').first().click();
+  await page.waitForTimeout(200);
   await page.locator('.setup-actions .button:not(.ghost)').click();
   await page.waitForTimeout(500);
   const error = page.locator('.setup-error');
   const text = await error.innerText().catch(() => '');
-  check('finishing is refused while a day is unmapped', /at least one exercise/i.test(text), text.replace(/\n/g, ' '));
+  check('finishing is refused while a day is unmapped', /pick a movement/i.test(text), text.replace(/\n/g, ' '));
   const colours = await error.evaluate(node => {
     const style = getComputedStyle(node);
     return { fg: style.color, bg: style.backgroundColor };

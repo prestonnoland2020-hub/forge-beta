@@ -18,3 +18,11 @@ body:has(.goal-builder-backdrop) .coach-bubble-shell{display:none}
 .goal-lift-pick>small{color:var(--ink-3);font-size:12px;line-height:1.45}
 
 .field-error{display:block;margin-top:4px;font-size:12px;font-weight:700;color:var(--bad)}
+
+/* Inline builder: setup's goal step. No backdrop, no shadow, no scroll box. */
+.goal-builder.goal-builder-inline{width:100%;max-height:none;overflow:visible;box-shadow:none;padding:0;border:0;background:transparent;gap:16px}
+.goal-builder.goal-builder-inline footer{position:static;display:flex;justify-content:space-between;gap:10px;padding:4px 0 0;border:0;background:transparent}
+.goal-builder.goal-builder-inline footer .button{flex:1}
+.goal-type-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.goal-type-chips button{min-height:46px;padding:10px 8px;border-radius:10px;border:1px solid var(--hairline-strong);background:var(--surface-sunken);color:var(--muted);font-weight:800;font-size:14px}
+.goal-type-chips button.active{border-color:var(--accent);background:color-mix(in srgb,var(--tint) 14%,var(--surface-sunken));color:var(--accent-text)}
