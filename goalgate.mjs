@@ -40,8 +40,10 @@ if (/I understand and accept this/i.test(body)) {
    not fail this line instead of the thing it is testing. */
 check('setup announces how many steps it has', /SETUP 1 OF \d/.test(body), body.slice(0, 90));
 const declared = Number((body.match(/SETUP 1 OF (\d)/) || [])[1] || 0);
-check('and it is more than the three questions it used to be', declared >= 4, String(declared));
-check('the third step is named for the goal', /Your first goal/i.test(body));
+/* THREE STEPS. Six was the problem the 2026-09-21 audit named: two consents,
+   a mapping step that contradicted itself, an empty step for runners. */
+check('and it is three', declared === 3, String(declared));
+check('the second step is named for the goal', /Your goal/i.test(body));
 
 /* 2. Walk to the goal step. */
 await p.evaluate(() => { const i = document.querySelector('.setup-fields input'); if (i) { const d = Object.getOwnPropertyDescriptor(i.constructor.prototype, 'value').set; d.call(i, 'Test Athlete'); i.dispatchEvent(new Event('input', { bubbles: true })); } });
@@ -49,33 +51,29 @@ await p.waitForTimeout(250);
 await clickText(p, /continue/);
 await p.waitForTimeout(700);
 
-/* 3. Step 2 must not advance without the safety confirmation. */
-const beforeSafety = await text(p);
-await clickText(p, /continue/);
-await p.waitForTimeout(500);
+/* 3. Step 1 must not advance without the safety box. */
 const afterBlocked = await text(p);
-check('step 2 still refuses to advance unconfirmed', /Confirm the safety note/i.test(afterBlocked), beforeSafety.slice(0, 60));
+check('step 1 refuses to advance unconfirmed', /Tick the safety box/i.test(afterBlocked), afterBlocked.slice(0, 60));
 
 await p.evaluate(() => { const boxes = [...document.querySelectorAll('.setup-check input')]; const safety = boxes[boxes.length - 1]; if (safety && !safety.checked) safety.click(); });
 await p.waitForTimeout(300);
 await clickText(p, /continue/);
 await p.waitForTimeout(800);
 body = await text(p);
-check('the goal step is reached', /SETUP 3 OF \d/.test(body), body.slice(0, 80));
+check('the goal step is reached', /SETUP 2 OF \d/.test(body), body.slice(0, 80));
 /* The copy said "One goal is all Forge needs" over a paragraph naming the
    wave, the mileage ramp and max week — three mechanisms nobody has met
    ninety seconds in. What it has to convey is that the goal drives the plan
    and that one is enough; the test asserts the meaning, not the sentence. */
-check('the goal step explains why a goal is required', /one goal/i.test(body) && /plan|program/i.test(body), body.slice(0, 200));
+check('the goal step says what a goal is for', /lift to hit or a race to run/i.test(body) && /writes every week/i.test(body), body.slice(0, 200));
+check('and the builder is on the page, not behind a button', /Save goal/i.test(body) && /Which lift/i.test(body));
 
 /* 4. THE GATE: finishing with no goal is refused, and the app is not entered. */
-/* The goal step is step 3 of 4, so the button that tries to leave it is
-   Continue — the finish button lives on the day-mapping step after it. */
-await clickText(p, /^continue/i);
-await p.waitForTimeout(1200);
+/* With no goal there is no Continue on this step at all — the builder's Save
+   is the only way forward, and it is disabled until the goal has a target. */
+const saveDisabled = await p.evaluate(() => [...document.querySelectorAll('button')].find(b => /Save goal/.test(b.textContent))?.disabled);
+check('the only way forward is a saved goal', saveDisabled === true && !/Continue →/.test(body), body.slice(0, 120));
 const url = p.url();
-body = await text(p);
-check('finishing without a goal is refused', /Add one goal to continue/i.test(body), body.slice(0, 120));
 check('the athlete is still in setup', /#\/onboarding/.test(url), url);
 const committed = await p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('forge-athlete-setup')).map(k => { try { return JSON.parse(localStorage.getItem(k)).completedAt || ''; } catch { return ''; } }));
 check('setup was never marked complete', committed.every(stamp => !stamp), JSON.stringify(committed));
@@ -104,7 +102,7 @@ await returning.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded'
 await returning.waitForTimeout(2200);
 check('a goal-less athlete is routed into the goal step', /#\/onboarding/.test(returning.url()), returning.url());
 const returningBody = await text(returning);
-check('they land on the goal step, not back at step one', /SETUP 3 OF \d|Your first goal/i.test(returningBody), returningBody.slice(0, 100));
+check('they land on the goal step, not back at step one', /SETUP 2 OF \d/.test(returningBody) && /Your goal/i.test(returningBody), returningBody.slice(0, 100));
 
 /* 7. An athlete WITH a goal is never bounced. */
 const settled = await b.newPage({ viewport: { width: 1280, height: 950 } });

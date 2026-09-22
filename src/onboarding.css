@@ -66,3 +66,12 @@
   .onboarding-grid aside li { padding: 4px 0; }
   .onboarding-grid > aside h1 { font-size: 34px; margin: 8px 0 0; }
 }
+
+/* Three-step setup. */
+.setup-choices.setup-days{grid-template-columns:repeat(5,1fr)}.setup-choices.setup-days button{font-size:18px}
+.setup-choices.setup-units{grid-template-columns:1fr 1fr}
+.setup-goal-lead{margin:0 0 12px;color:var(--muted);font-size:14px;line-height:1.5}
+.setup-check .text-button{padding:0;font-size:12px;font-weight:700;color:var(--accent-text);background:none;border:0;text-decoration:underline}
+.onboarding-card .disclaimer-copy{font-size:13px;color:var(--muted);display:grid;gap:8px}
+.setup-day-head:disabled{cursor:default;opacity:1}
+.setup-day-head .setup-day-count{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
