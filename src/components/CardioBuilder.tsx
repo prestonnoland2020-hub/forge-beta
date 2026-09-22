@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DialField } from './NumberDial';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import type { CardioLogDraft } from '../lib/cardioSession';
-import { parseCardioDescription } from '../lib/cardioParse';
+import { parseCardioDescription, statedTotals, fillToTotals } from '../lib/cardioParse';
 import { requestCardioParse } from '../features/training/coachService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioPlanSummary, type PlannedCardio } from './CardioPlanBuilder';
@@ -239,7 +239,9 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
     /* The AI logger may return a distance against a time unit ("2.1 minutes").
        Its unit is a suggestion, not a fact — a stated distance always lands on
        a distance unit so the miles are real. */
-    const rows = sourceRows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: Number(row.distance) > 0 && !isDistanceUnit(row.unit) ? distanceUnitFor(row.cardioType) : row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
+    /* A stated total ('1.65 miles 11:00 total') fills in what the rows left out. */
+    const completeRows = fillToTotals(sourceRows, statedTotals(description));
+    const rows = completeRows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: Number(row.distance) > 0 && !isDistanceUnit(row.unit) ? distanceUnitFor(row.cardioType) : row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
     const noteText = parsed.note && !note ? parsed.note : note;
     /* "Log it" logs it. The rows used to land in the composer for a second
        confirming tap, and a session that never got that tap was thrown away

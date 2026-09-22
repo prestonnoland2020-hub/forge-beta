@@ -170,3 +170,51 @@ export function parseCardioDescription(text: string): ParsedCardio {
   ].filter(Boolean).join(' · ');
   return { reflection: `Logged from your description: ${parts}. Adjust any line below before saving.`, note, rows };
 }
+
+/* THE TOTAL THE ATHLETE STATED WINS. "6×1 min at 5:42, 1 min off at 9:30,
+   1.65 miles 11:00 total" came back as the six hard minutes alone — 1.05 mi
+   in 6:00 — because the recoveries were dropped, and the day was worth two
+   thirds of what was run. When the words name a total distance or time and
+   the rows come up short, the remainder is added as one easy line, so the
+   session sums to what was actually done. */
+export type StatedTotals = { miles?: number; minutes?: number };
+export function statedTotals(text: string): StatedTotals {
+  const lower = text.toLowerCase();
+  if (!/\btotal\b|\ball\s*in\b|\baltogether\b|\boverall\b/.test(lower)) return {};
+  const out: StatedTotals = {};
+  /* The number nearest the word "total" on each side, distance and time. */
+  const anchor = lower.search(/\btotal\b|\ball\s*in\b|\baltogether\b|\boverall\b/);
+  const start = Math.max(0, anchor - 40);
+  const window = lower.slice(start, anchor + 40);
+  /* Several numbers can sit near the word — "5:42 pace … 11:00 total" — so
+     the one NEAREST to it is the total, not the first one found. */
+  const nearest = (pattern: RegExp) => {
+    let best: RegExpExecArray | null = null; let bestGap = Infinity;
+    for (const match of window.matchAll(new RegExp(pattern.source, 'g'))) {
+      const gap = Math.abs((start + (match.index || 0)) - anchor);
+      if (gap < bestGap) { bestGap = gap; best = match as unknown as RegExpExecArray; }
+    }
+    return best;
+  };
+  const miles = nearest(/(\d+(?:\.\d+)?)\s*(?:mi|mile|miles)\b/);
+  if (miles) out.miles = Number(miles[1]);
+  const km = !miles && nearest(/(\d+(?:\.\d+)?)\s*(?:km|kilometers?|kilometres?)\b/);
+  if (km) out.miles = Number(km[1]) * 0.621371;
+  const clock = nearest(/(\d{1,2}):(\d{2})(?::(\d{2}))?(?!\s*(?:\/|per|pace|min\/|\/mi))/);
+  if (clock) out.minutes = clock[3] ? Number(clock[1]) * 60 + Number(clock[2]) + Number(clock[3]) / 60 : Number(clock[1]) + Number(clock[2]) / 60;
+  else { const mins = nearest(/(\d+(?:\.\d+)?)\s*(?:min|mins|minutes)\b/); if (mins) out.minutes = Number(mins[1]); }
+  return out;
+}
+
+const milesOf = (row: ParsedCardioRow) => { const u = row.unit.toLowerCase(); const d = Number(row.distance) || 0; return u.startsWith('mi') ? d : u.startsWith('kilo') || u === 'km' ? d * 0.621371 : u.startsWith('meter') || u === 'm' ? d / 1609.344 : u.startsWith('yard') ? d / 1760 : 0; };
+
+export function fillToTotals(rows: ParsedCardioRow[], totals: StatedTotals): ParsedCardioRow[] {
+  if (!rows.length || (!totals.miles && !totals.minutes)) return rows;
+  const miles = rows.reduce((sum, row) => sum + milesOf(row), 0);
+  const minutes = rows.reduce((sum, row) => sum + (Number(row.timeMinutes) || 0), 0);
+  const shortMiles = totals.miles && miles > 0 && totals.miles - miles > totals.miles * 0.05 ? totals.miles - miles : 0;
+  const shortMinutes = totals.minutes && minutes > 0 && totals.minutes - minutes > totals.minutes * 0.05 ? totals.minutes - minutes : 0;
+  if (!shortMiles && !shortMinutes) return rows;
+  const type = rows[0].cardioType;
+  return [...rows, { cardioType: type, distance: Number(shortMiles.toFixed(2)), unit: 'miles', timeMinutes: Number(shortMinutes.toFixed(2)) }];
+}
