@@ -73,7 +73,14 @@ function starterSplit(focus: AthleteSetup['primaryFocus'], count: number): Athle
     { name: 'Long Cardio', type: 'Cardio' as const, muscles: [] },
   ];
   const source = focus === 'Strength' ? strength : focus === 'Endurance' ? endurance : [strength[0], endurance[0], strength[1], strength[2]];
-  return Array.from({ length: Math.max(1, Math.min(7, count)) }, (_, index) => source[index % source.length]);
+  /* EVERY DAY GETS ITS OWN NAME. The plan matches days by name, so a 4-day
+     strength split with "Chest & Back" twice was one day to the plan and two
+     to the cursor. A repeat is numbered: Chest & Back, …, Chest & Back 2. */
+  return Array.from({ length: Math.max(1, Math.min(7, count)) }, (_, index) => {
+    const day = source[index % source.length];
+    const repeat = Math.floor(index / source.length);
+    return repeat ? { ...day, name: `${day.name} ${repeat + 1}` } : day;
+  });
 }
 
 /* THE FORM READS THE PROFILE ONCE, on its first render, so it must not be

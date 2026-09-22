@@ -3,6 +3,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { coreFirst, coreOnly, isCoreLift, isWeightedBodyweight, CORE_LIFT_LABELS } from '../lib/coreLifts';
 import { canonicalLiftKey } from '../lib/liftAliases';
+import { normalizeGoalValue, isTimeUnit, isPaceMetric } from '../lib/goalInput';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
 
@@ -51,6 +52,16 @@ export function GoalBuilder({ onClose, onSave, initialGoal, splitDays, coreLifts
    used; it is just applied on arrival now as well as on a click. */
 const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':(initialGoal?.exercise ?? (initialType==='strength'?'Back Squat':initialType==='endurance'?'5K Run':''))); const [metric,setMetric]=useState(initialGoal?.type==='Strength'?'Real 1RM':initialGoal?.type==='Body Composition'?'Body weight':initialGoal?.metric ?? 'Real 1RM');
   const [current,setCurrent]=useState(initialGoal?.current ?? ''); const [target,setTarget]=useState(initialGoal?.target?.split(' ')[0] ?? ''); const [unit,setUnit]=useState(initialGoal?.unit ?? initialGoal?.target?.split(' ').slice(1).join(' ') ?? 'lb');
+  /* Checked on Continue, not on every keystroke; the message sits under the field. */
+  const [fieldErrors,setFieldErrors]=useState<{current?:string;target?:string}>({});
+  const checkValues=()=>{
+    const errors:{current?:string;target?:string}={};
+    const targetResult=normalizeGoalValue(target,unit,String(metric));
+    if(!targetResult.ok)errors.target=targetResult.message;else setTarget(targetResult.value);
+    if(current.trim()){const currentResult=normalizeGoalValue(current,unit,String(metric));if(!currentResult.ok)errors.current=currentResult.message;else setCurrent(currentResult.value)}
+    setFieldErrors(errors);
+    return !errors.target&&!errors.current;
+  };
   const [targetDate,setTargetDate]=useState(initialGoal?.date ?? (()=>{const date=new Date();date.setDate(date.getDate()+84);return date.toISOString().slice(0,10)})());
   const [connection,setConnection]=useState(initialGoal?.connection ?? connectionDays[0]?.name ?? 'No fixed day');
   const [muscles,setMuscles]=useState<string[]>(['Quads','Glutes','Hamstrings']);
@@ -191,10 +202,11 @@ const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT
 <label>Measurement<select value={metric} onChange={e=>setMetric(e.target.value)}><option>Resting heart rate</option><option>Repetition count</option><option>Daily steps</option><option>Sleep duration</option><option>Weekly completion</option><option>Session frequency</option><option>Distance</option><option>Duration</option><option>Body measurement</option><option>Yes/no milestone</option></select>
 </label>
 </div>}<div className="field-grid three">
-<label>Current<input value={current} onChange={e=>setCurrent(e.target.value)} placeholder="Optional" />
+<label>Current<input value={current} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setCurrent(e.target.value);if(fieldErrors.current)setFieldErrors(errors=>({...errors,current:undefined}))}} placeholder="Optional" />
+{fieldErrors.current&&<small className="field-error">{fieldErrors.current}</small>}
 </label>
-<label>Target<input value={target} onChange={e=>setTarget(e.target.value)} placeholder={String(metric).toLowerCase().includes('pace')?'8:30':undefined} />
-{String(metric).toLowerCase().includes('pace')&&<small>Minutes and seconds — 8:30 (8.5 also reads as 8:30).</small>}
+<label>Target<input value={target} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setTarget(e.target.value);if(fieldErrors.target)setFieldErrors(errors=>({...errors,target:undefined}))}} placeholder={isPaceMetric(String(metric))?'8:30':isTimeUnit(unit)?(/hh/.test(unit)?'1:20:00':'22:30'):'315'} />
+{fieldErrors.target?<small className="field-error">{fieldErrors.target}</small>:isPaceMetric(String(metric))?<small>Minutes and seconds — 8:30 (8.5 also reads as 8:30).</small>:isTimeUnit(unit)?<small>A clock — 22:30. A bare number is minutes.</small>:null}
 </label>
 <label>Unit<select value={unit} onChange={e=>setUnit(e.target.value)}>{unitOptions.map(option=><option key={option}>{option}</option>)}</select>
 </label>
@@ -227,7 +239,7 @@ const title=useMemo(()=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT
 <span>Add disabled exercises, overwrite your split, or change completed workout history.</span>
 </div>
 </div>}
-    <footer>{step>1?<button className="button ghost" onClick={()=>setStep(step-1)}>Back</button>:<button className="button ghost" onClick={onClose}>Cancel</button>}<button className="button" disabled={step===2&&(!target.trim()||!targetDate||(type!=='body'&&!exercise.trim()))} onClick={()=>step<3?setStep(step+1):onSave({type:selectedType.label,title,target:`${target} ${unit}`.trim(),date:targetDate,connection,exercise,metric,current,unit,trackingSource:'Workout history',checkInFrequency:'Automatic',reminderEnabled:false,eventTemplate:exercise==='HYROX'?'hyrox-standard':isCustomRun?'custom-running-event':undefined,eventDivision:exercise==='HYROX'?eventDivision:undefined,eventDistance:isCustomRun?eventDistance:undefined,eventDistanceUnit:isCustomRun?eventDistanceUnit:undefined,eventSurface:isCustomRun?eventSurface:undefined})}>{step<3?'Continue →':initialGoal?'Update Goal ✓':'Create Goal ✓'}</button>
+    <footer>{step>1?<button className="button ghost" onClick={()=>setStep(step-1)}>Back</button>:<button className="button ghost" onClick={onClose}>Cancel</button>}<button className="button" disabled={step===2&&(!target.trim()||!targetDate||(type!=='body'&&!exercise.trim()))} onClick={()=>{if(step===2&&!checkValues())return;if(step<3){setStep(step+1);return}onSave({type:selectedType.label,title,target:`${target} ${unit}`.trim(),date:targetDate,connection,exercise,metric,current,unit,trackingSource:'Workout history',checkInFrequency:'Automatic',reminderEnabled:false,eventTemplate:exercise==='HYROX'?'hyrox-standard':isCustomRun?'custom-running-event':undefined,eventDivision:exercise==='HYROX'?eventDivision:undefined,eventDistance:isCustomRun?eventDistance:undefined,eventDistanceUnit:isCustomRun?eventDistanceUnit:undefined,eventSurface:isCustomRun?eventSurface:undefined})}}>{step<3?'Continue →':initialGoal?'Update Goal ✓':'Create Goal ✓'}</button>
 </footer>
   </section>
 </div>;

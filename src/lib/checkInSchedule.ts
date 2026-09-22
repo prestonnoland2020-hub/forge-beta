@@ -118,9 +118,14 @@ export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayI
   /* Otherwise the slow cadence — and only for someone who has actually been
      training, because the question is about training. */
   if (lastAsked && daysBetween(lastAsked, todayIso) < CADENCE_DAYS) return null;
+  /* "BEFORE TODAY" MEANS BEFORE. The cadence question is about how the
+     athlete arrives at a session, so it is never asked on a day they have
+     already trained — a runner's first ever log was followed by "how do the
+     legs feel?", which reads as an app that did not notice the run. */
+  if (records.some(record => record.date === todayIso)) return null;
   const trainedRecently = records.some(record => {
     const age = daysBetween(record.date, todayIso);
-    return age >= 0 && age <= CADENCE_DAYS + 1;
+    return age >= 1 && age <= CADENCE_DAYS + 1;
   });
   if (!trainedRecently) return null;
   return { reason: 'cadence', prompt: 'Quick check before today — how are you holding up?' };

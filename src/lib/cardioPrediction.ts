@@ -92,6 +92,21 @@ const volumeShortfallFor = (secondsPerMile: number, weeklyMiles: number) => {
   return Math.max(0, Math.min(1, 1 - weeklyMiles / needed));
 };
 
+/* EVERY CONTINUOUS RUN THAT COULD STAND AS RACE EVIDENCE, one per effort,
+   dated. The predictor reads these; the feasibility gate counts them. */
+export function raceEvidenceEfforts(records: WorkoutRecord[]): Array<{ date: string; miles: number; seconds: number }> {
+  return records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
+    if (nonRunning(`${session.activity} ${session.summary}`)) return [];
+    /* AND THE EFFORT HAS TO BE ONE. A walk at 20:00 a mile and a 2:25/mi
+       "mile" are both in this athlete's log, and both were eligible to become
+       a race prediction. runQuality throws out what is not running before any
+       of it is converted to the goal distance. */
+    return continuousRunEfforts(session)
+      .filter(effort => isRaceEvidence(effort.miles, effort.minutes * 60))
+      .map(effort => ({ date: record.date, miles: effort.miles, seconds: effort.minutes * 60 }));
+  }));
+}
+
 export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number, excluded: string[] = [], workouts: CurveEffort[] = []): RacePrediction | null {
   if (!goalMiles) return null;
   /* ONE PIECE, RUN IN ONE GO — never a session's totals.
@@ -106,16 +121,7 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      A race is a continuous effort and the only evidence for one is a single
      continuous segment. continuousRunEfforts hands those over one at a time,
      and never hands over a piece that has distance without a time. */
-  const runs = records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
-    if (nonRunning(`${session.activity} ${session.summary}`)) return [];
-    /* AND THE EFFORT HAS TO BE ONE. A walk at 20:00 a mile and a 2:25/mi
-       "mile" are both in this athlete's log, and both were eligible to become
-       a race prediction. runQuality throws out what is not running before any
-       of it is converted to the goal distance. */
-    return continuousRunEfforts(session)
-      .filter(effort => isRaceEvidence(effort.miles, effort.minutes * 60))
-      .map(effort => ({ date: record.date, miles: effort.miles, seconds: effort.minutes * 60 }));
-  }));
+  const runs = raceEvidenceEfforts(records);
   const windowDays = 180;
   /* EVERY EFFORT IS ELIGIBLE; THE DISTANT ONES ARE JUST TRUSTED LESS.
 
