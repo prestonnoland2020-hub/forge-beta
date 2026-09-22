@@ -139,7 +139,11 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      place cardio. Both arrive asynchronously, so the memo must recompute when
      they do — otherwise it decides "no run today" against an empty split and
      never revisits it. */
-  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage]);
+  /* A CHECK-IN CHANGES TODAY, so it is part of what today is fingerprinted
+     on — otherwise the saved row from before the check-in was reused all day
+     and "backing today off" was only ever a sentence on a card. */
+  const recoveryStamp=recovery.confidence==='Low'?'':`${recovery.readiness}:${recovery.strengthFatigue}`;
+  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   /* ONE PIPELINE, ANY DAY OF THE SPLIT.
 
@@ -319,7 +323,14 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
       /* A tested single the athlete is not taking today falls back to the
          double the lift already earned, rather than being offered twice. */
-      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
+      /* THE CHECK-IN KEEPS ITS PROMISE. The card says "Backing today off — no
+         heavy singles, hold the load" under 55 and "easing" under 70, but the
+         wave took no readiness input, so a beat-up athlete was still handed
+         the attempt. Under 55 the single waits for another day; under 65 (or
+         with high strength fatigue) the lift holds what it already did. */
+      const lowReadiness=recovery.confidence!=='Low'&&recovery.readiness<55;
+      const recovering=recovery.confidence!=='Low'&&(recovery.readiness<65||recovery.strengthFatigue==='High');
+      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness,holding:recovering,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
       const accessorySessions=liveSessions.get(key)||0;
       const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
@@ -328,9 +339,10 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       /* A lift with no goal on it is not on the wave's calendar at all — its
          cycle advances with its own sessions, so saying "week 4 of the wave"
          over it was describing a program it is not running. */
-      return{...prescription,source:'history' as const,rationale:tests
+      const readinessNote=lowReadiness&&tests&&todayHoldsTheAttempt?` Readiness ${recovery.readiness} — the attempt waits for a better day.`:recovering?` Readiness ${recovery.readiness} — holding the load today.`:'';
+      return{...prescription,source:'history' as const,rationale:(tests
         ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`
-        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from your best calc max ${live.best}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`};
+        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from your best calc max ${live.best}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`)+readinessNote};
     };
     /* The day's plan prescription leads with the goal lift; every other set
        keeps its own exercise and simply joins the wave. */
@@ -343,7 +355,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:calculateEstimatedOneRepMax(wave.weight,wave.reps)||0,rationale:wave.rationale};
     });
     return{...cardioBase,topSets};
-  },[records,goals,setup,days,profile,aiPlanStamp,goalStamp,planInputsStamp]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[records,goals,setup,days,profile,aiPlanStamp,goalStamp,planInputsStamp,recovery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* The due day, and the same pipeline for any other. `buildFor` is what the
      logger calls when the athlete overrides the day; nothing about it is a
