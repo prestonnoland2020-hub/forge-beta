@@ -69,26 +69,32 @@ export const weighDay = (record: WorkoutRecord): DayWeight => ({
   tonnage: topSetsOf(record).reduce((total, set) => total + Number(set.weight || 0) * Number(set.reps || 0), 0),
 });
 
-export function isBigDay(record: WorkoutRecord, history: WorkoutRecord[]): boolean {
+/* WHY a day was big — the question has to say the true reason. A 405 × 8
+   squat day with a 3.1-mile run on it fired on tonnage and then asked "that
+   was your longest run in a while", which it was not. */
+export type BigDayReason = 'max' | 'run' | 'tonnage';
+export function bigDayReason(record: WorkoutRecord, history: WorkoutRecord[]): BigDayReason | null {
   const weight = weighDay(record);
-  if (weight.maxAttempt) return true;
+  if (weight.maxAttempt) return 'max';
   /* Their own recent normal, taken over the last month and excluding the day
      being judged, so the day cannot help decide what normal is. */
   const prior = history.filter(item => item.id !== record.id && daysBetween(item.date, record.date) > 0 && daysBetween(item.date, record.date) <= 28);
   const usualRun = median(prior.map(runMilesOf));
-  if (weight.miles >= HARD_RUN_FLOOR_MILES && usualRun > 0 && weight.miles >= usualRun * HARD_MARGIN) return true;
+  if (weight.miles >= HARD_RUN_FLOOR_MILES && usualRun > 0 && weight.miles >= usualRun * HARD_MARGIN) return 'run';
   const usualTonnage = median(prior.map(item => weighDay(item).tonnage));
-  return weight.tonnage > 0 && usualTonnage > 0 && weight.tonnage >= usualTonnage * HARD_TONNAGE_MARGIN;
+  return weight.tonnage > 0 && usualTonnage > 0 && weight.tonnage >= usualTonnage * HARD_TONNAGE_MARGIN ? 'tonnage' : null;
 }
+export const isBigDay = (record: WorkoutRecord, history: WorkoutRecord[]): boolean => bigDayReason(record, history) !== null;
 
-const bigDayPrompt = (record: WorkoutRecord): string => {
+const bigDayPrompt = (record: WorkoutRecord, reason: BigDayReason): string => {
   const weight = weighDay(record);
-  if (weight.maxAttempt) {
+  if (reason === 'max') {
     const set = topSetsOf(record).find(item => Number(item.reps) === 1);
     return `You took ${set?.lift || 'a single'}${set?.weight ? ` at ${set.weight}` : ''} yesterday. How did you pull up?`;
   }
-  if (weight.miles >= 1) return `That was your longest run in a while — ${weight.miles.toFixed(1)} miles. How do the legs feel?`;
-  return `${record.title || 'That session'} was a big one for you. How did you pull up?`;
+  if (reason === 'run') return `That was your longest run in a while — ${weight.miles.toFixed(1)} miles. How do the legs feel?`;
+  const heaviest = [...topSetsOf(record)].sort((a, b) => Number(b.weight || 0) * Number(b.reps || 0) - Number(a.weight || 0) * Number(a.reps || 0))[0];
+  return heaviest ? `${heaviest.lift} ${heaviest.weight} × ${heaviest.reps} yesterday — a big one. How did you pull up?` : `${record.title || 'That session'} was a big one for you. How did you pull up?`;
 };
 
 /* Whether the coach should ask today, and what about. */
@@ -98,9 +104,11 @@ const bigDayPrompt = (record: WorkoutRecord): string => {
    is the reason the athlete answers at all. */
 export type VerdictLookup = (recordId: string) => { ask: string } | null | undefined;
 
-export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayIso = iso(new Date()), verdictFor?: VerdictLookup): CheckInAsk | null {
-  /* One a day, always. */
+export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayIso = iso(new Date()), verdictFor?: VerdictLookup, snoozedIso?: string): CheckInAsk | null {
+  /* One a day, always — and "Not now" is an answer for the day too. It was
+     local state, so every reopen of the app asked the same question again. */
   if (checkIns.some(item => item.date === todayIso)) return null;
+  if (snoozedIso === todayIso) return null;
   const answered = new Set(checkIns.map(item => item.aboutRecordId).filter(Boolean) as string[]);
   const lastAsked = [...checkIns].sort((a, b) => b.date.localeCompare(a.date))[0]?.date;
 
@@ -113,7 +121,7 @@ export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayI
     })
     .sort((a, b) => b.date.localeCompare(a.date));
   const big = recent.find(record => !answered.has(record.id) && isBigDay(record, records));
-  if (big) return { reason: 'big-day', aboutRecordId: big.id, prompt: verdictFor?.(big.id)?.ask || bigDayPrompt(big) };
+  if (big) return { reason: 'big-day', aboutRecordId: big.id, prompt: verdictFor?.(big.id)?.ask || bigDayPrompt(big, bigDayReason(big, records) || 'tonnage') };
 
   /* Otherwise the slow cadence — and only for someone who has actually been
      training, because the question is about training. */

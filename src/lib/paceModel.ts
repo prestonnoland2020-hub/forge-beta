@@ -40,6 +40,9 @@ export const MARATHON_MILES = 26.219;
 /* Easy pace as a multiple of threshold. The wide end is deliberate: easy
    running has a range, and an athlete who is already running easy inside it
    should not be told they are doing it wrong. */
+/* Seconds per mile inside threshold that interval and repetition pace may reach. */
+export const INTERVAL_MAX_GAP = 45;
+export const REPETITION_MAX_GAP = 70;
 export const EASY_MULTIPLE_FAST = 1.24;
 export const EASY_MULTIPLE_SLOW = 1.40;
 
@@ -201,6 +204,11 @@ export function paceModel(
     return fromCurve ? fromCurve.seconds / miles : paceAt(evidence, miles, shortfall);
   };
   const threshold = at(THRESHOLD_MILES);
+  /* The ladder's fast end is judged against the threshold their SPEED
+     implies, before the volume correction — the shortfall is about endurance,
+     and it must not drag a genuine fast mile's repetition pace with it. */
+  const atFit = (miles: number) => { const fromCurve = curve ? predictFromCurve(curve, miles, 0) : null; return fromCurve ? fromCurve.seconds / miles : paceAt(evidence, miles, 0); };
+  const thresholdFit = Math.min(threshold, atFit(THRESHOLD_MILES));
   return {
     source, supported: source !== 'goal', from: recent || older,
     exponent: curve ? curve.exponent : RIEGEL_EXPONENT,
@@ -215,8 +223,13 @@ export function paceModel(
        slower than a shade inside easy. */
     marathon: Math.min(at(MARATHON_MILES), threshold * EASY_MULTIPLE_FAST * 0.98),
     threshold,
-    interval: at(INTERVAL_MILES),
-    repetition: at(REPETITION_MILES) * 0.97,
+    /* THE LADDER HOLDS AT THE FAST END TOO. Fitted through a sharp short
+       effort, the curve put Preston's 3K pace at 5:11/mi under a 6:52
+       threshold, and the deload fartlek printed it. Interval pace sits
+       25–45 s/mi inside threshold for anyone; repetition pace a little inside
+       that. Nothing on a workout card is faster than the ladder allows. */
+    interval: Math.max(at(INTERVAL_MILES), thresholdFit - INTERVAL_MAX_GAP),
+    repetition: Math.max(at(REPETITION_MILES) * 0.97, thresholdFit - REPETITION_MAX_GAP),
   };
 }
 
