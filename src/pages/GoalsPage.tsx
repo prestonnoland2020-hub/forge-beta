@@ -19,8 +19,8 @@ import { MileageGate, MileageCheckOnGoal } from '../components/MileageGate';
    the numbers sit under it where they have room, and Forge's verdict — which
    was buried behind a tap — rides on the face of the card. */
 
-const verdictLabel = (verdict: string) =>
-  verdict === 'reachable' ? 'On track' : verdict === 'needs-more' ? 'Needs more' : 'Out of reach';
+const verdictLabel = (verdict: string, reason?: string) =>
+  verdict === 'reachable' ? 'On track' : verdict === 'needs-more' ? (reason === 'evidence' ? 'Too early' : 'Needs more') : 'Out of reach';
 
 const typeLabel = (type: string) => (type === 'Strength' ? 'Strength' : type === 'Endurance' ? 'Endurance' : 'Body');
 
@@ -117,7 +117,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               </span>
               <strong className="goal-card-title">{goal.title}</strong>
               <span className="goal-card-target">{formatGoalTarget(goal.target, goal.metric, goal.unit)}<small>{goal.metric}</small></span>
-              {verdict && <span className={`goal-card-verdict ${verdict.verdict}`}><i aria-hidden="true" />{verdictLabel(verdict.verdict)}</span>}
+              {verdict && <span className={`goal-card-verdict ${verdict.verdict}`}><i aria-hidden="true" />{verdictLabel(verdict.verdict, verdict.reason)}</span>}
             </button>
             {/* EDIT AND DELETE BELONG TO THE GOAL YOU OPENED. A row of two
                 buttons under every goal is a row of two buttons the athlete

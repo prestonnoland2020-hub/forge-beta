@@ -63,9 +63,14 @@ export type NoteVerdict = {
 };
 
 export type WeekMiles = {
-  /* The plan week the athlete is in. */
+  /* The plan week the athlete is in — the key, so this is said once a week. */
   startIso: string;
+  /* The plan's weekly target. */
   planned: number;
+  /* Miles in the LAST SEVEN DAYS, today included. Preston's plan week starts
+     on a Friday; "10.7 of 22 this week" on a Monday counted Friday–Monday
+     and left out the 5 mi he ran on Wednesday. Nobody's week is the plan's
+     week; the last seven days is a week whoever you are. */
   ran: number;
   daysLeft: number;
 };
@@ -97,7 +102,6 @@ export const SESSION_FRESH_DAYS = 3;
 /* A week is "behind" when this much of it is left and no more than this share
    is run. Friday of a Monday-week at 60% done is worth a word; Tuesday at 20%
    is just Tuesday. */
-export const WEEK_WARN_DAYS_LEFT = 3;
 export const WEEK_WARN_SHARE = 0.6;
 /* And a closed week is worth a word only if it fell short by a real margin. */
 export const WEEK_SHORT_SHARE = 0.8;
@@ -171,17 +175,16 @@ export function coachNotes(input: CoachNoteInput): CoachNote[] {
     });
   }
 
-  /* THIS WEEK'S MILES AGAINST THE PLAN'S, when the week is nearly gone. */
-  if (input.week && input.week.planned > 0 && input.week.daysLeft <= WEEK_WARN_DAYS_LEFT && input.week.daysLeft >= 0
-    && input.week.ran <= input.week.planned * WEEK_WARN_SHARE) {
-    const left = input.week.daysLeft;
+  /* THE LAST SEVEN DAYS AGAINST THE PLAN'S WEEK. A rolling week is always a
+     whole week, so it is comparable on any day; said once per plan week. */
+  if (input.week && input.week.planned > 0 && input.week.ran <= input.week.planned * WEEK_WARN_SHARE) {
     notes.push({
       key: `week-miles:${input.week.startIso}`,
       kind: 'week-miles',
       priority: 70,
-      say: `${miles(input.week.ran)} of ${miles(input.week.planned)} mi this week, ${left === 0 ? 'no days' : left === 1 ? '1 day' : `${left} days`} left.`,
-      detail: `${miles(Math.max(0, input.week.planned - input.week.ran))} mi short of the plan.`,
-      ask: `I've run ${miles(input.week.ran)} of ${miles(input.week.planned)} miles this week with ${left} days left. Should I make it up or let it go?`,
+      say: `${miles(input.week.ran)} mi in the last 7 days — the plan wants ${miles(input.week.planned)}.`,
+      detail: `${miles(Math.max(0, input.week.planned - input.week.ran))} mi short of a plan week.`,
+      ask: `I've run ${miles(input.week.ran)} miles in the last 7 days against ${miles(input.week.planned)} planned. Should I make it up or let it go?`,
     });
   }
 

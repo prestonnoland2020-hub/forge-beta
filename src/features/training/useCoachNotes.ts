@@ -134,7 +134,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
       const endIso = addDays(startIso, 6);
       const planned = Number(stored.plan.weeks[index]?.mileage) || 0;
       const daysLeft = Math.max(0, Math.round((Date.parse(`${endIso}T12:00:00`) - Date.parse(`${todayIso}T12:00:00`)) / 86400000));
-      week = { startIso, planned, ran: milesBetween(records, startIso, todayIso), daysLeft };
+      week = { startIso, planned, ran: milesBetween(records, addDays(todayIso, -6), todayIso), daysLeft };
       /* Last week closes on the first day of this one; told once, on that day. */
       if (index > 0 && todayIso === startIso) {
         const lastStart = addDays(startIso, -7);

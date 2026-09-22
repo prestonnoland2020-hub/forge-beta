@@ -377,7 +377,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
         while prescribing half the volume he was already running. A verdict is
         the one thing on this card that can change what he does on Monday. */}
     {verdict && <div className={`goal-verdict ${verdict.verdict}`}>
-      <strong>{verdict.verdict === 'reachable' ? 'On the numbers, yes' : verdict.verdict === 'needs-more' ? 'Not on this training' : 'Not by this date'}</strong>
+      <strong>{verdict.verdict === 'reachable' ? 'On the numbers, yes' : verdict.verdict === 'needs-more' ? (verdict.reason === 'evidence' ? 'Too early to call' : 'Not on this training') : 'Not by this date'}</strong>
       <p>{verdict.say}</p>
       {verdict.insteadOf && <p className="goal-verdict-instead">{verdict.insteadOf}</p>}
     </div>}

@@ -16,3 +16,5 @@ body:has(.goal-builder-backdrop) .coach-bubble-shell{display:none}
 .goal-lift-chips button.active{border-color:var(--accent);background:color-mix(in srgb,var(--tint) 10%,var(--surface-2));color:var(--accent-text)}
 .goal-lift-other{font-size:12px}
 .goal-lift-pick>small{color:var(--ink-3);font-size:12px;line-height:1.45}
+
+.field-error{display:block;margin-top:4px;font-size:12px;font-weight:700;color:var(--bad)}

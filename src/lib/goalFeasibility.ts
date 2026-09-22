@@ -5,7 +5,7 @@ import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
 import { isRaceEvidence } from './runQuality';
-import { predictRaceFromLegacyMethod } from './cardioPrediction';
+import { predictRaceFromLegacyMethod, raceEvidenceEfforts } from './cardioPrediction';
 import type { Effort as CurveEffort } from './fitnessCurve';
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
@@ -39,6 +39,8 @@ export type Feasibility = {
      'needs-more'  — reachable, but only if something changes; that is named.
      'out-of-reach'— not in this time frame, whatever changes. */
   verdict: 'reachable' | 'needs-more' | 'out-of-reach';
+  /* 'evidence' — needs-more only because there is not enough logged yet. */
+  reason?: 'evidence';
   /* One sentence, plain, no hedging. */
   say: string;
   /* What would be reachable instead, when the goal is not. */
@@ -116,6 +118,20 @@ export const reachableSeconds = (currentSeconds: number, weeks: number) =>
    Six months, which is the same window the other race predictor already uses,
    so the two cannot disagree about which efforts are even eligible. */
 export const RACE_EVIDENCE_WINDOW_DAYS = 180;
+/* ONE RUN IS NOT A VERDICT. A runner who logged one easy 5K on day one was
+   told "Out of reach — keep 22:00 for next year" and shown a modal about the
+   miles she was "running a week", from a week that was one run long. Forge
+   judges a race goal after three runs across at least a week; until then it
+   says it is too early, and no ramp is offered. */
+export const MIN_RACE_EVIDENCE_RUNS = 3;
+export const MIN_RACE_EVIDENCE_SPAN_DAYS = 7;
+export function raceEvidenceState(records: WorkoutRecord[], todayIso = localDayIso()) {
+  const cutoff = new Date(`${todayIso}T12:00:00`); cutoff.setDate(cutoff.getDate() - RACE_EVIDENCE_WINDOW_DAYS);
+  const cutoffIso = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+  const dates = Array.from(new Set(raceEvidenceEfforts(records).filter(effort => effort.date >= cutoffIso && effort.date <= todayIso).map(effort => effort.date))).sort();
+  const spanDays = dates.length ? Math.round((Date.parse(`${dates[dates.length - 1]}T12:00:00`) - Date.parse(`${dates[0]}T12:00:00`)) / 86400000) : 0;
+  return { runs: dates.length, spanDays, enough: dates.length >= MIN_RACE_EVIDENCE_RUNS && spanDays >= MIN_RACE_EVIDENCE_SPAN_DAYS };
+}
 
 /* The athlete's best CONTINUOUS run, as a time at a distance — the only thing a
    race prediction can honestly be built from. Intervals are not a race. */
@@ -176,6 +192,13 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
      it had to be stretched rather than accepting only near-distance ones. */
   const prediction = predictRaceFromLegacyMethod(records, distance, excluded, workouts);
   const best = prediction?.source || null;
+  const evidence = raceEvidenceState(records);
+  if (best && !evidence.enough) {
+    const more = Math.max(0, MIN_RACE_EVIDENCE_RUNS - evidence.runs);
+    return { goal: goal.title, verdict: 'needs-more', reason: 'evidence',
+      say: `Too early to call — ${evidence.runs} run${evidence.runs === 1 ? '' : 's'} on file. Forge judges this after ${MIN_RACE_EVIDENCE_RUNS} runs across a week.`,
+      change: more > 0 ? `Log ${more} more run${more === 1 ? '' : 's'} and the verdict, the projection and the mileage check all become real.` : 'Spread the runs over a full week and the verdict becomes real.' };
+  }
 
   if (!best) {
     return { goal: goal.title, verdict: 'needs-more',

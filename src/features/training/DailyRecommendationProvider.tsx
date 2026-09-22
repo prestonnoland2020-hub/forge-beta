@@ -106,14 +106,23 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     if(atCursor.type==='rest'&&daysSinceLogged>=2)return nextAfter(atCursor.position)?.position??atCursor.position;
     return atCursor.position;
   })();
-  const duePosition=cycle.revision>0?(statePosition||cycle.nextPosition):inferredPosition;
-  /* WHICH DAY THIS SPLIT DAY IS FOR. The position is the one AFTER the last
-     session logged, so on a day the athlete has already trained it belongs to
-     tomorrow — and anything drawing a calendar from it has to know that, or it
-     paints the next session onto a day that is already finished. */
-  const trainedToday=records.some(record=>record.date===isoToday()
+  /* TODAY STAYS TODAY'S DAY ONCE SOMETHING IS LOGGED ON IT. The cursor is the
+     position AFTER the last logged session, so the moment a set was saved the
+     recommendation flipped to tomorrow's day — the logger's header changed to
+     "Shoulders & Arms · position 2" under a Bench Press that had just been
+     saved, and Finish Day then marked the wrong day complete. A day with work
+     on it is pinned to the split day that work was logged against; the cursor
+     moves on when the date does. */
+  const todayRecord=records.find(record=>record.date===isoToday()
     &&((record.topSets||[]).some(set=>set.completed!==false)||(record.cardioSessions||[]).length>0));
-  const anchorDate=(()=>{if(!trainedToday)return isoToday();const next=new Date();next.setHours(12,0,0,0);next.setDate(next.getDate()+1);return`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`})();
+  const trainedToday=Boolean(todayRecord);
+  const pinnedPosition=todayRecord?.splitPosition&&days.some(day=>day.position===todayRecord.splitPosition)?todayRecord.splitPosition:undefined;
+  const duePosition=pinnedPosition??(cycle.revision>0?(statePosition||cycle.nextPosition):inferredPosition);
+  /* WHICH DAY THIS SPLIT DAY IS FOR. Pinned, it is today's. Unpinned on a day
+     already trained (a record with no split position), the position is the
+     one after the last session, so it belongs to tomorrow — and anything
+     drawing a calendar from it has to know that. */
+  const anchorDate=(()=>{if(!trainedToday||pinnedPosition)return isoToday();const next=new Date();next.setHours(12,0,0,0);next.setDate(next.getDate()+1);return`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`})();
   const splitDay=days.find(day=>day.position===duePosition)||trainingDays[0]||days[0]||{position:1,name:'Start training',type:'strength' as const,muscles:[],exercises:[],cardioTypes:[]};
   const date=isoToday();
   /* eslint-disable-next-line react-hooks/exhaustive-deps */

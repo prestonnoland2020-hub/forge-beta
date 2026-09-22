@@ -9,6 +9,7 @@ import { bestsFromHistory,calendarEmptyState,wavePrescription,testsOneRepMax,goa
 import { PlanProgress,TodayCard,WeekList,useWeekSwipe,waveSentence,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
 import { MileageGate } from './MileageGate';
 import { localDayIso } from '../lib/time';
+import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 
 type SplitDay={name:string;dayType:string;muscles?:string[];exercises?:string[];cardioPolicy?:'none'|'forge'|'planned';cardio?:PlannedCardio[]};
 type CalendarSession={date:Date;kind:string;title:string;detail:string;metric?:string;goal:string;stress:'High'|'Moderate'|'Low'|'Rest';scaled?:boolean;lifts?:PlanLift[];run?:PlanRun};
@@ -23,7 +24,7 @@ function scaleCardio(plan:PlannedCardio,week:PlanWeek,profile:AdaptiveProfile){
   return{summary:cardioPlanSummary(next),reason:`Scaled for ${week.phase.toLowerCase()} phase${profile.readiness<75?' and current recovery':''}.`};
 }
 
-function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number},liftAnchors?:LiftAnchors,liftSessions?:Map<string,number>,liftMisses?:Map<string,Map<number,number>>,liftLastAt?:LiftAnchors):CalendarSession[]{
+function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number;dateIso?:string},liftAnchors?:LiftAnchors,liftSessions?:Map<string,number>,liftMisses?:Map<string,Map<number,number>>,liftLastAt?:LiftAnchors):CalendarSession[]{
   const strengthGoal=goals.find(goal=>goal.type==='Strength');const enduranceGoal=goals.find(goal=>goal.type==='Endurance');const start=new Date(`${week.startDate}T12:00:00`);const cycle=splitDays.length?splitDays:[{name:'Strength',dayType:'strength'},{name:'Easy cardio',dayType:'cardio'},{name:'Rest',dayType:'rest'}];let strengthIndex=0;
   /* The same rotation the program uses, anchored to the live split cursor.
      Without the anchor this calendar drifted from the program on the same
@@ -61,6 +62,13 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     if(requestedRuns>1&&!named.has('long')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpacedFrom(freeCardioOnly().length?freeCardioOnly():free),'long');
     while(cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'easy');
   }
+  /* THE GOAL LIFT SITS ON THE DAY THAT TRAINS IT. "Primary" used to mean the
+     first strength day of the week, which put "Back Squat 225 × 8" on Chest &
+     Back while Lower Body — the day the athlete mapped the squat to — got
+     "establish a baseline". Only when no day maps it does the first strength
+     day carry it. */
+  const goalKeys=new Set([...goalLifts].map(name=>canonicalLiftKey(name)));
+  const goalOwnerIndex=weekDays.findIndex(({day})=>{const t=day.dayType.toLowerCase();return (t==='strength'||t==='mixed')&&(day.exercises||[]).some(name=>goalKeys.has(canonicalLiftKey(name)))});
   return weekDays.map(({date,day},index)=>{
     const type=day.dayType.toLowerCase();const attached=day.cardioPolicy==='planned'?day.cardio?.[0]:undefined;const scaled=attached?scaleCardio(attached,week,profile):null;const role=cardioByDay.get(index);let cardioText='';let cardioKind='';let cardioStress:'High'|'Moderate'|'Low'|undefined;
     if(role==='quality'){cardioKind='FORGE · Quality';cardioText=week.quality;cardioStress='High'}else if(role==='long'){cardioKind='FORGE · Long run';cardioText=week.longRun;cardioStress='Moderate'}else if(role==='easy'){cardioKind='FORGE · Easy';cardioText=week.easy;cardioStress='Low'}else if(scaled){cardioKind='PLAN · Cardio';cardioText=scaled.summary;cardioStress=attached!.structure==='Steady'?'Low':'High'}
@@ -69,7 +77,7 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     if(type==='hyrox')return{date,kind:'HYROX',title:day.name,detail:'Forge writes the session on the day — stations, compromised running or a simulation, paced off your threshold.',goal:goals.find(goal=>/hyrox/i.test(`${goal.exercise||''} ${goal.title}`))?.title||'HYROX',stress:'High'};
     if(type==='rest'&&!cardioText)return{date,kind:'Recovery',title:day.name,detail:'No strength or cardio scheduled. Optional mobility or easy walking only.',goal:'Fatigue management',stress:'Rest'};
     if(type==='rest'&&cardioText)return{date,kind:cardioKind,title:day.name,detail:`No strength · ${cardioText}${scaled?` · ${scaled.reason}`:' · Scheduled from this calendar week’s cardio requirements.'}`,goal:enduranceGoal?.title||'Endurance development',stress:cardioStress||'Low',scaled:true,run};
-    if(type==='strength'||type==='mixed'){const isPrimary=strengthIndex++===0;
+    if(type==='strength'||type==='mixed'){const isPrimary=goalOwnerIndex>=0?index===goalOwnerIndex:strengthIndex++===0;
     /* The goal lift appears ONCE a week, on the primary strength day. Other
        days train their own muscles — no squat-stage stamp on every row. */
     /* Bests are keyed canonically, so the lookup has to be too. */
@@ -104,7 +112,13 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
   const swipeTo=useRef<(direction:1|-1)=>void>(()=>{});
   const swipe=useWeekSwipe(swipeTo);
   const active=roadmap[Math.max(0,Math.min(viewWeek,roadmap.length-1))];
-  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,undefined,history.anchors,history.sessions,history.misses,history.lastAt):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts,history]);
+  /* THE SAME CURSOR TODAY USES. Without an anchor the rolling cycle was
+     keyed to days since 1970, so on a fresh account the Plan tab said
+     "TODAY · Shoulders & Arms" while Today said Chest & Back — two answers to
+     "what is today" on the first screen the athlete ever saw. */
+  const {anchorPosition,anchorDate}=useDailyRecommendation();
+  const anchor=useMemo(()=>anchorPosition?{position:anchorPosition,dateIso:anchorDate}:undefined,[anchorPosition,anchorDate]);
+  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history.anchors,history.sessions,history.misses,history.lastAt):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history]);
   if(!active)return null;
   /* THE PRE-PROGRAM PLAN WEARS THE SAME CLOTHES AS THE PROGRAM. This screen
      had its own layout — a 12wk/6mo/1yr toggle, an export, a rules card — so
@@ -134,7 +148,7 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
     {/* A goal the running is not built for says so here too — the pre-program
         plan is where most athletes see their first week. */}
     <MileageGate/>
-    {viewWeek===0&&<TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout"/>}
+    {viewWeek===0&&<TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout?source=recommendation"/>}
     <WeekList sessions={weekSessions} unit={unit} records={records}
       title={viewWeek===0?'This week':`Week ${viewWeek+1} · ${range}`}
       note={viewWeek>0?'A projection \u2014 numbers firm up as you log.':undefined}/>
