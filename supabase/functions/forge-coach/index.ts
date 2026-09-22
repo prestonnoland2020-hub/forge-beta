@@ -47,6 +47,23 @@ RULES
 - Use the athlete's units; meters for track repeats and rowing, yards for swimming unless they said meters.
 - If the description is not a cardio workout, return one row with cardioType "Run", distance 0, timeMinutes 0, and a reflection saying you could not read a workout from it.`;
 
+const CONTEXT_LIMIT = 30000;
+function fitContext(raw: Record<string, unknown>): string {
+  let json = JSON.stringify(raw);
+  if (json.length <= CONTEXT_LIMIT) return json;
+  const ctx: Record<string, unknown> = { ...raw };
+  const history = Array.isArray(ctx.recentTrainingHistory) ? (ctx.recentTrainingHistory as unknown[]) : null;
+  if (history) {
+    let keep = history.length;
+    while (keep > 10 && json.length > CONTEXT_LIMIT) {
+      keep = Math.floor(keep * 0.7);
+      ctx.recentTrainingHistory = history.slice(0, keep);
+      json = JSON.stringify(ctx);
+    }
+  }
+  return json.length <= CONTEXT_LIMIT ? json : json.slice(0, CONTEXT_LIMIT);
+}
+
 Deno.serve(async request => {
   const corsHeaders = corsFor(request);
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -61,7 +78,12 @@ Deno.serve(async request => {
        be well-formed -- a blank question must not cost the athlete a use. */
     await consumeQuota(caller, 'forge-coach');
     spent = true;
-    const context = JSON.stringify(body.context || {}).slice(0, 30000);
+    /* TRIM THE BULK, NOT THE END. A blind slice cut the JSON mid-string and,
+       with the training history sitting before the summaries in the payload,
+       threw away the career summary, the deterministic recommendation and the
+       evidence rules for any active athlete. The history is shortened until
+       the whole thing fits; the slice is only a last resort. */
+    const context = fitContext(body.context || {});
     const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(caller.id));
     const safetyIdentifier = Array.from(new Uint8Array(identifierBytes)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32);
     const workoutScope = String(body.scope || '') === 'workout';
