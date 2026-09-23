@@ -10,10 +10,9 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { isDemoMode } from '../lib/env';
 import { useSyncStatus } from '../features/sync/SyncStatusProvider';
 import { localDayIso } from '../lib/time';
-import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { needsFollowUp } from '../features/training/athleteNotesService';
-import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyMorningWorkout, maybeNotifyPartnerTrained } from '../lib/notifications';
+import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyPartnerTrained } from '../lib/notifications';
 import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
@@ -113,7 +112,6 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     window.addEventListener('focus', onReturn);
     return () => { document.removeEventListener('visibilitychange', onReturn); window.removeEventListener('focus', onReturn); };
   }, [syncStravaNow]);
-  const { recommendation } = useDailyRecommendation();
   const { notes } = useAthleteNotes();
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachExpanded, setCoachExpanded] = useState(false);
@@ -151,18 +149,18 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const onSettings = location.pathname === '/profile' && Boolean(new URLSearchParams(location.search).get('view'));
   const hasRecoveryData = recovery.confidence !== 'Low';
 
-  /* Best-effort system notifications: morning brief and body-log check-ins.
-     They fire once per day when the app opens; the Coach tab always shows the
-     same content in-app. */
+  /* Body-log check-ins, best effort, once a day when the app opens.
+
+     THE MORNING BRIEF IS THE SERVER'S. A page-side "Today's training" used to
+     fire here too, from whatever `recommendation` was on the first render —
+     before the cycle and the day's records had loaded — so it said "Rest" at
+     7:40 while the Today card, a second later, said Long Run; and once sent,
+     the day's tag was spent, so the correction never went out. forge-push
+     sends the morning line from stored data at 6am; nothing here competes. */
   useEffect(() => {
     const prefs = loadNotificationPrefs();
-    if (prefs.morningWorkout && recommendation) {
-      const selected = recommendation.topSets.filter(set => set.selected).map(set => set.exercise);
-      const summary = [recommendation.splitDay.name, selected.slice(0, 3).join(', '), recommendation.cardio?.selected ? recommendation.cardio.title : ''].filter(Boolean).join(' · ');
-      maybeNotifyMorningWorkout(summary || 'Open Forge to see today’s training.');
-    }
     if (prefs.injuryFollowUp) notes.filter(needsFollowUp).forEach(note => maybeNotifyFollowUp(note.area || note.kind));
-  }, [recommendation, notes]);
+  }, [notes]);
 
   /* iOS retires push subscriptions after a quiet spell and says nothing, so
      the worker is registered and the subscription re-confirmed on every

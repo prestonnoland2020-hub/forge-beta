@@ -5,8 +5,9 @@ import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 import { canonicalLiftKey } from '../lib/liftAliases';
-import { bestsFromHistory,calendarEmptyState,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
-import { PlanProgress,TodayCard,WeekList,useWeekSwipe,waveSentence,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
+import { bestsFromHistory,calendarEmptyState,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,waveSlot,WAVE_REPS,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
+type LiveLifts=(day:SplitDay,position:number)=>PlanLift[]|null;
+import { PlanProgress,TodayCard,WeekList,useWeekSwipe,waveSentence,reconcileToday,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
 import { MileageGate } from './MileageGate';
 import { localDayIso } from '../lib/time';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -24,7 +25,7 @@ function scaleCardio(plan:PlannedCardio,week:PlanWeek,profile:AdaptiveProfile){
   return{summary:cardioPlanSummary(next),reason:`Scaled for ${week.phase.toLowerCase()} phase${profile.readiness<75?' and current recovery':''}.`};
 }
 
-function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number;dateIso?:string},liftAnchors?:LiftAnchors,liftSessions?:Map<string,number>,liftMisses?:Map<string,Map<number,number>>,liftLastAt?:LiftAnchors):CalendarSession[]{
+function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number;dateIso?:string},liftAnchors?:LiftAnchors,liftSessions?:Map<string,number>,liftMisses?:Map<string,Map<number,number>>,liftLastAt?:LiftAnchors,liveLifts?:LiveLifts):CalendarSession[]{
   const strengthGoal=goals.find(goal=>goal.type==='Strength');const enduranceGoal=goals.find(goal=>goal.type==='Endurance');const start=new Date(`${week.startDate}T12:00:00`);const cycle=splitDays.length?splitDays:[{name:'Strength',dayType:'strength'},{name:'Easy cardio',dayType:'cardio'},{name:'Rest',dayType:'rest'}];let strengthIndex=0;
   /* The same rotation the program uses, anchored to the live split cursor.
      Without the anchor this calendar drifted from the program on the same
@@ -89,11 +90,27 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     const lead=dayLifts[0];
     const leadTests=lead?testsOneRepMax(lead,goalLifts):false;
     const wave=lead?wavePrescription(bests.get(canonicalLiftKey(lead))||0,week.week-1,{tests:leadTests,anchors:liftAnchors?.get(canonicalLiftKey(lead)),accessory:!leadTests,sessions:(liftSessions?.get(canonicalLiftKey(lead))||0)+(week.week-1),misses:liftMisses?.get(canonicalLiftKey(lead)),lastAt:liftLastAt?.get(canonicalLiftKey(lead))}):null;
-    const dayTopSet=lead&&wave?`${lead}: ${wave.weight} × ${wave.reps}${wave.isMax?' tested MAX':''}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
-    const lifts:PlanLift[]=isPrimary&&week.strengthLoad?[{exercise:week.strengthExercise,weight:week.strengthLoad,reps:week.strengthReps}]:lead&&wave?[{exercise:lead,weight:wave.weight,reps:wave.reps}]:[];
+    /* THE SAME NUMBERS TODAY PRESCRIBES. This week's loads used to come from
+       a wave keyed to the calendar week — 250 × 8 in "week 1" — while the
+       logger, opening the same day, asked 285 × 4 from the engine's own
+       reading of where the lift is. One athlete, two prescriptions, both on
+       screen. The recommendation provider is the authority: this week shows
+       exactly what it prescribes, and later weeks are projected from its rung. */
+    const position=splitDays.findIndex(item=>item.name===day.name)+1;
+    const live=(liveLifts?.(day,position)||[]).filter(item=>item.weight>0&&item.reps>0);
+    const projected:PlanLift[]=live.map(item=>{
+      if(week.week<=1)return item;
+      const key=canonicalLiftKey(item.exercise);const best=bests.get(key)||0;const tests=testsOneRepMax(item.exercise,goalLifts);
+      const base=Math.max(0,WAVE_REPS.indexOf(item.reps as typeof WAVE_REPS[number]));
+      const ahead=best?wavePrescription(best,base+week.week-1,{tests,anchors:liftAnchors?.get(key),accessory:!tests,sessions:(liftSessions?.get(key)||0)+(week.week-1),misses:liftMisses?.get(key),lastAt:liftLastAt?.get(key)}):null;
+      return ahead?{exercise:item.exercise,weight:ahead.weight,reps:ahead.reps}:item;
+    });
+    const dayTopSet=projected.length?`${projected[0].exercise}: ${projected[0].weight} × ${projected[0].reps}${week.week>1&&waveSlot(Math.max(0,WAVE_REPS.indexOf(live[0].reps as typeof WAVE_REPS[number]))+week.week-1).isMax&&testsOneRepMax(projected[0].exercise,goalLifts)?' tested MAX':''}`
+      :lead&&wave?`${lead}: ${wave.weight} × ${wave.reps}${wave.isMax?' tested MAX':''}`:(day.exercises||[]).length?`${(day.exercises||[])[0]}: establish a baseline`:'';
+    const lifts:PlanLift[]=projected.length?projected:isPrimary&&week.strengthLoad?[{exercise:week.strengthExercise,weight:week.strengthLoad,reps:week.strengthReps}]:lead&&wave?[{exercise:lead,weight:wave.weight,reps:wave.reps}]:[];
     /* Every strength day carries a recommended top set from ITS mapped
        exercises and logged bests — the goal lift still leads its own day. */
-    const strength=isPrimary?`${week.topSet}${week.strengthLoad?` · ${week.strengthFocus}`:''}`:dayTopSet?`Top set · ${dayTopSet}`:`${day.muscles?.filter(muscle=>muscle!=='Cardio').join(' + ')||'Accessory'} · no exercise mapped yet`;return{date,kind:cardioKind?`${type==='mixed'?'Mixed':'Strength'} + ${cardioKind}`:(type==='mixed'?'Mixed':'Strength'),title:day.name,detail:cardioText?`${strength} · Cardio: ${cardioText}`:strength,goal:strengthGoal?.title||'Strength development',stress:cardioStress==='High'?'High':isPrimary?'High':'Moderate',scaled:Boolean(cardioText),lifts,run};}
+    const strength=isPrimary&&!projected.length?`${week.topSet}${week.strengthLoad?` · ${week.strengthFocus}`:''}`:dayTopSet?`Top set · ${dayTopSet}`:`${day.muscles?.filter(muscle=>muscle!=='Cardio').join(' + ')||'Accessory'} · no exercise mapped yet`;return{date,kind:cardioKind?`${type==='mixed'?'Mixed':'Strength'} + ${cardioKind}`:(type==='mixed'?'Mixed':'Strength'),title:day.name,detail:cardioText?`${strength} · Cardio: ${cardioText}`:strength,goal:strengthGoal?.title||'Strength development',stress:cardioStress==='High'?'High':isPrimary?'High':'Moderate',scaled:Boolean(cardioText),lifts,run};}
     if(cardioText)return{date,kind:cardioKind,title:day.name,detail:`${cardioText}${scaled?` · ${scaled.reason}`:' · Scheduled from this calendar week’s mileage and long-run requirement.'}`,goal:enduranceGoal?.title||'Endurance development',stress:cardioStress||'Low',scaled:true,run};
     return{date,kind:'Flexible',title:day.name,detail:'No additional cardio is required to satisfy this week.',goal:enduranceGoal?.title||'Training balance',stress:'Low'};
   });
@@ -116,9 +133,15 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
      keyed to days since 1970, so on a fresh account the Plan tab said
      "TODAY · Shoulders & Arms" while Today said Chest & Back — two answers to
      "what is today" on the first screen the athlete ever saw. */
-  const {anchorPosition,anchorDate}=useDailyRecommendation();
+  const {anchorPosition,anchorDate,recommendationFor,recommendation}=useDailyRecommendation();
+  /* Today's prescription for any split day — the one pipeline the Today card,
+     the logger and the coach already read. */
+  const liveLifts=useMemo<LiveLifts>(()=>(day,position)=>{const built=recommendationFor(position,day.name);return built?built.topSets.filter(set=>set.selected).map(set=>({exercise:set.exercise,weight:set.weight,reps:set.reps})):null},[recommendationFor]);
+  /* The rung this week is on, read off today's lead lift (or the first
+     strength day's) — so "8-REP WEEK" is true of the numbers under it. */
+  const baseRung=useMemo(()=>{const lead=recommendation?.topSets.find(set=>set.selected&&set.weight>0)||splitDays.map((day,index)=>recommendationFor(index+1,day.name)?.topSets.find(set=>set.selected&&set.weight>0)).find(Boolean);const index=lead?WAVE_REPS.indexOf(lead.reps as typeof WAVE_REPS[number]):-1;return index<0?0:index},[recommendation,recommendationFor,splitDays]);
   const anchor=useMemo(()=>anchorPosition?{position:anchorPosition,dateIso:anchorDate}:undefined,[anchorPosition,anchorDate]);
-  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history.anchors,history.sessions,history.misses,history.lastAt):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history]);
+  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history.anchors,history.sessions,history.misses,history.lastAt,liveLifts):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history,liveLifts]);
   if(!active)return null;
   /* THE PRE-PROGRAM PLAN WEARS THE SAME CLOTHES AS THE PROGRAM. This screen
      had its own layout — a 12wk/6mo/1yr toggle, an export, a rules card — so
@@ -131,20 +154,20 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
     summary:session.stress==='Rest'||session.lifts?.length||session.run?undefined:session.detail,
     empty:calendarEmptyState(session),
   });
-  const weekSessions=sessions.map(toPlanSession);
   const todayIso=localDayIso();
+  const weekSessions=viewWeek===0?reconcileToday(sessions.map(toPlanSession),recommendation,todayIso):sessions.map(toPlanSession);
   const todaySession=weekSessions.find(session=>localDayIso(session.date)===todayIso);
   const loggedToday=records.find(record=>record.date===todayIso&&((record.topSets||[]).some(set=>set.completed!==false)||(record.cardioSessions||[]).length>0));
   const unit='lb';
   /* "Numbers firm up as you log" was printed under the week heading AND on
      every projected week below it. Once is enough, and the week it is about is
      the place for it. */
-  const sentence=`${waveSentence(0)}${active.mileage?` ${active.mileage} mi of running.`:''}`;
+  const sentence=`${waveSentence(baseRung+viewWeek)}${active.mileage?` ${active.mileage} mi of running.`:''}`;
   const short=(date:Date)=>date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const range=weekSessions.length?`${short(weekSessions[0].date)} – ${short(weekSessions[weekSessions.length-1].date)}`:'';
   swipeTo.current=direction=>setViewWeek(current=>Math.max(0,Math.min(current+direction,roadmap.length-1)));
   return <div className="pv" {...swipe}>
-    <PlanProgress weekIndex={viewWeek} current={0} total={roadmap.length} waveIndexFor={index=>index} sentence={sentence} onPick={setViewWeek}/>
+    <PlanProgress weekIndex={viewWeek} current={0} total={roadmap.length} waveIndexFor={index=>baseRung+index} sentence={sentence} onPick={setViewWeek}/>
     {/* A goal the running is not built for says so here too — the pre-program
         plan is where most athletes see their first week. */}
     <MileageGate/>

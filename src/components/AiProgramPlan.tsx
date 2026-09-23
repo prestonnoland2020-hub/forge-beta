@@ -9,7 +9,7 @@ import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvi
 import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { PlanRebuildModal } from './PlanRebuildModal';
-import { PlanProgress, PlanActions, TodayCard, WeekList, useWeekSwipe, waveSentence, type PlanSession } from './PlanView';
+import { PlanProgress, PlanActions, TodayCard, WeekList, useWeekSwipe, waveSentence, reconcileToday, type PlanSession } from './PlanView';
 import { MileageGate } from './MileageGate';
 import { PlanPressureCard } from './PlanPressureCard';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
@@ -672,7 +672,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     run: session.run,
     empty: calendarEmptyState(session),
   });
-  const weekSessions = sessions.map(toPlanSession);
+  const weekSessions = weekIndex === currentIndex ? reconcileToday(sessions.map(toPlanSession), recommendation, todayIso) : sessions.map(toPlanSession);
   const todaySession = weekSessions.find(session => localDayIso(session.date) === todayIso);
   const loggedToday = records.find(record => record.date === todayIso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0));
   const waveNow = waveIndexOf(stored, weekIndex);

@@ -19,6 +19,9 @@ import { liftPositions } from '../../lib/liftProgression';
 import { canonicalLiftKey } from '../../lib/liftAliases';
 import { localDayIso } from '../../lib/time';
 import { coachNotes, nextNote, type CoachNote, type CoachNoteInput } from '../../lib/coachNotes';
+import { weekReview } from '../../lib/weekReview';
+import { calculateEstimatedOneRepMax } from '../../lib/strength';
+import { useCoachingStrategy } from './CoachingStrategyProvider';
 
 /* FEEDING THE COACH ITS FACTS.
 
@@ -72,6 +75,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
   const { setup } = useProfileSetup();
   const { recovery } = useAdaptiveTraining();
   const { recommendation } = useDailyRecommendation();
+  const { strategy } = useCoachingStrategy();
   const userId = user?.id || 'preview-user';
 
   const [remembered, setRemembered] = useState<Remembered>(() => readRemembered(userId));
@@ -160,14 +164,58 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
       ? { loggedPace: clockText(easyPace), easyRange: `${clockText(paces.easyFast)}–${clockText(paces.easySlow)}` }
       : null;
 
-    return coachNotes({
+    const notes = coachNotes({
       todayIso,
       verdicts: judged.map(verdict => ({ date: verdict.date, outcome: verdict.outcome, say: verdict.say, text: verdict.text })),
       levelMoves: moves,
       trend: sessionTrend(judged),
       week, closedWeek, liftMisses, goalChanges, readiness, easyTooFast: easy,
     });
-  }, [records, goals, setup, recovery, recommendation, remembered.goalVerdicts]);
+
+    /* THE WEEK REVIEWED, once the week has closed. The reviewed week is the
+       last complete plan week, or the last Monday-to-Sunday when there is no
+       plan; it is keyed to its start date so it is said once. */
+    const weekStart = (() => {
+      if (stored && stored.plan.weeks.length) {
+        const index = currentWeekIndex(stored);
+        const thisStart = addDays(stored.startDate, index * 7);
+        return index > 0 ? addDays(thisStart, -7) : null;
+      }
+      const date = new Date(`${todayIso}T12:00:00`);
+      const monday = addDays(todayIso, -((date.getDay() + 6) % 7));
+      return addDays(monday, -7);
+    })();
+    if (weekStart) {
+      const weekEnd = addDays(weekStart, 6);
+      const priorStart = addDays(weekStart, -7);
+      const inWeek = records.filter(record => record.date >= weekStart && record.date <= weekEnd);
+      const trainedDays = new Set(inWeek.filter(record => (record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0).map(record => record.date)).size;
+      const plannedDays = (setup?.splitDays || []).filter(day => day.type !== 'Rest').length;
+      const planWeekMiles = (startIso: string) => { if (!stored || !stored.plan.weeks.length) return 0; const index = Math.round((Date.parse(`${startIso}T12:00:00`) - Date.parse(`${stored.startDate}T12:00:00`)) / (7 * 86400000)); return Number(stored.plan.weeks[index]?.mileage) || 0; };
+      const before = records.filter(record => record.date < weekStart);
+      const bestBefore = new Map<string, number>();
+      before.forEach(record => (record.topSets || []).forEach(set => { const key = canonicalLiftKey(set.lift); const max = calculateEstimatedOneRepMax(Number(set.weight) || 0, Number(set.reps) || 0) || 0; if (max > (bestBefore.get(key) || 0)) bestBefore.set(key, max); }));
+      const prs: Array<{ lift: string; weight: number; reps: number }> = [];
+      inWeek.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false) return; const key = canonicalLiftKey(set.lift); const max = calculateEstimatedOneRepMax(Number(set.weight) || 0, Number(set.reps) || 0) || 0; if (max > (bestBefore.get(key) || 0) && !prs.some(pr => canonicalLiftKey(pr.lift) === key)) prs.push({ lift: set.lift, weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 }); }));
+      const nextText = (() => {
+        if (stored && stored.plan.weeks.length) { const wk = stored.plan.weeks[currentWeekIndex(stored)]; if (wk?.quality) return `${wk.quality}${wk.qualityDay ? ` on ${wk.qualityDay}` : ''}`; }
+        const set = recommendation?.topSets.find(item => item.selected);
+        return recommendation ? `${recommendation.splitDay.name}${set ? ` — ${set.exercise}${set.weight ? ` ${set.weight} × ${set.reps}` : ''}` : ''}` : '';
+      })();
+      const review = weekReview({
+        todayIso, weekStartIso: weekStart, trainedDays, plannedDays,
+        ranMiles: milesBetween(records, weekStart, weekEnd), plannedMiles: planWeekMiles(weekStart),
+        priorRanMiles: milesBetween(records, priorStart, addDays(priorStart, 6)), priorPlannedMiles: planWeekMiles(priorStart),
+        verdicts: judged.filter(verdict => verdict.date >= weekStart && verdict.date <= weekEnd).map(verdict => ({ date: verdict.date, outcome: verdict.outcome, text: verdict.text })),
+        liftMisses, prs,
+        readinessAvg: recovery && recovery.confidence !== 'Low' ? recovery.readiness : null,
+        loadBiasPercent: strategy.loadBiasPercent,
+        nextText, metric,
+      });
+      if (review) notes.push(review);
+    }
+    return notes.sort((a, b) => b.priority - a.priority);
+  }, [records, goals, setup, recovery, recommendation, remembered.goalVerdicts, strategy.loadBiasPercent]);
 
   /* The goal-verdict memory advances for every goal that has NO pending
      change, so the first time a goal is seen its verdict is simply recorded

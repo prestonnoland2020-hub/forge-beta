@@ -1580,3 +1580,21 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .coach-actions li::before{content:'→ ';color:var(--accent-text)}
 .coach-actions footer{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .coach-message p{white-space:pre-line}
+/* THE WEEK, REVIEWED: four numbered lines and, when warranted, one tap. */
+.forge-noticed-lines{margin:0;padding-left:20px;display:grid;gap:5px;font-size:13.5px;line-height:1.4}
+.forge-noticed-lines li:first-child{font-weight:700}
+.forge-noticed-lines li::marker{color:var(--ink-3);font-variant-numeric:tabular-nums}
+.forge-noticed-actions-list{margin:0;padding:0;list-style:none;display:grid;gap:5px}
+.forge-noticed-actions-list li{padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:13px;font-weight:600}
+.forge-noticed-actions-list li::before{content:'→ ';color:var(--accent-text)}
+/* FORGE WRITES A DAY THAT IS NOT IN THE SPLIT. */
+.forge-writes-it{display:grid;gap:12px}
+.forge-writes-chips{display:flex;gap:8px;flex-wrap:wrap}
+.forge-writes-chips button{min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:22px;background:var(--surface-2);color:var(--text);font-weight:700;font-size:13px}
+.forge-writes-chips button.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface-2))}
+.forge-writes-chips button:disabled{opacity:.6}
+.forge-writes-custom{display:grid;gap:8px}
+.forge-writes-custom textarea{width:100%;resize:vertical}
+.forge-writes-error{margin:0;font-size:12.5px;color:var(--warning)}
+.forge-writes-rationale{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
+.forge-writes-it.written .text-button{justify-self:start}
