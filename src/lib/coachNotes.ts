@@ -50,6 +50,10 @@ export type CoachNote = {
   detail?: string;
   /* What to hand the coach if the athlete taps "Ask Forge" on this note. */
   ask: string;
+  /* THE RECEIPT. The log lines that add up to the number in `say`, so "that
+     is wrong" becomes "oh, Tuesday's run isn't there" — a logging fix, not
+     lost trust. */
+  receipt?: string[];
 };
 
 /* A judged hard session, as the coach needs it. */
@@ -73,6 +77,8 @@ export type WeekMiles = {
      week; the last seven days is a week whoever you are. */
   ran: number;
   daysLeft: number;
+  /* The runs that add up to `ran`, one readable line each — the receipt. */
+  runs?: string[];
 };
 
 export type ClosedWeek = { startIso: string; planned: number; ran: number };
@@ -184,6 +190,7 @@ export function coachNotes(input: CoachNoteInput): CoachNote[] {
       priority: 70,
       say: `${miles(input.week.ran)} mi in the last 7 days — the plan wants ${miles(input.week.planned)}.`,
       detail: `${miles(Math.max(0, input.week.planned - input.week.ran))} mi short of a plan week.`,
+      receipt: input.week.runs,
       ask: `I've run ${miles(input.week.ran)} miles in the last 7 days against ${miles(input.week.planned)} planned. Should I make it up or let it go?`,
     });
   }

@@ -3,10 +3,9 @@ import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider'
 import { calculateEstimatedOneRepMax } from './strength';
 import { sameLift } from './liftAliases';
 import { predictRaceFromLegacyMethod } from './cardioPrediction';
-import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
-import { countsAsRunVolume, isRaceEvidence, anchorsPace } from './runQuality';
 import { weeklyMilesFrom } from './runVolume';
+import { runLines, longestRun } from './stats';
 
 /* WHAT THE COACH WAS NEVER TOLD.
 
@@ -87,13 +86,6 @@ const bestPerDay = (points: Array<{ date: string; value: number }>, lowerIsBette
    20:00 and 15:16 a mile; counting them told the plan he had a base he has not
    built, and told the feasibility model he was closer than he is. Classified
    once, in runQuality, so every surface throws out the same things. */
-const runs = (records: WorkoutRecord[]) => records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
-  const miles = cardioMiles(session);
-  const minutes = summarizeCardioDraft(session).minutes;
-  if (!miles || !minutes || !/run/i.test(`${session.activity} ${session.summary || ''}`)) return [];
-  if (!countsAsRunVolume(miles, minutes * 60)) return [];
-  return [{ date: record.date, miles, minutes }];
-}));
 
 /* THE WEEK'S RUNNING, WEEK BY WEEK — not one average.
 
@@ -117,7 +109,7 @@ export function weeklyRunning(records: WorkoutRecord[], weeks = 8): RunningWeek[
   };
   const thisWeek = monday(localDayIso());
   const totals = new Map<string, number>();
-  runs(records).forEach(run => {
+  runLines(records).forEach(run => {
     const week = monday(run.date);
     totals.set(week, (totals.get(week) || 0) + run.miles);
   });
@@ -357,25 +349,14 @@ const isBodyGoal = (goal: CreatedGoal) =>
    that leading empty weeks are not weeks somebody ran nothing, lives in
    runVolume now and applies everywhere rather than here alone. */
 export function medianWeeklyMiles(records: WorkoutRecord[]): number {
-  return weeklyMilesFrom(runs(records).map(run => ({ date: run.date, miles: run.miles })));
+  return weeklyMilesFrom(runLines(records).map(run => ({ date: run.date, miles: run.miles })));
 }
 
 
 /* The longest single continuous run on file. A long run the athlete is already
    doing every week is the floor for the plan's long run, not a stretch. */
 export function longestContinuousRun(records: WorkoutRecord[]): number {
-  let longest = 0;
-  records.forEach(record => (record.cardioSessions || []).forEach(session => {
-    if (!/run/i.test(session.activity || '')) return;
-    const intervals = session.prescription?.legacyIntervals;
-    if (Array.isArray(intervals) && intervals.length > 1) return;
-    const miles = cardioMiles(session);
-    /* And a 6-mile walk is not a 6-mile long run. Untimed distance still
-       counts — not knowing how long it took does not mean it was a stroll. */
-    if (!countsAsRunVolume(miles, summarizeCardioDraft(session).minutes * 60)) return;
-    if (miles > longest) longest = miles;
-  }));
-  return round1(longest);
+  return round1(longestRun(records)?.miles || 0);
 }
 
 export function goalTrajectories(goals: CreatedGoal[], records: WorkoutRecord[], excluded: string[] = []): GoalTrajectory[] {

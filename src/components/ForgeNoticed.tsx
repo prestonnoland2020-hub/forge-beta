@@ -22,6 +22,10 @@ export function ForgeNoticed() {
     </div>
     <p className="forge-noticed-say">{note.say}</p>
     {note.detail && <p className="forge-noticed-detail">{note.detail}</p>}
+    {note.receipt && <details className="forge-noticed-receipt">
+      <summary>{note.receipt.length ? `The ${note.receipt.length} run${note.receipt.length === 1 ? '' : 's'} behind that` : 'No runs logged in the last 7 days'}</summary>
+      {note.receipt.length > 0 && <ul>{note.receipt.map(line => <li key={line}>{line}</li>)}</ul>}
+    </details>}
     <div className="forge-noticed-actions">
       <button type="button" className="text-button" onClick={() => openCoachBubble(note.ask)}>Ask Forge</button>
       <button type="button" className="button secondary small-button" onClick={() => acknowledge(note)}>Got it</button>

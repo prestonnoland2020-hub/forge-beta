@@ -47,6 +47,66 @@ RULES
 - Use the athlete's units; meters for track repeats and rowing, yards for swimming unless they said meters.
 - If the description is not a cardio workout, return one row with cardioType "Run", distance 0, timeMinutes 0, and a reflection saying you could not read a workout from it.`;
 
+/* THE COACH'S ACTIONS. Every training-scope answer is JSON: the answer, and
+   zero or more actions from a fixed vocabulary. Strict schema, so every
+   field is present and unused ones are null. The client validates each
+   entry against what the athlete actually has before showing it, and
+   nothing is applied until the athlete taps Apply. */
+const ACTION_TYPES = ['rest_today', 'swap_today', 'shorten_today', 'log_note', 'clear_note', 'set_weekly_mileage', 'set_running_days', 'set_load_bias', 'update_goal', 'create_exercise', 'create_workout'];
+const nullable = (type: string) => ({ type: [type, 'null'] });
+const coachAnswerSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    answer: { type: 'string' },
+    actions: {
+      type: 'array',
+      maxItems: 6,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          type: { type: 'string', enum: ACTION_TYPES },
+          dayName: nullable('string'),
+          minutes: nullable('integer'),
+          noteKind: { type: ['string', 'null'], enum: ['injury', 'fatigue', 'other', null] },
+          text: nullable('string'),
+          area: nullable('string'),
+          miles: nullable('number'),
+          days: nullable('integer'),
+          percent: nullable('number'),
+          goalTitle: nullable('string'),
+          target: nullable('string'),
+          date: nullable('string'),
+          name: nullable('string'),
+          items: { type: ['array', 'null'], items: { type: 'string' } },
+        },
+        required: ['type', 'dayName', 'minutes', 'noteKind', 'text', 'area', 'miles', 'days', 'percent', 'goalTitle', 'target', 'date', 'name', 'items'],
+      },
+    },
+  },
+  required: ['answer', 'actions'],
+};
+
+const actionInstructions = `
+ACTING, NOT ONLY ANSWERING
+Your reply is JSON: { answer, actions }. \`answer\` is the coaching answer, written exactly as the RESPONSE STYLE says. \`actions\` is what you would change in the athlete's plan because of what they said — chosen ONLY from this list, with every other field null:
+- rest_today — today becomes a rest day (illness, exhaustion, a hard day yesterday that should not be doubled, an explicit "I need a day off").
+- swap_today { dayName } — today becomes a different split day; dayName must be one of establishedSplit's names exactly.
+- shorten_today { minutes } — the athlete has less time today (10–180). Keep the day, trim it.
+- log_note { noteKind: injury|fatigue|other, text, area } — the athlete reported pain, an injury, or fatigue. text is their words in one line; area is the body part ("knee", "lower back") when there is one. Forge trains around a logged injury automatically: lifts that load it are held and running is swapped for the bike.
+- clear_note { area } — the athlete says a logged issue (athleteHealthNotes) is better or gone.
+- set_weekly_mileage { miles } — they asked to run more or less per week, with a number.
+- set_running_days { days } — they asked to change how many days a week they run.
+- set_load_bias { percent } — they asked for lighter or heavier strength loads across the board (−10 to +10; 2.5 steps).
+- update_goal { goalTitle, target?, date? } — they asked to change an existing goal's target or date; goalTitle must match a goal in \`goals\` exactly; date is YYYY-MM-DD.
+- create_exercise { name, items: muscles } — they asked to add an exercise to their library; items are muscle names from: Chest, Back, Shoulders, Quads, Glutes, Hamstrings, Biceps, Triceps, Forearms, Abs, Calves.
+- create_workout { name, items: exercises } — they asked to save a reusable strength workout from named exercises.
+
+WHEN TO ACT. A message that reports a state (pain, fatigue, illness, no time, travel) or asks for a change gets the matching action. A question ("should I run today?", "what does the plan want this week?") gets an empty actions list — answer it. Never act on something the athlete did not say. Never combine rest_today with swap_today. If the athlete reports pain, log_note is the action — do not also rest_today unless they asked for rest or the pain makes today's session impossible. Say in \`answer\` what you are changing and why, in one clause, and never claim the change is already made — it is applied when they confirm.
+
+NUMBERS YOU MAY QUOTE. runningFacts carries the athlete's running as Forge counted it: last7Days.miles with the runs behind it, longestRun30d, longestRunEver. weeklyRunning is the week-by-week series. Every distance, pace, time or count you state must appear in the context; never add up the log yourself, and never call a run "your longest" unless runningFacts says it is.`;
+
 const CONTEXT_LIMIT = 30000;
 function fitContext(raw: Record<string, unknown>): string {
   let json = JSON.stringify(raw);
@@ -95,7 +155,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v6',
+        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v7',
         reasoning: { effort: cardioScope ? 'low' : 'medium' },
         text: cardioScope ? {
           verbosity: 'low',
@@ -134,7 +194,10 @@ Deno.serve(async request => {
               required: ['answer', 'title', 'rounds', 'roundRestSeconds', 'stations'],
             },
           },
-        } : { verbosity: 'low' },
+        } : {
+          verbosity: 'low',
+          format: { type: 'json_schema', name: 'forge_coach_answer', strict: true, schema: coachAnswerSchema },
+        },
         instructions: cardioScope ? cardioLogInstructions : `You are Forge Coach: a direct, evidence-first strength and conditioning coach inside the athlete's training log.
 
 SUCCESS CRITERIA
@@ -197,6 +260,8 @@ COACHING RULES
 RESPONSE STYLE
 Answer the question first. Normal answers are 2–4 short sentences and under 120 words. Plain words a lifter uses. No hedging stack: one honest uncertainty is worth stating, three in a row is an evasion. Weekly plans use one concise line per day and stay under 220 words. Use plain language, minimal formatting, and no generic executive-summary filler, AI disclaimer, motivational padding, or medical diagnosis.
 
+${workoutScope ? '' : actionInstructions}
+
 WORKOUT SCOPE
 Return one editable cardio/circuit using only exact movement names and units in availableLibrary. Honor selected movements when supplied; otherwise choose a balanced assortment supported by the request, goals, recent work, and limitations. HYROX simulations alternate Run with functional stations when Run is available. Do not turn every conditioning request into running. Keep targets realistic, use each movement's saved unit, and explain the assortment briefly.`,
         input: cardioScope
@@ -227,7 +292,16 @@ Return one editable cardio/circuit using only exact movement names and units in 
       const workout = JSON.parse(answer);
       return Response.json({ answer: String(workout.answer), workout: { title: workout.title, rounds: workout.rounds, roundRestSeconds: workout.roundRestSeconds, stations: workout.stations } }, { headers: corsHeaders });
     }
-    return Response.json({ answer }, { headers: corsHeaders });
+    /* Training scope: JSON with actions. A malformed body is still an answer
+       — the text is handed back and the actions are dropped, never the
+       reverse. */
+    try {
+      const parsed = JSON.parse(answer) as { answer?: unknown; actions?: unknown };
+      const actions = Array.isArray(parsed.actions) ? parsed.actions.filter(item => item && typeof item === 'object' && ACTION_TYPES.includes(String((item as { type?: unknown }).type))).slice(0, 6) : [];
+      return Response.json({ answer: String(parsed.answer || answer), actions }, { headers: corsHeaders });
+    } catch {
+      return Response.json({ answer, actions: [] }, { headers: corsHeaders });
+    }
   } catch (error) {
     /* The athlete asked, the meter ticked, and nothing came back. Give the use
        back -- a provider outage is not something they should pay for. A 429

@@ -10,7 +10,8 @@ import { readLocalAiPlan, currentWeekIndex, goalLiftNames, type StoredAiPlan } f
 import { sessionTrend, parsePrescription } from '../../lib/sessionVerdict';
 import { paceModel, easyTooFast, loggedEasyPace } from '../../lib/paceModel';
 import { enduranceTarget, clockText, QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../../lib/qualitySession';
-import { medianWeeklyMiles, longestContinuousRun, weeklyRunning } from '../../lib/goalTrajectory';
+import { medianWeeklyMiles, longestContinuousRun } from '../../lib/goalTrajectory';
+import { milesBetween, last7DayRuns, receiptLine } from '../../lib/stats';
 import { goalFeasibility } from '../../lib/goalFeasibility';
 import { progressionLevels } from '../../lib/progressionLevels';
 import { workoutEfforts } from '../../lib/workoutEvidence';
@@ -63,27 +64,6 @@ const addDays = (iso: string, days: number) => {
   return localDayIso(date);
 };
 
-/* Miles run on days in [fromIso, toIso], inclusive — the plan's week, not the
-   calendar's. weeklyRunning buckets by Monday; a block that started on a
-   Wednesday needs its own boundaries. */
-const milesBetween = (records: ReturnType<typeof useWorkoutHistory>['records'], fromIso: string, toIso: string) =>
-  weeklyRunning(records, 12).length === 0 ? 0 : records
-    .filter(record => record.date >= fromIso && record.date <= toIso)
-    .reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => {
-      const intervals = (session.prescription as { legacyIntervals?: Array<{ unit?: string; distance?: number; cardioType?: string }> } | undefined)?.legacyIntervals || [];
-      return sum + intervals.filter(line => /run|jog/i.test(String(line.cardioType || session.activity || '')))
-        .reduce((miles, line) => miles + toMiles(Number(line.distance) || 0, String(line.unit || '')), 0);
-    }, 0), 0);
-
-const toMiles = (distance: number, unit: string) => {
-  const normalized = unit.toLowerCase();
-  if (!distance) return 0;
-  if (normalized.startsWith('mile')) return distance;
-  if (normalized.startsWith('kilo') || normalized === 'km') return distance * 0.621371;
-  if (normalized.startsWith('met')) return distance / 1609.344;
-  if (normalized.startsWith('yard')) return distance / 1760;
-  return 0;
-};
 
 export function useCoachNotes(): { note: CoachNote | null; pending: number; acknowledge: (note: CoachNote) => void } {
   const { user } = useAuth();
@@ -100,6 +80,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
 
   const notes = useMemo<CoachNote[]>(() => {
     const todayIso = localDayIso();
+    const metric = setup?.units === 'Metric';
     const stored: StoredAiPlan | null = readLocalAiPlan();
     const runGoal = enduranceTarget(goals);
     const split = (setup?.splitDays || []).map(day => ({ name: day.name, dayType: day.type }));
@@ -134,7 +115,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
       const endIso = addDays(startIso, 6);
       const planned = Number(stored.plan.weeks[index]?.mileage) || 0;
       const daysLeft = Math.max(0, Math.round((Date.parse(`${endIso}T12:00:00`) - Date.parse(`${todayIso}T12:00:00`)) / 86400000));
-      week = { startIso, planned, ran: milesBetween(records, addDays(todayIso, -6), todayIso), daysLeft };
+      week = { startIso, planned, ran: milesBetween(records, addDays(todayIso, -6), todayIso), daysLeft, runs: last7DayRuns(records, todayIso).map(line => receiptLine(line, metric)) };
       /* Last week closes on the first day of this one; told once, on that day. */
       if (index > 0 && todayIso === startIso) {
         const lastStart = addDays(startIso, -7);

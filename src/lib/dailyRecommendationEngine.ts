@@ -70,6 +70,8 @@ export type RecommendedCardio={
 export type DailyRecommendation={
   /* What the body log took off today, said in one line on the card. */
   bodyLogNote?:string;
+  /* What the athlete agreed with the coach for today, in one line. */
+  coachNote?:string;
   id?:string;
   date:string;
   status:'active'|'completed'|'superseded';

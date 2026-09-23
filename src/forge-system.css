@@ -1562,7 +1562,21 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .forge-noticed-head small{color:var(--ink-3);font-size:11px;font-weight:700}
 .forge-noticed-say{margin:0;font-size:15px;font-weight:700;line-height:1.4;color:var(--ink)}
 .forge-noticed-detail{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
+.forge-noticed-receipt{font-size:12px;color:var(--ink-2)}
+.forge-noticed-receipt summary{cursor:pointer;color:var(--ink-3);list-style:none}
+.forge-noticed-receipt summary::-webkit-details-marker{display:none}
+.forge-noticed-receipt summary::before{content:'›';display:inline-block;margin-right:6px;transition:transform .15s}
+.forge-noticed-receipt[open] summary::before{transform:rotate(90deg)}
+.forge-noticed-receipt ul{margin:6px 0 0;padding-left:18px;font-variant-numeric:tabular-nums}
+.forge-noticed-receipt li{margin:2px 0}
 .forge-noticed-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:2px}
 .forge-noticed-actions .small-button{min-height:38px;padding:0 14px;font-size:13px}
 
 .today-bodylog-note{margin:0 0 8px;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--warning) 12%,var(--surface-1));color:var(--text);font-size:12.5px;line-height:1.4}
+.today-coach-note{background:color-mix(in srgb,var(--accent) 12%,var(--surface-1))}
+/* THE CONFIRM CARD. One line per change the coach proposes, two buttons. */
+.coach-actions ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.coach-actions li{padding:10px 12px;border-radius:8px;background:var(--surface-2);font-size:13px;font-weight:600;line-height:1.35}
+.coach-actions li::before{content:'→ ';color:var(--accent-text)}
+.coach-actions footer{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.coach-message p{white-space:pre-line}

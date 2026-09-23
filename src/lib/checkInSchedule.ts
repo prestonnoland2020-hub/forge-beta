@@ -1,7 +1,6 @@
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import type { CheckIn } from './readiness';
-import { cardioMiles, summarizeCardioDraft } from './cardioSession';
-import { countsAsRunVolume } from './runQuality';
+import { runMilesOfRecord, isLongestRunInWindow } from './stats';
 
 /* WHEN THE COACH ASKS, AND WHEN IT SHUTS UP.
 
@@ -36,11 +35,8 @@ const daysBetween = (from: string, to: string) =>
   Math.round((new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime()) / 86400000);
 
 const topSetsOf = (record: WorkoutRecord) => record.topSets || [];
-const runMilesOf = (record: WorkoutRecord) => (record.cardioSessions || []).reduce((total, session) => {
-  const miles = cardioMiles(session);
-  const minutes = summarizeCardioDraft(session).minutes;
-  return total + (countsAsRunVolume(miles, minutes * 60) ? miles : 0);
-}, 0);
+/* One definition of a run, shared with every other number in the app. */
+const runMilesOf = (record: WorkoutRecord) => runMilesOfRecord(record);
 
 /* WHAT COUNTS AS A HARD DAY, measured against this athlete rather than against
    a number someone picked. A single is always hard. Everything else has to
@@ -86,13 +82,19 @@ export function bigDayReason(record: WorkoutRecord, history: WorkoutRecord[]): B
 }
 export const isBigDay = (record: WorkoutRecord, history: WorkoutRecord[]): boolean => bigDayReason(record, history) !== null;
 
-const bigDayPrompt = (record: WorkoutRecord, reason: BigDayReason): string => {
+const bigDayPrompt = (record: WorkoutRecord, reason: BigDayReason, history: WorkoutRecord[] = []): string => {
   const weight = weighDay(record);
   if (reason === 'max') {
     const set = topSetsOf(record).find(item => Number(item.reps) === 1);
     return `You took ${set?.lift || 'a single'}${set?.weight ? ` at ${set.weight}` : ''} yesterday. How did you pull up?`;
   }
-  if (reason === 'run') return `That was your longest run in a while — ${weight.miles.toFixed(1)} miles. How do the legs feel?`;
+  /* SAY ONLY WHAT IS TRUE. "Your longest run in a while" was said about a
+     run that was merely longer than usual, and the athlete knew it was not.
+     Longest in the last month is checked; otherwise it is "a bigger run than
+     usual", which is what the rule actually measured. */
+  if (reason === 'run') return isLongestRunInWindow(record, history)
+    ? `That was your longest run in a month — ${weight.miles.toFixed(1)} miles. How do the legs feel?`
+    : `A bigger run than usual yesterday — ${weight.miles.toFixed(1)} miles. How do the legs feel?`;
   const heaviest = [...topSetsOf(record)].sort((a, b) => Number(b.weight || 0) * Number(b.reps || 0) - Number(a.weight || 0) * Number(a.reps || 0))[0];
   return heaviest ? `${heaviest.lift} ${heaviest.weight} × ${heaviest.reps} yesterday — a big one. How did you pull up?` : `${record.title || 'That session'} was a big one for you. How did you pull up?`;
 };
@@ -121,7 +123,7 @@ export function dueCheckIn(records: WorkoutRecord[], checkIns: CheckIn[], todayI
     })
     .sort((a, b) => b.date.localeCompare(a.date));
   const big = recent.find(record => !answered.has(record.id) && isBigDay(record, records));
-  if (big) return { reason: 'big-day', aboutRecordId: big.id, prompt: verdictFor?.(big.id)?.ask || bigDayPrompt(big, bigDayReason(big, records) || 'tonnage') };
+  if (big) return { reason: 'big-day', aboutRecordId: big.id, prompt: verdictFor?.(big.id)?.ask || bigDayPrompt(big, bigDayReason(big, records) || 'tonnage', records) };
 
   /* Otherwise the slow cadence — and only for someone who has actually been
      training, because the question is about training. */
