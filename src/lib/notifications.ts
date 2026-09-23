@@ -30,12 +30,6 @@ const show = (tag: string, title: string, body: string) => {
   try { new Notification(title, { body, tag: `forge-${tag}`, icon: './forge-icon-192.png' }); markSent(tag); } catch { /* some platforms need a service worker; the in-app card still shows */ }
 };
 
-/* Morning brief: once per day, in the morning, when the day isn't logged yet. */
-export const maybeNotifyMorningWorkout = (summary: string) => {
-  const hour = new Date().getHours();
-  if (hour < 5 || hour >= 12) return;
-  show('morning-workout', 'Today’s training', summary);
-};
 
 /* THE NUDGE. One line, once a day, and only when it can still change
    something: a partner has trained and you have not. This is the whole of
