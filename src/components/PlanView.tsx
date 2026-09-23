@@ -151,7 +151,7 @@ export function reconcileToday(sessions: PlanSession[], recommendation: DailyRec
     const lifts = recommendation.topSets.filter(set => set.selected && set.weight > 0).map(set => ({ exercise: set.exercise, weight: set.weight, reps: set.reps }));
     const cardio = recommendation.cardio;
     const run = cardio ? { kind: (cardio.session.stress === 'High' ? 'Hard run' : cardio.session.role === 'Long' ? 'Long run' : 'Easy run') as PlanRun['kind'], text: cardio.summary } : undefined;
-    const emptyState: PlanSession['empty'] = rest && !lifts.length && !run ? 'rest' : undefined;
+    const emptyState: PlanSession['empty'] = rest && !lifts.length && !run ? ('rest' as const) : undefined;
     return { ...session, title: recommendation.splitDay.name, lifts, run, empty: emptyState, summary: recommendation.coachNote || (rest ? undefined : session.summary) };
   });
 }
