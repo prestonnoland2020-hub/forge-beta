@@ -476,8 +476,15 @@ function WorkoutEditor() {
       if(evidence.size){
         const scoreOf=(muscles:string[]=[])=>muscles.reduce((total,muscle)=>total+(evidence.has(muscle)?1:0),0);
         const recScore=scoreOf(recommendation.splitDay.muscles);
-        let bestIndex=-1,bestScore=0;
-        savedDays.forEach((day,index)=>{const score=scoreOf((day.muscles||[]).filter(muscle=>muscle!=='Cardio'));if(score>bestScore){bestScore=score;bestIndex=index}});
+        /* A TIE GOES TO THE NEAREST DAY AHEAD, NEVER THE FIRST IN THE LIST.
+           "Sharms" and "Sharms 2" carry the same muscles; picking the first
+           match saved a Sharms 2 session as position 3, and the cycle,
+           told position 3 was done, moved to 4 — Long Run the morning after
+           Sharms 2, with Rest skipped. Ties resolve to the split day closest
+           at or after the one that was due. */
+        let bestIndex=-1,bestScore=0;const count=savedDays.length;const duePos=recommendation.splitDay.position;
+        const distance=(index:number)=>((index+1-duePos)%count+count)%count;
+        savedDays.forEach((day,index)=>{const score=scoreOf((day.muscles||[]).filter(muscle=>muscle!=='Cardio'));if(score>bestScore||(score===bestScore&&score>0&&distance(index)<distance(bestIndex))){bestScore=score;bestIndex=index}});
         if(recScore===0&&bestScore>0&&bestIndex+1!==recommendation.splitDay.position){
           contentMismatch=true;
           draft.title=savedDays[bestIndex].name||title;
