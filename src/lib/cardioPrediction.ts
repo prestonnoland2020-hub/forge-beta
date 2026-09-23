@@ -4,6 +4,7 @@ import { localDayIso } from './time';
 import { isRaceEvidence, countsAsRunVolume } from './runQuality';
 import { volumeForPace } from './riegel';
 import { weeklyMilesFrom, type DatedMiles } from './runVolume';
+import { runLines } from './stats';
 import { trustedEfforts, CONFIRMED_PREFIX } from './effortAudit';
 import { fitnessCurve, predictFromCurve, type Effort as CurveEffort } from './fitnessCurve';
 
@@ -68,16 +69,7 @@ export const NEAR_ENOUGH = 0.25;
 /* Every run the athlete has actually covered — everything that counts as
    running, not only the pieces good enough to predict a race from. */
 export function runVolumeEntries(records: WorkoutRecord[]): DatedMiles[] {
-  const out: DatedMiles[] = [];
-  for (const record of records) {
-    for (const session of record.cardioSessions || []) {
-      if (nonRunning(`${session.activity} ${session.summary}`)) continue;
-      for (const effort of continuousRunEfforts(session)) {
-        if (countsAsRunVolume(effort.miles, effort.minutes * 60)) out.push({ date: record.date, miles: effort.miles });
-      }
-    }
-  }
-  return out;
+  return runLines(records).map(line => ({ date: line.date, miles: line.miles }));
 }
 
 /* WHAT THE ATHLETE RUNS IN A WEEK, from the one definition in runVolume — see

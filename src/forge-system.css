@@ -1562,6 +1562,13 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .forge-noticed-head small{color:var(--ink-3);font-size:11px;font-weight:700}
 .forge-noticed-say{margin:0;font-size:15px;font-weight:700;line-height:1.4;color:var(--ink)}
 .forge-noticed-detail{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
+.forge-noticed-receipt{font-size:12px;color:var(--ink-2)}
+.forge-noticed-receipt summary{cursor:pointer;color:var(--ink-3);list-style:none}
+.forge-noticed-receipt summary::-webkit-details-marker{display:none}
+.forge-noticed-receipt summary::before{content:'›';display:inline-block;margin-right:6px;transition:transform .15s}
+.forge-noticed-receipt[open] summary::before{transform:rotate(90deg)}
+.forge-noticed-receipt ul{margin:6px 0 0;padding-left:18px;font-variant-numeric:tabular-nums}
+.forge-noticed-receipt li{margin:2px 0}
 .forge-noticed-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:2px}
 .forge-noticed-actions .small-button{min-height:38px;padding:0 14px;font-size:13px}
 
