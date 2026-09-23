@@ -43,6 +43,13 @@ const records = [steady('r1', 2, 5, 45), steady('r2', 4, 3, 27), steady('r3', 9,
 await p.evaluate(r => localStorage.setItem('forge-workout-history-v1', JSON.stringify(r)), records);
 await p.reload(); await p.waitForTimeout(2800); await dismissModals();
 
+console.log('\nThe week reviewed, first');
+const homeText = await text();
+check('Home opens on the review of last week', /YOUR WEEK\n(1 more\n)?Last week: 3 sessions, 9 mi, a PR \(Back Squat 275 × 5\)\./.test(homeText), between(homeText, 'YOUR WEEK', 120));
+check('with what matters, what changes and what is next', /Nothing changes/.test(homeText) && /Next: /.test(homeText), between(homeText, 'YOUR WEEK', 300));
+await dismissModals(); await tapText('Got it'); await p.waitForTimeout(500);
+check('Got it puts it away for good', !/YOUR WEEK/.test(await text()));
+
 console.log('\nThe same day everywhere');
 const home = readHome(await text());
 const plan = readPlan(await go('#/plan'));

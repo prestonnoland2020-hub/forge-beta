@@ -135,6 +135,47 @@ async function answeredToday(pairs: Array<[string, string]>): Promise<Set<string
   return new Set((data || []).map(row => pairKey(row.owner_id as string, String(row.check_in_date))));
 }
 
+/* WHAT TODAY HOLDS, IN ONE LINE. The brief used to say "Open Forge to see
+   what is next in your split" — an interruption that carried nothing. The
+   cycle cursor and the split's day names are in the database, and a
+   recommendation row is there when the app has already built today, so the
+   line can name the day and its lift: "Lower Body — Back Squat 285 × 4."
+   Batched over everyone due, like the other lookups. */
+type NextUp = { line: string };
+async function nextUpFor(pairs: Array<[string, string]>): Promise<Map<string, NextUp>> {
+  const out = new Map<string, NextUp>();
+  if (!pairs.length) return out;
+  const owners = [...new Set(pairs.map(pair => pair[0]))];
+  const dates = [...new Set(pairs.map(pair => pair[1]))];
+  /* A recommendation the app has already saved for today wins: it carries the
+     load and the cardio the athlete will actually see. */
+  const { data: recs } = await admin.from('daily_recommendations').select('owner_id,recommendation_date,recommendation,status')
+    .in('owner_id', owners).in('recommendation_date', dates);
+  for (const row of (recs || []) as Array<Record<string, unknown>>) {
+    const rec = (row.recommendation || {}) as { splitDay?: { name?: string; type?: string }; topSets?: Array<{ exercise?: string; weight?: number; reps?: number; selected?: boolean }>; cardio?: { summary?: string; selected?: boolean }; coachNote?: string };
+    const day = String(rec.splitDay?.name || '');
+    if (!day) continue;
+    const set = (rec.topSets || []).find(item => item.selected !== false && Number(item.weight) > 0);
+    const parts = [set ? `${set.exercise} ${set.weight} × ${set.reps}` : (rec.topSets || [])[0]?.exercise, rec.cardio && rec.cardio.selected !== false ? rec.cardio.summary : ''].filter(Boolean);
+    out.set(pairKey(String(row.owner_id), String(row.recommendation_date)), { line: rec.splitDay?.type === 'rest' ? `${day}. ${rec.coachNote || 'Nothing owed today.'}` : `${day}${parts.length ? ` — ${parts.join(' · ')}` : ''}.` });
+  }
+  const remaining = owners.filter(owner => !dates.some(date => out.has(pairKey(owner, date))));
+  if (!remaining.length) return out;
+  const { data: cycles } = await admin.from('training_cycle_state').select('owner_id,split_id,next_position').in('owner_id', remaining);
+  const splitIds = [...new Set((cycles || []).map(row => String(row.split_id)))];
+  const { data: days } = splitIds.length ? await admin.from('training_split_days').select('split_id,position,name,goal_lifts,cardio_types').in('split_id', splitIds) : { data: [] };
+  for (const cycle of (cycles || []) as Array<Record<string, unknown>>) {
+    const day = ((days || []) as Array<Record<string, unknown>>).find(item => String(item.split_id) === String(cycle.split_id) && Number(item.position) === Number(cycle.next_position));
+    if (!day) continue;
+    const lifts = Array.isArray(day.goal_lifts) ? (day.goal_lifts as string[]).filter(Boolean) : [];
+    const cardio = Array.isArray(day.cardio_types) ? (day.cardio_types as string[]).filter(Boolean) : [];
+    const detail = [lifts[0], cardio[0]].filter(Boolean).join(' · ');
+    const line = `${String(day.name)}${detail ? ` — ${detail}` : ''}.`;
+    for (const date of dates) if (!out.has(pairKey(String(cycle.owner_id), date))) out.set(pairKey(String(cycle.owner_id), date), { line });
+  }
+  return out;
+}
+
 const dayBefore = (date: string) => {
   const parsed = new Date(`${date}T12:00:00Z`);
   parsed.setUTCDate(parsed.getUTCDate() - 1);
@@ -230,6 +271,7 @@ Deno.serve(async request => {
     const days = await daysAround(pairs);
     const told = await sentDays(kind, pairs);
     const answered = await answeredToday(pairs);
+    const nextUp = await nextUpFor(pairs);
     for (const { row, date } of due) {
       const key = pairKey(row.owner_id, date);
       if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already sent today' }); continue; }
@@ -249,7 +291,7 @@ Deno.serve(async request => {
           body: `${yesterday.title ? `${yesterday.title} yesterday` : 'You trained yesterday'}. Three taps and Forge shapes today around it.`,
           tag: `checkin-${date}`, url: './#/',
         }
-        : { title: 'Today’s training', body: 'Open Forge to see what is next in your split.', tag: `morning-${date}`, url: './#/' };
+        : { title: 'Today’s training', body: nextUp.get(key)?.line || 'Open Forge to see what is next in your split.', tag: `morning-${date}`, url: './#/' };
       messages.push({ row, date, payload });
     }
   }

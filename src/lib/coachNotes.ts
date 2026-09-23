@@ -34,8 +34,9 @@
 
 import type { VerdictOutcome, SessionTrend } from './sessionVerdict';
 import type { LevelMove, Zone } from './progressionLevels';
+import type { RawAction } from './coachActions';
 
-export type CoachNoteKind = 'readiness' | 'trend' | 'goal-moved' | 'session' | 'week-miles' | 'week-closed' | 'lift-miss' | 'easy-too-fast';
+export type CoachNoteKind = 'week-review' | 'readiness' | 'trend' | 'goal-moved' | 'session' | 'week-miles' | 'week-closed' | 'lift-miss' | 'easy-too-fast';
 
 export type CoachNote = {
   /* Stable across renders and days: what this note is ABOUT, so it is shown
@@ -54,6 +55,11 @@ export type CoachNote = {
      is wrong" becomes "oh, Tuesday's run isn't there" — a logging fix, not
      lost trust. */
   receipt?: string[];
+  /* A review is four lines, not one; rendered in place of say/detail. */
+  lines?: string[];
+  /* One-tap changes, in the coach's action vocabulary; applied through the
+     same path as the chat coach's confirm card. */
+  actions?: RawAction[];
 };
 
 /* A judged hard session, as the coach needs it. */
