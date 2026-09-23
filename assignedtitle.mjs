@@ -36,7 +36,10 @@ console.log('\nAnd everything the stickiness was protecting still holds');
 /* Asserted as a single ordered pattern rather than by splitting on `||` — the
    last fallback contains a nested `||` of its own, so splitting reports five
    links in a chain of four. */
-const CHAIN = /^const title=assignedName\|\|editingRecord\?\.title\|\|existingDay\?\.title\|\|\(usingSplit\?\(plannedDay\?\.name\|\|'Planned Workout'\):'Custom Workout'\);$/;
+/* The last link grew a Forge-written session's name ("HYROX stations ·
+   front half") ahead of 'Custom Workout' — still the last link, after every
+   day identity the athlete or the split chose. */
+const CHAIN = /^const title=assignedName\|\|editingRecord\?\.title\|\|existingDay\?\.title\|\|\(usingSplit\?\(plannedDay\?\.name\|\|'Planned Workout'\):written\?\.name\|\|'Custom Workout'\);$/;
 check('the fallback chain is exactly: chosen day, the edit, the saved day, the plan',
   CHAIN.test(titleLine.trim()), titleLine.trim());
 /* The note explaining WHY it is sticky has to survive, or the next person to
