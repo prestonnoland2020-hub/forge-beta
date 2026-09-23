@@ -1573,3 +1573,10 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .forge-noticed-actions .small-button{min-height:38px;padding:0 14px;font-size:13px}
 
 .today-bodylog-note{margin:0 0 8px;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--warning) 12%,var(--surface-1));color:var(--text);font-size:12.5px;line-height:1.4}
+.today-coach-note{background:color-mix(in srgb,var(--accent) 12%,var(--surface-1))}
+/* THE CONFIRM CARD. One line per change the coach proposes, two buttons. */
+.coach-actions ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.coach-actions li{padding:10px 12px;border-radius:8px;background:var(--surface-2);font-size:13px;font-weight:600;line-height:1.35}
+.coach-actions li::before{content:'→ ';color:var(--accent-text)}
+.coach-actions footer{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.coach-message p{white-space:pre-line}

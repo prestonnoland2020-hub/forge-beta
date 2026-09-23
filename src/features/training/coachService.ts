@@ -19,6 +19,9 @@ export type ForgeCoachResponse = {
   source: 'ai' | 'local' | 'limit';
   error?: string;
   upgrade?: boolean;
+  /* What the coach would change, unvalidated — lib/coachActions checks each
+     entry against the athlete's own plan before it is shown. */
+  actions?: unknown[];
   workout?: {
     title: string;
     rounds: number;
@@ -36,7 +39,7 @@ export async function requestForgeCoach(request: ForgeCoachRequest, localFallbac
   // key belongs only in the `forge-coach` Edge Function secret store. See
   // FORGE_GO_LIVE.md before switching VITE_DEMO_MODE off.
   if (isDemoMode) return { answer: localFallback, source: 'local', error: 'Forge is running in preview mode.' };
-  let data: { answer?: unknown; workout?: ForgeCoachResponse['workout'] } | null = null;
+  let data: { answer?: unknown; actions?: unknown; workout?: ForgeCoachResponse['workout'] } | null = null;
   let error: unknown = null;
   /* A dropped connection throws instead of returning an error object; it
      must land on the same "couldn't reach the coach" path, not the caller. */
@@ -58,7 +61,7 @@ export async function requestForgeCoach(request: ForgeCoachRequest, localFallbac
     if(limited)return{ answer: detail, source: 'limit', error: detail, upgrade };
     return { answer: localFallback, source: 'local', error: detail };
   }
-  return { answer: String(data.answer), source: 'ai', workout: data.workout };
+  return { answer: String(data.answer), source: 'ai', workout: data.workout, actions: Array.isArray(data.actions) ? data.actions : [] };
 }
 
 /* The AI cardio box: send the athlete's description, get structured rows plus

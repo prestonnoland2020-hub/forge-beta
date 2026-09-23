@@ -3,9 +3,7 @@ import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider'
 import { calculateEstimatedOneRepMax } from './strength';
 import { sameLift } from './liftAliases';
 import { predictRaceFromLegacyMethod } from './cardioPrediction';
-import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
-import { countsAsRunVolume, isRaceEvidence, anchorsPace } from './runQuality';
 import { weeklyMilesFrom } from './runVolume';
 import { runLines, longestRun } from './stats';
 
@@ -88,13 +86,6 @@ const bestPerDay = (points: Array<{ date: string; value: number }>, lowerIsBette
    20:00 and 15:16 a mile; counting them told the plan he had a base he has not
    built, and told the feasibility model he was closer than he is. Classified
    once, in runQuality, so every surface throws out the same things. */
-const runs = (records: WorkoutRecord[]) => records.flatMap(record => (record.cardioSessions || []).flatMap(session => {
-  const miles = cardioMiles(session);
-  const minutes = summarizeCardioDraft(session).minutes;
-  if (!miles || !minutes || !/run/i.test(`${session.activity} ${session.summary || ''}`)) return [];
-  if (!countsAsRunVolume(miles, minutes * 60)) return [];
-  return [{ date: record.date, miles, minutes }];
-}));
 
 /* THE WEEK'S RUNNING, WEEK BY WEEK — not one average.
 

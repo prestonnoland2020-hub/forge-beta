@@ -18,6 +18,8 @@ import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 import { useAthleteNotes } from './useAthleteNotes';
 import { bodyLogState,exerciseBlocked } from '../../lib/bodyLog';
+import { useTodayOverride } from './coachOverrides';
+import { shortenRecommendation } from '../../lib/coachActions';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void;
   /* The full prescription for ANY split position, built by the same pipeline
@@ -119,13 +121,21 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     &&((record.topSets||[]).some(set=>set.completed!==false)||(record.cardioSessions||[]).length>0));
   const trainedToday=Boolean(todayRecord);
   const pinnedPosition=todayRecord?.splitPosition&&days.some(day=>day.position===todayRecord.splitPosition)?todayRecord.splitPosition:undefined;
-  const duePosition=pinnedPosition??(cycle.revision>0?(statePosition||cycle.nextPosition):inferredPosition);
+  /* WHAT THE ATHLETE AGREED WITH THE COACH. "Rest today" or "make it the
+     upper day" is an override for today only; it never moves the cycle, and
+     a day already trained is left alone. */
+  const coachOverride=useTodayOverride(isoToday());
+  const coachSwap=!pinnedPosition&&coachOverride?.position&&days.some(day=>day.position===coachOverride.position)?coachOverride.position:undefined;
+  const coachRest=!pinnedPosition&&Boolean(coachOverride?.rest);
+  const duePosition=pinnedPosition??coachSwap??(cycle.revision>0?(statePosition||cycle.nextPosition):inferredPosition);
   /* WHICH DAY THIS SPLIT DAY IS FOR. Pinned, it is today's. Unpinned on a day
      already trained (a record with no split position), the position is the
      one after the last session, so it belongs to tomorrow — and anything
      drawing a calendar from it has to know that. */
   const anchorDate=(()=>{if(!trainedToday||pinnedPosition)return isoToday();const next=new Date();next.setHours(12,0,0,0);next.setDate(next.getDate()+1);return`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`})();
-  const splitDay=days.find(day=>day.position===duePosition)||trainingDays[0]||days[0]||{position:1,name:'Start training',type:'strength' as const,muscles:[],exercises:[],cardioTypes:[]};
+  const splitDayRaw=days.find(day=>day.position===duePosition)||trainingDays[0]||days[0]||{position:1,name:'Start training',type:'strength' as const,muscles:[],exercises:[],cardioTypes:[]};
+  const splitDay=coachRest?{...splitDayRaw,name:'Rest day',type:'rest' as const,muscles:[],exercises:[],cardioTypes:[]}:splitDayRaw;
+  const coachStamp=coachOverride?`${coachOverride.rest?'R':''}:${coachOverride.position||''}:${coachOverride.minutes||''}`:'';
   const date=isoToday();
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   const aiPlanStamp=useMemo(()=>readLocalAiPlan()?.generatedAt||'',[refreshKey]);
@@ -150,7 +160,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const {notes:athleteNotes}=useAthleteNotes();
   const bodyLog=useMemo(()=>bodyLogState(athleteNotes,isoToday()),[athleteNotes]);
   const bodyLogStamp=bodyLog.areas.join('+');
-  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp]);
+  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   /* ONE PIPELINE, ANY DAY OF THE SPLIT.
 
@@ -376,7 +386,12 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      preview or an approximation — it is the identical prescription that day
      will carry when the cycle reaches it. */
   const buildFor=useCallback((day:RecommendationSplitDay)=>applyPlan(buildBase(day)),[applyPlan,buildBase]);
-  const generated=useMemo(()=>buildFor(splitDay),[buildFor,splitDay]);
+  const generated=useMemo(()=>{
+    const built=buildFor(splitDay);
+    if(!built||!coachOverride)return built;
+    const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(built,coachOverride.minutes):built;
+    return{...fitted,coachNote:coachOverride.note||undefined};
+  },[buildFor,splitDay,coachOverride,coachRest]);
   /* NAME FIRST, POSITION SECOND. The logger numbers the days from the local
      copy of the split; this list comes from the server's. They normally agree,
      but they are two lists, and one omitted rest day shifts every index after
