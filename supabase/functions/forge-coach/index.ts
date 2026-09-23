@@ -148,10 +148,13 @@ Deno.serve(async request => {
     const safetyIdentifier = Array.from(new Uint8Array(identifierBytes)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32);
     const workoutScope = String(body.scope || '') === 'workout';
     const cardioScope = String(body.scope || '') === 'cardio-log';
-    const aiResponse = await fetch('https://api.openai.com/v1/responses', {
+    const askProvider = (payload: Record<string, unknown>) => fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')!}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify(payload),
+    });
+    const trainingScope = !cardioScope && !workoutScope;
+    const providerPayload = {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
@@ -267,8 +270,17 @@ Return one editable cardio/circuit using only exact movement names and units in 
         input: cardioScope
           ? `Athlete's description of the completed cardio workout: ${question}\nContext JSON (may include a synced device summary and the athlete's saved cardio types): ${context}`
           : `Scope: ${String(body.scope || 'training')}\nAthlete question: ${question}\nVerified context JSON: ${context}`,
-      }),
-    });
+    };
+    let aiResponse = await askProvider(providerPayload);
+    /* THE COACH NEVER GOES DARK OVER ITS OWN SCHEMA. If the provider ever
+       rejects the structured format (a schema rule tightened upstream, a
+       model that does not support it), the same question is asked again as
+       plain text. The athlete gets an answer with no actions rather than
+       "Coach service failed (400)" on every message until someone notices. */
+    if (!aiResponse.ok && trainingScope && aiResponse.status === 400) {
+      console.warn('forge-coach-schema-rejected', await aiResponse.text().catch(() => ''));
+      aiResponse = await askProvider({ ...providerPayload, text: { verbosity: 'low' } });
+    }
     if (!aiResponse.ok) throw new Error(`Coach service failed (${aiResponse.status}).`);
     const responseBody = await aiResponse.json();
     const answer = outputText(responseBody);
