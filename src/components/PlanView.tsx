@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { WAVE_REPS, WAVE_LENGTH } from '../features/training/aiPlanService';
 import { localDayIso } from '../lib/time';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
+import type { DailyRecommendation } from '../lib/dailyRecommendationEngine';
 
 /* THE PLAN TAB, AS SOMEONE WHO JUST WANTS TO TRAIN READS IT.
 
@@ -136,6 +137,24 @@ const sameDayName = (a: string, b: string) =>
   a.toLowerCase().replace(/[^a-z0-9]/g, '') === b.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /* ── 2. Today ────────────────────────────────────────────────────────────── */
+/* TODAY IS WHAT THE RECOMMENDATION SAYS, on this tab too. The week's rows
+   come from the split rotation; a coach override ("rest today", "make it
+   the upper day") changes the recommendation without moving the rotation,
+   so the Plan tab said Shoulders & Arms while Home said Rest day. Today's
+   row is reconciled to the recommendation whenever the two name different
+   days; every other row keeps the rotation. */
+export function reconcileToday(sessions: PlanSession[], recommendation: DailyRecommendation | null | undefined, todayIso: string): PlanSession[] {
+  if (!recommendation?.splitDay) return sessions;
+  return sessions.map(session => {
+    if (localDayIso(session.date) !== todayIso || session.title === recommendation.splitDay.name) return session;
+    const rest = recommendation.splitDay.type === 'rest';
+    const lifts = recommendation.topSets.filter(set => set.selected && set.weight > 0).map(set => ({ exercise: set.exercise, weight: set.weight, reps: set.reps }));
+    const cardio = recommendation.cardio;
+    const run = cardio ? { kind: (cardio.session.stress === 'High' ? 'Hard run' : cardio.session.role === 'Long' ? 'Long run' : 'Easy run') as PlanRun['kind'], text: cardio.summary } : undefined;
+    return { ...session, title: recommendation.splitDay.name, lifts, run, empty: rest && !lifts.length && !run ? 'rest' : undefined, summary: recommendation.coachNote || (rest ? undefined : session.summary) };
+  });
+}
+
 export function TodayCard({ session, unit, logged, workoutHref }: {
   session: PlanSession | undefined; unit: string; logged?: WorkoutRecord; workoutHref: string;
 }) {
