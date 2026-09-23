@@ -81,6 +81,7 @@ export function HomePage() {
             Cardio" day showed a red "Fix →" demanding a strength exercise for
             a day that is not meant to have one, and following it to the
             library fixed nothing. */}
+        {recommendation.bodyLogNote && <p className="today-bodylog-note">{recommendation.bodyLogNote}</p>}
         {!recommendedSets.length && recommendation.splitDay.type !== 'rest' && recommendation.splitDay.type !== 'cardio' && recommendation.splitDay.type !== 'hyrox' && <Link className="feed-empty-row" to="/exercises"><span><small>STRENGTH</small><strong>Choose exercises for this split day</strong><em>Forge needs a strength exercise mapped to this day.</em></span><b>Fix →</b></Link>}
         {recommendation.cardio && <label className={recommendation.cardio.selected ? 'selected' : ''}><input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} /><span><small>{recommendation.splitDay.type === 'hyrox' ? 'HYROX' : 'CARDIO'}</small><strong>{recommendation.cardio.title}</strong><em>{cardioPlanSummary(recommendation.cardio.session.plan)}</em></span></label>}
       </div>

@@ -9,6 +9,7 @@ import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
 import { liftPositions, rungFor } from './liftProgression';
 import { hyroxSession,hyroxSessionsDone,weeksUntil } from './hyroxSession';
+import { exerciseBlocked,EMPTY_BODY_LOG,type BodyLogState } from './bodyLog';
 
 /* Bump this whenever the engine's OUTPUT changes shape or policy — the daily
    card is snapshotted to Supabase, and a stale snapshot with a matching
@@ -67,6 +68,8 @@ export type RecommendedCardio={
 };
 
 export type DailyRecommendation={
+  /* What the body log took off today, said in one line on the card. */
+  bodyLogNote?:string;
   id?:string;
   date:string;
   status:'active'|'completed'|'superseded';
@@ -93,6 +96,8 @@ type EngineInput={
   /* Threshold pace in seconds per mile, when a run has established one. */
   thresholdSecondsPerMile?:number;
   metric?:boolean;
+  /* Active body-log notes, already turned into what they block. */
+  bodyLog?:BodyLogState;
 };
 
 /* Alias-aware: a split day mapped to "Back Squat" on a phone that predates a
@@ -143,8 +148,14 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const used=new Set<string>();
   const coveredMuscles=new Set<string>();
   const selectedExercises:Array<{muscle:string;exercise:LibraryExercise;optional:boolean}>=[];
+  const bodyLog=input.bodyLog||EMPTY_BODY_LOG;
+  const heldByBodyLog:string[]=[];
   const explicitlyMapped=strengthLibrary.filter(exercise=>explicitNames.has(normalized(exercise.name))).sort(compareExercise);
   explicitlyMapped.forEach(exercise=>{
+    /* THE BODY LOG IS READ HERE, NOT ONLY BY THE CHAT. A knee in the log
+       means no squat today; the day keeps its other lifts and the card says
+       what was left out and why. */
+    if(exerciseBlocked(exercise,bodyLog)){heldByBodyLog.push(exercise.name);return}
     // Label a mapped exercise with its own primary muscle. Matching against the
     // day's muscle list first meant Bench showed as "Triceps" simply because
     // Triceps happened to come earlier in that list than Chest.
@@ -170,7 +181,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
       const leads=strengthLibrary.filter(exercise=>exercise.muscles[0]===muscle);
       const involves=strengthLibrary.filter(exercise=>exercise.muscles.includes(muscle));
       const pool=leads.length?leads:involves;
-      const candidate=pool.sort(compareExercise).find(exercise=>!used.has(normalized(exercise.name)));
+      const candidate=pool.sort(compareExercise).find(exercise=>!used.has(normalized(exercise.name))&&!exerciseBlocked(exercise,bodyLog));
       if(!candidate)return;
       selectedExercises.push({muscle,exercise:candidate,optional:!leads.length});
       used.add(normalized(candidate.name));coveredMuscles.add(muscle);
@@ -239,7 +250,20 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
     }
     return weekly.scheduled[0];
   })();
-  const cardio=cardioCandidate?{id:`cardio-${cardioCandidate.id}`,title:cardioCandidate.title,summary:hyrox?hyrox.summary:formatCardio(cardioCandidate),rationale:cardioCandidate.rationale,session:cardioCandidate,selected:true}:undefined;
+  const runBlocked=bodyLog.blocksRunning&&cardioCandidate&&!hyrox&&/run/i.test(`${cardioCandidate.plan.activity} ${cardioCandidate.title}`);
+  const cardio=cardioCandidate?runBlocked
+    ?(()=>{
+      /* RUNNING IS OFF WHILE THE LOWER LEG IS IN THE LOG. The aerobic work
+         stays — same minutes, on the bike or the rower — so the week keeps
+         its volume without loading what hurts. */
+      const minutes=Number(cardioCandidate.plan.duration)||Math.round((Number(cardioCandidate.plan.distance)||3)*9)||30;
+      const session={...cardioCandidate,role:'Easy' as const,title:`Bike or row · ${minutes} min easy`,stress:'Low' as const,plan:{...cardioCandidate.plan,activity:'Bike',structure:'Steady' as const,distance:undefined,distanceUnit:undefined,pace:undefined,duration:String(minutes)},rationale:`No running while your ${bodyLog.areas.join(' and ')} is in the body log. ${minutes} easy minutes on the bike or rower keeps the aerobic work.`};
+      return{id:`cardio-${cardioCandidate.id}-noimpact`,title:session.title,summary:`Bike or row · ${minutes} min easy`,rationale:session.rationale,session,selected:true};
+    })()
+    :{id:`cardio-${cardioCandidate.id}`,title:cardioCandidate.title,summary:hyrox?hyrox.summary:formatCardio(cardioCandidate),rationale:cardioCandidate.rationale,session:cardioCandidate,selected:true}:undefined;
+  const bodyLogNote=heldByBodyLog.length||runBlocked
+    ?`${bodyLog.areas.join(' and ').replace(/^./,c=>c.toUpperCase())} in your body log: ${[heldByBodyLog.length?`${heldByBodyLog.join(', ')} held`:'',runBlocked?'running swapped for bike or row':''].filter(Boolean).join(', ')}.`
+    :undefined;
   const lastCompletedDate=input.records.map(record=>record.date).sort().at(-1);
   const selectedCount=topSets.filter(set=>set.selected).length;
   /* DAY ONE HAS NOT COMPLETED ANYTHING. This sentence used to assert that
@@ -252,5 +276,5 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const explanation=input.splitDay.type==='rest'
     ?'The completed-workout cursor reached a rest day. No hard work is required; any displayed strength option is optional and does not replace recovery.'
     :`${input.splitDay.name} is ${started?`next because the last completed recommendation advanced the split to position ${input.splitDay.position}`:`where your split starts — position ${input.splitDay.position}, with nothing completed yet`}. ${selectedCount?`${selectedCount} history-grounded top-set ${selectedCount===1?'option is':'options are'} ready.`:started?'':'Your first logged sets become the baseline everything after this is measured against.'}${hyrox?' Forge wrote today\'s HYROX session from your threshold pace and how many HYROX days are in the log.':cardio?' Cardio comes from the same goals, pace history, and recovery inputs.':''}`;
-  return{id:undefined,date:input.date,status:'active',algorithmVersion:DAILY_RECOMMENDATION_VERSION,inputFingerprint:input.inputFingerprint,splitDay:input.splitDay,topSets,cardio,headline:input.splitDay.type==='rest'?'Recovery is next':input.splitDay.type==='hyrox'?'HYROX day':`${input.splitDay.name} is next`,explanation,evidence:{lastCompletedDate,activeDays7:intelligence.activeDays7,historyCount:input.records.length,goalNames:input.goals.map(goal=>goal.title)}};
+  return{bodyLogNote,id:undefined,date:input.date,status:'active',algorithmVersion:DAILY_RECOMMENDATION_VERSION,inputFingerprint:input.inputFingerprint,splitDay:input.splitDay,topSets,cardio,headline:input.splitDay.type==='rest'?'Recovery is next':input.splitDay.type==='hyrox'?'HYROX day':`${input.splitDay.name} is next`,explanation,evidence:{lastCompletedDate,activeDays7:intelligence.activeDays7,historyCount:input.records.length,goalNames:input.goals.map(goal=>goal.title)}};
 }

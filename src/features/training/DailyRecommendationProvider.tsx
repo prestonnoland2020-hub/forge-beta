@@ -16,6 +16,8 @@ import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftName
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
+import { useAthleteNotes } from './useAthleteNotes';
+import { bodyLogState,exerciseBlocked } from '../../lib/bodyLog';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void;
   /* The full prescription for ANY split position, built by the same pipeline
@@ -143,7 +145,12 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      on — otherwise the saved row from before the check-in was reused all day
      and "backing today off" was only ever a sentence on a card. */
   const recoveryStamp=recovery.confidence==='Low'?'':`${recovery.readiness}:${recovery.strengthFatigue}`;
-  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp]);
+  /* THE BODY LOG IS AN INPUT TO TODAY. A note is part of the fingerprint, so
+     the saved row from before "my knee hurts" is not reused all day. */
+  const {notes:athleteNotes}=useAthleteNotes();
+  const bodyLog=useMemo(()=>bodyLogState(athleteNotes,isoToday()),[athleteNotes]);
+  const bodyLogStamp=bodyLog.areas.join('+');
+  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   /* ONE PIPELINE, ANY DAY OF THE SPLIT.
 
@@ -158,7 +165,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      shortcut left out. So the whole thing is a function of the day now, the due
      day is simply the argument Today passes, and the logger passes whichever
      day the athlete picked. */
-  const buildBase=useCallback((day:RecommendationSplitDay)=>buildDailyRecommendation({date,splitDay:day,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,thresholdSecondsPerMile:day.type==='hyrox'?paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[]).threshold:undefined,metric:setup?.units==='Metric',inputFingerprint:recommendationFingerprint({date,splitDay:day,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp})}),[date,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,cycle.revision,aiPlanStamp,planInputsStamp]);
+  const buildBase=useCallback((day:RecommendationSplitDay)=>buildDailyRecommendation({date,splitDay:day,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,thresholdSecondsPerMile:day.type==='hyrox'?paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[]).threshold:undefined,metric:setup?.units==='Metric',bodyLog,inputFingerprint:recommendationFingerprint({date,splitDay:day,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp})}),[date,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,cycle.revision,aiPlanStamp,planInputsStamp]);
   /* The stored AI program is authoritative for today's numbers: when its
      current week prescribes a top set for this split day, that exercise,
      weight, and reps replace the engine's guess — so Today, Plan, and the
@@ -232,9 +239,11 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     })();
     /* Say why, rather than silently dropping the session. An athlete who
        cannot see that Forge noticed assumes it forgot. */
-    const cardioBase={...generatedBase,cardio:planCardio&&doneQuality
+    const planRunBlocked=bodyLog.blocksRunning&&planCardio&&/run/i.test(planCardio.title);
+    const noImpact=planRunBlocked&&planCardio?(()=>{const minutes=Number((planCardio.session.plan as {duration?:string}).duration)||Math.round((Number((planCardio.session.plan as {distance?:string}).distance)||3)*9)||30;return{...planCardio,id:`${planCardio.id}-noimpact`,title:`Bike or row · ${minutes} min easy`,summary:`Bike or row · ${minutes} min easy`,rationale:`No running while your ${bodyLog.areas.join(' and ')} is in the body log. ${minutes} easy minutes on the bike or rower keeps the aerobic work.`,session:{...planCardio.session,role:'Easy' as const,title:`Bike or row · ${minutes} min easy`,stress:'Low' as const,plan:{...(planCardio.session.plan as object),activity:'Bike',structure:'Steady',distance:undefined,distanceUnit:undefined,pace:undefined,duration:String(minutes)} as never}}})():planCardio;
+    const cardioBase={...generatedBase,cardio:planCardio&&doneQuality&&!planRunBlocked
       ?{...planCardio,rationale:`${planCardio.rationale} Your ${week.quality} is already done — ${doneQuality.matched} × ${Math.round(doneQuality.meters)} m logged ${doneQuality.date===generatedBase.date?'today':`on ${doneQuality.date}`} — so today stays easy.`}
-      :planCardio};
+      :noImpact,bodyLogNote:generatedBase.bodyLogNote||(planRunBlocked?`${bodyLog.areas.join(' and ').replace(/^./,c=>c.toUpperCase())} in your body log: running swapped for bike or row.`:undefined)};
     const rawMatch=week?.topSets?.find(set=>set.splitDay===generatedBase.splitDay.name)||week?.topSets?.find(set=>splitDayKey(set.splitDay)===splitDayKey(generatedBase.splitDay.name));
     if(!rawMatch)return cardioBase;
     /* THE GOAL LIFT OWNS ITS DAY — same repair the Plan page applies, so
@@ -250,7 +259,12 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const dayOwner=dayGoalLifts.some(name=>canonicalLiftKey(name)===canonicalLiftKey(rawMatch.exercise))
       ?rawMatch.exercise
       :[...dayGoalLifts].sort((a,b)=>(goalDueByLift.get(canonicalLiftKey(a))??Number.MAX_SAFE_INTEGER)-(goalDueByLift.get(canonicalLiftKey(b))??Number.MAX_SAFE_INTEGER)||a.localeCompare(b))[0];
-    const match=dayOwner&&canonicalLiftKey(dayOwner)!==canonicalLiftKey(rawMatch.exercise)?{...rawMatch,exercise:dayOwner}:rawMatch;
+    const matchRaw=dayOwner&&canonicalLiftKey(dayOwner)!==canonicalLiftKey(rawMatch.exercise)?{...rawMatch,exercise:dayOwner}:rawMatch;
+    /* A goal lift the body log holds does not lead the day; the day keeps
+       whatever the engine could prescribe around it. */
+    const matchLibrary=exercises.find(item=>sameLift(item.name,matchRaw.exercise));
+    if(matchLibrary&&exerciseBlocked(matchLibrary,bodyLog))return cardioBase;
+    const match=matchRaw;
     /* EVERY recommended top set runs the same 8/6/4/2/1 wave — not just the
        day's goal lift. An accessory used to come from a separate progression,
        so one card on the day said "8-rep week" while the next said something
@@ -355,7 +369,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:calculateEstimatedOneRepMax(wave.weight,wave.reps)||0,rationale:wave.rationale};
     });
     return{...cardioBase,topSets};
-  },[records,goals,setup,days,profile,aiPlanStamp,goalStamp,planInputsStamp,recovery]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[records,goals,setup,days,profile,aiPlanStamp,goalStamp,planInputsStamp,recovery,bodyLog,exercises]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* The due day, and the same pipeline for any other. `buildFor` is what the
      logger calls when the athlete overrides the day; nothing about it is a

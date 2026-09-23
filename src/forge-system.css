@@ -1564,3 +1564,5 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .forge-noticed-detail{margin:0;font-size:13px;line-height:1.45;color:var(--ink-2)}
 .forge-noticed-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:2px}
 .forge-noticed-actions .small-button{min-height:38px;padding:0 14px;font-size:13px}
+
+.today-bodylog-note{margin:0 0 8px;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--warning) 12%,var(--surface-1));color:var(--text);font-size:12.5px;line-height:1.4}

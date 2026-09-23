@@ -11,6 +11,7 @@ import { GoalBuilder, noop, type CreatedGoal } from '../components/GoalBuilder';
 import { isProgrammableStrength, useTrainingLibrary, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { coreFirst } from '../lib/coreLifts';
+import { createNote, extractArea, saveNote } from '../features/training/athleteNotesService';
 
 /* THREE SCREENS. Setup was six steps and a disclaimer before an athlete saw
    the app: two consent boxes in a row, a goal builder with three sub-steps of
@@ -230,6 +231,9 @@ function OnboardingForm() {
       const completed = { ...data, username, runningDays, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString() };
       saveSetup(completed);
       updateProfile({ runningDays, injuryConstraint: data.injuryConstraint });
+      /* "WHAT SHOULD FORGE AVOID?" GOES INTO THE BODY LOG, where the daily
+         engine reads it — it used to reach only the circuit builder's prompt. */
+      if (data.injuryConstraint && data.limitationNotes.trim() && !isEditing) void saveNote(createNote('injury', data.limitationNotes.trim(), extractArea(data.limitationNotes)));
       const from = (location.state as { from?: string } | null)?.from;
       navigate(from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
     } catch (reason) {
