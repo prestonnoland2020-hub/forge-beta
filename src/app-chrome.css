@@ -89,7 +89,9 @@
     bottom: calc(var(--tab-clear) + 14px);
     transition: transform .3s var(--glide), opacity .2s ease;
   }
-  html.keyboard-open .coach-bubble-shell:not(.expanded) { transform: translateY(24px); opacity: 0; pointer-events: none; }
+  /* Only the closed button steps aside for the keyboard — an open sheet is
+     what the athlete is typing into. */
+  html.keyboard-open .coach-bubble-shell:not(.expanded):not(:has(.coach-bubble-panel.open)) { transform: translateY(24px); opacity: 0; pointer-events: none; }
   .coach-bubble-toggle {
     width: 54px; min-width: 54px; height: 54px; padding: 0; border-radius: 999px; justify-content: center;
     box-shadow: 0 10px 26px -6px color-mix(in srgb, var(--accent) 55%, transparent), 0 2px 6px rgb(0 0 0 / .12);

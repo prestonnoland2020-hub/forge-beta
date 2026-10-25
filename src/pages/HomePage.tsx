@@ -10,6 +10,7 @@ import { StravaReviewModal } from '../components/StravaReviewModal';
 import { formatCardioSummary } from '../lib/cardioSession';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
+import { isSickNote } from '../lib/bodyLog';
 
 const todayIso = () => {
   const now = new Date();
@@ -49,7 +50,7 @@ export function HomePage() {
     <StravaReviewModal />
     {bufferedNotes.length > 0 && <Link className="buffer-banner" to="/coach">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 2.8 19.5a1 1 0 0 0 .87 1.5h16.66a1 1 0 0 0 .87-1.5L12 3Z"/><path d="M12 10v4M12 17.5v.5"/></svg>
-      <span>Training around {bufferedNotes.map(note => note.area || note.kind).join(', ')} — check in on Coach</span>
+      <span>{bufferedNotes.some(isSickNote) ? 'Resting while you’re sick — tell Forge when you feel better' : `Training around ${bufferedNotes.map(note => note.area || note.kind).join(', ')} — check in on Coach`}</span>
     </Link>}
 
     {completedToday ? <section className="feed-card today-focus-card completed">
