@@ -19,7 +19,12 @@ const config: CapacitorConfig = {
     /* The app is dark. Without this the WebView flashes white between the
        splash screen and first paint, which reads as a broken launch. */
     backgroundColor: '#0b100e',
-    contentInset: 'always',
+    /* 'never': the page draws under the status bar and home indicator and
+       pads itself with env(safe-area-inset-*), which every screen already
+       does. 'always' made iOS add its own inset on top, and with the keyboard
+       resizing the page as well the content came back from a keyboard pushed
+       down under a dark strip and stayed there. */
+    contentInset: 'never',
     /* Bounce-scrolling past the top of a fixed app chrome exposes the
        WebView's own background and looks like the app came apart. */
     scrollEnabled: true,
@@ -47,14 +52,16 @@ const config: CapacitorConfig = {
       splashImmersive: false,
     },
     Keyboard: {
-      /* `body` resizing keeps the workout log's inputs above the keyboard
-         without the layout jumping, which matters most on the one screen
-         holding unsaved work. */
-      resize: 'body',
+      /* `native` resizes the WebView itself, so the page is simply shorter
+         while the keyboard is up and exactly its old size after. `body` moved
+         the document instead, which is what left screens shifted. */
+      resize: 'native',
       resizeOnFullScreen: true,
     },
     StatusBar: {
-      style: 'DARK',
+      /* The starting style only; features/shell/nativeChrome sets dark or
+         light text from the theme as soon as the app runs. */
+      style: 'DEFAULT',
       backgroundColor: '#0b100e',
     },
   },

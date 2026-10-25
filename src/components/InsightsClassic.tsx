@@ -282,8 +282,8 @@ export function InsightsClassic() {
      the page had failed rather than like there was nothing to show yet. */
   if (!records.length) return <div className="insights-classic">
     <section className="card ic-card ic-blank">
-      <header className="ic-head"><i /><h3>Nothing to measure yet</h3></header>
-      <p>Progress is built entirely from what you log — top sets, cardio, body weight. The first session starts the chart; a couple of weeks make the trends worth reading.</p>
+      <header className="ic-head"><i /><h3>No progress yet</h3></header>
+      <p>Log your first workout and your charts start here.</p>
       <a className="button" href="#/workout">Log today's workout →</a>
     </section>
   </div>;

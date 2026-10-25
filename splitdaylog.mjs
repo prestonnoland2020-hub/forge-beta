@@ -36,10 +36,10 @@ await p.goto('http://localhost:4191/#/workout', { waitUntil: 'domcontentloaded' 
 await p.waitForTimeout(2800);
 
 console.log('\n  the morning Forge recommends a run');
-check('the log opens on the recommendation', /RECOMMEND/i.test(await body()));
+check('the log opens on the recommendation', /Today/i.test(await body()));
 
 console.log('\n  he chooses a lifting day out of his split instead');
-check('the split option is offered', await click('Choose day'));
+check('the split option is offered', (await click('Change')) && await click('Pick a day'));
 await p.waitForTimeout(900);
 /* The picker defaults to the day due today — the run — so pick the lifting
    day explicitly, the way he did. */
@@ -74,7 +74,7 @@ check('and they are the movements mapped to this day',
   listed.some(row => /bench/i.test(row)) || listed.some(row => /squat/i.test(row)), JSON.stringify(listed).slice(0, 200));
 
 console.log('\n  and a top set can actually be logged');
-check('the sheet is reachable', await click('Add top set|Log a top set'));
+check('the sheet is reachable', await click('Add a lift|Add top set|Log a top set'));
 await p.waitForTimeout(700);
 check('it opens', await p.evaluate(() => Boolean(document.querySelector('.top-set-sheet'))));
 

@@ -53,7 +53,7 @@ const sweep = async (route, name, prepare) => {
 const clickText = re => p.evaluate(src => { const rx = new RegExp(src, 'i'); const el = [...document.querySelectorAll('button')].find(x => rx.test(x.textContent || '') && !x.disabled); el?.click(); }, re);
 
 await sweep('/workout', 'the log');
-await sweep('/workout', 'the add-top-set sheet', () => clickText('Add a top set|Add top set'));
+await sweep('/workout', 'the add-top-set sheet', () => clickText('Add a lift|Add a top set|Add top set'));
 await sweep('/plan', 'the plan');
 await sweep('/plan', 'the regenerate sheet', () => clickText('Regenerate plan'));
 await sweep('/coach', 'the coach');

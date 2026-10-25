@@ -47,8 +47,8 @@ check('an unlogged row derives the ask from the prescription',
   /const askReps = logged \? 0 : displayedSet\.prescribedReps \|\| 0;/.test(cards));
 check('a logged row prints its result, never an ask',
   /const askWeight = logged \? 0 : displayedSet\.prescribedWeight \|\| 0;/.test(cards));
-check('the closed row says what was asked', /asks \$\{askText\}/.test(cards));
-check('the open row labels it PLAN ASKS', /PLAN ASKS<\/span><strong>\{askText\}/.test(cards));
+check('the closed row says what was asked', /<small>Today \{askText\}<\/small>/.test(cards));
+check("the open row labels it as today's ask", /Today: <strong>\{askText\}<\/strong>/.test(cards));
 check('and says whose number goes in the dial', /Log what you actually lifted\./.test(cards));
 
 console.log('\nThe dial itself stays empty until it is filled');

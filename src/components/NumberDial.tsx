@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { tap } from '../lib/haptics';
 
 /* NUMBERS ARE PICKED, NOT TYPED. A keyboard for a barbell load is the wrong
    instrument: it covers half the screen, offers 40 characters when 12 are
@@ -75,11 +76,17 @@ function Wheel({ values, selected, onSelect, format }: {
   const settle = useRef<number>(0);
   const index = Math.max(0, values.indexOf(selected));
 
-  /* Open on the current value rather than at zero. */
+  /* Open on the current value rather than at zero — and follow it after
+     that, so a tap on +5 or a preset turns the wheel to the new value instead
+     of leaving it showing the old one. */
+  const mounted = useRef(false);
   useEffect(() => {
     const node = ref.current;
-    if (node) node.scrollTop = index * ITEM_HEIGHT;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!node) return;
+    const target = index * ITEM_HEIGHT;
+    if (!mounted.current) { node.scrollTop = target; mounted.current = true; return; }
+    if (Math.abs(node.scrollTop - target) > 2) node.scrollTo({ top: target, behavior: 'smooth' });
+  }, [index]);
 
   const onScroll = () => {
     const node = ref.current;
@@ -88,7 +95,9 @@ function Wheel({ values, selected, onSelect, format }: {
     settle.current = window.setTimeout(() => {
       const nearest = Math.round(node.scrollTop / ITEM_HEIGHT);
       const value = values[Math.max(0, Math.min(values.length - 1, nearest))];
-      if (value !== undefined && value !== selected) onSelect(value);
+      /* A click under the thumb for each value the wheel lands on, the way
+         an iOS picker ticks. */
+      if (value !== undefined && value !== selected) { tap(); onSelect(value); }
     }, 90);
   };
 
@@ -155,14 +164,41 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
     : String(whole);
   const confirm = () => onConfirm(kind === 'distance' ? String(Number(shown)) : shown);
 
+  /* THE WEIGHT DIAL IS AN INSTRUMENT, NOT A FORM. The number is the screen:
+     large, live, and readable at arm's length between sets. Under it, the
+     moves a lifter actually makes — a plate up, a plate down — as buttons,
+     the loads a bar is usually at as one tap, and the wheels for anything
+     else. Cancel and Done sit where iOS puts them, at the top of the sheet. */
+  const metric = unit === 'kg';
+  const step = kind === 'bodyweight' ? 1 : metric ? 2.5 : 5;
+  const maxLoad = kind === 'bodyweight' ? (metric ? 399 : 799) : (metric ? 497.5 : 995);
+  const setTotal = (next: number) => {
+    const clamped = Math.max(0, Math.min(maxLoad, Math.round(next / step) * step));
+    const hundreds = Math.floor(clamped / 100) * 100;
+    setWhole(hundreds);
+    setFraction(Math.round((clamped - hundreds) * 10) / 10);
+  };
+  const total = whole + fraction;
+  const nudges = kind === 'bodyweight' ? [-5, -1, 1, 5] : metric ? [-5, -2.5, 2.5, 5] : [-10, -5, 5, 10];
+  const presets = kind === 'weight' ? (metric ? [20, 40, 60, 80, 100, 120, 140] : [45, 95, 135, 185, 225, 275, 315]) : [];
+  const unitLabel = kind === 'clock' ? '' : kind === 'reps' ? (Number(shown) === 1 ? 'rep' : 'reps') : columns.find(column => column.suffix)?.suffix || unit || '';
+
   /* Same rule as every other backdrop in the app: a click that started inside
      the sheet is never a click on the backdrop, whatever unmounts along the
      way. See the note in TopSetSheet for what the stopPropagation version
      costs. */
   return <div className="dial-backdrop" role="dialog" aria-modal="true" aria-label={title}
     onClick={event => { if (event.target === event.currentTarget) onCancel(); }}>
-    <div className="dial-sheet">
-      <header><strong>{title}</strong><span className="dial-preview">{shown}{unit && kind !== 'clock' ? ` ${unit}` : ''}</span></header>
+    <div className={weightLike ? 'dial-sheet dial-pro weight-like' : 'dial-sheet dial-pro'}>
+      <span className="dial-grabber" aria-hidden="true" />
+      <header className="dial-head">
+        <button type="button" className="dial-cancel" onClick={onCancel}>Cancel</button>
+        <strong>{title}</strong>
+        <button type="button" className="dial-ok" onClick={() => { tap(); confirm(); }}>Done</button>
+      </header>
+      <div className="dial-readout dial-preview" aria-live="polite"><b key={shown}>{shown}</b>{unitLabel && <span>{unitLabel}</span>}</div>
+      {weightLike && <div className="dial-nudges">{nudges.map(amount =>
+        <button type="button" key={amount} onClick={() => { tap(); setTotal(total + amount); }} disabled={amount < 0 ? total <= 0 : total >= maxLoad}>{amount > 0 ? '+' : '−'}{Math.abs(amount)}</button>)}</div>}
       <div className="dial-columns">
         {/* The highlighted band is the selection, exactly as a picker reads. */}
         <div className="dial-band" aria-hidden="true" />
@@ -192,17 +228,17 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
               <span className="dial-suffix">{columns[0].suffix}</span>
             </>}
       </div>
-      <footer>
-        <button type="button" className="dial-cancel" onClick={onCancel}>Cancel</button>
-        <button type="button" className="dial-ok" onClick={confirm}>OK</button>
-      </footer>
+      {presets.length > 0 && <div className="dial-presets" aria-label="Common loads">{presets.map(load =>
+        <button type="button" key={load} className={total === load ? 'active' : ''} onClick={() => { tap(); setTotal(load); }}>{load}</button>)}</div>}
     </div>
   </div>;
 }
 
 /* The field a caller places in a form: it shows the value, opens the dial on
    tap, and never raises a keyboard. */
-export function DialField({ label, kind, unit, value, onChange, placeholder = '0', hint }: {
+/* An empty dial reads "Add", not 0: a grey zero in a field looks like a value
+   someone entered, and nobody weighs 0 lb. */
+export function DialField({ label, kind, unit, value, onChange, placeholder = 'Add', hint }: {
   label: string; kind: DialKind; unit?: string; value: string; onChange: (value: string) => void;
   placeholder?: string; hint?: string;
 }) {

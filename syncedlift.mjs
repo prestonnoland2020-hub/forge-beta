@@ -91,7 +91,7 @@ const liftAndRuns = { id: 'd1', date: iso, title: 'Morning Weight Training', mus
   }, [setup, goals, splitDays]);
   await p.goto('http://localhost:4191/#/workout', { waitUntil: 'domcontentloaded' });
   await p.waitForTimeout(2800);
-  const opened = await p.evaluate(() => { const el = [...document.querySelectorAll('button')].find(x => /Add a top set|Add top set|Log a top set/i.test(x.textContent)); if (!el) return false; el.click(); return true; });
+  const opened = await p.evaluate(() => { const el = [...document.querySelectorAll('button')].find(x => /Add a lift|Add a top set|Add a lift|Add top set|Log a top set/i.test(x.textContent)); if (!el) return false; el.click(); return true; });
   check('the log offers the top-set sheet', opened);
   await p.waitForTimeout(700);
   await p.fill('.top-set-sheet-search input', 'Bench');

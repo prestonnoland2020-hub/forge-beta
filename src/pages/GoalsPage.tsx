@@ -3,7 +3,6 @@ import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
-import { formatGoalTarget } from '../lib/time';
 import { competingRaces, goalFeasibility } from '../lib/goalFeasibility';
 import { enduranceTarget } from '../lib/qualitySession';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
@@ -20,7 +19,7 @@ import { MileageGate, MileageCheckOnGoal } from '../components/MileageGate';
    was buried behind a tap — rides on the face of the card. */
 
 const verdictLabel = (verdict: string, reason?: string) =>
-  verdict === 'reachable' ? 'On track' : verdict === 'needs-more' ? (reason === 'evidence' ? 'Too early' : 'Needs more') : 'Out of reach';
+  verdict === 'reachable' ? 'On track' : verdict === 'needs-more' ? (reason === 'evidence' ? 'Too early to tell' : 'Needs more time') : 'Out of reach';
 
 const typeLabel = (type: string) => (type === 'Strength' ? 'Strength' : type === 'Endurance' ? 'Endurance' : 'Body');
 
@@ -98,10 +97,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     <section className="card compact-goal-list">
       {syncError && <p className="data-sync-error">{syncError}</p>}
       <header>
-        <div>
-          <span className="eyebrow">Active goals</span>
-          <h2>{goals.length ? `${goals.length} ${goals.length === 1 ? 'goal' : 'goals'}` : 'No goals yet'}</h2>
-        </div>
+        <h2>{goals.length ? 'Your goals' : 'No goals yet'}</h2>
         {goals.length ? <button className="button secondary small-button" onClick={() => openBuilder()}>＋ New</button> : null}
       </header>
 
@@ -113,10 +109,11 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
             <button className="goal-card-face" onClick={() => toggleGoal(index)} aria-pressed={isOpen} aria-expanded={isOpen}>
               <span className="goal-card-meta">
                 <b className={`goal-type-tag ${goal.type.toLowerCase()}`}>{typeLabel(goal.type)}</b>
-                <small className="goal-card-due">{new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small>
+                <small className="goal-card-due">by {new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small>
               </span>
               <strong className="goal-card-title">{goal.title}</strong>
-              <span className="goal-card-target">{formatGoalTarget(goal.target, goal.metric, goal.unit)}<small>{goal.metric}</small></span>
+              {/* The title already says the target ("225 lb Bench"); the
+                  second copy of it, and "REAL 1RM" under that, went. */}
               {verdict && <span className={`goal-card-verdict ${verdict.verdict}`}><i aria-hidden="true" />{verdictLabel(verdict.verdict, verdict.reason)}</span>}
             </button>
             {/* EDIT AND DELETE BELONG TO THE GOAL YOU OPENED. A row of two

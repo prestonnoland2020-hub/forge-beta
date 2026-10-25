@@ -5,6 +5,7 @@ import type { LoggedTopSet, WorkoutRecord } from '../features/training/WorkoutHi
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { lastCompletedSet } from './LastPerformance';
 import { STRENGTH_MUSCLES } from './TopSetSheet';
+import { tap } from '../lib/haptics';
 
 type Props = {
   sets: LoggedTopSet[];
@@ -94,6 +95,9 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
   const [newExerciseName, setNewExerciseName] = useState('');
   const [newExerciseMuscles, setNewExerciseMuscles] = useState<string[]>([]);
   const [createError, setCreateError] = useState('');
+  /* The exercise picker is a "Swap" away, not a dropdown above every set:
+     the plan already chose the lift, and the dropdown only repeated its name. */
+  const [swapKey, setSwapKey] = useState<string | null>(null);
   const options = exercises.filter(exercise => exercise.enabled && exercise.kind === 'Strength');
   const availableMuscles = Array.from(new Set([...muscles.filter(muscle => STRENGTH_MUSCLES.includes(muscle)), ...STRENGTH_MUSCLES]));
   const inferMuscle = (exerciseName: string, fallback = '') => {
@@ -140,7 +144,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
   };
 
   return <section className="top-set-card-stack">
-    <header><div><span className="eyebrow">{planLabel || 'TOP SETS'}</span><h2>{sets.length} {sets.length === 1 ? 'top set' : 'top sets'}</h2><p>Tap a saved set to correct it. Anything you add is saved as completed.</p></div><div className="top-set-header-actions"><button type="button" className="button ghost" onClick={onAdd}>＋ Add top set</button></div></header>
+    <header><div><h2>Lifts</h2>{sets.length > 0 && <small className="top-set-progress">{sets.filter(set => set.lift && loggedKeys.includes(setKey(set))).length} of {sets.length} done</small>}</div></header>
     {creatingExercise && <section className="inline-log-exercise" aria-label="Add an exercise to your library">
       <header><div><span className="eyebrow">NEW STRENGTH EXERCISE</span><h3>Add it once. Log it now.</h3><p>The muscle mapping keeps future split recommendations accurate.</p></div><button type="button" className="text-button" onClick={() => setCreatingExercise(false)}>Cancel</button></header>
       <label>Exercise name<input autoFocus value={newExerciseName} onChange={event => { setNewExerciseName(event.target.value); setCreateError(''); }} placeholder="e.g. Dumbbell incline press" /></label>
@@ -189,12 +193,15 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
             onTouchStart={event => beginSwipe(key, event.touches[0])}
             onTouchMove={event => moveSwipe(key, event.touches[0])}
             onTouchEnd={endSwipe}>
-            <button type="button" className="top-set-row" aria-expanded="false" onClick={() => (offset ? closeSwipe() : toggle(set, index))}>
-              <span className="top-set-row-name">{set.lift}</span>
+            {/* A CHECKLIST LINE. A circle that fills when the set is saved, the
+                lift, and either the result or one clear action — the day reads
+                as how much is left, at a glance. */}
+            <button type="button" className="top-set-row" aria-expanded="false" onClick={() => { if (offset) { closeSwipe(); return; } tap(); toggle(set, index); }}>
+              <span className={logged ? 'top-set-check done' : 'top-set-check'} aria-hidden="true">{logged && <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17l9-10" /></svg>}</span>
+              <span className="top-set-row-name">{set.lift}{!logged && askText && <small>Today {askText}</small>}</span>
               {logged
-                ? <span className="top-set-row-figures">{set.weight} {unit} ×{set.reps}{max ? <small>max {max} {unit}</small> : null}</span>
-                : <span className="top-set-row-figures pending">{set.weight > 0 ? `${set.weight} ${unit} ×${set.reps}` : 'Not logged'}<small>{askText ? `asks ${askText} · tap to log` : 'tap to log'}</small></span>}
-              <b aria-hidden="true">{logged ? '⌄' : '›'}</b>
+                ? <span className="top-set-row-figures">{set.weight} {unit} × {set.reps}</span>
+                : <span className="top-set-row-log">Log</span>}
             </button>
           </div>
         </article>;
@@ -202,20 +209,23 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
 
       return <article className={`card top-set-entry ${logged ? 'logged' : ''}`} key={set.id || `set-${index}`}>
         <div className="top-set-entry-head">
-          {logged
-            ? <button type="button" className="top-set-entry-toggle" aria-expanded="true" onClick={() => toggle(set, index)}><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></button>
-            : <div><span className="eyebrow">TOP SET {index + 1}</span><h3>{displayedSet.lift || 'Select an exercise'}</h3></div>}
-          {logged && !isCorrecting ? <div className="logged-top-set-actions"><strong className="logged-badge">Saved ✓</strong><button type="button" className="text-button" onClick={() => startCorrection(set, index)}>Edit</button><button type="button" className="text-button danger" onClick={() => onDeleteLogged(index, set)}>Delete</button></div> : <button type="button" className="text-button" onClick={isCorrecting ? cancelCorrection : () => onRemove(index)}>{isCorrecting ? 'Cancel' : 'Remove'}</button>}
+          <button type="button" className="top-set-entry-toggle" aria-expanded="true" onClick={() => { if (isCorrecting) { cancelCorrection(); return; } tap(); toggle(set, index); }}><h3>{displayedSet.lift || 'Choose a lift'}</h3></button>
+          {logged && !isCorrecting ? <div className="logged-top-set-actions"><button type="button" className="text-button" onClick={() => startCorrection(set, index)}>Edit</button><button type="button" className="text-button danger" onClick={() => onDeleteLogged(index, set)}>Delete</button></div> : isCorrecting ? <button type="button" className="text-button" onClick={cancelCorrection}>Cancel</button> : null}
         </div>
-        {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} ×{set.reps}</strong><small>Calculated max {max ?? '—'} {unit}</small></div> : <>
-          <label className="top-set-exercise-field">Exercise<select value={displayedSet.lift} onChange={event => { if (event.target.value === '__new__') { setCreatingExercise(true); setCreateError(''); return; } chooseExercise(event.target.value); }}><option value="">Choose exercise</option>{options.map(exercise => <option key={exercise.id}>{exercise.name}</option>)}<option value="__new__">＋ Add a new exercise…</option></select></label>
-          {displayedSet.lift && <div className="inline-last-set"><span>LAST COMPLETED</span>{previous ? <><strong>{previous.weight} {unit} ×{previous.reps}</strong><small>Calculated max {calculateEstimatedOneRepMax(previous.weight, previous.reps) ?? previous.weight} {unit} · {new Date(`${previous.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small></> : <small>No earlier completed top set—this result establishes the baseline.</small>}</div>}
-          {askText && <div className="inline-last-set plan-ask"><span>PLAN ASKS</span><strong>{askText}</strong><small>Log what you actually lifted.</small></div>}
+        {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} × {set.reps}</strong>{max ? <small>About {max} {unit} for one rep</small> : null}</div> : <>
+          {(!displayedSet.lift || swapKey === rowKey(set, index)) && <label className="top-set-exercise-field">Lift<select value={displayedSet.lift} onChange={event => { if (event.target.value === '__new__') { setCreatingExercise(true); setCreateError(''); return; } chooseExercise(event.target.value); }}><option value="">Choose exercise</option>{options.map(exercise => <option key={exercise.id}>{exercise.name}</option>)}<option value="__new__">＋ Add a new exercise…</option></select></label>}
+          {/* ONE LINE OF CONTEXT, not two labelled boxes: what the plan asks
+              for today, else what you did last time, else that this is the
+              first one. */}
+          {displayedSet.lift && <p className="top-set-hint">{askText
+            ? <>Today: <strong>{askText}</strong>{previous ? <> · last time {previous.weight} × {previous.reps}</> : null}. Log what you actually lifted.</>
+            : previous
+              ? <>Last time: <strong>{previous.weight} {unit} × {previous.reps}</strong> · {new Date(`${previous.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
+              : <>First time — pick a weight you can lift with good form for your heaviest set.</>}</p>}
           <div className="field-grid dial-grid">
             <DialField label="Weight" kind="weight" unit={unit} value={displayedSet.weight ? String(displayedSet.weight) : ''} onChange={next => changeDisplayedSet({ weight: Number(next) })} />
             <DialField label="Reps" kind="reps" value={displayedSet.reps ? String(displayedSet.reps) : ''} onChange={next => changeDisplayedSet({ reps: Number(next) })} />
           </div>
-          {max && <div className="top-set-card-result"><span>CALCULATED MAX</span><strong>{max} {unit}</strong></div>}
           {/* A FOOTER IS FOR WHAT THE ATHLETE NEEDS TO KNOW BEFORE TAPPING SAVE.
               "This exercise supplies its muscle mapping automatically" is how
               the record gets built, and it sat under every open card for
@@ -223,9 +233,11 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
               thing in the row. A correction genuinely needs its warning, and a
               blocked save genuinely needs its reason. Otherwise the footer is
               just the button. */}
-          <footer className={isCorrecting || blockedReason ? undefined : 'bare'}><span>{isCorrecting ? 'This replaces the completed result everywhere it is used.' : blockedReason}</span><button type="button" className="button" disabled={!displayedSet.lift || !displayedSet.weight || !displayedSet.reps || Boolean(blockedReason && !isCorrecting)} onClick={isCorrecting ? saveCorrection : () => onQuickLog(set)}>{isCorrecting ? 'Save correction' : 'Save top set'}</button></footer>
+          <footer className={isCorrecting || blockedReason ? undefined : 'bare'}><span>{isCorrecting ? 'This replaces the completed result everywhere it is used.' : blockedReason}</span><button type="button" className="button top-set-save" disabled={!displayedSet.lift || !displayedSet.weight || !displayedSet.reps || Boolean(blockedReason && !isCorrecting)} onClick={() => { tap(); if (isCorrecting) { saveCorrection(); return; } onQuickLog(set); /* Saved, it folds back to its checklist line so the next lift is the next thing on screen. */ const key = rowKey(set, index); setOpenKeys(current => current.filter(item => item !== key)); setClosedKeys(current => [...current.filter(item => item !== key), key]); }}>{isCorrecting ? 'Save correction' : 'Save set'}</button></footer>
+          {!isCorrecting && !logged && <div className="top-set-minor">{displayedSet.lift && <button type="button" className="text-button" onClick={() => setSwapKey(key => key === rowKey(set, index) ? null : rowKey(set, index))}>{swapKey === rowKey(set, index) ? 'Keep this lift' : 'Swap lift'}</button>}<button type="button" className="text-button danger" onClick={() => onRemove(index)}>Remove</button></div>}
         </>}
       </article>;
     })}
+    <button type="button" className="top-set-add" onClick={() => { tap(); onAdd(); }}>＋ Add a lift</button>
   </section>;
 }

@@ -1,0 +1,182 @@
+/* SCREEN-LEVEL FIXES FROM A WALK THROUGH EVERY TAB.
+
+   Each rule here answers something that looked broken or shouted on a phone.
+   They are deliberately narrow — one screen, one element — so none of them
+   reaches anything that was not seen to be wrong. */
+
+/* Progress, empty: the button's label sat at the top of a 56px pill, because
+   the card lays its children out as a block and the anchor inherited none of
+   the button's centring. */
+.ic-blank .button { display: inline-flex; align-items: center; justify-content: center; }
+
+@media (max-width: 900px) {
+  /* The floating coach button sat on the last row of every list — Profile's
+     Settings chevron, the end of the week on Plan. The page now ends below it. */
+  .app-main .page:not(:has(.workout-editor)) { padding-bottom: calc(var(--tab-clear, 96px) + 92px); }
+
+  /* Profile: the name was set in 48px capitals beside a 72px avatar, with the
+     edit button under it — a poster, on a settings screen. */
+  .simple-profile-head h2 { font-size: 26px; line-height: 1.1; text-transform: none; letter-spacing: -.01em; margin: 0 0 4px; }
+  .simple-profile-head .avatar.xlarge { width: 60px; height: 60px; font-size: 22px; }
+
+  /* Section titles inside cards read as headings, not shouted labels. */
+  .session-details h3, .cardio-log h3, .top-set-card-stack > header h2, .compact-goal-list > header h2 {
+    text-transform: none; letter-spacing: -.01em; font-size: 20px;
+  }
+  .compact-goal-list > header { align-items: center; }
+
+  /* Empty states: one short line under a plain heading, and room to breathe. */
+  .history-first-empty strong, .coach-empty strong { font-size: 18px; }
+  .history-first-empty span, .coach-empty p { color: var(--ink-3, var(--muted)); }
+  .coach-empty { padding-block: 28px; }
+
+  /* The coach's footnote was three sentences of small print under the input. */
+  .coach-boundary { text-align: center; opacity: .8; }
+
+  /* Cards answer a press the way buttons do. */
+  .simple-settings-list > a, .simple-settings-list > button, .goal-card-face, .today-workout-items label, .feed-card .button {
+    transition: transform .14s ease, background-color .14s ease;
+  }
+  .simple-settings-list > a:active, .simple-settings-list > button:active, .goal-card-face:active { transform: scale(.985); }
+}
+
+/* ── LOG WORKOUT, AS A CHECKLIST ─────────────────────────────────────────
+   The day reads top to bottom as what is left: the day's name, its lifts as
+   rows with a circle that fills when the set is saved, an optional fold for
+   notes and body weight, and one Finish bar that counts what is done. */
+.workout-source-card .workout-date { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.workout-source-card .workout-date > div { display: grid; gap: 2px; min-width: 0; }
+.workout-source-card .workout-date strong { font-size: 24px; line-height: 1.15; text-transform: none; letter-spacing: -.015em; }
+.workout-source-card .workout-date .eyebrow { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--ink-3, var(--muted)); }
+.workout-change { font-weight: 800; font-size: 15px; color: var(--accent-text, var(--accent)); background: none; border: 0; padding: 8px 4px; }
+.workout-source-card .source-options { margin-top: 14px; }
+.workout-source-card .source-options button b { text-transform: none; letter-spacing: 0; font-size: 15px; }
+
+.top-set-card-stack > header > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
+.top-set-progress { font-size: 14px; font-weight: 700; color: var(--ink-3, var(--muted)); font-variant-numeric: tabular-nums; }
+
+.top-set-entry.closed .top-set-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  min-height: 64px; padding: 12px 16px; text-align: left;
+}
+.top-set-check {
+  width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center;
+  border: 2px solid var(--hairline-strong, var(--line)); color: var(--accent-contrast, #fff);
+  transition: background-color .2s ease, border-color .2s ease, transform .25s cubic-bezier(.3, 1.4, .5, 1);
+}
+.top-set-check.done { background: var(--accent); border-color: var(--accent); transform: scale(1.04); }
+.top-set-row-name { display: grid; gap: 2px; font-size: 17px; font-weight: 800; min-width: 0; }
+.top-set-row-name small { font-size: 13px; font-weight: 600; color: var(--ink-3, var(--muted)); }
+.top-set-entry.closed .top-set-row-figures { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.top-set-row-log {
+  padding: 8px 16px; border-radius: 999px; font-size: 15px; font-weight: 800;
+  background: var(--accent); color: var(--accent-contrast, #fff);
+}
+.top-set-entry.logged.closed .top-set-row-name { color: var(--ink-2, var(--text)); }
+
+.top-set-entry:not(.closed) .top-set-entry-head h3 { font-size: 22px; text-transform: none; letter-spacing: -.01em; margin: 0; }
+.top-set-entry-toggle { background: none; border: 0; padding: 0; text-align: left; color: inherit; }
+.top-set-hint { margin: 2px 0 4px; font-size: 15px; line-height: 1.45; color: var(--ink-3, var(--muted)); }
+.top-set-hint strong { color: var(--ink, var(--text)); }
+.top-set-save { width: 100%; min-height: 54px; border-radius: 14px; font-size: 17px; }
+.top-set-entry footer.bare { padding: 0; border: 0; }
+.top-set-minor { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.top-set-minor .text-button { font-size: 14px; font-weight: 700; padding: 8px 2px; }
+.top-set-add {
+  width: 100%; min-height: 54px; border-radius: 16px; font-size: 16px; font-weight: 800;
+  border: 1.5px dashed var(--hairline-strong, var(--line)); background: transparent; color: var(--ink-2, var(--text));
+}
+.top-set-add:active, .top-set-row-log:active { transform: scale(.97); }
+
+details.session-details > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; cursor: pointer; min-height: 32px; }
+details.session-details > summary::-webkit-details-marker { display: none; }
+details.session-details > summary span { display: grid; gap: 2px; }
+details.session-details > summary strong { font-size: 17px; }
+details.session-details > summary small { font-size: 13px; color: var(--ink-3, var(--muted)); font-weight: 600; }
+details.session-details > summary::after { content: '›'; font-size: 22px; color: var(--ink-3, var(--muted)); transition: transform .2s ease; }
+details.session-details[open] > summary::after { transform: rotate(90deg); }
+details.session-details[open] > summary { margin-bottom: 14px; }
+
+.workout-finish-bar {
+  position: sticky; bottom: 0; z-index: 6; display: grid; gap: 10px;
+  margin: 0 calc(-1 * var(--gutter, 16px)); padding: 18px var(--gutter, 16px) calc(12px + var(--safe-b, env(safe-area-inset-bottom)));
+  background: linear-gradient(to bottom, transparent, var(--bg) 24px);
+}
+.workout-finish-bar .save-workout {
+  position: static !important; width: 100% !important; box-shadow: none !important;
+  min-height: 58px; border-radius: 16px; display: flex; flex-direction: column; gap: 0; font-size: 17px;
+}
+.workout-finish-bar .save-workout small { font-size: 12.5px; font-weight: 700; opacity: .82; }
+
+/* Smaller things seen on the phone: the day card's old divider under its
+   title, the gap under an open lift's name, and the saved flash as a quiet
+   confirmation rather than an instruction. */
+.workout-source-card .workout-date { border-bottom: 0 !important; padding-bottom: 0 !important; margin-bottom: 0 !important; }
+.top-set-entry:not(.closed) .top-set-entry-head { min-height: 0; margin-bottom: 0; padding-bottom: 0; align-items: center; }
+.top-set-entry:not(.closed) { display: grid; gap: 12px; }
+.quick-log-flash { text-align: center; }
+.quick-log-flash small { display: inline-block; padding: 8px 14px; border-radius: 999px; font-weight: 700; color: var(--accent-text, var(--accent)); background: color-mix(in srgb, var(--accent) 12%, transparent); animation: screen-fade .3s ease-out; }
+
+/* ── THE DIAL, AS AN INSTRUMENT ──────────────────────────────────────────
+   An iOS picker sheet: a grabber, Cancel and Done in the header, the number
+   itself large enough to read at arm's length, plate-sized nudges for the
+   change a lifter actually makes between sets, wheels that fade toward their
+   edges around a lens, and the loads a bar usually sits at as one tap. */
+.dial-sheet.dial-pro {
+  padding: 8px 18px calc(18px + var(--safe-b, env(safe-area-inset-bottom)));
+  border: 0; border-radius: 28px 28px 0 0; gap: 14px;
+  background: var(--surface-1, var(--card));
+  box-shadow: 0 -20px 60px -10px rgb(0 0 0 / .35);
+  animation: dial-sheet-up .38s cubic-bezier(.2, .9, .25, 1);
+}
+@keyframes dial-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+.dial-grabber { display: block; width: 38px; height: 5px; margin: 0 auto 2px; border-radius: 3px; background: var(--hairline-strong, var(--line)); }
+.dial-pro .dial-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.dial-pro .dial-head strong { font: 700 16px var(--body, inherit); letter-spacing: 0; text-transform: none; color: var(--ink, var(--text)); }
+.dial-pro .dial-cancel, .dial-pro .dial-ok {
+  border: 0; background: none; padding: 10px 2px; border-radius: 8px; font-size: 17px;
+}
+.dial-pro .dial-cancel { justify-self: start; color: var(--ink-3, var(--muted)); font-weight: 600; }
+.dial-pro .dial-ok { justify-self: end; color: var(--accent-text, var(--accent)); font-weight: 800; }
+.dial-pro .dial-cancel:active, .dial-pro .dial-ok:active { opacity: .55; }
+
+.dial-pro .dial-readout { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 6px 0 2px; }
+.dial-pro .dial-readout b {
+  font: 800 64px/1 var(--display-font, var(--display)); letter-spacing: -.03em;
+  color: var(--ink, var(--text)); font-variant-numeric: tabular-nums;
+  animation: dial-tick .18s ease-out;
+}
+.dial-pro .dial-readout span { font-size: 20px; font-weight: 800; color: var(--ink-3, var(--muted)); }
+@keyframes dial-tick { from { transform: translateY(4px) scale(.97); opacity: .6; } to { transform: none; opacity: 1; } }
+
+.dial-nudges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.dial-nudges button {
+  min-height: 46px; border-radius: 14px; border: 0;
+  background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent);
+  color: var(--ink, var(--text)); font: 800 17px var(--display-font, inherit); font-variant-numeric: tabular-nums;
+  transition: transform .12s ease, background-color .12s ease;
+}
+.dial-nudges button:active { transform: scale(.94); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.dial-nudges button:disabled { opacity: .35; }
+
+.dial-pro .dial-columns { height: 200px; }
+.dial-pro .dial-wheel {
+  height: 200px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
+}
+.dial-pro .dial-pad { height: 78px; }
+.dial-pro .dial-band { border: 0; border-radius: 12px; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); }
+.dial-pro .dial-value { font-size: 22px; opacity: .45; }
+.dial-pro .dial-value.active { font-size: 24px; opacity: 1; transform: none; }
+.dial-pro .dial-plus { color: var(--ink-3, var(--muted)); font-weight: 800; }
+
+.dial-presets { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -18px; padding: 2px 18px; }
+.dial-presets::-webkit-scrollbar { display: none; }
+.dial-presets button {
+  flex: none; min-height: 40px; padding: 8px 16px; border-radius: 999px;
+  border: 1.5px solid var(--hairline-strong, var(--line)); background: transparent;
+  color: var(--ink-2, var(--text)); font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums;
+}
+.dial-presets button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast, #fff); }
+@media (prefers-reduced-motion: reduce) { .dial-sheet.dial-pro, .dial-pro .dial-readout b { animation: none; } }

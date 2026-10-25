@@ -99,7 +99,7 @@ export async function setDistanceDial(page, label, whole, hundredths) {
 export async function logTopSet(page, lift, weight, reps) {
   await page.evaluate(() => {
     const open = [...document.querySelectorAll('button')]
-      .find(el => /Add a top set|Add top set|Log a top set/i.test(el.textContent || ''));
+      .find(el => /Add a lift|Add a top set|Add a lift|Add top set|Log a top set/i.test(el.textContent || ''));
     open?.click();
   });
   await page.waitForTimeout(700);

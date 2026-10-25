@@ -24,11 +24,13 @@ let pass = 0, fail = 0;
 const check = (n, ok, d = '') => { if (ok) { pass++; console.log(`PASS  ${n}`); } else { fail++; console.log(`FAIL  ${n} ${d}`); } };
 const options = () => p.evaluate(() => [...document.querySelectorAll('.source-options button')].map(x => x.innerText.replace(/\n/g, ' ')));
 
+/* The three ways in sit behind a Change link now; today's plan is the default. */
+await p.evaluate(() => document.querySelector('.workout-change')?.click()); await p.waitForTimeout(400);
 const opts = await options();
 check('exactly three ways to start a day', opts.length === 3, JSON.stringify(opts));
-check('Forge recommended is first', /FORGE/.test(opts[0] || '') && /Recommended/i.test(opts[0] || ''), opts[0]);
-check('choose from your split is second', /SPLIT/.test(opts[1] || '') && /Choose day/i.test(opts[1] || ''), opts[1]);
-check('start fresh is third', /FRESH/.test(opts[2] || '') && /Start fresh/i.test(opts[2] || ''), opts[2]);
+check("today's plan is first", /Today/i.test(opts[0] || ''), opts[0]);
+check('pick a day from your split is second', /Pick a day/i.test(opts[1] || ''), opts[1]);
+check('a blank day is third', /Blank/i.test(opts[2] || ''), opts[2]);
 check('Repeat is gone', !opts.some(o => /repeat|reuse/i.test(o)), JSON.stringify(opts));
 
 const click = i => p.evaluate(n => document.querySelectorAll('.source-options button')[n].click(), i);

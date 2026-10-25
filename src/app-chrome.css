@@ -1,0 +1,147 @@
+/* THE APP'S CHROME, IN ONE PLACE.
+
+   The bottom bar had sixty-four rules across ten files, each correcting the
+   last, and a script moving it every frame on top of that. It is now
+   `.tab-bar` — a new name, so none of those rules reach it — and everything
+   about it, the header, the screen transitions and the coach sheet lives
+   here. Loaded last, so it is the last word.
+
+   The model is a native iOS app: a floating tab bar that stays put, with a
+   highlight that slides to the tab you chose; a large plain title; screens
+   that push in from the right when you go deeper and slide back when you
+   return; and a coach that rises as a sheet over a dimmed screen. */
+
+.tab-bar { display: none; }
+
+@media (max-width: 900px) {
+  :root {
+    --tab-h: 64px;
+    --tab-gap: 10px;
+    --tab-clear: calc(var(--tab-h) + var(--tab-gap) + var(--safe-b, env(safe-area-inset-bottom)));
+    --chrome-clear: calc(var(--tab-clear) + 28px);
+    --spring: cubic-bezier(.32, 1.25, .5, 1);
+    --glide: cubic-bezier(.2, .8, .2, 1);
+  }
+
+  /* ── Tab bar ─────────────────────────────────────────────────────────── */
+  .tab-bar {
+    position: fixed; z-index: 30;
+    left: 14px; right: 14px;
+    bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) - 6px);
+    height: var(--tab-h);
+    padding: 6px;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--ink, var(--text)) 8%, transparent);
+    background: color-mix(in srgb, var(--surface-1, var(--panel)) 80%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(22px);
+    backdrop-filter: saturate(180%) blur(22px);
+    box-shadow: 0 12px 32px -8px rgb(0 0 0 / .22), 0 2px 6px rgb(0 0 0 / .06);
+    transition: transform .34s var(--glide), opacity .22s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Out of the way while typing and during a workout — the way an iOS tab bar
+     slides down under a keyboard or a full-screen task. */
+  html.keyboard-open .tab-bar, .tab-bar.away {
+    transform: translateY(calc(100% + 40px)); opacity: 0; pointer-events: none;
+  }
+  .tab-indicator {
+    position: absolute; top: 6px; bottom: 6px; left: 6px;
+    width: calc((100% - 12px) / 5);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    transform: translateX(calc(var(--tab-index, 0) * 100%));
+    transition: transform .42s var(--spring);
+  }
+  .tab-bar .tab {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-width: 0; border-radius: 999px;
+    color: var(--ink-3, var(--muted)); text-decoration: none;
+    -webkit-user-select: none; user-select: none; touch-action: manipulation;
+    transition: color .2s ease;
+  }
+  .tab-bar .tab .nav-icon { width: 26px; height: 26px; display: grid; place-items: center; border: 0; background: none; }
+  .tab-bar .tab .nav-icon svg { width: 23px; height: 23px; transition: transform .28s var(--spring); }
+  .tab-bar .tab small {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  }
+  .tab-bar .tab.active { color: var(--accent-text, var(--accent)); }
+  .tab-bar .tab.active .nav-icon svg { stroke-width: 2.3; }
+  .tab-bar .tab:active .nav-icon svg { transform: scale(.86); }
+
+  /* The page clears the bar — and only the safe area when the bar is away. */
+  .app-main .page { padding-bottom: calc(var(--tab-clear) + 28px); }
+  .app-frame:has(.tab-bar.away) .app-main .page { padding-bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 28px); }
+  .app-frame:has(.tab-bar.away) .save-workout { bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 10px) !important; }
+
+  /* ── Header: a large plain title ─────────────────────────────────────── */
+  .topbar { height: calc(62px + env(safe-area-inset-top)); border-bottom-color: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); }
+  .topbar h1 { font-size: 28px; line-height: 1.1; text-transform: none; letter-spacing: -.02em; font-weight: 800; }
+  .top-actions .top-insights, .top-actions .top-log { width: 40px; height: 40px; }
+  .top-actions a, .top-back { transition: transform .14s ease, background-color .14s ease; }
+  .top-actions a:active { transform: scale(.9); }
+
+  /* ── Floating coach button ───────────────────────────────────────────── */
+  .coach-bubble-shell {
+    left: auto; right: 16px;
+    bottom: calc(var(--tab-clear) + 14px);
+    transition: transform .3s var(--glide), opacity .2s ease;
+  }
+  html.keyboard-open .coach-bubble-shell:not(.expanded) { transform: translateY(24px); opacity: 0; pointer-events: none; }
+  .coach-bubble-toggle {
+    width: 54px; min-width: 54px; height: 54px; padding: 0; border-radius: 999px; justify-content: center;
+    box-shadow: 0 10px 26px -6px color-mix(in srgb, var(--accent) 55%, transparent), 0 2px 6px rgb(0 0 0 / .12);
+    transition: transform .16s var(--spring);
+  }
+  .coach-bubble-toggle:active { transform: scale(.9); }
+  .coach-bubble-toggle span { width: auto; height: auto; background: none; color: inherit; display: grid; place-items: center; font-size: 26px; }
+  .coach-bubble-toggle b { display: none; }
+
+  /* ── The coach as a sheet ────────────────────────────────────────────── */
+  .coach-bubble-shell:has(.coach-bubble-panel.open) { z-index: 42; }
+  .coach-bubble-shell:not(.expanded) .coach-bubble-panel {
+    position: fixed; inset: auto 0 0 0; width: auto;
+    max-height: 88dvh; border: 0; border-radius: 26px 26px 0 0;
+    padding-bottom: var(--safe-b, env(safe-area-inset-bottom));
+    opacity: 1; visibility: hidden; transform: translateY(104%);
+    box-shadow: 0 -18px 50px -12px rgb(0 0 0 / .3);
+    transition: transform .44s var(--glide), visibility 0s linear .44s;
+  }
+  .coach-bubble-shell:not(.expanded) .coach-bubble-panel.open {
+    visibility: visible; transform: none;
+    transition: transform .44s var(--glide), visibility 0s;
+  }
+  .coach-bubble-panel > header { position: relative; height: 66px; padding-top: 12px; border-bottom: 0; background: transparent; }
+  .coach-bubble-shell:not(.expanded) .coach-bubble-panel > header::before {
+    content: ''; position: absolute; top: 8px; left: 50%; width: 38px; height: 5px; margin-left: -19px;
+    border-radius: 3px; background: var(--hairline-strong, var(--line));
+  }
+  .coach-bubble-panel > header span { display: none; }
+  .coach-bubble-panel > header strong { font-size: 20px; text-transform: none; letter-spacing: -.01em; }
+  .coach-bubble-panel > header button { border: 0; border-radius: 999px; width: 38px; height: 38px; font-size: 18px; background: color-mix(in srgb, var(--ink, var(--text)) 8%, transparent); }
+  .coach-bubble-backdrop { display: block; z-index: 40; animation: scrim-in .3s ease; }
+}
+
+@media (min-width: 901px) {
+  .coach-bubble-backdrop:not(.expanded) { display: none; }
+}
+
+/* ── Screen transitions ────────────────────────────────────────────────── */
+/* Short and eased out, so a tap never waits on them; no fill-mode, so the
+   transform is gone the moment the animation ends and nothing fixed inside
+   the page is left positioned against it. */
+.screen-push { animation: screen-push .34s cubic-bezier(.2, .8, .2, 1); }
+.screen-pop { animation: screen-pop .34s cubic-bezier(.2, .8, .2, 1); }
+.screen-fade { animation: screen-fade .24s ease-out; }
+@keyframes screen-push { from { opacity: .35; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes screen-pop { from { opacity: .35; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+@keyframes screen-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-push, .screen-pop, .screen-fade, .coach-bubble-backdrop { animation: none; }
+  .tab-bar, .tab-indicator, .coach-bubble-panel, .coach-bubble-shell { transition: none !important; }
+}
+@media print { .tab-bar { display: none !important; } }

@@ -48,6 +48,6 @@ export function HistoryPage({embedded=false}:{embedded?:boolean}={}){
                 cursor into the split — useful in a bug report, meaningless on a
                 Tuesday. */}
             {selected.recommendationId&&<small className="recommendation-lineage">Forge planned this day</small>}<div className="simple-preview-results">{recordTopSets(selected).map((set,index)=><div key={`${set.lift}-${index}`}><strong>{set.lift}</strong><span>{set.weight} {weightUnit} ×{set.reps}</span></div>)}{recordTopSets(selected).length===0&&strengthMuscles(selected).length>0&&<div><strong>Strength workout</strong><span>{strengthMuscles(selected).join(' · ')} · no historical top set recorded</span></div>}{(selected.cardioSessions||[]).map(session=><div key={session.id}><strong>{session.activity}</strong><span>{formatCardioSummary(session)}</span></div>)}</div>{selected.notes&&<aside className="selected-day-notes"><span className="eyebrow">NOTES</span><p>{selected.notes}</p></aside>}</>:<p>No training is logged for this date.</p>}</section>
-    </>:<section className="card history-first-empty"><strong>Your history starts with your first completed workout.</strong><span>Nothing is prefilled or estimated here—only saved results appear.</span><Link className="button" to="/workout?source=blank">Log a workout →</Link></section>}
+    </>:<section className="card history-first-empty"><strong>No workouts yet</strong><span>Every workout you finish shows up here.</span><Link className="button" to="/workout?source=blank">Log a workout →</Link></section>}
   </div>;
 }
