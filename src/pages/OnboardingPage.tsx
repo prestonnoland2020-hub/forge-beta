@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
@@ -11,6 +11,7 @@ import { isProgrammableStrength, useTrainingLibrary, type LibraryExercise } from
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { coreFirst, coreOnly, CORE_LIFTS, CORE_LIFT_LABELS, isWeightedBodyweight } from '../lib/coreLifts';
 import { normalizeGoalValue } from '../lib/goalInput';
+import { success, tap, warning } from '../lib/haptics';
 import { createNote, extractArea, saveNote } from '../features/training/athleteNotesService';
 
 /* ONE QUESTION A SCREEN. Setup was three dense screens — a form of six
@@ -46,12 +47,16 @@ const guessUnits = (): AthleteSetup['units'] => {
   try { return /-(US|LR|MM)$/i.test(navigator.language || '') ? 'Imperial' : 'Metric'; } catch { return 'Imperial'; }
 };
 
-const focusCards: Array<{ id: AthleteSetup['primaryFocus']; label: string; copy: string }> = [
-  { id: 'Strength', label: 'Get stronger', copy: 'Lift more on the big lifts' },
-  { id: 'Endurance', label: 'Run faster', copy: 'Train for a race or a time' },
-  { id: 'Hybrid', label: 'Both', copy: 'Strength and running together' },
-  { id: 'Body composition', label: 'Change my weight', copy: 'Lose or gain, steadily' },
+/* Line icons drawn on a 24-unit grid in currentColor, so a selected card
+   recolours its icon with the rest of it. */
+const icon = (path: string) => <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
+const focusCards: Array<{ id: AthleteSetup['primaryFocus']; label: string; copy: string; icon: ReactElement }> = [
+  { id: 'Strength', label: 'Get stronger', copy: 'Lift more on the big lifts', icon: icon('M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12') },
+  { id: 'Endurance', label: 'Run faster', copy: 'Train for a race or a time', icon: icon('M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M10 2h4') },
+  { id: 'Hybrid', label: 'Both', copy: 'Strength and running together', icon: icon('M13 2 4 14h7l-1 8 9-12h-7l1-8z') },
+  { id: 'Body composition', label: 'Change my weight', copy: 'Lose or gain, steadily', icon: icon('M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM8.5 11a3.5 3.5 0 0 1 7 0M12 11l1.6-2.2') },
 ];
+const check = <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5 10 17l9-10" /></svg>;
 
 /* The races a first goal is almost always one of. The distance decides the
    clock: anything a recreational runner finishes inside an hour is mm:ss. */
@@ -200,10 +205,19 @@ function OnboardingForm() {
   ], [askGoal, weightGoal, runningPlanned]);
   const [stepId, setStepId] = useState<StepId>(needsExercises ? 'week' : needsGoal && askGoal ? (weightGoal ? 'target' : 'goal') : 'name');
   const stepIndex = Math.max(0, steps.indexOf(stepId));
-  const go = (offset: number) => { setError(''); setStepId(steps[Math.min(steps.length - 1, Math.max(0, stepIndex + offset))]); window.scrollTo(0, 0); };
+  /* Forward slides in from the right, Back from the left — the direction a
+     navigation stack moves, so the screen goes where the finger expects. */
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward');
+  const go = (offset: number) => { setError(''); setDirection(offset < 0 ? 'back' : 'forward'); setStepId(steps[Math.min(steps.length - 1, Math.max(0, stepIndex + offset))]); window.scrollTo(0, 0); };
   /* A tap answers and moves on — with a beat in between, so the athlete sees
-     which card they pressed before it slides away. */
-  const tapThen = (apply: () => void) => { apply(); window.setTimeout(() => go(1), 160); };
+     the check land on what they pressed before it slides away. */
+  const [advancing, setAdvancing] = useState(false);
+  const tapThen = (apply: () => void) => {
+    if (advancing) return;
+    tap(); apply(); setAdvancing(true);
+    window.setTimeout(() => { setAdvancing(false); go(1); }, 240);
+  };
+  const fail = (message: string) => { warning(); setError(message); };
 
   const pendingGoalLift = goalKind === 'lift' && goalExercise ? [goalExercise] : [];
   const goalLiftKeys = new Set([...goals.map(goal => goal.exercise ? String(goal.exercise) : ''), ...pendingGoalLift].filter(Boolean).map(canonicalLiftKey));
@@ -247,24 +261,24 @@ function OnboardingForm() {
   const [pendingGoal, setPendingGoal] = useState<CreatedGoal | null>(null);
 
   const submitName = () => {
-    if (!data.displayName.trim()) return setError('Enter your name.');
+    if (!data.displayName.trim()) return fail('Enter your name.');
     go(1);
   };
   const submitTarget = () => {
-    if (goalKind !== 'weight' && !goalExercise) return setError('Pick a goal first.');
-    if (goalExercise === 'HYROX' && !division) return setError('Pick your HYROX division.');
-    if (!goalTarget.trim()) return setError('Enter your target to continue.');
+    if (goalKind !== 'weight' && !goalExercise) return fail('Pick a goal first.');
+    if (goalExercise === 'HYROX' && !division) return fail('Pick your HYROX division.');
+    if (!goalTarget.trim()) return fail('Enter your target to continue.');
     const target = normalizeGoalValue(goalTarget, goalUnit, goalMetric);
-    if (!target.ok) return setError(target.message);
+    if (!target.ok) return fail(target.message);
     let current = '';
     if (goalCurrent.trim()) {
       const checked = normalizeGoalValue(goalCurrent, goalUnit, goalMetric);
-      if (!checked.ok) return setError(`Right now: ${checked.message}`);
+      if (!checked.ok) return fail(`Right now: ${checked.message}`);
       current = checked.value;
     }
     if (goalKind === 'weight') {
       const weight = Number(target.value);
-      if (weight < 40 || weight > 1500) return setError(`Enter a weight between 40 and 1500 ${massUnit}.`);
+      if (weight < 40 || weight > 1500) return fail(`Enter a weight between 40 and 1500 ${massUnit}.`);
       if (current) set('currentWeight', current);
     }
     setGoalTarget(target.value); setGoalCurrent(current);
@@ -273,11 +287,11 @@ function OnboardingForm() {
   };
 
   const finish = async () => {
-    if (!isEditing && !data.acceptedSafety) return setError('Tick the safety box to finish.');
+    if (!isEditing && !data.acceptedSafety) return fail('Tick the safety box to finish.');
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
-    if (!goals.length && !pendingGoal) return setError('Set a goal first. Forge builds the plan around it.');
-    if (unmappedDays.length) return setError(`Pick a movement for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
+    if (!goals.length && !pendingGoal) return fail('Set a goal first. Forge builds the plan around it.');
+    if (unmappedDays.length) return fail(`Pick a movement for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
     const weight = Number(data.currentWeight);
     const weightGiven = Boolean(String(data.currentWeight || '').trim()) && Number.isFinite(weight) && weight > 0;
     setSaving(true); setError('');
@@ -326,136 +340,171 @@ function OnboardingForm() {
          engine reads it — it used to reach only the circuit builder's prompt. */
       if (data.injuryConstraint && data.limitationNotes.trim() && !isEditing) void saveNote(createNote('injury', data.limitationNotes.trim(), extractArea(data.limitationNotes)));
       const from = (location.state as { from?: string } | null)?.from;
+      success();
       navigate(from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
+      fail(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
     }
   };
 
+  /* EVERY TOGGLE ANSWERS UNDER THE THUMB, not only the ones that move on. */
+  const toggle = (apply: () => void) => () => { tap(); setError(''); apply(); };
   const unitToggle = <div className="ob-units" role="radiogroup" aria-label="Units">{(['Imperial', 'Metric'] as const).map(item =>
-    <button type="button" role="radio" aria-checked={data.units === item} className={data.units === item ? 'active' : ''} onClick={() => set('units', item)} key={item}>{item === 'Imperial' ? (goalKind === 'race' || stepId === 'running' ? 'Miles' : 'lb') : (goalKind === 'race' || stepId === 'running' ? 'Km' : 'kg')}</button>)}</div>;
+    <button type="button" role="radio" aria-checked={data.units === item} className={data.units === item ? 'active' : ''} onClick={toggle(() => set('units', item))} key={item}>{item === 'Imperial' ? (goalKind === 'race' || stepId === 'running' ? 'Miles' : 'lb') : (goalKind === 'race' || stepId === 'running' ? 'Km' : 'kg')}</button>)}</div>;
+  const chip = (key: string, label: string, active: boolean, onClick: () => void) =>
+    <button type="button" key={key} className={active ? 'active' : ''} aria-pressed={active} onClick={onClick}>{active && <span className="ob-chip-check">{check}</span>}{label}</button>;
 
-  const screen = (() => {
+  const nameReady = Boolean(data.displayName.trim());
+  const targetReady = Boolean(goalTarget.trim()) && (goalExercise !== 'HYROX' || Boolean(division));
+  const safetyNeeded = !isEditing && !data.acceptedSafety;
+  const STEP_FORM = 'ob-step-form';
+
+  /* Each screen is a body and, where something has to be confirmed rather
+     than tapped, an action pinned to the bottom — where the thumb already is,
+     and above the keyboard while one is open. */
+  const screen: { body: ReactElement; action?: ReactElement } = (() => {
     switch (stepId) {
-      case 'name': return <>
-        <h1>What should we call you?</h1>
-        <form className="ob-form" onSubmit={event => { event.preventDefault(); submitName(); }}>
-          <input className="ob-input" autoFocus autoComplete="given-name" enterKeyHint="next" value={data.displayName} onChange={event => set('displayName', event.target.value)} placeholder="First name" aria-label="Your name" />
-          <button className="button ob-next" type="submit">Continue</button>
-        </form>
-      </>;
-      case 'focus': return <>
+      case 'name': return {
+        body: <>
+          <h1>What should we call you?</h1>
+          <form id={STEP_FORM} className="ob-form" onSubmit={event => { event.preventDefault(); submitName(); }}>
+            <input className="ob-input" autoFocus autoComplete="given-name" autoCapitalize="words" enterKeyHint="next" value={data.displayName} onChange={event => set('displayName', event.target.value)} placeholder="First name" aria-label="Your name" />
+          </form>
+        </>,
+        action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!nameReady} onClick={() => nameReady && tap()}>Continue</button>,
+      };
+      case 'focus': return { body: <>
         <h1>What are you training for?</h1>
-        <div className="ob-cards">{focusCards.map(card =>
-          <button type="button" key={card.id} className={data.primaryFocus === card.id ? 'ob-card active' : 'ob-card'}
+        <div className="ob-cards" role="radiogroup" aria-label="Training focus">{focusCards.map(card => {
+          const active = data.primaryFocus === card.id;
+          return <button type="button" role="radio" aria-checked={active} key={card.id} className={active ? 'ob-card active' : 'ob-card'}
             onClick={() => tapThen(() => { if (data.primaryFocus !== card.id) { set('primaryFocus', card.id); set('splitDays', []); setGoalExercise(''); setGoalTarget(''); setGoalCurrent(''); setPendingGoal(null); } })}>
-            <strong>{card.label}</strong><small>{card.copy}</small>
-          </button>)}</div>
-      </>;
-      case 'days': return <>
+            <span className="ob-card-icon">{card.icon}</span>
+            <span className="ob-card-text"><strong>{card.label}</strong><small>{card.copy}</small></span>
+            <span className="ob-radio">{active && check}</span>
+          </button>;
+        })}</div>
+      </> };
+      case 'days': return { body: <>
         <h1>How many days a week can you train?</h1>
         <p className="ob-lead">Most people start with 3 or 4. You can change it any time.</p>
-        <div className="ob-days">{[2, 3, 4, 5, 6].map(count =>
-          <button type="button" key={count} className={data.trainingDays === count ? 'active' : ''} aria-pressed={data.trainingDays === count}
+        <div className="ob-days" role="radiogroup" aria-label="Days a week">{[2, 3, 4, 5, 6].map(count =>
+          <button type="button" role="radio" key={count} className={data.trainingDays === count ? 'active' : ''} aria-checked={data.trainingDays === count}
             onClick={() => tapThen(() => { if (data.trainingDays !== count) { set('trainingDays', count); set('splitDays', []); } })}>{count}</button>)}</div>
-      </>;
+      </> };
       case 'goal': {
         const showLifts = data.primaryFocus !== 'Endurance';
         const showRaces = data.primaryFocus !== 'Strength';
         const pick = (name: string) => tapThen(() => { if (goalExercise !== name) { setGoalExercise(name); setGoalTarget(''); setGoalCurrent(''); setPendingGoal(null); setDivision(''); } });
-        return <>
+        return { body: <>
           <h1>{showLifts && showRaces ? 'Pick one goal to start with' : showLifts ? 'Which lift do you want to improve?' : 'What are you training for?'}</h1>
           <p className="ob-lead">Forge builds every week around it. You can add more goals later.</p>
-          {showLifts && <>{showRaces && <h2 className="ob-group">A lift</h2>}<div className="ob-chips">{liftChoices.map(name =>
-            <button type="button" key={name} className={goalExercise === name ? 'active' : ''} aria-pressed={goalExercise === name} onClick={() => pick(name)}>{CORE_LIFT_LABELS[name] || name}</button>)}</div></>}
-          {showRaces && <>{showLifts && <h2 className="ob-group">A race</h2>}<div className="ob-chips">{races.map(item =>
-            <button type="button" key={item.name} className={goalExercise === item.name ? 'active' : ''} aria-pressed={goalExercise === item.name} onClick={() => pick(item.name)}>{item.label}</button>)}</div></>}
-        </>;
+          {showLifts && <>{showRaces && <h2 className="ob-group">A lift</h2>}<div className="ob-chips">{liftChoices.map(name => chip(name, CORE_LIFT_LABELS[name] || name, goalExercise === name, () => pick(name)))}</div></>}
+          {showRaces && <>{showLifts && <h2 className="ob-group">A race</h2>}<div className="ob-chips">{races.map(item => chip(item.name, item.label, goalExercise === item.name, () => pick(item.name)))}</div></>}
+        </> };
       }
       case 'target': {
         const label = CORE_LIFT_LABELS[goalExercise] || goalExercise;
         const question = goalKind === 'race' ? `What ${race!.label} time are you aiming for?` : goalKind === 'weight' ? 'What weight are you aiming for?' : goalUnit === 'reps' ? `How many ${label.toLowerCase()} do you want to do?` : `What do you want to ${label === 'Pull Ups' ? 'add on pull ups' : `${label.toLowerCase()} for one rep`}?`;
         /* "e.g." on purpose: a bare 315 in grey reads as already filled in, and
            the first person through tapped Continue on an empty field. */
-        const placeholder = `e.g. ${goalKind === 'race' ? race!.placeholder : goalUnit === 'reps' ? '12' : goalKind === 'weight' ? (massUnit === 'kg' ? '75' : '170') : (massUnit === 'kg' ? '140' : '315')}`;
-        return <>
-          <h1>{question}</h1>
-          {goalKind === 'lift' && isWeightedBodyweight(goalExercise) && <div className="ob-units ob-measure">
-            <button type="button" className={pullUpReps ? 'active' : ''} onClick={() => { setPullUpReps(true); setGoalTarget(''); setGoalCurrent(''); }}>Reps</button>
-            <button type="button" className={!pullUpReps ? 'active' : ''} onClick={() => { setPullUpReps(false); setGoalTarget(''); setGoalCurrent(''); }}>Added weight</button>
-          </div>}
-          <form className="ob-form" onSubmit={event => { event.preventDefault(); submitTarget(); }}>
-            <div className="ob-target">
-              <input className="ob-input" autoFocus inputMode={goalKind === 'race' ? 'numeric' : 'decimal'} enterKeyHint="next" value={goalTarget} onChange={event => { setError(''); setGoalTarget(goalKind === 'race' ? formatClock(event.target.value) : event.target.value); }} placeholder={placeholder} aria-label="Target" />
-              {goalKind === 'race' ? <span className="ob-suffix">{goalUnit === 'mm:ss' ? 'min:sec' : 'h:mm:ss'}</span> : goalUnit === 'reps' ? <span className="ob-suffix">reps</span> : unitToggle}
-            </div>
-            {goalExercise === 'HYROX' && <><h2 className="ob-group">Division</h2><div className="ob-chips">{hyroxDivisions.map(item =>
-              <button type="button" key={item} className={division === item ? 'active' : ''} aria-pressed={division === item} onClick={() => { setError(''); setDivision(item); }}>{item}</button>)}</div></>}
-            <label className="ob-optional"><span>{goalKind === 'weight' ? 'Your weight today' : goalKind === 'race' ? 'Your best time now' : 'Your best right now'} <em>optional</em></span>
-              <input className="ob-input small" inputMode={goalKind === 'race' ? 'numeric' : 'decimal'} value={goalCurrent} onChange={event => { setError(''); setGoalCurrent(goalKind === 'race' ? formatClock(event.target.value) : event.target.value); }} placeholder={goalKind === 'race' ? 'Leave blank if you don’t know' : 'Leave blank if unsure'} />
-            </label>
-            <h2 className="ob-group">By when?</h2>
-            <div className="ob-chips">{goalWeeks.map(weeks =>
-              <button type="button" key={weeks} className={!pickDate && goalDate === weeksFromNow(weeks) ? 'active' : ''} onClick={() => { setPickDate(false); setGoalDate(weeksFromNow(weeks)); }}>{weeks} weeks</button>)}
-              <button type="button" className={pickDate || !goalWeeks.some(weeks => goalDate === weeksFromNow(weeks)) ? 'active' : ''} onClick={() => setPickDate(true)}>Pick a date</button></div>
-            {pickDate && <input className="ob-input small" type="date" min={weeksFromNow(2)} value={goalDate} onChange={event => event.target.value && setGoalDate(event.target.value)} aria-label="Goal date" />}
-            <button className="button ob-next" type="submit">Continue</button>
-          </form>
-        </>;
+        const placeholder = `e.g. ${goalKind === 'race' ? race!.placeholder : goalUnit === 'reps' ? '12' : goalKind === 'weight' ? (massUnit === 'kg' ? '75' : '170') : (massUnit === 'kg' ? ({ 'Bench Press': '100', 'Deadlift': '180' } as Record<string, string>)[goalExercise] || '140' : ({ 'Bench Press': '225', 'Deadlift': '405' } as Record<string, string>)[goalExercise] || '315')}`;
+        const customDate = pickDate || !goalWeeks.some(weeks => goalDate === weeksFromNow(weeks));
+        return {
+          body: <>
+            <h1>{question}</h1>
+            {goalKind === 'lift' && isWeightedBodyweight(goalExercise) && <div className="ob-units ob-measure">
+              <button type="button" className={pullUpReps ? 'active' : ''} onClick={toggle(() => { setPullUpReps(true); setGoalTarget(''); setGoalCurrent(''); })}>Reps</button>
+              <button type="button" className={!pullUpReps ? 'active' : ''} onClick={toggle(() => { setPullUpReps(false); setGoalTarget(''); setGoalCurrent(''); })}>Added weight</button>
+            </div>}
+            <form id={STEP_FORM} className="ob-form" onSubmit={event => { event.preventDefault(); submitTarget(); }}>
+              <div className="ob-target">
+                <input className="ob-input" autoFocus inputMode={goalKind === 'race' ? 'numeric' : 'decimal'} enterKeyHint="done" value={goalTarget} onChange={event => { setError(''); setGoalTarget(goalKind === 'race' ? formatClock(event.target.value) : event.target.value); }} placeholder={placeholder} aria-label="Target" />
+                {goalKind === 'race' ? <span className="ob-suffix">{goalUnit === 'mm:ss' ? 'min:sec' : 'h:mm:ss'}</span> : goalUnit === 'reps' ? <span className="ob-suffix">reps</span> : unitToggle}
+              </div>
+              {goalExercise === 'HYROX' && <><h2 className="ob-group">Division</h2><div className="ob-chips">{hyroxDivisions.map(item => chip(item, item, division === item, toggle(() => setDivision(item))))}</div></>}
+              <label className="ob-optional"><span>{goalKind === 'weight' ? 'Your weight today' : goalKind === 'race' ? 'Your best time now' : 'Your best right now'} <em>optional</em></span>
+                <input className="ob-input small" inputMode={goalKind === 'race' ? 'numeric' : 'decimal'} value={goalCurrent} onChange={event => { setError(''); setGoalCurrent(goalKind === 'race' ? formatClock(event.target.value) : event.target.value); }} placeholder={goalKind === 'race' ? 'Leave blank if you don’t know' : 'Leave blank if unsure'} />
+              </label>
+              <h2 className="ob-group">By when?</h2>
+              <div className="ob-chips">
+                {goalWeeks.map(weeks => chip(String(weeks), `${weeks} weeks`, !customDate && goalDate === weeksFromNow(weeks), toggle(() => { setPickDate(false); setGoalDate(weeksFromNow(weeks)); })))}
+                {chip('date', 'Pick a date', customDate, toggle(() => setPickDate(true)))}
+              </div>
+              {pickDate && <input className="ob-input small" type="date" min={weeksFromNow(2)} value={goalDate} onChange={event => event.target.value && setGoalDate(event.target.value)} aria-label="Goal date" />}
+            </form>
+          </>,
+          action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!targetReady} onClick={() => targetReady && tap()}>Continue</button>,
+        };
       }
-      case 'running': return <>
+      case 'running': return { body: <>
         <h1>How much do you run in a week right now?</h1>
         <p className="ob-lead">A rough guess is fine. Forge starts from here and builds up safely.</p>
         {unitToggle}
-        <div className="ob-cards">{mileageChoices[data.units].map(([label, miles]) =>
-          <button type="button" key={label} className={data.weeklyMileage === miles ? 'ob-card active' : 'ob-card'} onClick={() => tapThen(() => set('weeklyMileage', miles))}><strong>{label}</strong></button>)}</div>
-      </>;
-      case 'week': return <>
-        <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
-        <p className="ob-lead">Forge picked a lift for each day. Tap any day to change it — or just start.</p>
-        {/* The stored title is the builder's ("5K Run · 24:30 mm:ss") so Goals
-            reads it the same; this card says it the way a person would. */}
-        {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small></div>}
-        <div className="ob-week">{plannedDays.map((day, index) => {
-          const lifting = day.type === 'Strength' || day.type === 'Mixed';
-          const chosen = dayExercises[index] || [];
-          const open = openDay === index;
-          return <section className={open ? 'setup-day open' : 'setup-day'} key={`${day.name}-${index}`}>
-            <button type="button" className="setup-day-head" onClick={() => lifting && setOpenDay(open ? -1 : index)} aria-expanded={lifting ? open : undefined} disabled={!lifting}>
-              <span><strong>Day {index + 1} · {day.name}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick a movement') : 'Running — Forge plans it'}</small></span>
-              {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Change'}</span>}
-            </button>
-            {open && <div className="muscle-picker compact-muscle-picker setup-day-options">
-              {optionsForDay(index).map(exercise => {
-                const selected = chosen.includes(exercise.name);
-                return <button type="button" key={exercise.id} aria-pressed={selected} className={selected ? 'muscle-chip active' : 'muscle-chip'} onClick={() => toggleDayExercise(index, exercise.name)}>
-                  {exercise.name}{goalLiftKeys.has(canonicalLiftKey(exercise.name)) ? <i className="setup-goal-flag" title="Goal lift"> ★</i> : null}</button>;
-              })}
-            </div>}
-          </section>;
+        <div className="ob-cards" role="radiogroup" aria-label="Weekly running">{mileageChoices[data.units].map(([label, miles]) => {
+          const active = data.weeklyMileage === miles;
+          return <button type="button" role="radio" aria-checked={active} key={label} className={active ? 'ob-card compact active' : 'ob-card compact'} onClick={() => tapThen(() => set('weeklyMileage', miles))}>
+            <span className="ob-card-text"><strong>{label}</strong></span><span className="ob-radio">{active && check}</span>
+          </button>;
         })}</div>
-        <label className="setup-check"><input type="checkbox" checked={data.injuryConstraint} onChange={event => set('injuryConstraint', event.target.checked)} /><span><strong>I have an injury or limitation</strong><small>Forge will train around it.</small></span></label>
-        {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
-        {!isEditing && <label className="setup-check safety"><input type="checkbox" checked={data.acceptedSafety} onChange={event => set('acceptedSafety', event.target.checked)} /><span><strong>I understand Forge is training guidance, not medical advice, and I’ll stop and report any pain.</strong><small><button type="button" className="text-button" onClick={() => setSafetyOpen(value => !value)}>{safetyOpen ? 'Hide details' : 'Read details'}</button></small></span></label>}
-        {safetyOpen && <div className="disclaimer-copy">
-          <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
-          <p>Strength and endurance training carry real risk. Check with a physician before starting or changing a program — especially with a heart condition, injury, chronic illness, or during pregnancy. Stop any exercise that causes pain, dizziness, or unusual shortness of breath.</p>
-          <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue in Ask Forge so training can work around it — and see a professional when something does not resolve.</p>
-        </div>}
-        <button className="button ob-next" disabled={saving} onClick={finish}>{saving ? 'Saving…' : editingFreely ? 'Save' : 'Enter Forge'}</button>
-      </>;
+      </> };
+      case 'week': return {
+        body: <>
+          <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
+          <p className="ob-lead">Forge picked a lift for each day. Tap any day to change it — or just start.</p>
+          {/* The stored title is the builder's ("5K Run · 24:30 mm:ss") so Goals
+              reads it the same; this card says it the way a person would. */}
+          {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small></div>}
+          <div className="ob-week">{plannedDays.map((day, index) => {
+            const lifting = day.type === 'Strength' || day.type === 'Mixed';
+            const chosen = dayExercises[index] || [];
+            const open = openDay === index;
+            return <section className={open ? 'setup-day open' : 'setup-day'} key={`${day.name}-${index}`}>
+              <button type="button" className="setup-day-head" onClick={() => { if (!lifting) return; tap(); setOpenDay(open ? -1 : index); }} aria-expanded={lifting ? open : undefined} disabled={!lifting}>
+                <span className="ob-day-number">{index + 1}</span>
+                <span className="ob-day-text"><strong>{day.name}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick a movement') : 'Running — Forge plans it'}</small></span>
+                {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Change'}</span>}
+              </button>
+              {open && <div className="muscle-picker compact-muscle-picker setup-day-options">
+                {optionsForDay(index).map(exercise => {
+                  const selected = chosen.includes(exercise.name);
+                  return <button type="button" key={exercise.id} aria-pressed={selected} className={selected ? 'muscle-chip active' : 'muscle-chip'} onClick={() => { tap(); toggleDayExercise(index, exercise.name); }}>
+                    {exercise.name}{goalLiftKeys.has(canonicalLiftKey(exercise.name)) ? <i className="setup-goal-flag" title="Goal lift"> ★</i> : null}</button>;
+                })}
+              </div>}
+            </section>;
+          })}</div>
+          <label className="setup-check"><input type="checkbox" checked={data.injuryConstraint} onChange={event => { tap(); set('injuryConstraint', event.target.checked); }} /><span><strong>I have an injury or limitation</strong><small>Forge will train around it.</small></span></label>
+          {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
+          {!isEditing && <label className="setup-check safety"><input type="checkbox" checked={data.acceptedSafety} onChange={event => { tap(); set('acceptedSafety', event.target.checked); }} /><span><strong>I understand Forge is training guidance, not medical advice, and I’ll stop and report any pain.</strong><small><button type="button" className="text-button" onClick={() => setSafetyOpen(value => !value)}>{safetyOpen ? 'Hide details' : 'Read details'}</button></small></span></label>}
+          {safetyOpen && <div className="disclaimer-copy">
+            <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
+            <p>Strength and endurance training carry real risk. Check with a physician before starting or changing a program — especially with a heart condition, injury, chronic illness, or during pregnancy. Stop any exercise that causes pain, dizziness, or unusual shortness of breath.</p>
+            <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue in Ask Forge so training can work around it — and see a professional when something does not resolve.</p>
+          </div>}
+        </>,
+        action: <>
+          {safetyNeeded && !error && <p className="ob-action-hint">Tick the safety box above to continue</p>}
+          <button className="button ob-next" disabled={saving || safetyNeeded} onClick={finish}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
+        </>,
+      };
     }
   })();
 
   return <main className="onboarding-shell ob-shell">
     <header className="ob-top">
-      {stepIndex > 0 && !(needsExercises && stepId === 'week') ? <button type="button" className="ob-back" aria-label="Back" onClick={() => go(-1)} disabled={saving}>←</button> : <span className="ob-back-spacer" />}
+      {stepIndex > 0 && !(needsExercises && stepId === 'week')
+        ? <button type="button" className="ob-back" aria-label="Back" onClick={() => { tap(); go(-1); }} disabled={saving}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
+        : <span className="ob-back-spacer" />}
       <div className="ob-progress" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={stepIndex + 1} aria-label={`Step ${stepIndex + 1} of ${steps.length}`}><i style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }} /></div>
-      {editingFreely ? <button type="button" className="ob-cancel" onClick={() => navigate('/profile')}>Cancel</button> : <span className="ob-back-spacer" />}
+      {editingFreely ? <button type="button" className="ob-cancel" onClick={() => navigate('/profile')}>Cancel</button> : <span className="ob-step-count">{stepIndex + 1}/{steps.length}</span>}
     </header>
-    <section className="ob-screen" key={stepId}>
-      {screen}
-      {error && <div className="setup-error" role="alert">{error}</div>}
+    <section className={`ob-screen ob-slide-${direction}`} key={stepId}>
+      {screen.body}
     </section>
+    {(screen.action || error) && <footer className="ob-action">
+      {error && <div className="setup-error" role="alert">{error}</div>}
+      {screen.action}
+    </footer>}
   </main>;
 }
