@@ -54,7 +54,7 @@ const clickText = re => p.evaluate(src => { const rx = new RegExp(src, 'i'); con
 check('the log shows the top sets it already has', await has('.top-set-card-stack'));
 check('nothing takes over the screen unprompted', !(await has('.top-set-sheet-backdrop')));
 
-check('add top set is offered', await clickText('Add top set|Log a top set'));
+check('add top set is offered', await clickText('Add a lift|Add top set|Log a top set'));
 await p.waitForTimeout(600);
 check('it takes over the screen', await has('.top-set-sheet-backdrop') && await has('.top-set-sheet'));
 check('it asks for the exercise by typing, not by dropdown', await has('.top-set-sheet-search input') && !(await has('.top-set-sheet select')));
@@ -140,7 +140,7 @@ await p.waitForTimeout(2600);
    shows them as logged lines — that is the whole point of the log knowing
    what today holds. */
 check('a fresh sheet on a logged day shows its saved lines', await p.evaluate(() => document.querySelectorAll('.top-set-entry.closed').length > 0));
-check('and still offers the sheet', await clickText('Add top set|Log a top set'));
+check('and still offers the sheet', await clickText('Add a lift|Add top set|Log a top set'));
 await p.waitForTimeout(600);
 check('which opens the same takeover', await has('.top-set-sheet-backdrop') && await has('.top-set-sheet-search input'));
 

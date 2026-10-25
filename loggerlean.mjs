@@ -34,7 +34,7 @@ check('the intro no longer reads the source buttons out',
 check('but an edit still says it is an edit', /Update the saved results for this day\./.test(page));
 check('and a back-dated entry still says so', /Log anything you completed on this date/.test(page));
 check('the top-set launcher drops the popup explanation',
-  !/Tap to log one in a popup/.test(page) && /The one heaviest meaningful set per lift\./.test(page));
+  !/Tap to log one in a popup/.test(page) && /Add a lift/.test(page));
 check('session details drops the line about being a form',
   !/Review the context Forge will save with this workout/.test(page));
 check('and the cardio card drops its own',

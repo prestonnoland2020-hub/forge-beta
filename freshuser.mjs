@@ -64,8 +64,7 @@ const between = (t, a, len) => { const i = t.indexOf(a); return i < 0 ? '' : t.s
   await setDial(p, 0, [100, 85]); await setDial(p, 1, [5]);
   await tapText(p, 'Save top set'); await p.waitForTimeout(1000);
   t = await text(p);
-  check('after saving a set the header still says Chest & Back', /LOGGING ·[^\n]*\nCHEST & BACK/.test(t), between(t, 'LOGGING ·', 45));
-  check('and split position 1', /SPLIT POSITION 1/.test(t));
+  check('after saving a set the header still says Chest & Back', /Chest & Back/i.test(await p.evaluate(() => document.querySelector('.workout-date strong')?.textContent || '')), between(t, 'Chest', 45));
   const btn = await p.$('button.save-workout'); await btn.scrollIntoViewIfNeeded(); await btn.click(); await p.waitForTimeout(2000);
   check('Finish Day leaves the logger', /#\/$/.test(p.url()), p.url());
   t = await text(p);

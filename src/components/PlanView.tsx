@@ -1,3 +1,6 @@
+import { useAthleteNotes } from '../features/training/useAthleteNotes';
+import { sickDayStatus } from '../lib/bodyLog';
+import { EASE_PERCENT } from '../lib/coachActions';
 import { useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { WAVE_REPS, WAVE_LENGTH } from '../features/training/aiPlanService';
@@ -240,14 +243,22 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const todayIso = localDayIso();
+  /* Being sick reaches the week, not just Today: the days inside it read as
+     rest, and the days after it as the same session, lighter. */
+  const { notes } = useAthleteNotes();
+  const easeStep = /kg/i.test(unit) ? 2.5 : 5;
+  const eased = (weight: number) => Math.max(easeStep, Math.floor(weight * (1 - EASE_PERCENT / 100) / easeStep) * easeStep);
   return <section className="card pv-week">
     <header><h3>{title}</h3></header>
     <div className="pv-week-rows">
-      {sessions.map(session => {
+      {sessions.map(planned => { let session = planned;
         const iso = localDayIso(session.date);
         const isToday = iso === todayIso;
         const past = iso < todayIso;
         const logged = records.find(record => record.date === iso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0 || record.muscles.some(muscle => muscle !== 'Cardio')));
+        const health = !past && !logged ? sickDayStatus(notes, iso) : null;
+        if (health === 'sick') session = { ...session, title: 'Rest — you’re sick', lifts: [], run: undefined, empty: 'rest', summary: undefined };
+        if (health === 'easing') session = { ...session, lifts: session.lifts.map(lift => lift.weight ? { ...lift, weight: eased(lift.weight) } : lift), run: session.run ? { ...session.run, kind: 'Easy run' } : undefined };
         const isRest = session.empty === 'rest' && !session.lifts.length && !session.run;
         const isOpenDay = session.empty === 'open' && !session.lifts.length && !session.run;
         /* THE PAST IS HISTORY, NOT A PROJECTION. A rolling split rotates around
@@ -269,11 +280,12 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
            week on anyone training four days. The row goes quiet instead: muted,
            and it says what is true, which is that nothing was logged. */
         const missed = past && !logged && !isRest;
-        const heading = logged ? logged.title : past ? (isRest ? 'Rest' : 'Nothing logged') : isRest ? 'Rest' : session.title;
+        const heading = logged ? logged.title : past ? (isRest ? 'Rest' : 'Nothing logged') : health === 'sick' ? 'Rest — you’re sick' : isRest ? 'Rest' : session.title;
         /* One line, in words the athlete would use. */
         const summary = logged
           ? [...(logged.topSets || []).filter(set => set.completed !== false).slice(0, 2).map(set => `${set.lift} ${set.weight}×${set.reps}`), ...(logged.cardioSessions || []).slice(0, 1).map(cardio => cardio.summary?.replace(`${cardio.activity} · `, '') || cardio.activity)].filter(Boolean).join(' · ') || 'Logged'
           : past ? (isRest ? 'Rest day' : 'No training on this day')
+          : health === 'sick' ? 'Training waits until you feel better'
           : isRest ? 'Nothing scheduled'
           : isOpenDay ? 'Open — nothing required'
           : [
@@ -285,6 +297,7 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
                that read as a rendering bug and, worse, hid the real problem:
                that day has no top set waiting for it. Say that instead. */
             ].filter(Boolean).join(' · ') || session.summary || 'No top set prescribed';
+        const shownSummary = health === 'easing' && !logged ? `Easier · ${summary}` : summary;
         /* A logged day opens on what was logged; a day gone by with nothing on
            it has nothing to open. */
         const loggedLifts = (logged?.topSets || []).filter(set => set.completed !== false);
@@ -296,7 +309,7 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
             <span className="pv-row-date"><b>{weekdayShort(session.date)}</b><small>{dayNumber(session.date)}</small></span>
             <span className="pv-row-body">
               <strong>{heading}</strong>
-              <small>{summary}</small>
+              <small>{shownSummary}</small>
             </span>
             <span className="pv-row-state" aria-hidden="true">{logged ? '✓' : isToday ? 'Today' : canExpand ? '›' : ''}</span>
           </button>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
 import { CoachCheckIn } from './CoachCheckIn';
@@ -17,6 +17,7 @@ import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
+import { tap } from '../lib/haptics';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
    standalone exercise library that duplicated what the Log screen already does;
@@ -49,6 +50,26 @@ function NavGlyph({ name }: { name: NavGlyphName }) {
   return <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg></span>;
 }
 
+/* THE TAB BAR. Five destinations, each owning the screens that are steps into
+   it, so the tab you came from stays lit while you are inside it. */
+const tabs = [
+  { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' },
+  { to: '/plan', label: 'Plan', icon: 'calendar', owns: (path: string) => path === '/plan' || path === '/split' },
+  { to: '/goals', label: 'Goals', icon: 'target', owns: (path: string) => path === '/goals' },
+  { to: '/history', label: 'Activities', icon: 'history', owns: (path: string) => path === '/history' },
+  { to: '/profile', label: 'Profile', icon: 'you', owns: (path: string) => path === '/profile' || path.startsWith('/partners') || path === '/exercises' },
+] as const;
+
+/* How deep a screen sits under its tab, which is what decides the direction a
+   screen moves: deeper slides in from the right, shallower slides back from
+   the left, and a move between tabs cross-fades — the way every iOS app does
+   it, so the motion says where you went. */
+function screenDepth(path: string, search: string) {
+  if (tabs.some(tab => tab.to === path)) return path === '/profile' && new URLSearchParams(search).get('view') ? (new URLSearchParams(search).get('view') === 'settings' ? 1 : 2) : 0;
+  if (/^\/partners\/.+/.test(path)) return 2;
+  return 1;
+}
+
 export function AppShell({ coach }: { coach?: ReactNode }) {
   /* Deploy freshness for installed PWAs. iOS pins a Home-Screen app to the
      shell it installed with, and GitHub Pages caches index.html — so a fix
@@ -74,6 +95,25 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   },[]);
 
   const location = useLocation();
+  const screenKey = `${location.pathname}?${new URLSearchParams(location.search).get('view') || ''}`;
+  const lastScreen = useRef({ key: screenKey, depth: screenDepth(location.pathname, location.search) });
+  /* Decided while rendering, not in an effect: the new screen's first frame
+     has to carry the right direction, or it starts sliding the wrong way and
+     corrects itself a frame later. */
+  const motion = useRef<'push' | 'pop' | 'fade' | 'none'>('none');
+  if (lastScreen.current.key !== screenKey) {
+    const depth = screenDepth(location.pathname, location.search);
+    motion.current = depth > lastScreen.current.depth ? 'push' : depth < lastScreen.current.depth ? 'pop' : 'fade';
+    lastScreen.current = { key: screenKey, depth };
+  }
+  /* A new screen starts at its top. Without this, switching tabs kept the
+     last page's scroll and opened Goals halfway down an empty page. */
+  const firstScreen = useRef(true);
+  useEffect(() => { if (firstScreen.current) { firstScreen.current = false; return; } window.scrollTo(0, 0); }, [screenKey]);
+  const activeTab = tabs.findIndex(tab => tab.owns(location.pathname));
+  /* A workout in progress and the full coach are tasks, not places: the tab
+     bar steps aside for them the way a native app's does. */
+  const hideTabs = location.pathname === '/workout' || location.pathname === '/coach';
   const { recovery } = useAdaptiveTraining();
   const { setup } = useProfileSetup();
   const { failures: syncFailures, retryAll } = useSyncStatus();
@@ -146,7 +186,6 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       default: return { title: 'Forge' };
     }
   })();
-  const onSettings = location.pathname === '/profile' && Boolean(new URLSearchParams(location.search).get('view'));
   const hasRecoveryData = recovery.confidence !== 'Low';
 
   /* Body-log check-ins, best effort, once a day when the app opens.
@@ -223,14 +262,10 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
           {hasRecoveryData && <NavLink className="top-readiness" to="/profile?view=devices"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
-          {/* Three actions, the same three on every screen, each with one
-              home: Progress (the chart), Log (the plus), Settings (the gear).
-              Profile itself is a tab — in the bottom bar on a phone, at the
-              foot of the sidebar on a desktop — so the header no longer
-              carries an avatar that opened the same screen as the gear. */}
           <NavLink className="top-insights" to="/insights" aria-label="Progress"><NavGlyph name="chart"/></NavLink>
           {location.pathname !== '/workout' && <NavLink className="top-log" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></NavLink>}
-          <Link className={onSettings ? 'top-settings active' : 'top-settings'} to="/profile?view=settings" aria-label="Settings" aria-current={onSettings ? 'page' : undefined}><NavGlyph name="gear"/></Link>
+          {/* Settings has one door, the first row of Profile. A gear on every
+              screen was a second way into the same list. */}
         </div>
       </header>
       {/* A PREVIEW BUILD SAYS SO, ON EVERY SCREEN. `.env` carries
@@ -248,14 +283,12 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
           : `${syncFailures.map(failure => failure.label).join(', ')} haven’t reached your account. They’re safe on this phone and will retry.`}</span>
         <button onClick={() => { retrySync(); retryAll(); }}>Retry</button>
       </div>}
-      <main className="page"><Outlet /></main>
+      <main className={`page screen-${motion.current}`} key={screenKey}><Outlet /></main>
     </div>
-    <nav className="bottom-nav" aria-label="Mobile navigation">
-      <NavLink to="/" end aria-label="Today"><NavGlyph name="home"/><small>Today</small></NavLink>
-      <NavLink to="/plan" aria-label="Plan"><NavGlyph name="calendar"/><small>Plan</small></NavLink>
-      <NavLink to="/goals" aria-label="Goals"><NavGlyph name="target"/><small>Goals</small></NavLink>
-      <NavLink to="/history" aria-label="Activities"><NavGlyph name="history"/><small>Activities</small></NavLink>
-      <NavLink to="/profile" aria-label="Profile"><NavGlyph name="you"/><small>Profile</small></NavLink>
+    <nav className={hideTabs ? 'tab-bar away' : 'tab-bar'} aria-label="Tabs" style={{ '--tab-index': Math.max(0, activeTab) } as CSSProperties}>
+      {activeTab >= 0 && <span className="tab-indicator" aria-hidden="true" />}
+      {tabs.map((tab, index) => <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className={index === activeTab ? 'tab active' : 'tab'} aria-current={index === activeTab ? 'page' : undefined}
+        onClick={() => { if (index !== activeTab) tap(); }}><NavGlyph name={tab.icon}/><small>{tab.label}</small></NavLink>)}
     </nav>
     {/* THE COACH SPEAKS FIRST WHEN IT HAS SOMETHING THAT MATTERS. An athlete
         whose goal cannot be reached on the running they do is told on the way
@@ -269,14 +302,16 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     <EffortCheck />
     <CoachCheckIn />
     <MileageStartupCheck />
-    {coachOpen && coachExpanded && <button className="coach-bubble-backdrop" type="button" aria-label="Close expanded Forge coach" onClick={() => setCoachExpanded(false)} />}
+    {/* Open, the coach is a sheet over a dimmed screen, and tapping the dim
+        closes it — on a phone always, on a desktop when expanded. */}
+    {coachOpen && <button className={coachExpanded ? 'coach-bubble-backdrop expanded' : 'coach-bubble-backdrop'} type="button" aria-label="Close Forge coach" onClick={() => { if (coachExpanded) setCoachExpanded(false); else setCoachOpen(false); }} />}
     <div className={`${coachExpanded ? 'coach-bubble-shell expanded' : 'coach-bubble-shell'}${location.pathname === '/coach' || location.pathname === '/workout' ? ' coach-bubble-hidden' : ''}`}>
       <section className={coachOpen ? 'coach-bubble-panel open' : 'coach-bubble-panel'} aria-hidden={!coachOpen} aria-label="Forge AI coach">
         <header><div><span>AI COACH</span><strong>Ask Forge</strong></div><div className="coach-window-actions"><button type="button" onClick={() => setCoachExpanded(value => !value)} aria-label={coachExpanded ? 'Restore Forge coach' : 'Expand Forge coach'} title={coachExpanded ? 'Restore' : 'Expand'}>{coachExpanded ? '↙' : '↗'}</button><button type="button" onClick={() => { setCoachOpen(false); setCoachExpanded(false); }} aria-label="Close Forge coach">×</button></div></header>
         <div className="coach-bubble-content">{coach}</div>
       </section>
-      <button type="button" className={coachOpen ? 'coach-bubble-toggle active' : 'coach-bubble-toggle'} onClick={() => { setCoachOpen(open => !open); if (coachOpen) setCoachExpanded(false); }} aria-expanded={coachOpen} aria-label={coachOpen ? 'Close Forge coach' : 'Open Forge coach'}>
-        <span>{coachOpen ? '×' : 'AI'}</span><b>{coachOpen ? 'Close' : 'Ask Forge'}</b>
+      <button type="button" className={coachOpen ? 'coach-bubble-toggle active' : 'coach-bubble-toggle'} onClick={() => { tap(); setCoachOpen(open => !open); if (coachOpen) setCoachExpanded(false); }} aria-expanded={coachOpen} aria-label={coachOpen ? 'Close Forge coach' : 'Open Forge coach'}>
+        <span>{coachOpen ? '×' : <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9L12 2.5zM18.5 15l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z"/></svg>}</span><b>{coachOpen ? 'Close' : 'Ask Forge'}</b>
       </button>
     </div>
   </div>;

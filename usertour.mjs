@@ -54,7 +54,7 @@ for (const [route, name] of [['/', 'today'], ['/plan', 'plan'], ['/goals', 'goal
     await page.waitForTimeout(150);
   };
   /* has-text takes a string or a regex, never a pipe inside a string. */
-await page.locator('button').filter({ hasText: /Add top set|Log a top set/ }).first().click();
+await page.locator('button').filter({ hasText: /Add a lift|Add top set|Log a top set/ }).first().click();
   await page.waitForTimeout(400);
   await page.fill('.top-set-sheet-search input', 'Bench Press');
   await page.waitForTimeout(300);
@@ -65,7 +65,7 @@ await page.locator('button').filter({ hasText: /Add top set|Log a top set/ }).fi
   await page.locator('.top-set-sheet footer button:has-text("Save top set")').click();
   await page.waitForTimeout(1200);
   await shot(page, 'workout-after-topset');
-  console.log('editor still open (Finish Day present):', await page.locator('text=Finish Day').count());
+  console.log('editor still open (Finish Day present):', await page.locator('text=Finish workout').count());
   console.log('hijacked to completed screen:', await page.locator('text=Today is logged').count());
 
   // AI cardio: pace phrase

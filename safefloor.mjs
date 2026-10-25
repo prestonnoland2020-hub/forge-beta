@@ -57,17 +57,19 @@ check('a reported inset still wins, because max() takes the larger',
   /max\(env\(safe-area-inset-bottom\),/.test(theme));
 
 console.log('\nIt is measured at startup and again when the phone turns');
-const pin = readFileSync('./src/features/shell/pinChrome.ts', 'utf8');
-check('measured before anything else', /if \(typeof window !== 'undefined'\) applyHomeIndicatorFallback\(\);/.test(pin));
+/* pinChrome became nativeChrome when the tab bar stopped chasing the visual
+   viewport; the inset is still measured there, first and on a rotation. */
+const pin = readFileSync('./src/features/shell/nativeChrome.ts', 'utf8');
+check('measured before anything else', pin.indexOf('applyHomeIndicatorFallback();') > -1
+  && pin.indexOf('applyHomeIndicatorFallback();') < pin.indexOf('const root'));
 const lib = readFileSync('./src/lib/homeIndicatorFallback.ts', 'utf8');
 check('both insets are measured, from one probe', /probe\.style\.height = 'env\(safe-area-inset-bottom,0px\)';/.test(lib));
 check('and the top one is read first', lib.indexOf('safe-area-inset-top') < lib.indexOf("probe.style.height = 'env(safe-area-inset-bottom"));
 check('and re-measured on a rotation, because the strip moves',
-  /const remeasure = \(\) => \{ applyHomeIndicatorFallback\(\); schedule\(\); \};/.test(pin)
+  /const remeasure = \(\) => applyHomeIndicatorFallback\(\);/.test(pin)
   && /addEventListener\('orientationchange', remeasure\)/.test(pin));
 check('and the listener is removed with the rest', /removeEventListener\('orientationchange', remeasure\)/.test(pin));
-check('it does not ride on visualViewport existing',
-  pin.indexOf('applyHomeIndicatorFallback()') < pin.indexOf('if (!viewport) return'));
+check('it does not ride on visualViewport existing', !/window\.visualViewport/.test(pin));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);

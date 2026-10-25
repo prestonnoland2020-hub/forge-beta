@@ -19,7 +19,7 @@ import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 import { useAthleteNotes } from './useAthleteNotes';
 import { bodyLogState,exerciseBlocked } from '../../lib/bodyLog';
 import { useTodayOverride } from './coachOverrides';
-import { shortenRecommendation } from '../../lib/coachActions';
+import { shortenRecommendation,easeRecommendation,EASE_PERCENT } from '../../lib/coachActions';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void;
   /* The full prescription for ANY split position, built by the same pipeline
@@ -125,8 +125,12 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      upper day" is an override for today only; it never moves the cycle, and
      a day already trained is left alone. */
   const coachOverride=useTodayOverride(isoToday());
+  /* THE BODY LOG IS READ BEFORE THE DAY IS CHOSEN, because being sick
+     decides the day: every scheduled day is rest until it clears. */
+  const {notes:athleteNotes}=useAthleteNotes();
+  const bodyLog=useMemo(()=>bodyLogState(athleteNotes,isoToday()),[athleteNotes]);
   const coachSwap=!pinnedPosition&&coachOverride?.position&&days.some(day=>day.position===coachOverride.position)?coachOverride.position:undefined;
-  const coachRest=!pinnedPosition&&Boolean(coachOverride?.rest);
+  const coachRest=!pinnedPosition&&(Boolean(coachOverride?.rest)||bodyLog.sick);
   const duePosition=pinnedPosition??coachSwap??(cycle.revision>0?(statePosition||cycle.nextPosition):inferredPosition);
   /* WHICH DAY THIS SPLIT DAY IS FOR. Pinned, it is today's. Unpinned on a day
      already trained (a record with no split position), the position is the
@@ -157,9 +161,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const recoveryStamp=recovery.confidence==='Low'?'':`${recovery.readiness}:${recovery.strengthFatigue}`;
   /* THE BODY LOG IS AN INPUT TO TODAY. A note is part of the fingerprint, so
      the saved row from before "my knee hurts" is not reused all day. */
-  const {notes:athleteNotes}=useAthleteNotes();
-  const bodyLog=useMemo(()=>bodyLogState(athleteNotes,isoToday()),[athleteNotes]);
-  const bodyLogStamp=bodyLog.areas.join('+');
+  const bodyLogStamp=`${bodyLog.areas.join('+')}${bodyLog.sick?':sick':''}${bodyLog.easing?':easing':''}`;
   const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   /* ONE PIPELINE, ANY DAY OF THE SPLIT.
@@ -388,10 +390,16 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const buildFor=useCallback((day:RecommendationSplitDay)=>applyPlan(buildBase(day)),[applyPlan,buildBase]);
   const generated=useMemo(()=>{
     const built=buildFor(splitDay);
-    if(!built||!coachOverride)return built;
-    const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(built,coachOverride.minutes):built;
-    return{...fitted,coachNote:coachOverride.note||undefined};
-  },[buildFor,splitDay,coachOverride,coachRest]);
+    if(!built)return built;
+    /* Sick: the day is rest (coachRest above), and the card says why and
+       how it ends. Easing back: the same session, lighter. */
+    const eased=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric'):built;
+    const bodyNote=bodyLog.sick&&!pinnedPosition?'You’re sick, so today is a rest day. Tell Forge when you feel better and it will ease you back in.'
+      :eased!==built?`Easing back in: loads ${EASE_PERCENT}% lighter and cardio kept easy today.`:undefined;
+    if(!coachOverride)return bodyNote?{...eased,coachNote:bodyNote}:eased;
+    const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(eased,coachOverride.minutes):eased;
+    return{...fitted,coachNote:bodyNote||coachOverride.note||undefined};
+  },[buildFor,splitDay,coachOverride,coachRest,bodyLog.sick,bodyLog.easing,pinnedPosition,setup?.units]);
   /* NAME FIRST, POSITION SECOND. The logger numbers the days from the local
      copy of the split; this list comes from the server's. They normally agree,
      but they are two lists, and one omitted rest day shifts every index after

@@ -10,6 +10,7 @@ import { StravaReviewModal } from '../components/StravaReviewModal';
 import { formatCardioSummary } from '../lib/cardioSession';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
+import { isSickNote } from '../lib/bodyLog';
 
 const todayIso = () => {
   const now = new Date();
@@ -44,12 +45,12 @@ export function HomePage() {
   return <div className="forge-feed">
     {/* The header already says TODAY; the big line is the greeting and the
         small one is the date, so nothing on the screen names it twice. */}
-    <header className="feed-welcome"><div><span>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</span><h2>{greeting}, {firstName}</h2></div><Link to="/history">See activity</Link></header>
+    <header className="feed-welcome"><div><span>{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</span><h2>{greeting}, {firstName}</h2></div></header>
     {syncError && <div className="save-confirmation save-warning">Your workout is ready here. Account sync will retry automatically.</div>}
     <StravaReviewModal />
     {bufferedNotes.length > 0 && <Link className="buffer-banner" to="/coach">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 2.8 19.5a1 1 0 0 0 .87 1.5h16.66a1 1 0 0 0 .87-1.5L12 3Z"/><path d="M12 10v4M12 17.5v.5"/></svg>
-      <span>Training around {bufferedNotes.map(note => note.area || note.kind).join(', ')} — check in on Coach</span>
+      <span>{bufferedNotes.some(isSickNote) ? 'Resting while you’re sick — tell Forge when you feel better' : `Training around ${bufferedNotes.map(note => note.area || note.kind).join(', ')} — check in on Coach`}</span>
     </Link>}
 
     {completedToday ? <section className="feed-card today-focus-card completed">
@@ -72,9 +73,9 @@ export function HomePage() {
          athlete picks the day. The completed card puts Edit in this same
          slot, so this is the same kind of link, doing the same kind of job. */
       <section className="feed-card today-focus-card">
-      <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>NEXT IN YOUR SPLIT</small><strong>{recommendation.splitDay.name}</strong><em>{recommendation.splitDay.muscles.join(' · ') || (recommendation.splitDay.type === 'hyrox' ? 'Race-specific session' : 'Cardio and recovery')}</em></div></div><Link to="/workout?source=split">Change day</Link></header>
+      <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>UP NEXT</small><strong>{recommendation.splitDay.name}</strong>{/* "Chest & Back" over "Chest · Back" said it twice; the muscles show only when the day's name does not already. */}{(() => { const muscles = recommendation.splitDay.muscles; const named = muscles.length > 0 && muscles.every(muscle => recommendation.splitDay.name.toLowerCase().includes(muscle.toLowerCase())); return named ? null : <em>{muscles.join(' · ') || (recommendation.splitDay.type === 'hyrox' ? 'Race-specific session' : 'Cardio and recovery')}</em>; })()}</div></div><Link to="/workout?source=split">Change day</Link></header>
       <div className="today-workout-items">
-        {recommendedSets.map(set => <label className={set.selected ? 'selected' : ''} key={set.id}><input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} /><span><small>{set.muscle}{set.optional ? ' · OPTIONAL' : ''}</small><strong>{set.exercise}</strong><em>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : 'Log a baseline set'}</em></span></label>)}
+        {recommendedSets.map(set => <label className={set.selected ? 'selected' : ''} key={set.id}><input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} /><span>{set.optional && <small>OPTIONAL</small>}<strong>{set.exercise}</strong><em>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : 'Find your starting weight'}</em></span></label>)}
         {/* A CARDIO DAY IS NOT MISSING ITS LIFT. The engine deliberately
             prescribes no top sets on a cardio-only split day, but this row
             excluded only rest days — so the Hybrid starter split's "Quality

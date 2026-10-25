@@ -52,7 +52,7 @@ const openField = label => p.evaluate(text => {
    loose on the day screen. This looked for it on the page and found nothing,
    then read `.dial-wheel[0]` of an empty list and threw. */
 await p.evaluate(() => [...document.querySelectorAll('button')]
-  .find(el => /Add a top set|Add top set|Log a top set/i.test(el.textContent || ''))?.click());
+  .find(el => /Add a lift|Add a top set|Add a lift|Add top set|Log a top set/i.test(el.textContent || ''))?.click());
 await p.waitForTimeout(700);
 await p.fill('.top-set-sheet-search input', 'Bench').catch(() => {});
 await p.waitForTimeout(400);

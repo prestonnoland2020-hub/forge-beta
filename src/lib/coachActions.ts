@@ -1,4 +1,5 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
+import { SICK_AREA, EASE_BACK_DAYS } from './bodyLog';
 
 /* THE COACH CAN ACT.
 
@@ -48,7 +49,7 @@ export type CoachAction =
   | { type: 'rest_today'; label: string }
   | { type: 'swap_today'; dayName: string; position: number; label: string }
   | { type: 'shorten_today'; minutes: number; label: string }
-  | { type: 'log_note'; noteKind: 'injury' | 'fatigue' | 'other'; text: string; area?: string; label: string }
+  | { type: 'log_note'; noteKind: 'injury' | 'fatigue' | 'other'; text: string; area?: string; bufferDays?: number; label: string }
   | { type: 'clear_note'; area: string; label: string }
   | { type: 'set_weekly_mileage'; miles: number; label: string }
   | { type: 'set_running_days'; days: number; label: string }
@@ -117,16 +118,28 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
       const text = str(entry.text).slice(0, 240);
       if (!text) return null;
       const kindText = str(entry.noteKind).toLowerCase();
+      /* How long the athlete said it will last, if they said — "sick for a
+         few days", "out all week". Clamped to a fortnight; past that it is a
+         conversation with a doctor, not a buffer. */
+      const stated = Math.round(num(entry.days));
+      const bufferDays = stated >= 1 && stated <= 14 ? stated : undefined;
+      /* SICK IS ITS OWN STATE. It is stored as fatigue named "Sick" (see
+         lib/bodyLog), which turns every day into rest until it clears and
+         eases the days after. */
+      if (kindText === 'illness' || kindText === 'sick') {
+        const days = bufferDays ?? 3;
+        return { type, noteKind: 'fatigue', text, area: SICK_AREA, bufferDays: days, label: `Sick — rest for ${days === 1 ? 'today' : `${days} days`}, then ${EASE_BACK_DAYS} easier days back` };
+      }
       const noteKind: 'injury' | 'fatigue' | 'other' = kindText === 'injury' || kindText === 'fatigue' ? kindText : 'other';
       const area = str(entry.area).slice(0, 40) || undefined;
       const what = area || (noteKind === 'fatigue' ? 'fatigue' : 'a note');
-      return { type, noteKind, text, area, label: noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? 'Body log: fatigue — ease the next few days' : `Body log: ${what}` };
+      return { type, noteKind, text, area, bufferDays, label: noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? `Lighter training for ${bufferDays ? `${bufferDays} days` : 'the next few days'}` : `Body log: ${what}` };
     }
     case 'clear_note': {
       const wanted = norm(str(entry.area));
       const area = ctx.activeNoteAreas.find(item => norm(item) === wanted) || ctx.activeNoteAreas.find(item => norm(item).includes(wanted) || wanted.includes(norm(item)));
       if (!area) return null;
-      return { type, area, label: `Clear ${area} from the body log` };
+      return { type, area, label: norm(area) === norm(SICK_AREA) ? `Back to training — ${EASE_BACK_DAYS} easier days first` : `Clear ${area} from the body log` };
     }
     case 'set_weekly_mileage': {
       const miles = clamp(Math.round(num(entry.miles) * 10) / 10, 1, 150);
@@ -220,6 +233,30 @@ export function shortenRecommendation(rec: DailyRecommendation, minutes: number)
   return { ...rec, topSets: keptSets, cardio, explanation: `${rec.explanation} Trimmed to ${minutes} minutes${dropped ? ` — ${dropped} top set${dropped === 1 ? '' : 's'} dropped` : ''}.` };
 }
 
+/* EASING BACK IN. The first days after being sick, or a tired stretch, keep
+   the session but take the edge off it: every load 10% down to a weight the
+   bar can hold, and the cardio a quarter shorter and steady — no intervals
+   the morning after a fever. */
+export const EASE_PERCENT = 10;
+export function easeRecommendation(rec: DailyRecommendation, metric = false): DailyRecommendation {
+  const step = metric ? 2.5 : 5;
+  const topSets = rec.topSets.map(set => {
+    if (!(set.weight > 0)) return set;
+    const weight = Math.max(step, Math.floor((set.weight * (1 - EASE_PERCENT / 100)) / step) * step);
+    return { ...set, weight, calculatedMax: set.calculatedMax ? Math.round(set.calculatedMax * weight / set.weight) : set.calculatedMax, rationale: `Easing back in — ${EASE_PERCENT}% lighter today. ${set.rationale || ''}`.trim() };
+  });
+  let cardio = rec.cardio;
+  if (cardio) {
+    const minutes = cardioMinutesOf(cardio);
+    const fit = Math.max(15, Math.round(minutes * 0.75));
+    const plan: Record<string, unknown> = { ...(cardio.session.plan as Record<string, unknown>), duration: String(fit), structure: 'Steady' };
+    if (typeof plan.distance === 'string' && Number(plan.distance) > 0) plan.distance = String(Math.round(Number(plan.distance) * 0.75 * 10) / 10);
+    delete plan.repeats; delete plan.pace;
+    cardio = { ...cardio, summary: `Easy · ${fit} min`, session: { ...cardio.session, plan, stress: 'Low' } as typeof cardio.session };
+  }
+  return { ...rec, topSets, cardio };
+}
+
 const cardioMinutesOf = (cardio: NonNullable<DailyRecommendation['cardio']>) => {
   const plan = cardio.session.plan as { duration?: string; distance?: string };
   return Number(plan.duration) || Math.round((Number(plan.distance) || 0) * 9) || 30;
@@ -230,14 +267,48 @@ const cardioMinutesOf = (cardio: NonNullable<DailyRecommendation['cardio']>) => 
    30 minutes" trims. Deliberately small — anything subtler waits for the
    coach. The server never sees this; it exists so an offline athlete's
    "my knee hurts" is not lost. */
+/* THE COACH STILL ACTS WITHOUT THE AI. When forge-coach cannot be reached —
+   offline, a preview build, a provider outage — the athlete's sentence is
+   read for the handful of states that should change the plan, so "I'm sick"
+   still rests today and holds the week instead of earning a paragraph. Every
+   entry goes through parseActions like the server's do. */
+const SICK = /\b(sick|ill|unwell|flu|fever|feverish|covid|virus|stomach bug|food poisoning|strep|sinus infection|chest infection|throwing up|vomiting|nauseous)\b|\b(a|the|my) cold\b|\bcaught a cold\b|\bcoming down with\b/;
+const BETTER = /\b(feel(?:ing)? (?:a lot |much |way )?better|i'?m better|recovered|back to normal|over it|no longer sick|not sick anymore|healthy again)\b/;
+/* "for 3 days", "a couple of days", "all week", "this week" → days. */
+export function statedDays(lower: string): number | undefined {
+  const words: Record<string, number> = { a: 1, one: 1, two: 2, couple: 2, three: 3, few: 3, four: 4, five: 5, six: 6, seven: 7, several: 4 };
+  const days = lower.match(/\b(\d{1,2}|a|one|two|three|four|five|six|seven|couple|few|several)\s*(?:of\s*)?(?:more\s*)?(day|days|week|weeks)\b/);
+  if (days) {
+    const count = Number(days[1]) || words[days[1]] || 1;
+    return Math.min(14, /week/.test(days[2]) ? count * 7 : count);
+  }
+  if (/\b(all|this|the whole) week\b/.test(lower)) return 7;
+  if (/\b(today|tonight)\b/.test(lower) && !/\bdays?\b/.test(lower)) return 1;
+  return undefined;
+}
+
 export function localActions(question: string, ctx: ActionContext): CoachAction[] {
   const text = question.trim();
-  if (!text || /\?\s*$/.test(text)) return [];
-  const raw: RawAction[] = [];
+  if (!text) return [];
   const lower = text.toLowerCase();
+  /* "Should I train if I'm sick?" is a question, not a report — unless it
+     also says they are ("I'm sick, should I run?"). */
+  const asks = /\?\s*$/.test(text);
+  /* "…when I'm sick?", "…if I have a cold?" is asking about a situation, not
+     reporting one. */
+  const hypothetical = asks && /\b(if|when|whenever|in case|while)\s+(?:i|i'?m|you|you'?re)\b/.test(lower);
+  const reports = !asks || (!hypothetical && /\b(i'?m|i am|i've|i have|i got|i feel|feeling)\b/.test(lower));
+  if (!reports) return [];
+  const raw: RawAction[] = [];
+  const sickNow = ctx.activeNoteAreas.some(area => area.toLowerCase() === SICK_AREA.toLowerCase());
+  if (sickNow && BETTER.test(lower)) return parseActions([{ type: 'clear_note', area: SICK_AREA }], ctx);
   const area = extractAreaWord(lower);
+  if (SICK.test(lower) && !/\bsick of\b/.test(lower)) {
+    raw.push({ type: 'rest_today' }, { type: 'log_note', noteKind: 'illness', text, days: statedDays(lower) ?? null });
+    return parseActions(raw, ctx);
+  }
   if (/\b(hurt|hurts|pain|painful|sore|tweak|tweaked|injur\w*|strain\w*|sprain\w*|tight|pulled|aching|sharp)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'injury', text, area });
-  else if (/\b(fatigued?|exhausted|drained|burn(?:ed|t) out|run down|no energy|wiped|overtrained|sick|ill|flu|cold)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: null });
+  else if (/\b(fatigued?|exhausted|drained|burn(?:ed|t) out|run down|no energy|wiped|overtrained|so tired|really tired|barely slept|didn'?t sleep|no sleep|slept \d hours?)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: null, days: statedDays(lower) ?? 2 });
   if (area && /\b(better|fine|gone|cleared|healed|good now|no longer)\b/.test(lower) && ctx.activeNoteAreas.length) raw.push({ type: 'clear_note', area });
   if (/\b(rest day|day off|need a rest|take today off|skip today|not training today)\b/.test(lower)) raw.push({ type: 'rest_today' });
   const minutes = lower.match(/\b(\d{2,3})\s*(?:min|mins|minutes)\b/);

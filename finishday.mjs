@@ -23,7 +23,7 @@ async function open(history){
 const stored=(page)=>page.evaluate(iso => { const all=JSON.parse(localStorage.getItem('forge-workout-history-v1')||'[]'); const d=all.find(r=>r.date===iso); return d?(d.topSets||[]).map(s=>`${s.lift} ${s.weight}x${s.reps}`):null }, iso);
 {
   const page=await open(days);
-  await page.locator('button:has-text("Finish Day")').click(); await page.waitForTimeout(1200);
+  await page.locator('button:has-text("Finish workout")').click(); await page.waitForTimeout(1200);
   check('an untouched plan day is refused', page.url().includes('/workout'), page.url());
   check('and nothing is written for it', (await stored(page))===null, JSON.stringify(await stored(page)));
   await page.close();
@@ -31,8 +31,8 @@ const stored=(page)=>page.evaluate(iso => { const all=JSON.parse(localStorage.ge
 {
   const page=await open([{ id:'t', date: iso, title:'Chest & Back', muscles:['Chest'], hasCardio:false, topSets:[{ id:'s1', muscle:'Chest', lift:'Bench Press', weight:305, reps:5, calculatedMax:356, completed:true }], ...{} }, ...days]);
   const rows=await page.locator('.top-set-entry').allInnerTexts();
-  check('a set saved earlier today shows as logged', rows.some(r=>/305 lb ×5/.test(r)), JSON.stringify(rows));
-  await page.locator('button:has-text("Finish Day")').click(); await page.waitForTimeout(1200);
+  check('a set saved earlier today shows as logged', rows.some(r=>/305 lb × ?5/.test(r)), JSON.stringify(rows));
+  await page.locator('button:has-text("Finish workout")').click(); await page.waitForTimeout(1200);
   check('Finish Day completes', page.url().endsWith('#/'), page.url());
   const sets=await stored(page);
   check('and the day keeps exactly what was done', JSON.stringify(sets)==='["Bench Press 305x5"]', JSON.stringify(sets));

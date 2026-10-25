@@ -45,8 +45,10 @@ export function useCoachActions() {
       if (action.type === 'set_weekly_mileage') { updateProfile({ weeklyMileage: action.miles }); if (setup) { const ceiling = Number(setup.maxWeeklyMileage) || 0; saveSetup({ ...setup, weeklyMileage: action.miles, maxWeeklyMileage: ceiling && action.miles > ceiling ? Math.ceil(action.miles * 1.1) : setup.maxWeeklyMileage }); } }
       if (action.type === 'set_running_days') { updateProfile({ runningDays: action.days }); if (setup) saveSetup({ ...setup, runningDays: action.days }); }
       if (action.type === 'set_load_bias') updateStrategy({ loadBiasPercent: action.percent, lastAdjustment: reason });
-      if (action.type === 'log_note') upsert(createNote(action.noteKind, action.text, action.area || extractArea(action.text)));
-      if (action.type === 'clear_note') { const note = notes.find(item => item.status === 'active' && (item.area || kindLabel[item.kind]) === action.area); if (note) upsert({ ...note, status: 'cleared' }); }
+      if (action.type === 'log_note') upsert(createNote(action.noteKind, action.text, action.area || extractArea(action.text), action.bufferDays));
+      /* Cleared today, it ends today — which is what starts the easier days
+         back after being sick (lib/bodyLog reads the end date). */
+      if (action.type === 'clear_note') { const note = notes.find(item => item.status === 'active' && (item.area || kindLabel[item.kind]) === action.area); if (note) upsert({ ...note, status: 'cleared', bufferUntil: todayIso }); }
       if (action.type === 'update_goal') { const index = goals.findIndex(goal => goal.title === action.goalTitle); if (index >= 0) saveGoal({ ...goals[index], ...(action.target ? { target: action.target } : {}), ...(action.date ? { date: action.date } : {}) }, index); }
       if (action.type === 'create_exercise') addExercise({ name: action.name, kind: action.muscles.includes('Cardio') ? 'Cardio' : 'Strength', muscles: action.muscles, detail: 'Coach-created · User confirmed', enabled: true, custom: true });
       if (action.type === 'create_workout') { const cardioOnly = action.items.every(item => exercises.find(exercise => exercise.name.toLowerCase() === item.toLowerCase())?.kind === 'Cardio'); addWorkout({ name: action.name, kind: cardioOnly ? 'Cardio' : 'Strength', source: 'User', summary: action.items.join(' · '), exercises: action.items }); }

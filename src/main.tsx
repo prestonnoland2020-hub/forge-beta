@@ -79,7 +79,11 @@ import './partners.css';
    phone-first with a desktop counterpart, and the band between them — every
    iPad in portrait — belonged to neither. This owns it, so it has to win. */
 import './device-fit.css';
-import { pinChromeToVisualViewport } from './features/shell/pinChrome';
+/* And after that, the chrome: the tab bar, header, transitions and coach
+   sheet, in one file that nothing older can override. */
+import './app-chrome.css';
+import './app-polish.css';
+import { startNativeChrome } from './features/shell/nativeChrome';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.
@@ -122,11 +126,11 @@ if ((!launch || launch === 'navigate')
   window.location.hash = '/';
 }
 
-/* THE BOTTOM BAR AND THE HEADER FOLLOW WHAT YOU CAN SEE, not what the page
-   thinks the window is. On iOS those are two different rectangles the moment
-   anyone pinches, double-taps a paragraph, or opens the keyboard — and a fixed
-   element is glued to the wrong one. See lib/visualViewportChrome. */
-pinChromeToVisualViewport();
+/* THE CHROME BEHAVES LIKE AN APP'S: a tab bar fixed to the screen that steps
+   aside for the keyboard, and a status bar that follows the theme. It used to
+   chase the visual viewport every frame, which is what made the bar stick
+   halfway up the screen. See features/shell/nativeChrome. */
+startNativeChrome();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
