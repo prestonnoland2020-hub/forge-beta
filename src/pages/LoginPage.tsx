@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { signInWithProvider, type OAuthProvider } from '../features/auth/authService';
 import { useAuth } from '../features/auth/AuthProvider';
+import { isDemoMode } from '../lib/env';
 
 export function LoginPage() {
   const { user, loading } = useAuth();
@@ -21,20 +22,26 @@ export function LoginPage() {
     }
   }
 
-  /* SIGN IN WITH APPLE IS NOT OFFERED HERE.
+  /* SIGN IN WITH APPLE IS BEHIND A SWITCH, NOT GONE.
 
-     The button was on this screen and did not complete a sign-in, which is
-     worse than not offering it: the athlete taps the more prominent of the two
-     options, lands nowhere, and has no reason to trust the other one. Google
-     is the single route until Apple is configured end to end and verified on
-     a real device.
+     The button was on this screen once and did not complete a sign-in, which
+     is worse than not offering it: the athlete taps the more prominent of the
+     two options, lands nowhere, and has no reason to trust the other one. So
+     it shows only where it can work — every preview build, and a real build
+     with VITE_APPLE_SIGN_IN=true, which is set once Apple is configured in
+     Supabase and verified on a real device.
 
-     Worth knowing before it comes back: App Review Guideline 4.8 asks an app
-     using a third-party login to also offer a login that limits data
-     collection to name and email, hides the email if the user wants, and does
-     no advertising tracking without consent. Sign in with Apple is the usual
-     way to satisfy it. That makes this a submission blocker to resolve, not a
-     decision to leave settled. */
+     It has to come back before submission: App Review Guideline 4.8 asks an
+     app using a third-party login to also offer one that limits collection to
+     name and email and can hide the email. Sign in with Apple is that login. */
+  const appleButton = (isDemoMode || import.meta.env.VITE_APPLE_SIGN_IN === 'true') && (
+    <button className="apple-button" onClick={() => void signIn('apple')} disabled={loading || Boolean(busy)}>
+      {/* A drawn mark, not the U+F8FF glyph — that character exists only in
+          Apple's own fonts, so it vanished in Chrome and on Android. */}
+      <svg className="apple-mark" aria-hidden="true" viewBox="0 0 814 1000" width="17" height="20" fill="currentColor"><path d="M788 341c-6 4-108 62-108 190 0 148 130 200 134 202-1 3-21 72-69 142-43 62-88 124-156 124s-86-40-165-40c-77 0-104 41-167 41s-106-57-156-127C43 791 0 674 0 563c0-178 116-272 230-272 61 0 111 40 149 40 37 0 94-42 163-42 26 0 120 2 182 92zM555 175c28-34 49-81 49-127 0-7-1-13-2-19-46 2-101 31-134 70-26 30-50 76-50 124 0 7 1 15 2 17 3 1 8 1 12 1 41 0 93-28 123-66z" /></svg>
+      {busy === 'apple' ? 'Opening Apple…' : 'Continue with Apple'}
+    </button>
+  );
   const googleButton = (
     <button className="google-button" onClick={() => void signIn('google')} disabled={loading || Boolean(busy)}>
       <span className="google-mark" aria-hidden="true">G</span>
@@ -54,7 +61,7 @@ export function LoginPage() {
         <h1 id="login-title">Show up.<br />Forge ahead.</h1>
         <p>Today’s workout, your progress, and one coach that learns from every session.</p>
 
-        <div className="login-providers">{googleButton}</div>
+        <div className="login-providers">{appleButton}{googleButton}</div>
 
         {error && <div className="login-error" role="alert">{error}</div>}
         <p className="login-note">Secure sign-in. Your training stays with your account.</p>

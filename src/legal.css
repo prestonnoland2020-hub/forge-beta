@@ -139,3 +139,26 @@
   border-top: 1px solid var(--hairline);
 }
 .legal-foot a { color: var(--ink-2); text-decoration: none; }
+
+/* Apple's own button: black with a white logo and label, the style its
+   guidelines ask for on a light screen. Like Google's, it does NOT follow the
+   theme — and it sits above Google's, as Apple's review expects. */
+.apple-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 0 var(--s4, 16px);
+  border: 0;
+  border-radius: 10px;
+  background: #000000;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.apple-button:active:not(:disabled) { transform: translateY(1px); }
+.apple-button:disabled { cursor: wait; opacity: .72; }
+.apple-mark { flex: none; margin-top: -3px; }
