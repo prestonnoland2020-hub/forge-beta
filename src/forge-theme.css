@@ -146,6 +146,15 @@
      direction actually separates in the current tone, so `color-mix(in srgb,
      var(--surface-1) 96%, var(--lift))` reads correctly in both. */
   --lift: #14181a;
+  /* THE FACETED MARK'S OWN COLOURS, the same in both tones. The app's mark is
+     normally a one-colour mask; the sign-in entrance draws the full logo, and
+     these are its tile, its near-white wedge, its grey wedge and the long
+     45° shadow the whole F casts across the tile. Only the
+     arms follow the accent. #7b807e is here as a FACET, never as type. */
+  --mark-tile: #3f4849;
+  --mark-face: #f3f5f5;
+  --mark-shade: #7b807e;
+  --mark-shadow: rgba(0, 0, 0, .34);
 
   /* The ambient glow behind the page. On dark it is the accent catching the
      top-right corner; on light the same wash reads as a stain, so light gets
@@ -171,6 +180,7 @@
 
   --ease: cubic-bezier(.2, .7, .3, 1);
   --dur: 150ms;
+  --ease-strike: cubic-bezier(.16, 1, .3, 1);
 
   /* ---- Type --------------------------------------------------------------
      ARCHIVO for display, INTER for everything else.
@@ -249,6 +259,10 @@
     --scrim: rgba(0, 0, 0, .72);
 
     --lift: #ffffff;
+    --mark-tile: #3f4849;
+    --mark-face: #f3f5f5;
+    --mark-shade: #7b807e;
+    --mark-shadow: rgba(0, 0, 0, .34);
     --page-glow: var(--accent-wash);
     --grid-line: rgba(255, 255, 255, .035);
   }
@@ -301,6 +315,10 @@
   --scrim: rgba(0, 0, 0, .72);
 
   --lift: #ffffff;
+  --mark-tile: #3f4849;
+  --mark-face: #f3f5f5;
+  --mark-shade: #7b807e;
+  --mark-shadow: rgba(0, 0, 0, .34);
   --page-glow: var(--accent-wash);
   --grid-line: rgba(255, 255, 255, .035);
 }
