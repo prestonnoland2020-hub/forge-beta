@@ -261,3 +261,85 @@ details.session-details[open] > summary { margin-bottom: 14px; }
 .ss-sheet-foot button.danger { color: #c0392b; }
 .ss-sheet-foot button:disabled { opacity: .35; }
 @media (prefers-reduced-motion: reduce) { .ss-sheet, .ss-backdrop { animation: none; } }
+
+/* ── GOALS, AS A SCOREBOARD ──────────────────────────────────────────────
+   Category is colour you can tell apart at a glance — strength indigo,
+   endurance teal, body amber — and progress is a second, separate colour
+   on the bar: green on track, yellow more work, red out of reach. The bars
+   fill and the numbers count as the page opens. */
+.goals-workspace { --gx-strength: #4f5bd5; --gx-endurance: #0f9d8a; --gx-body: #e08a1e;
+  --gx-good: #22a35a; --gx-work: #e3a008; --gx-off: #dc4a3d; --gx-none: #9aa5a0; gap: 18px; }
+
+.gx-hero { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 18px; padding: 18px; border-radius: 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gx-strength) 14%, var(--surface-1, #fff)), color-mix(in srgb, var(--gx-endurance) 12%, var(--surface-1, #fff)));
+  border: 1px solid color-mix(in srgb, var(--ink, #000) 7%, transparent); animation: gx-rise .45s cubic-bezier(.2,.8,.2,1) both; }
+.gx-ring { position: relative; width: 96px; height: 96px; display: grid; place-items: center; }
+.gx-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.gx-ring circle { fill: none; stroke-width: 9; }
+.gx-ring-track { stroke: color-mix(in srgb, var(--ink, #000) 9%, transparent); }
+.gx-ring-fill { stroke: var(--gx-good); stroke-linecap: round; transition: stroke-dashoffset 1.3s cubic-bezier(.2,.8,.2,1) .15s; }
+.gx-ring strong { position: relative; font: 800 24px var(--display-font, inherit); font-variant-numeric: tabular-nums; }
+.gx-hero-text { display: grid; gap: 4px; min-width: 0; }
+.gx-hero-text > span { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3, var(--muted)); }
+.gx-hero-text > strong { font-size: 20px; line-height: 1.2; }
+.gx-tally { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.gx-tally b { padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 800; }
+.gx-tally .good { background: color-mix(in srgb, var(--gx-good) 16%, transparent); color: #157a42; }
+.gx-tally .work { background: color-mix(in srgb, var(--gx-work) 20%, transparent); color: #8a6100; }
+.gx-tally .off { background: color-mix(in srgb, var(--gx-off) 16%, transparent); color: #a8322a; }
+
+.gx-group { display: grid; gap: 10px; --gx-cat: var(--gx-strength); }
+.gx-group.endurance { --gx-cat: var(--gx-endurance); }
+.gx-group.body { --gx-cat: var(--gx-body); }
+.gx-group-head { display: flex; align-items: center; gap: 10px; }
+.gx-group-head h2 { margin: 0; font-size: 20px; text-transform: none; letter-spacing: -.01em; }
+.gx-group-head small { margin-left: auto; font-weight: 800; color: var(--ink-3, var(--muted)); }
+.gx-group-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: var(--gx-cat); color: #fff; }
+.gx-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.gx-card { border-radius: 20px; background: var(--surface-1, var(--card)); border: 1px solid color-mix(in srgb, var(--ink, #000) 7%, transparent);
+  box-shadow: 0 6px 18px -10px rgb(0 0 0 / .18); position: relative; overflow: hidden; animation: gx-rise .5s cubic-bezier(.2,.8,.2,1) both; }
+.gx-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--gx-cat); }
+.gx-face { display: grid; gap: 12px; width: 100%; padding: 16px 16px 14px 20px; border: 0; background: none; color: inherit; text-align: left; transition: transform .12s ease; }
+.gx-face:active { transform: scale(.99); }
+.gx-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.gx-title { font-size: 19px; line-height: 1.25; font-weight: 800; }
+.gx-pill { flex: none; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.gx-pill.tone-on-track, .gx-pill.tone-reached { background: color-mix(in srgb, var(--gx-good) 16%, transparent); color: #157a42; }
+.gx-pill.tone-needs-work { background: color-mix(in srgb, var(--gx-work) 20%, transparent); color: #8a6100; }
+.gx-pill.tone-off-track { background: color-mix(in srgb, var(--gx-off) 16%, transparent); color: #a8322a; }
+.gx-pill.tone-unknown { background: color-mix(in srgb, var(--ink, #000) 7%, transparent); color: var(--ink-3, var(--muted)); }
+.gx-numbers { display: flex; align-items: flex-end; gap: 12px; }
+.gx-now, .gx-target { display: grid; gap: 0; font-variant-numeric: tabular-nums; line-height: 1; }
+.gx-now { font: 800 34px/1 var(--display-font, inherit); letter-spacing: -.02em; }
+.gx-target { font-size: 20px; font-weight: 800; color: var(--ink-2, var(--text)); }
+.gx-now small, .gx-target small { margin-top: 5px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3, var(--muted)); }
+.gx-arrow { color: var(--ink-3, var(--muted)); font-weight: 800; padding-bottom: 16px; }
+.gx-bar { display: block; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--ink, #000) 8%, transparent); overflow: hidden; }
+.gx-bar i { display: block; height: 100%; border-radius: inherit; background: var(--gx-none);
+  transition: width 1.2s cubic-bezier(.2,.8,.2,1) var(--gx-delay, 150ms); position: relative; }
+.tone-on-track .gx-bar i, .tone-reached .gx-bar i { background: linear-gradient(90deg, #5fd08f, var(--gx-good)); }
+.tone-needs-work .gx-bar i { background: linear-gradient(90deg, #f6cf5a, var(--gx-work)); }
+.tone-off-track .gx-bar i { background: linear-gradient(90deg, #f08a7e, var(--gx-off)); }
+.gx-bar i::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .45), transparent); transform: translateX(-100%); animation: gx-shine 1.6s ease calc(var(--gx-delay, 150ms) + 1s) 1; }
+.gx-foot { display: flex; align-items: baseline; justify-content: space-between; }
+.gx-foot b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gx-foot small { font-size: 13px; font-weight: 700; color: var(--ink-3, var(--muted)); }
+.tone-reached .gx-title::after { content: ' 🏆'; }
+.gx-card .goal-card-actions, .gx-card .goal-card-detail { padding: 0 16px 14px 20px; }
+
+.gx-empty { text-align: center; padding: 28px 20px; border-radius: 22px; background: var(--surface-1, var(--card)); border: 1px dashed var(--hairline-strong, var(--line)); }
+.gx-empty h2 { margin: 12px 0 6px; font-size: 22px; text-transform: none; }
+.gx-empty p { margin: 0; color: var(--ink-3, var(--muted)); }
+.gx-empty-art { display: flex; justify-content: center; gap: 10px; }
+.gx-empty-art span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; color: #fff; animation: gx-rise .5s both; }
+.gx-empty-art .strength { background: var(--gx-strength); } .gx-empty-art .endurance { background: var(--gx-endurance); animation-delay: .08s; } .gx-empty-art .body { background: var(--gx-body); animation-delay: .16s; }
+.gx-add { width: 100%; min-height: 56px; border-radius: 18px; border: 1.5px dashed var(--hairline-strong, var(--line)); background: transparent; color: var(--ink-2, var(--text)); font-size: 16px; font-weight: 800; }
+.gx-add:active { transform: scale(.98); }
+
+@keyframes gx-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes gx-shine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .gx-card, .gx-hero, .gx-empty-art span { animation: none; } .gx-bar i, .gx-ring-fill { transition: none; } .gx-bar i::after { display: none; } }
+.gx-hero.ring-work .gx-ring-fill { stroke: var(--gx-work); }
+.gx-hero.ring-off .gx-ring-fill { stroke: var(--gx-off); }
+.gx-hero.ring-none .gx-ring-fill { stroke: var(--gx-none); }

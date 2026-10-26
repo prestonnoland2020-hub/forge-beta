@@ -12,7 +12,7 @@ import { paceModel, easyTooFast, loggedEasyPace } from '../../lib/paceModel';
 import { enduranceTarget, clockText, QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../../lib/qualitySession';
 import { medianWeeklyMiles, longestContinuousRun } from '../../lib/goalTrajectory';
 import { milesBetween, last7DayRuns, receiptLine } from '../../lib/stats';
-import { goalFeasibility } from '../../lib/goalFeasibility';
+import { goalFeasibility, competingRaces } from '../../lib/goalFeasibility';
 import { progressionLevels } from '../../lib/progressionLevels';
 import { workoutEfforts } from '../../lib/workoutEvidence';
 import { liftPositions } from '../../lib/liftProgression';
@@ -170,6 +170,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
       levelMoves: moves,
       trend: sessionTrend(judged),
       week, closedWeek, liftMisses, goalChanges, readiness, easyTooFast: easy,
+      raceClash: (() => { const clash = competingRaces(goals); if (!clash) return null; const built = enduranceTarget(goals); return { ...clash, builtFor: built ? (built.goal.title || built.goal.exercise) : undefined }; })(),
     });
 
     /* THE WEEK REVIEWED, once the week has closed. The reviewed week is the
