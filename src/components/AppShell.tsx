@@ -54,10 +54,10 @@ function NavGlyph({ name }: { name: NavGlyphName }) {
    it, so the tab you came from stays lit while you are inside it. */
 const tabs = [
   { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' },
-  { to: '/plan', label: 'Plan', icon: 'calendar', owns: (path: string) => path === '/plan' || path === '/split' },
+  { to: '/plan', label: 'Plan', icon: 'calendar', owns: (path: string) => path === '/plan' },
   { to: '/goals', label: 'Goals', icon: 'target', owns: (path: string) => path === '/goals' },
   { to: '/history', label: 'Activities', icon: 'history', owns: (path: string) => path === '/history' },
-  { to: '/profile', label: 'Profile', icon: 'you', owns: (path: string) => path === '/profile' || path.startsWith('/partners') || path === '/exercises' },
+  { to: '/profile', label: 'Profile', icon: 'you', owns: (path: string) => path === '/profile' || path === '/split' || path.startsWith('/partners') || path === '/exercises' },
 ] as const;
 
 /* How deep a screen sits under its tab, which is what decides the direction a

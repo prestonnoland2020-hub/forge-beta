@@ -180,3 +180,84 @@ details.session-details[open] > summary { margin-bottom: 14px; }
 }
 .dial-presets button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast, #fff); }
 @media (prefers-reduced-motion: reduce) { .dial-sheet.dial-pro, .dial-pro .dial-readout b { animation: none; } }
+
+/* ── THE SPLIT, AS A LIST AND A SHEET ────────────────────────────────────
+   Days read top to bottom like the week; a day opens into a sheet with only
+   what its type needs. The sheet's controls are segments and chips, all at
+   least 44px, so the whole split is buildable with a thumb. */
+.split-simple { display: grid; gap: 14px; }
+.ss-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.ss-head h2 { margin: 0; font-size: 24px; line-height: 1.15; text-transform: none; letter-spacing: -.015em; }
+.ss-head small { color: var(--ink-3, var(--muted)); font-weight: 600; font-size: 14px; }
+.ss-head .split-autosave { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+
+.ss-templates { display: grid; gap: 8px; padding: 14px; border-radius: 18px; background: color-mix(in srgb, var(--accent) 7%, var(--surface-1, var(--card))); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+.ss-templates-head { display: flex; align-items: center; justify-content: space-between; }
+.ss-templates-head strong { font-size: 16px; }
+.ss-templates > button { display: grid; gap: 2px; text-align: left; padding: 12px 14px; min-height: 56px; border-radius: 14px; border: 1px solid var(--hairline-strong, var(--line)); background: var(--surface-1, var(--card)); color: var(--ink, var(--text)); transition: transform .12s ease; }
+.ss-templates > button:active { transform: scale(.98); }
+.ss-templates > button strong { font-size: 16px; }
+.ss-templates > button small { color: var(--ink-3, var(--muted)); font-weight: 600; }
+
+.ss-days { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ss-day > button { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; text-align: left; min-height: 68px; padding: 12px 16px; border-radius: 16px; border: 1px solid var(--hairline, var(--line)); background: var(--surface-1, var(--card)); color: var(--ink, var(--text)); transition: transform .12s ease, background-color .12s ease; }
+.ss-day > button:active { transform: scale(.985); }
+.ss-num { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; font-weight: 800; font-size: 14px; background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent-text, var(--accent)); text-transform: capitalize; }
+.ss-rest .ss-num { background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); color: var(--ink-3, var(--muted)); }
+.ss-cardio .ss-num, .ss-hyrox .ss-num { background: color-mix(in srgb, #2fa36b 15%, transparent); color: #1f7a4e; }
+.ss-text { display: grid; gap: 2px; min-width: 0; }
+.ss-text strong { font-size: 17px; }
+.ss-text small { font-size: 14px; color: var(--ink-3, var(--muted)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-chev { font-size: 22px; color: var(--ink-3, var(--muted)); }
+
+.ss-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ss-add { flex: 1; min-height: 52px; border-radius: 16px; border: 1.5px dashed var(--hairline-strong, var(--line)); background: transparent; color: var(--ink-2, var(--text)); font-size: 16px; font-weight: 800; }
+.ss-actions .text-button { font-weight: 800; font-size: 15px; padding: 10px 4px; }
+
+.ss-mileage { display: grid; gap: 12px; }
+.ss-mileage > div:first-child { display: grid; gap: 2px; }
+.ss-mileage small, .ss-settings small { color: var(--ink-3, var(--muted)); font-weight: 600; }
+.ss-mileage-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ss-mileage-fields label, .ss-settings label { display: grid; gap: 6px; font-weight: 700; font-size: 14px; }
+.ss-settings > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.ss-settings > summary::-webkit-details-marker { display: none; }
+.ss-settings > summary > span { display: grid; gap: 2px; }
+.ss-settings > summary::after { content: '›'; font-size: 22px; color: var(--ink-3, var(--muted)); transition: transform .2s ease; }
+.ss-settings[open] > summary::after { transform: rotate(90deg); }
+.ss-settings > div { display: grid; gap: 12px; padding-top: 14px; }
+
+.ss-backdrop { position: fixed; inset: 0; z-index: 50; background: var(--scrim, rgb(0 0 0 / .4)); display: flex; align-items: flex-end; animation: scrim-in .25s ease; }
+.ss-sheet { width: 100%; max-width: 640px; margin: 0 auto; max-height: 92dvh; display: flex; flex-direction: column; border-radius: 26px 26px 0 0; background: var(--surface-1, var(--card)); box-shadow: 0 -18px 50px -12px rgb(0 0 0 / .3); animation: dial-sheet-up .36s cubic-bezier(.2, .9, .25, 1); }
+.ss-grabber { display: block; width: 38px; height: 5px; margin: 8px auto 0; border-radius: 3px; background: var(--hairline-strong, var(--line)); }
+.ss-sheet-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 8px 18px 10px; }
+.ss-sheet-head span { font-size: 14px; font-weight: 700; color: var(--ink-3, var(--muted)); }
+.ss-sheet-head strong { font-size: 16px; max-width: 46vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-done { justify-self: end; border: 0; background: none; color: var(--accent-text, var(--accent)); font-size: 17px; font-weight: 800; padding: 8px 2px; }
+.ss-sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 4px 18px 16px; display: grid; gap: 16px; }
+.ss-field { display: grid; gap: 6px; font-weight: 700; font-size: 14px; }
+.ss-field input, .ss-search { width: 100%; box-sizing: border-box; min-height: 50px; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--hairline-strong, var(--line)); background: var(--surface-sunken); color: var(--ink, var(--text)); font-size: 17px; font-weight: 600; }
+.ss-segment { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); }
+.ss-segment.two { grid-template-columns: 1fr 1fr; }
+.ss-segment.three { grid-template-columns: repeat(3, 1fr); }
+.ss-segment button { min-height: 44px; border: 0; border-radius: 10px; background: none; color: var(--ink-2, var(--text)); font-size: 15px; font-weight: 800; transition: background-color .15s ease; }
+.ss-segment button.active { background: var(--surface-1, #fff); color: var(--ink, var(--text)); box-shadow: 0 1px 3px rgb(0 0 0 / .14); }
+.ss-block { display: grid; gap: 10px; }
+.ss-block-head { display: flex; align-items: baseline; justify-content: space-between; }
+.ss-block-head strong { font-size: 17px; }
+.ss-block-head small { color: var(--ink-3, var(--muted)); font-weight: 700; }
+.ss-trains { margin: -4px 0 0; font-size: 14px; color: var(--ink-3, var(--muted)); font-weight: 600; }
+.ss-trains .text-button { font-size: 14px; font-weight: 800; padding: 0 4px; }
+.ss-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ss-chips button { min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--hairline-strong, var(--line)); background: transparent; color: var(--ink-2, var(--text)); font-weight: 800; font-size: 15px; }
+.ss-chips button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast, #fff); }
+.ss-lifts { display: grid; gap: 6px; max-height: 300px; overflow-y: auto; }
+.ss-lifts button { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--hairline, var(--line)); background: transparent; color: var(--ink, var(--text)); font-size: 16px; font-weight: 700; text-align: left; }
+.ss-lifts button.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.ss-check { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--hairline-strong, var(--line)); font-size: 13px; color: var(--accent-contrast, #fff); }
+.ss-lifts button.selected .ss-check { background: var(--accent); border-color: var(--accent); }
+.ss-empty, .ss-note { margin: 0; color: var(--ink-3, var(--muted)); font-size: 14px; line-height: 1.5; }
+.ss-sheet-foot { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 12px 18px calc(12px + var(--safe-b, env(safe-area-inset-bottom))); border-top: 1px solid var(--hairline, var(--line)); }
+.ss-sheet-foot button { min-height: 46px; border-radius: 12px; border: 0; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); color: var(--ink, var(--text)); font-weight: 800; font-size: 15px; }
+.ss-sheet-foot button.danger { color: #c0392b; }
+.ss-sheet-foot button:disabled { opacity: .35; }
+@media (prefers-reduced-motion: reduce) { .ss-sheet, .ss-backdrop { animation: none; } }

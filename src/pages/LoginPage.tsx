@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { signInWithProvider, type OAuthProvider } from '../features/auth/authService';
 import { useAuth } from '../features/auth/AuthProvider';
 import { isDemoMode } from '../lib/env';
+import { ForgeStrikeMark } from '../components/ForgeStrikeMark';
 
 export function LoginPage() {
   const { user, loading } = useAuth();
@@ -52,8 +53,8 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <a className="login-brand" href="#/" aria-label="Forge home">
-        <span className="brand-mark"><i /></span>
-        <span>FORGE</span>
+        <ForgeStrikeMark />
+        <span className="strike-word"><span>F</span><span>O</span><span>R</span><span>G</span><span>E</span></span>
       </a>
 
       <section className="login-card" aria-labelledby="login-title">

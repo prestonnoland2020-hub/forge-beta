@@ -1,0 +1,109 @@
+/* THE SIGN-IN ENTRANCE — "Strike".
+
+   The faceted F assembles on the sign-in screen: the two arms fly in along
+   the mark's own 45° cut, the near-white wedge drops, the grey wedge rises,
+   the long shadow falls out to the lower right and one glint crosses the
+   tile. Then FORGE sets letter by letter and the card rises.
+
+   It plays once, on the screen's first paint, and only here — the legal
+   pages reuse .login-brand and keep the plain mask. Nothing waits for it:
+   the buttons are live from the first frame. Under reduced motion every part
+   is simply where it ends up, because the animation lives entirely inside
+   the no-preference query below.
+
+   Offsets are in viewBox units (the mark is 732 wide), scaled up from the
+   canvas spec's 120 because this mark draws at 34px, not 92. */
+
+.strike-mark {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--mark-face) 16%, transparent), transparent 62%),
+    var(--mark-tile);
+  box-shadow: var(--shadow-2);
+}
+
+.strike-mark svg {
+  position: relative;
+  width: 34px;
+  height: 29px;
+  overflow: visible;
+}
+
+.strike-base { fill: var(--mark-shade); }
+.strike-wedge { fill: var(--mark-face); }
+.strike-arm1,
+.strike-arm2 { fill: var(--accent); }
+
+.strike-shadow {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  filter:
+    drop-shadow(2px 2px 0 var(--mark-shadow)) drop-shadow(2px 2px 0 var(--mark-shadow))
+    drop-shadow(3px 3px 0 var(--mark-shadow)) drop-shadow(4px 4px 0 var(--mark-shadow))
+    drop-shadow(6px 6px 0 var(--mark-shadow));
+}
+
+/* Shaped by the mark and sitting exactly under it, so only the steps of
+   shadow it casts are ever seen. */
+.strike-shadow i {
+  width: 34px;
+  height: 29px;
+  background: var(--mark-shadow);
+  -webkit-mask: var(--forge-mark) center/contain no-repeat;
+  mask: var(--forge-mark) center/contain no-repeat;
+}
+
+.strike-glint {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 40%;
+  width: 16px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--mark-face) 30%, transparent), transparent);
+  transform: skewX(-24deg);
+  pointer-events: none;
+}
+
+.login-brand .strike-word span { display: inline-block; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .strike-mark { animation: strike-tile 420ms var(--ease-strike) both; }
+  .strike-arm1, .strike-arm2, .strike-wedge, .strike-base { transform-box: view-box; }
+  .strike-arm1 { animation: strike-arm 520ms var(--ease-strike) 120ms both; }
+  .strike-arm2 { animation: strike-arm 520ms var(--ease-strike) 230ms both; }
+  .strike-wedge { animation: strike-drop 460ms var(--ease-strike) 360ms both; }
+  .strike-base { animation: strike-rise 460ms var(--ease-strike) 440ms both; }
+  .strike-shadow { animation: strike-shadow 560ms var(--ease-strike) 640ms both; }
+  .strike-glint { animation: strike-glint 620ms ease-in-out 820ms both; }
+
+  .login-brand .strike-word span { animation: strike-up 420ms var(--ease-strike) both; }
+  .login-brand .strike-word span:nth-child(1) { animation-delay: 900ms; }
+  .login-brand .strike-word span:nth-child(2) { animation-delay: 950ms; }
+  .login-brand .strike-word span:nth-child(3) { animation-delay: 1000ms; }
+  .login-brand .strike-word span:nth-child(4) { animation-delay: 1050ms; }
+  .login-brand .strike-word span:nth-child(5) { animation-delay: 1100ms; }
+
+  .login-page > .login-card { animation: strike-up 520ms var(--ease-strike) 1150ms both; }
+}
+
+@keyframes strike-tile { from { opacity: 0; transform: scale(.86); } }
+@keyframes strike-arm { from { opacity: 0; transform: translate(260px, -260px); } }
+@keyframes strike-drop { from { opacity: 0; transform: translateY(-170px); } }
+@keyframes strike-rise { from { opacity: 0; transform: translate(-150px, 150px); } }
+@keyframes strike-shadow { from { opacity: 0; transform: translate(-10px, -10px); } }
+@keyframes strike-glint {
+  0% { opacity: 0; transform: translateX(-40px) skewX(-24deg); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(40px) skewX(-24deg); }
+}
+@keyframes strike-up { from { opacity: 0; transform: translateY(14px); } }
