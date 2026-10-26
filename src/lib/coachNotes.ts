@@ -36,7 +36,7 @@ import type { VerdictOutcome, SessionTrend } from './sessionVerdict';
 import type { LevelMove, Zone } from './progressionLevels';
 import type { RawAction } from './coachActions';
 
-export type CoachNoteKind = 'week-review' | 'readiness' | 'trend' | 'goal-moved' | 'session' | 'week-miles' | 'week-closed' | 'lift-miss' | 'easy-too-fast';
+export type CoachNoteKind = 'week-review' | 'readiness' | 'trend' | 'goal-moved' | 'race-clash' | 'session' | 'week-miles' | 'week-closed' | 'lift-miss' | 'easy-too-fast';
 
 export type CoachNote = {
   /* Stable across renders and days: what this note is ABOUT, so it is shown
@@ -106,6 +106,8 @@ export type CoachNoteInput = {
   goalChanges: GoalVerdictChange[];
   readiness: ReadinessToday | null;
   easyTooFast: { loggedPace: string; easyRange: string } | null;
+  /* Several races on one date: the block can only peak for one. */
+  raceClash?: { date: string; races: string[]; builtFor?: string } | null;
 };
 
 /* A session is news for this many days. After that it is history, and the
@@ -155,6 +157,21 @@ export function coachNotes(input: CoachNoteInput): CoachNote[] {
       say: input.trend.say,
       detail: input.trend.instruction,
       ask: input.trend.instruction,
+    });
+  }
+
+  /* RACES THAT SHARE A DAY. This used to be a card at the top of Goals, read
+     every time the page opened; it is a coach note now, said once per clash,
+     because it is a decision to make, not a heading to live under. */
+  if (input.raceClash) {
+    const day = new Date(`${input.raceClash.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    notes.push({
+      key: `race-clash:${input.raceClash.date}:${input.raceClash.races.join('|')}`,
+      kind: 'race-clash',
+      priority: 86,
+      say: `${input.raceClash.races.length} races on ${day} — a block can peak for one.`,
+      detail: input.raceClash.builtFor ? `Forge is building for ${input.raceClash.builtFor}. Move the others a few weeks out.` : 'Move all but one a few weeks out.',
+      ask: `I have ${input.raceClash.races.join(', ')} all on ${day}. Which should I build for, and when should the others go?`,
     });
   }
 

@@ -100,7 +100,7 @@ export function RunLine({ run }: { run: PlanRun }) {
    week below changes; the tab always opens on the week you are actually in.
    A week is a real tab stop, keyboard arrows included, because that is what it
    looks like. */
-export function PlanProgress({ weekIndex, current, total, waveIndexFor, sentence, onPick }: {
+export function PlanProgress({ weekIndex, current, total, waveIndexFor, onPick }: {
   weekIndex: number; current: number; total: number;
   waveIndexFor: (index: number) => number; sentence: ReactNode; onPick: (index: number) => void;
 }) {
@@ -125,7 +125,7 @@ export function PlanProgress({ weekIndex, current, total, waveIndexFor, sentence
           onClick={() => onPick(index)} />;
       })}
     </div>
-    <p className="pv-progress-sentence">{sentence}</p>
+    {/* "Top sets of 6 — heavier, fewer reps." restated the "6-REP WEEK" label beside it. */}
     {/* Looking somewhere other than now is a state worth naming, with the way
         back one tap away rather than a scroll and a guess. */}
     {away !== 0 && <button type="button" className="pv-progress-back" onClick={() => onPick(current)}>

@@ -83,13 +83,13 @@ if (page.url().includes('/onboarding')) {
 }
 
 const list = await page.evaluate(() => ({
-  count: document.querySelector('.goals-workspace h2, .compact-goal-list h2')?.textContent || '',
+  count: document.querySelector('.gx-hero-text strong')?.textContent || '',
   /* The list was rewritten from compact rows to cards; the shape of what is
      asserted is unchanged — a tag, a title and a target per goal. */
-  rows: [...document.querySelectorAll('.goal-card-face')].map(row => ({
-    tag: row.querySelector('.goal-type-tag')?.textContent || '',
-    title: row.querySelector('.goal-card-title')?.textContent || '',
-    target: row.querySelector('.goal-card-target')?.textContent || '',
+  rows: [...document.querySelectorAll('.gx-face')].map(row => ({
+    tag: row.closest('.gx-group')?.querySelector('h2')?.textContent || '',
+    title: row.querySelector('.gx-title')?.textContent || '',
+    target: row.querySelector('.gx-target')?.textContent || '',
   })),
 }));
 console.log('\n  the list');
@@ -106,7 +106,7 @@ check('with its target on it', body?.target?.includes('200'), body?.target || ''
 
 if (body) {
   const index = list.rows.findIndex(row => /^body/i.test(row.tag));
-  await page.evaluate(i => document.querySelectorAll('.goal-card-face')[i].click(), index);
+  await page.evaluate(i => document.querySelectorAll('.gx-face')[i].click(), index);
   await page.waitForTimeout(1200);
   const card = await page.evaluate(() => {
     const detail = document.querySelector('.goal-card-detail');

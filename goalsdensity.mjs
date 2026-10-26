@@ -20,7 +20,6 @@ const check = (label, ok, detail = '') => {
   if (!ok) fails += 1;
 };
 const page = readFileSync('./src/pages/GoalsPage.tsx', 'utf8');
-const css = readFileSync('./src/goal-tracking.css', 'utf8');
 
 console.log('\nA collapsed goal is the goal, not its controls');
 check('the actions render only for the open goal',
@@ -30,29 +29,18 @@ check('and the detail is still its own block',
 check('collapsing clears a half-pressed Delete',
   /const toggleGoal = \(index: number\) => \{ setConfirming\(null\);/.test(page));
 
-console.log('\nThe status shares the line the date is on');
-check('the meta row no longer spans the card', /\.goal-card-meta\{grid-column:1;/.test(css));
-check('the verdict sits opposite it on the same row',
-  /\.goal-card-verdict\{grid-column:2;grid-row:1;justify-self:end;/.test(css));
-check('a very narrow screen gives it back its own line',
-  /@media \(max-width:360px\)\{[^}]*\.goal-card-meta\{grid-column:1\/-1\}/.test(css.replace(/\s+/g, ' ')) ||
-  /max-width:360px[\s\S]*goal-card-verdict\{grid-column:1\/-1/.test(css));
+console.log('\nEach goal is its own card, grouped by kind');
+check('strength, endurance and body are separate sections', /const CATEGORIES = \[/.test(page) && /className=\{`gx-group \$\{category\.className\}`\}/.test(page));
+check('each goal draws a progress bar', /className="gx-bar" role="progressbar"/.test(page));
+check('the bar is coloured by the verdict', /tone-\$\{item\.tone\}/.test(page));
+check('the bars fill after the page mounts', /setFilled\(true\)/.test(page) && /width: filled \?/.test(page));
+check('adding a goal is the last thing on the page', page.lastIndexOf('className="gx-add"') > page.lastIndexOf('className="gx-cards"'));
 
-console.log('\nThe clash card says it once');
-check('the date is in the heading, not repeated below',
-  /<strong>\{clash\.races\.length\} races on \{new Date/.test(page));
-check('the advice is one sentence', /A block peaks for one — move the others out a few weeks\.<\/p>/.test(page));
-check('and it still names the race the block is built for',
-  /Built for <strong>\{built\.goal\.title \|\| built\.goal\.exercise\}<\/strong>/.test(page));
-check('the clashing races are not listed above the list that shows them',
-  !/clash\.races\.join/.test(page));
-check('and with no race chosen the rule still stands in its place',
-  /\{built\s*\?[\s\S]{0,260}:\s*<p>A block peaks for one/.test(page));
-/* The word survives once, in the comment explaining why the card exists. What
-   must not survive is a second paragraph of advice on the screen. */
-const clash = (page.match(/\{clash && <section[\s\S]*?<\/section>\}/) || [''])[0];
-check('the card is one heading and one line', (clash.match(/<p>/g) || []).length === 2, `${(clash.match(/<p>/g) || []).length} paragraph branches`);
-check('and none of them is the old three-sentence version', !/compromise/.test(clash));
+console.log('\nThe coach says what used to be a heading');
+check('the race-clash card is gone from the page', !/clash &&/.test(page) && !/Built for/.test(page));
+check('and the mileage gate is not drawn above the goals', !/<MileageGate \/>/.test(page));
+const notes = readFileSync('./src/lib/coachNotes.ts', 'utf8');
+check('a clash is a coach note instead, said once', /key: `race-clash:\$\{input\.raceClash\.date\}/.test(notes));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { PageIntro } from '../components/AppShell';
 import { waveLabel } from '../components/PlanView';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -102,7 +101,6 @@ export function PartnersPage() {
   };
 
   return <div className="stack-xl partners-page">
-    <PageIntro copy="Up to five people. You see where they are in their block and whether they have trained today — nothing else, and nothing they write." />
 
     {requests.length > 0 && <section className="card partner-requests">
       <h3>Waiting on you</h3>
