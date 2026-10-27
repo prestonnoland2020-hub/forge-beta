@@ -183,18 +183,19 @@
   --ease-strike: cubic-bezier(.16, 1, .3, 1);
 
   /* ---- Type --------------------------------------------------------------
-     ARCHIVO for display, INTER for everything else.
+     SAIRA for everything, GEIST MONO for codes.
 
-     Barlow Condensed, set uppercase at 800, was doing a lot of shouting — it
-     is a sports-poster face and it made every heading feel like a banner.
-     Archivo is a grotesque built for headlines AND small text: squarer, more
-     engineered, with real mass at 700-800 without narrowing. It answers the
-     mark, which is all straight cuts and hard angles.
-
-     Inter stays for body and data. It has the best tabular figures of any free
-     UI face, and this app is mostly numbers in columns. */
-  --display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
-  --body: 'Inter', system-ui, -apple-system, sans-serif;
+     Saira is squared and engineered, which suits a mark made of straight cuts
+     and hard angles, and it has a width axis. That axis is the whole system:
+     titles go wide and italic (--title-*), and everything else stays at
+     normal width. Its figures are tabular when asked, and this app is mostly
+     numbers in columns. */
+  --display: 'Saira Variable', 'Helvetica Neue', Arial, sans-serif;
+  --body: 'Saira Variable', system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --title-weight: 900;
+  --title-stretch: 112%;
+  --title-tracking: -.02em;
 }
 
 /* ---------------------------------------------------------------------------

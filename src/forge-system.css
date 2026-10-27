@@ -869,7 +869,7 @@ body{background-color:var(--bg);color:var(--text)}
 .goal-trajectory-chart.simple svg{height:auto}
 .goal-trajectory-chart.simple footer{display:block;font-size:11px;color:var(--ink-3)}
 .goal-trajectory-chart.simple footer strong{font-weight:700;color:var(--ink-2);font-size:11.5px}
-.trajectory-proj-label{fill:var(--info);font:900 11px Inter,sans-serif}
+.trajectory-proj-label{fill:var(--info);font:900 11px var(--body)}
 .cardio-goal-chart>footer span{color:var(--ink-3);font-size:10.5px}
 
 /* Roadmap weeks expand into their seven days — the same engine that builds
@@ -1080,7 +1080,7 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .ic-legend i.cardio{background:var(--chart-2)}
 .ic-line{width:100%;height:auto}
 .ic-grid{stroke:var(--hairline)}
-.ic-axis{fill:var(--ink-3);font:700 8.5px Inter,sans-serif}
+.ic-axis{fill:var(--ink-3);font:700 8.5px var(--body)}
 .ic-stroke{stroke:var(--chart-1);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
 .ic-dot{fill:var(--surface-1);stroke:var(--chart-1);stroke-width:2}
 .ic-freq{display:grid;gap:8px}

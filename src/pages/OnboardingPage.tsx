@@ -14,6 +14,7 @@ import { normalizeGoalValue } from '../lib/goalInput';
 import { success, tap, warning } from '../lib/haptics';
 import { createNote, extractArea, saveNote } from '../features/training/athleteNotesService';
 import { Icon } from '../components/Icon';
+import { ForgeLoader } from '../components/ForgeLoader';
 
 /* ONE QUESTION A SCREEN. Setup was three dense screens — a form of six
    controls, the full goal builder, and a lift picker per day — headed by
@@ -144,7 +145,7 @@ export function defaultLifts(days: AthleteSetup['splitDays'], library: LibraryEx
 export function OnboardingPage() {
   const { loading } = useProfileSetup();
   const { hydrated } = useGoals();
-  if (loading || !hydrated) return <main className="profile-loading"><span className="forge-mark">—</span><strong>FORGE</strong><p>Loading your training profile…</p></main>;
+  if (loading || !hydrated) return <ForgeLoader label="Loading your training profile…"/>;
   return <OnboardingForm />;
 }
 
