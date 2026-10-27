@@ -68,8 +68,11 @@ const MOVEMENT_RULES: Array<{ said: RegExp; lifts?: string; running?: boolean; l
 /* Is this sentence a limitation — something to avoid — and which one? Used
    by the coach to turn "I can't do overhead pressing" into a note the plan
    reads. */
+/* iOS types a curly apostrophe (can’t); the rules are written with a straight one. */
+export const plainText = (text: string) => text.toLowerCase().replace(/[\u2018\u2019\u02bc]/g, "'");
+
 export function limitationIn(text: string): string | null {
-  const lower = text.toLowerCase();
+  const lower = plainText(text);
   if (!/\b(no|avoid|can'?t|cannot|shouldn'?t|not allowed|not supposed|told not|stay off|stop|without)\b/.test(lower)) return null;
   return MOVEMENT_RULES.find(rule => rule.said.test(lower))?.label || null;
 }
@@ -91,7 +94,7 @@ export function bodyLogState(notes: BodyLogNote[], todayIso: string): BodyLogSta
      now decide which movements come off. Sickness and tiredness are handled
      as whole days below, not as movements. */
   const limiting = notes.filter(note => current(note) && (note.kind === 'injury' || note.kind === 'other') && !isSickNote(note));
-  const said = limiting.map(note => `${note.note || ''} ${note.area || ''}`.toLowerCase());
+  const said = limiting.map(note => plainText(`${note.note || ''} ${note.area || ''}`));
   const rules = MOVEMENT_RULES.filter(rule => said.some(text => rule.said.test(text)));
   const blockedMovements = rules.map(rule => rule.lifts).filter((lifts): lifts is string => Boolean(lifts));
   const restrictions = Array.from(new Set([...areas.map(area => `${area} protected`), ...rules.map(rule => rule.label)]));

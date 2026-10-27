@@ -1,5 +1,5 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
-import { SICK_AREA, EASE_BACK_DAYS, limitationIn } from './bodyLog';
+import { SICK_AREA, EASE_BACK_DAYS, limitationIn, plainText } from './bodyLog';
 
 /* THE COACH CAN ACT.
 
@@ -291,7 +291,7 @@ export function statedDays(lower: string): number | undefined {
 export function localActions(question: string, ctx: ActionContext): CoachAction[] {
   const text = question.trim();
   if (!text) return [];
-  const lower = text.toLowerCase();
+  const lower = plainText(text);
   /* "Should I train if I'm sick?" is a question, not a report — unless it
      also says they are ("I'm sick, should I run?"). */
   const asks = /\?\s*$/.test(text);

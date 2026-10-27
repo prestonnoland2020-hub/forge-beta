@@ -50,5 +50,8 @@ check('for as long as was said', a[0]?.bufferDays === 14, String(a[0]?.bufferDay
 a = localActions('my shoulder hurts, no overhead pressing', ctx);
 check('pain plus a limitation is one injury note, labelled with the change', a.length === 1 && a[0].noteKind === 'injury' && /no overhead pressing, shoulder protected/.test(a[0].label), JSON.stringify(a));
 
+console.log('\nAs a phone types it');
+check('a curly apostrophe (can’t) reads the same as a straight one', limitationIn('I can\u2019t do any jumping') === 'no jumping or impact');
+check('and the coach acts on it', localActions('I can\u2019t do any jumping for two weeks', ctx).length === 1);
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);
