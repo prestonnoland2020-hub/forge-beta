@@ -370,9 +370,14 @@ function WorkoutEditor() {
        Chest & Back must not credit chest and back for a session that was one
        squat — insights and muscle frequency read this, and a phantom Chest
        here is a chest session that never happened. On a fresh day the muscles
-       ARE what the athlete said they trained, so they stand. */
-    const dayMuscles=usingSplit?[]:freeMuscles.filter(muscle=>muscle!=='Cardio');
-    const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set([...dayMuscles,...(primary.length?primary:[set.muscle])])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
+       ARE what the athlete said they trained, so they stand.
+
+       NOT ON A BLANK DAY. The chips on a blank day choose which lifts are
+       offered and name the day; they are not a claim of work done. Writing
+       them into `muscles` meant ticking Chest + Back and logging one curl
+       credited a chest and a back session to Insights' frequency chart. A
+       blank day's muscles are the primary movers of what was logged. */
+    const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set(primary.length?primary:[set.muscle])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
     /* Saving a set keeps the session OPEN — only "Finish Day" completes the
        recommendation. The athlete keeps logging sets and cardio freely. */
     setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`Saved ${set.lift} · ${set.weight} ${weightUnit} × ${set.reps}`)};
@@ -394,7 +399,12 @@ function WorkoutEditor() {
       const {id,...savedDay}=sameDay;
       const first=remaining[0];
       const muscles=Array.from(new Set([...remaining.map(item=>item.muscle),...(sameDay.hasCardio?['Cardio']:[])]));
-      const result=updateRecord(id,{...savedDay,muscles:muscles.length?muscles:savedDay.muscles,topSets:remaining.length?remaining:undefined,lift:first?.lift,weight:first?.weight,reps:first?.reps,calculatedMax:first?.calculatedMax});
+      /* The last set gone takes its muscles with it. Falling back to the old
+         list left a day with nothing logged still listed as Chest + Back —
+         a workout in Activities and a session in Insights that never
+         happened. Only a day the athlete assigned to a split day keeps its
+         muscles, because then the list is their statement, not the sets'. */
+      const result=updateRecord(id,{...savedDay,muscles:muscles.length?muscles:savedDay.splitPosition?savedDay.muscles:[],topSets:remaining.length?remaining:undefined,lift:first?.lift,weight:first?.weight,reps:first?.reps,calculatedMax:first?.calculatedMax});
       if(!result.ok){setQuickLogMessage('That set could not be deleted. Refresh and try again.');return}
     }
     setTopSets(current=>current.filter((_,setIndex)=>setIndex!==index));
