@@ -372,12 +372,11 @@ function WorkoutEditor() {
        here is a chest session that never happened. On a fresh day the muscles
        ARE what the athlete said they trained, so they stand.
 
-       NOT ON A BLANK DAY. The chips on a blank day choose which lifts are
-       offered and name the day; they are not a claim of work done. Writing
-       them into `muscles` meant ticking Chest + Back and logging one curl
-       credited a chest and a back session to Insights' frequency chart. A
-       blank day's muscles are the primary movers of what was logged. */
-    const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set(primary.length?primary:[set.muscle])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
+       ON A BLANK DAY THAT INCLUDES THE CHIPS: the muscles ticked are what
+       the athlete says they trained, and they count in Activities and in
+       muscle frequency whether or not every one of them got a top set. */
+    const dayMuscles=usingSplit?[]:freeMuscles.filter(muscle=>muscle!=='Cardio');
+    const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set([...dayMuscles,...(primary.length?primary:[set.muscle])])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
     /* Saving a set keeps the session OPEN — only "Finish Day" completes the
        recommendation. The athlete keeps logging sets and cardio freely. */
     setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`Saved ${set.lift} · ${set.weight} ${weightUnit} × ${set.reps}`)};
@@ -398,12 +397,13 @@ function WorkoutEditor() {
       });
       const {id,...savedDay}=sameDay;
       const first=remaining[0];
-      const muscles=Array.from(new Set([...remaining.map(item=>item.muscle),...(sameDay.hasCardio?['Cardio']:[])]));
+      const chips=!usingSplit&&!written?freeMuscles.filter(muscle=>muscle!=='Cardio'):[];
+      const muscles=Array.from(new Set([...chips,...remaining.map(item=>item.muscle),...(sameDay.hasCardio?['Cardio']:[])]));
       /* The last set gone takes its muscles with it. Falling back to the old
          list left a day with nothing logged still listed as Chest + Back —
          a workout in Activities and a session in Insights that never
-         happened. Only a day the athlete assigned to a split day keeps its
-         muscles, because then the list is their statement, not the sets'. */
+         happened. What stays is what the athlete said: the muscles ticked on
+         a blank day, or the list of a day assigned to a split day. */
       const result=updateRecord(id,{...savedDay,muscles:muscles.length?muscles:savedDay.splitPosition?savedDay.muscles:[],topSets:remaining.length?remaining:undefined,lift:first?.lift,weight:first?.weight,reps:first?.reps,calculatedMax:first?.calculatedMax});
       if(!result.ok){setQuickLogMessage('That set could not be deleted. Refresh and try again.');return}
     }
@@ -431,7 +431,11 @@ function WorkoutEditor() {
        pass this guard on any split day with muscles, so Finish Day with zero
        sets wrote a strength session, lit the split day as done and advanced the
        cycle — for a workout that never happened. */
-    if(!editingRecord&&!completedTopSets.length&&!savedTopSetKeys.length&&!hasCardio&&!quickLoggedKeys.length&&!bodyWeightToSave&&!notes.trim()&&!effort){setSaveMessage('Log a top set or a cardio session first — Finish Day saves what you did.');return}
+    /* A BLANK DAY WITH MUSCLES TICKED IS A WORKOUT. Not every session gets a top
+       set typed in; "I trained chest and back" is the athlete's own statement,
+       and it counts in Activities and in muscle frequency. */
+    const blankMuscles=!usingSplit&&!written?freeMuscles.filter(muscle=>muscle!=='Cardio'):[];
+    if(!editingRecord&&!completedTopSets.length&&!savedTopSetKeys.length&&!hasCardio&&!quickLoggedKeys.length&&!bodyWeightToSave&&!notes.trim()&&!effort&&!blankMuscles.length){setSaveMessage('Log a top set or a cardio session first — Finish Day saves what you did.');return}
     /* Once the day exists its title stands. Logging cardio creates the day up
        front, which advances the split cursor — recomputing the title here
        would then stamp the NEXT split day's name onto the session that was
@@ -461,7 +465,7 @@ function WorkoutEditor() {
     const assignedDayMuscles=(editingRecord
       ?(dayOverride?savedDays[selectedPlanDay]?.muscles:editingRecord.splitPosition?savedDays[editingRecord.splitPosition-1]?.muscles:undefined)
       :((usingSplit||dayOverride)?plannedDay?.muscles:undefined))?.filter(muscle=>muscle!=='Cardio');
-    const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:exerciseDriven.length?exerciseDriven:(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
+    const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:(blankMuscles.length||exerciseDriven.length)?Array.from(new Set([...blankMuscles,...exerciseDriven])):(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
     const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id))};
     /* A second session added to an already-saved day keeps THAT DAY's identity.
        Without this, the split cursor has advanced by the time the athlete comes

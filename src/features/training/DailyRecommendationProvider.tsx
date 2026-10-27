@@ -17,7 +17,7 @@ import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 import { useAthleteNotes } from './useAthleteNotes';
-import { bodyLogState,exerciseBlocked } from '../../lib/bodyLog';
+import { bodyLogState,bodyLogReason,exerciseBlocked } from '../../lib/bodyLog';
 import { useTodayOverride } from './coachOverrides';
 import { shortenRecommendation,easeRecommendation,EASE_PERCENT } from '../../lib/coachActions';
 
@@ -161,7 +161,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const recoveryStamp=recovery.confidence==='Low'?'':`${recovery.readiness}:${recovery.strengthFatigue}`;
   /* THE BODY LOG IS AN INPUT TO TODAY. A note is part of the fingerprint, so
      the saved row from before "my knee hurts" is not reused all day. */
-  const bodyLogStamp=`${bodyLog.areas.join('+')}${bodyLog.sick?':sick':''}${bodyLog.easing?':easing':''}`;
+  const bodyLogStamp=`${bodyLog.areas.join('+')}|${bodyLog.restrictions.join('+')}${bodyLog.sick?':sick':''}${bodyLog.easing?':easing':''}`;
   const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   /* ONE PIPELINE, ANY DAY OF THE SPLIT.
@@ -252,10 +252,10 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Say why, rather than silently dropping the session. An athlete who
        cannot see that Forge noticed assumes it forgot. */
     const planRunBlocked=bodyLog.blocksRunning&&planCardio&&/run/i.test(planCardio.title);
-    const noImpact=planRunBlocked&&planCardio?(()=>{const minutes=Number((planCardio.session.plan as {duration?:string}).duration)||Math.round((Number((planCardio.session.plan as {distance?:string}).distance)||3)*9)||30;return{...planCardio,id:`${planCardio.id}-noimpact`,title:`Bike or row · ${minutes} min easy`,summary:`Bike or row · ${minutes} min easy`,rationale:`No running while your ${bodyLog.areas.join(' and ')} is in the body log. ${minutes} easy minutes on the bike or rower keeps the aerobic work.`,session:{...planCardio.session,role:'Easy' as const,title:`Bike or row · ${minutes} min easy`,stress:'Low' as const,plan:{...(planCardio.session.plan as object),activity:'Bike',structure:'Steady',distance:undefined,distanceUnit:undefined,pace:undefined,duration:String(minutes)} as never}}})():planCardio;
+    const noImpact=planRunBlocked&&planCardio?(()=>{const minutes=Number((planCardio.session.plan as {duration?:string}).duration)||Math.round((Number((planCardio.session.plan as {distance?:string}).distance)||3)*9)||30;return{...planCardio,id:`${planCardio.id}-noimpact`,title:`Bike or row · ${minutes} min easy`,summary:`Bike or row · ${minutes} min easy`,rationale:`No running while you’re working around ${bodyLogReason(bodyLog).toLowerCase()}. ${minutes} easy minutes on the bike or rower keeps the aerobic work.`,session:{...planCardio.session,role:'Easy' as const,title:`Bike or row · ${minutes} min easy`,stress:'Low' as const,plan:{...(planCardio.session.plan as object),activity:'Bike',structure:'Steady',distance:undefined,distanceUnit:undefined,pace:undefined,duration:String(minutes)} as never}}})():planCardio;
     const cardioBase={...generatedBase,cardio:planCardio&&doneQuality&&!planRunBlocked
       ?{...planCardio,rationale:`${planCardio.rationale} Your ${week.quality} is already done — ${doneQuality.matched} × ${Math.round(doneQuality.meters)} m logged ${doneQuality.date===generatedBase.date?'today':`on ${doneQuality.date}`} — so today stays easy.`}
-      :noImpact,bodyLogNote:generatedBase.bodyLogNote||(planRunBlocked?`${bodyLog.areas.join(' and ').replace(/^./,c=>c.toUpperCase())} in your body log: running swapped for bike or row.`:undefined)};
+      :noImpact,bodyLogNote:generatedBase.bodyLogNote||(planRunBlocked?`${bodyLogReason(bodyLog)}: running swapped for bike or row.`:undefined)};
     const rawMatch=week?.topSets?.find(set=>set.splitDay===generatedBase.splitDay.name)||week?.topSets?.find(set=>splitDayKey(set.splitDay)===splitDayKey(generatedBase.splitDay.name));
     if(!rawMatch)return cardioBase;
     /* THE GOAL LIFT OWNS ITS DAY — same repair the Plan page applies, so

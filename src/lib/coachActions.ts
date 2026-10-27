@@ -1,5 +1,5 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
-import { SICK_AREA, EASE_BACK_DAYS } from './bodyLog';
+import { SICK_AREA, EASE_BACK_DAYS, limitationIn } from './bodyLog';
 
 /* THE COACH CAN ACT.
 
@@ -133,7 +133,8 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
       const noteKind: 'injury' | 'fatigue' | 'other' = kindText === 'injury' || kindText === 'fatigue' ? kindText : 'other';
       const area = str(entry.area).slice(0, 40) || undefined;
       const what = area || (noteKind === 'fatigue' ? 'fatigue' : 'a note');
-      return { type, noteKind, text, area, bufferDays, label: noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? `Lighter training for ${bufferDays ? `${bufferDays} days` : 'the next few days'}` : `Body log: ${what}` };
+      const avoid = noteKind !== 'fatigue' ? limitationIn(text) : null;
+      return { type, noteKind, text, area, bufferDays, label: avoid ? `Plan change: ${avoid}${area ? `, ${area} protected` : ''}` : noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? `Lighter training for ${bufferDays ? `${bufferDays} days` : 'the next few days'}` : `Body log: ${what}` };
     }
     case 'clear_note': {
       const wanted = norm(str(entry.area));
@@ -307,7 +308,10 @@ export function localActions(question: string, ctx: ActionContext): CoachAction[
     raw.push({ type: 'rest_today' }, { type: 'log_note', noteKind: 'illness', text, days: statedDays(lower) ?? null });
     return parseActions(raw, ctx);
   }
+  /* A limitation names a movement to avoid; the plan takes it off (lib/bodyLog). */
+  const limitation = limitationIn(lower);
   if (/\b(hurt|hurts|pain|painful|sore|tweak|tweaked|injur\w*|strain\w*|sprain\w*|tight|pulled|aching|sharp)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'injury', text, area });
+  else if (limitation) raw.push({ type: 'log_note', noteKind: 'other', text, area, days: statedDays(lower) ?? 14 });
   else if (/\b(fatigued?|exhausted|drained|burn(?:ed|t) out|run down|no energy|wiped|overtrained|so tired|really tired|barely slept|didn'?t sleep|no sleep|slept \d hours?)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: null, days: statedDays(lower) ?? 2 });
   if (area && /\b(better|fine|gone|cleared|healed|good now|no longer)\b/.test(lower) && ctx.activeNoteAreas.length) raw.push({ type: 'clear_note', area });
   if (/\b(rest day|day off|need a rest|take today off|skip today|not training today)\b/.test(lower)) raw.push({ type: 'rest_today' });

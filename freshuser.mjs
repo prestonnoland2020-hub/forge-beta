@@ -49,7 +49,7 @@ const between = (t, a, len) => { const i = t.indexOf(a); return i < 0 ? '' : t.s
 
   console.log('\nToday and Plan name the same day');
   const home = await text(p);
-  const todayDay = between(home, 'NEXT IN YOUR SPLIT\n', 60).split('\n')[1];
+  const todayDay = between(home, 'UP NEXT\n', 60).split('\n')[1];
   await p.evaluate(() => { location.hash = '#/plan'; }); await p.waitForTimeout(2200);
   const plan = await text(p);
   const planDay = between(plan, 'TODAY ·', 80).split('\n')[1];
