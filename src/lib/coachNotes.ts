@@ -57,6 +57,10 @@ export type CoachNote = {
   receipt?: string[];
   /* A review is four lines, not one; rendered in place of say/detail. */
   lines?: string[];
+  /* THE REVIEW AS NUMBERS, for the card that draws it: days trained of
+     days planned, miles of miles planned, the week's PRs, what is next, and
+     the change — only when something actually changes. */
+  review?: { trained: number; planned: number; ran: number; plannedMiles: number; unit: string; prs: Array<{ lift: string; weight: number; reps: number }>; next: string; change?: string };
   /* One-tap changes, in the coach's action vocabulary; applied through the
      same path as the chat coach's confirm card. */
   actions?: RawAction[];

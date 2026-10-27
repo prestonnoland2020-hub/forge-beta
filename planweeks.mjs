@@ -58,7 +58,7 @@ const read = () => page.evaluate(() => ({
   selected: [...document.querySelectorAll('.pv-dot')].findIndex(d => d.getAttribute('aria-selected') === 'true') + 1,
   here: [...document.querySelectorAll('.pv-dot')].findIndex(d => d.classList.contains('here')) + 1,
   weekTitle: document.querySelector('.pv-week h3')?.textContent || '',
-  today: Boolean(document.querySelector('.pv-today')),
+  today: Boolean(document.querySelector('.pv-row.today')),
   back: document.querySelector('.pv-progress-back')?.textContent || '',
   note: document.querySelector('.pv-week-note')?.textContent || '',
   rows: [...document.querySelectorAll('.pv-row-body strong')].length,
@@ -78,13 +78,13 @@ check('and nothing is telling you to come back', open.back === '', open.back);
    bottom and the thing under your thumb is the card. These drags start on
    whatever is directly below the pips — the card when there is one. */
 const drag = (from, to) => page.evaluate(([x1, x2, y1, y2]) => {
-  const el = document.querySelector('.pv-today') || document.querySelector('.pv-week');
+  const el = document.querySelector('.pv-row.today') || document.querySelector('.pv-week');
   const touch = (x, y) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: y })];
   el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: touch(x1, y1), changedTouches: touch(x1, y1) }));
   el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: touch(x2, y2) }));
 }, [from.x, to.x, from.y, to.y]);
 const surface = async () => page.evaluate(() => {
-  const el = document.querySelector('.pv-today') || document.querySelector('.pv-week');
+  const el = document.querySelector('.pv-row.today') || document.querySelector('.pv-week');
   const box = el.getBoundingClientRect();
   return { x: box.x, y: box.y, width: box.width, height: box.height };
 });

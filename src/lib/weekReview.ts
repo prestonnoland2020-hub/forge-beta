@@ -114,6 +114,14 @@ export function weekReview(input: WeekReviewInput): CoachNote | null {
     say: happened,
     detail: matters,
     lines,
+    review: {
+      trained, planned: input.plannedDays,
+      ran: Math.round((input.metric ? input.ranMiles * 1.609344 : input.ranMiles) * 10) / 10,
+      plannedMiles: Math.round((input.metric ? input.plannedMiles * 1.609344 : input.plannedMiles) * 10) / 10,
+      unit, prs: input.prs, next: input.nextText,
+      /* "Nothing changes" is not news; only a real change earns a sentence. */
+      change: /^Nothing changes/.test(changes) ? undefined : changes,
+    },
     actions: actions.length ? actions : undefined,
     ask: `Review my week: ${happened} ${matters} What should change?`,
   };
