@@ -4,6 +4,7 @@ import { loadPartners, lastTrainedLabel, pendingInvite, didToday, type Partner }
 import { waveLabel } from './PlanView';
 import { useAuth } from '../features/auth/AuthProvider';
 import { isDemoMode } from '../lib/env';
+import { Icon } from './Icon';
 
 /* WHERE YOU SEE YOUR PARTNERS: on Today, under the workout, because that is
    the screen where you decide whether to train. A partner who has already
@@ -54,7 +55,7 @@ export function PartnersCard({ unit = 'lb' }: { unit?: string }) {
               ? <span className="partner-did">{didToday(partner, unit)}</span>
               : <span className="partner-quiet">{lastTrainedLabel(partner.lastTrained)}</span>}
           </div>
-          {partner.trainedToday && <b aria-label="Trained today">✓</b>}
+          {partner.trainedToday && <b aria-label="Trained today"><Icon name="check" size={12} stroke={3}/></b>}
         </Link>;
       })}
     </div>

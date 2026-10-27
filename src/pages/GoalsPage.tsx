@@ -10,6 +10,7 @@ import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { MileageCheckOnGoal } from '../components/MileageGate';
 import { tap } from '../lib/haptics';
+import { Icon } from '../components/Icon';
 
 /* THE GOALS PAGE IS THE CRUX, SO IT READS LIKE A SCOREBOARD.
 
@@ -166,7 +167,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               <span className="gx-top"><strong className="gx-title">{goal.title}</strong><span className={`gx-pill tone-${item.tone}`}>{item.label}</span></span>
               <span className="gx-numbers">
                 <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'calc max') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
-                <span className="gx-arrow" aria-hidden="true">→</span>
+                <span className="gx-arrow" aria-hidden="true"><Icon name="arrow" size={14}/></span>
                 <span className="gx-target">{item.targetText}<small>goal</small></span>
               </span>
               <span className="gx-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct * 100)} aria-label={`${goal.title}: ${Math.round(pct * 100)}%`}>

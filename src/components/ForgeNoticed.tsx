@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useCoachNotes } from '../features/training/useCoachNotes';
 import { useCoachActions } from '../features/training/useCoachActions';
 import { openCoachBubble } from '../features/training/coachService';
+import { Icon } from './Icon';
 
 /* THE COACH SPEAKING FIRST, ON THE SCREEN YOU OPEN FIRST.
 
@@ -43,7 +44,7 @@ export function ForgeNoticed() {
             <span className="wk-bar"><i style={{ width: `${Math.min(100, note.review.plannedMiles ? (note.review.ran / note.review.plannedMiles) * 100 : 100)}%` }} /></span>
             <strong>{note.review.ran}<small>{note.review.plannedMiles ? `/${note.review.plannedMiles}` : ''} {note.review.unit}</small></strong>
           </div>}
-          {note.review.prs.length > 0 && <div className="wk-prs">{note.review.prs.slice(0, 3).map(pr => <span key={pr.lift}>🏆 {pr.lift} {pr.weight}×{pr.reps}</span>)}</div>}
+          {note.review.prs.length > 0 && <div className="wk-prs">{note.review.prs.slice(0, 3).map(pr => <span key={pr.lift}><Icon name="trophy" size={14}/> {pr.lift} {pr.weight}×{pr.reps}</span>)}</div>}
           {note.review.change && <p className="wk-change">{note.review.change}</p>}
           {note.review.next && <p className="wk-next"><span>Next</span>{note.review.next}</p>}
         </div>

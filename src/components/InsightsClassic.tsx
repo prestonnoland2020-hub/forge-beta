@@ -6,6 +6,7 @@ import { isCardioMovement } from '../lib/muscleGroups';
 import { primaryMusclesFor } from '../lib/liftAliases';
 import { cardioMiles, summarizeCardioDraft, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { Icon } from './Icon';
 
 /* Insights rebuilt on the original Forge web app's structure: KPI tiles,
    8-week consistency, weight trend, muscle & cardio frequency, personal
@@ -284,7 +285,7 @@ export function InsightsClassic() {
     <section className="card ic-card ic-blank">
       <header className="ic-head"><i /><h3>No progress yet</h3></header>
       <p>Log your first workout and your charts start here.</p>
-      <a className="button" href="#/workout">Log today's workout →</a>
+      <a className="button" href="#/workout">Log today's workout <Icon name="arrow"/></a>
     </section>
   </div>;
 

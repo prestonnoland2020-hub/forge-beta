@@ -34,6 +34,7 @@ import { progressionLevels, levelNote, zoneOfPrescription } from '../lib/progres
 import { sessionVerdicts } from '../features/training/sessionVerdicts';
 import { workoutEfforts } from '../lib/workoutEvidence';
 import { QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../lib/qualitySession';
+import { Icon } from './Icon';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
 /* The prose `detail` stays for the coach and the roadmap; `lifts` and `run`
@@ -589,8 +590,8 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       <span className="eyebrow">BEFORE YOUR PLAN</span>
       <h3>Forge builds from what you log</h3>
       <p>Every set and run in your plan comes from your own numbers, so it needs a few first. {baseline.filter(item => item.done).length} of {baseline.length} done — when the last one lands, the block builds itself.</p>
-      <div className="pv-checklist">{baseline.map(item => <div key={item.key} className={item.done ? 'done' : ''}><b>{item.done ? '✓' : '○'}</b><span>{item.label}</span></div>)}</div>
-      <a className="button" href="#/workout">Log today’s session →</a>
+      <div className="pv-checklist">{baseline.map(item => <div key={item.key} className={item.done ? 'done' : ''}><b>{item.done ? <Icon name="check"/> : <Icon name="circle"/>}</b><span>{item.label}</span></div>)}</div>
+      <a className="button" href="#/workout">Log today’s session <Icon name="arrow"/></a>
     </section>
     <LongRangeTrainingPlan goals={goals} profile={profile} splitDays={splitDays} rhythm={rhythm} />
   </div>;
@@ -701,14 +702,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   };
 
   return <div className="pv" {...swipe}>
-    {untrainedGoalLifts.length > 0 && <section className="card untrained-goal-banner">
-      <div>
-        <span className="eyebrow">NOT IN YOUR SPLIT</span>
-        <strong>{untrainedGoalLifts.join(' and ')} {untrainedGoalLifts.length === 1 ? 'is a goal, but no day trains it' : 'are goals, but no day trains them'}</strong>
-        <small>Forge only prescribes movements a split day names, so this lift is never waved and never tested on max week. Add it to the day you train it on and the next block picks it up.</small>
-      </div>
-      <a className="button" href="#/split">Add it to a day →</a>
-    </section>}
     {/* AFTER THE LAST WEEK the tab used to freeze on "Week 10 of 10" with
         every row marked Missed and no way forward. A finished block says so
         and offers the next one. */}
@@ -721,18 +714,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     <PlanProgress weekIndex={weekIndex} current={currentIndex} total={plan.weeks.length}
       waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence}
       onPick={index => setViewWeek(index === currentIndex ? null : index)} />
-    {/* The gap between what a goal needs and what the plan is allowed to give
-        belongs where the plan is, not buried in a goal's detail panel. */}
-    <MileageGate onChanged={() => setRefreshAsk(true)} />
-    {/* And when the block itself is the problem, the coach says so here and
-        hands the rebuild the instruction, rather than leaving the athlete to
-        press Regenerate and think of something to type. */}
-    <PlanPressureCard onReshape={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />
-    <PlanActions
-      saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
-      onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}
-      request={stored.adjustments} requestNote={plan.adjustmentNote} generatedAt={stored.generatedAt}
-      error={error && !refreshAsk ? `${error} — showing the stored block.` : undefined} />
     {refreshAsk ? <PlanRebuildModal
       saved={Boolean(stored.saved)}
       standing={coachInstruction || stored.adjustments}
@@ -764,5 +745,28 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />
     {liveAdjusted ? <p className="pv-footnote">Loads follow your latest logged bests.</p> : null}
+    {/* THE WEEK FIRST. With a real account the mileage gap, the plan-pressure
+        card, a goal lift missing from the split and Save / Regenerate all
+        stacked above the week, and the week started below the fold. They are
+        about the plan, not today's training, so they follow it. */}
+    {untrainedGoalLifts.length > 0 && <section className="card untrained-goal-banner">
+      <div>
+        <span className="eyebrow">NOT IN YOUR SPLIT</span>
+        <strong>{untrainedGoalLifts.join(' and ')} {untrainedGoalLifts.length === 1 ? 'is a goal, but no day trains it' : 'are goals, but no day trains them'}</strong>
+      </div>
+      <a className="button" href="#/split">Add it to a day <Icon name="arrow"/></a>
+    </section>}
+    {/* The gap between what a goal needs and what the plan is allowed to give
+        belongs where the plan is, not buried in a goal's detail panel. */}
+    <MileageGate onChanged={() => setRefreshAsk(true)} />
+    {/* And when the block itself is the problem, the coach says so here and
+        hands the rebuild the instruction, rather than leaving the athlete to
+        press Regenerate and think of something to type. */}
+    <PlanPressureCard onReshape={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />
+    <PlanActions
+      saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
+      onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}
+      request={stored.adjustments} requestNote={plan.adjustmentNote} generatedAt={stored.generatedAt}
+      error={error && !refreshAsk ? `${error} — showing the stored block.` : undefined} />
   </div>;
 }
