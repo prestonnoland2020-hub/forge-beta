@@ -213,7 +213,10 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
         loadBiasPercent: strategy.loadBiasPercent,
         nextText, metric,
       });
-      if (review) notes.push(review);
+      /* NO "LAST WEEK" CARD ON TODAY. Preston asked for it gone: Today is
+         for today's training. The review is still built (lib/weekReview and
+         its suite are unchanged) but no longer queued as a note. */
+      void review;
     }
     return notes.sort((a, b) => b.priority - a.priority);
   }, [records, goals, setup, recovery, recommendation, remembered.goalVerdicts, strategy.loadBiasPercent]);
