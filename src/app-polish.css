@@ -346,3 +346,35 @@ details.session-details[open] > summary { margin-bottom: 14px; }
 .gx-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink, #000) 7%, transparent); }
 .gx-mode button { min-height: 42px; border: 0; border-radius: 10px; background: none; color: var(--ink-2, var(--text)); font-size: 15px; font-weight: 800; transition: background-color .15s ease; }
 .gx-mode button.active { background: var(--surface-1, #fff); color: var(--ink, var(--text)); box-shadow: 0 1px 3px rgb(0 0 0 / .14); }
+
+/* ── LAST WEEK, DRAWN ─────────────────────────────────────────────────── */
+.wk { display: grid; gap: 12px; margin: 4px 0 2px; }
+.wk-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; }
+.wk-row strong { font: 800 22px var(--display-font, inherit); font-variant-numeric: tabular-nums; }
+.wk-row strong small { font-size: 14px; font-weight: 700; color: var(--ink-3, var(--muted)); margin-left: 2px; }
+.wk-dots { display: flex; gap: 8px; }
+.wk-dots i { width: 26px; height: 26px; border-radius: 999px; border: 2px solid var(--hairline-strong, var(--line)); background: transparent; animation: gx-rise .4s both; }
+.wk-dots i.on { border-color: #22a35a; background: #22a35a; box-shadow: inset 0 0 0 4px var(--surface-1, #fff); }
+.wk-bar { display: block; height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink, #000) 8%, transparent); overflow: hidden; }
+.wk-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #4fd1c5, #0f9d8a); }
+.wk-prs { display: flex; flex-wrap: wrap; gap: 6px; }
+.wk-prs span { padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 800; background: color-mix(in srgb, #e3a008 18%, transparent); color: #7a5500; }
+.wk-change { margin: 0; font-size: 15px; line-height: 1.45; font-weight: 600; }
+.wk-next { margin: 0; display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; }
+.wk-next span { padding: 3px 9px; border-radius: 8px; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text, var(--accent)); }
+
+/* ── THE PLAN WEEK: TODAY GREEN, DONE DAYS CHECKED ──────────────────────
+   Today is the one green row, open by default, with Start on it; a day that
+   was trained wears a filled green check; days with nothing on them recede. */
+.pv-row-line { display: flex; align-items: center; gap: 10px; }
+.pv-row-line .pv-row-main { flex: 1; min-width: 0; }
+.pv-row.today { background: color-mix(in srgb, #22a35a 12%, var(--surface-1, #fff)) !important; border-radius: 14px; box-shadow: inset 4px 0 0 #22a35a; }
+.pv-row.today .pv-row-date b, .pv-row.today .pv-row-date small, .pv-row.today .pv-row-state { color: #157a42 !important; }
+.pv-row.today .pv-row-body strong { font-size: 18px; }
+.pv-row-start { flex: none; margin-right: 12px; padding: 9px 18px; border-radius: 999px; background: #22a35a; color: #fff !important; font-weight: 800; font-size: 15px; text-decoration: none; transition: transform .12s ease; }
+.pv-row-start:active { transform: scale(.95); }
+.pv-check { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: #22a35a; color: #fff; animation: ob-pop .3s cubic-bezier(.2,.9,.3,1.4); }
+.pv-row.done:not(.today) .pv-row-body strong { color: var(--ink-2, var(--text)); }
+.pv-row.rest .pv-row-body, .pv-row.rest .pv-row-date { opacity: .6; }
+.pv-row-swap { color: var(--ink-3, var(--muted)) !important; font-style: italic; }
+.pv-row-edit { display: inline-block; margin-top: 6px; font-weight: 800; color: var(--accent-text, var(--accent)); }

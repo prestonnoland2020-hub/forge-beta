@@ -9,7 +9,7 @@ import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvi
 import type { PlannedCardio } from './CardioPlanBuilder';
 import { LongRangeTrainingPlan } from './LongRangeTrainingPlan';
 import { PlanRebuildModal } from './PlanRebuildModal';
-import { PlanProgress, PlanActions, TodayCard, WeekList, useWeekSwipe, waveSentence, reconcileToday, type PlanSession } from './PlanView';
+import { PlanProgress, PlanActions, WeekList, useWeekSwipe, waveSentence, reconcileToday, type PlanSession } from './PlanView';
 import { MileageGate } from './MileageGate';
 import { PlanPressureCard } from './PlanPressureCard';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
@@ -744,7 +744,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     /> : null}
     {/* Today belongs to today. Looking at week six, there is no "today" in it,
         and a card headed TODAY over a week in October would be a lie. */}
-    {weekIndex === currentIndex && <TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref={workoutHref} />}
     {/* THREE PARAGRAPHS OF ADVICE, FOLDED INTO ONE LINE.
 
         Each of these earns its place — why the long run follows a leg day, that
@@ -761,7 +760,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       <summary>{notes.length === 1 ? 'One note on this week' : `${notes.length} notes on this week`}</summary>
       {notes.map(note => <p key={note}>{note}</p>)}
     </details>}
-    <WeekList sessions={weekSessions} unit={unit} records={records}
+    <WeekList sessions={weekSessions} unit={unit} records={records} todayHref={weekIndex === currentIndex ? workoutHref : undefined}
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />
     {liveAdjusted ? <p className="pv-footnote">Loads follow your latest logged bests.</p> : null}

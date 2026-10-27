@@ -7,7 +7,7 @@ import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { bestsFromHistory,calendarEmptyState,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,waveSlot,WAVE_REPS,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
 type LiveLifts=(day:SplitDay,position:number)=>PlanLift[]|null;
-import { PlanProgress,TodayCard,WeekList,useWeekSwipe,waveSentence,reconcileToday,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
+import { PlanProgress,WeekList,useWeekSwipe,waveSentence,reconcileToday,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
 import { MileageGate } from './MileageGate';
 import { localDayIso } from '../lib/time';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -112,7 +112,7 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
        exercises and logged bests — the goal lift still leads its own day. */
     const strength=isPrimary&&!projected.length?`${week.topSet}${week.strengthLoad?` · ${week.strengthFocus}`:''}`:dayTopSet?dayTopSet:`${day.muscles?.filter(muscle=>muscle!=='Cardio').join(' + ')||'Accessory'} · no exercise mapped yet`;return{date,kind:cardioKind?`${type==='mixed'?'Mixed':'Strength'} + ${cardioKind}`:(type==='mixed'?'Mixed':'Strength'),title:day.name,detail:cardioText?`${strength} · Cardio: ${cardioText}`:strength,goal:strengthGoal?.title||'Strength development',stress:cardioStress==='High'?'High':isPrimary?'High':'Moderate',scaled:Boolean(cardioText),lifts,run};}
     if(cardioText)return{date,kind:cardioKind,title:day.name,detail:`${cardioText}${scaled?` · ${scaled.reason}`:' · Scheduled from this calendar week’s mileage and long-run requirement.'}`,goal:enduranceGoal?.title||'Endurance development',stress:cardioStress||'Low',scaled:true,run};
-    return{date,kind:'Flexible',title:day.name,detail:'No additional cardio is required to satisfy this week.',goal:enduranceGoal?.title||'Training balance',stress:'Low'};
+    return{date,kind:'Flexible',title:day.name,detail:'Your running is covered this week — nothing required.',goal:enduranceGoal?.title||'Training balance',stress:'Low'};
   });
 }
 
@@ -171,8 +171,7 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
     {/* A goal the running is not built for says so here too — the pre-program
         plan is where most athletes see their first week. */}
     <MileageGate/>
-    {viewWeek===0&&<TodayCard session={todaySession} unit={unit} logged={loggedToday} workoutHref="/workout?source=recommendation"/>}
-    <WeekList sessions={weekSessions} unit={unit} records={records}
+    <WeekList todayHref={viewWeek===0?"/workout?source=recommendation":undefined} sessions={weekSessions} unit={unit} records={records}
       title={viewWeek===0?'This week':`Week ${viewWeek+1} · ${range}`}
       note={viewWeek>0?'A projection \u2014 numbers firm up as you log.':undefined}/>
   </div>;

@@ -27,13 +27,30 @@ export function ForgeNoticed() {
   const applyAndClose = () => { coach.apply(actions, note.ask); acknowledge(note); };
   return <section className={`card forge-noticed${review ? ' forge-week-review' : ''}`} role="status" aria-live="polite">
     <div className="forge-noticed-head">
-      <span className="eyebrow">{review ? 'Your week' : 'Forge noticed'}</span>
+      <span className="eyebrow">{review ? 'Last week' : 'Forge noticed'}</span>
       {pending > 1 && <small>{pending - 1} more</small>}
     </div>
-    {note.lines
+    {/* THE WEEK, DRAWN. Four numbered sentences read as homework; the same
+        facts are a row of days, a bar of miles and a PR — and a sentence only
+        when something is actually changing. */}
+    {note.review
+      ? <div className="wk">
+          {note.review.planned > 0 && <div className="wk-row">
+            <span className="wk-dots" aria-label={`${note.review.trained} of ${note.review.planned} days trained`}>{Array.from({ length: Math.max(note.review.planned, note.review.trained) }, (_, index) => <i key={index} className={index < note.review!.trained ? 'on' : ''} style={{ animationDelay: `${index * 90}ms` }} />)}</span>
+            <strong>{note.review.trained}<small>/{note.review.planned} days</small></strong>
+          </div>}
+          {(note.review.plannedMiles > 0 || note.review.ran > 0) && <div className="wk-row">
+            <span className="wk-bar"><i style={{ width: `${Math.min(100, note.review.plannedMiles ? (note.review.ran / note.review.plannedMiles) * 100 : 100)}%` }} /></span>
+            <strong>{note.review.ran}<small>{note.review.plannedMiles ? `/${note.review.plannedMiles}` : ''} {note.review.unit}</small></strong>
+          </div>}
+          {note.review.prs.length > 0 && <div className="wk-prs">{note.review.prs.slice(0, 3).map(pr => <span key={pr.lift}>🏆 {pr.lift} {pr.weight}×{pr.reps}</span>)}</div>}
+          {note.review.change && <p className="wk-change">{note.review.change}</p>}
+          {note.review.next && <p className="wk-next"><span>Next</span>{note.review.next}</p>}
+        </div>
+      : note.lines
       ? <ol className="forge-noticed-lines">{note.lines.map(line => <li key={line}>{line}</li>)}</ol>
       : <p className="forge-noticed-say">{note.say}</p>}
-    {!note.lines && note.detail && <p className="forge-noticed-detail">{note.detail}</p>}
+    {!note.lines && !note.review && note.detail && <p className="forge-noticed-detail">{note.detail}</p>}
     {note.receipt && <details className="forge-noticed-receipt">
       <summary>{note.receipt.length ? `The ${note.receipt.length} run${note.receipt.length === 1 ? '' : 's'} behind that` : 'No runs logged in the last 7 days'}</summary>
       {note.receipt.length > 0 && <ul>{note.receipt.map(line => <li key={line}>{line}</li>)}</ul>}

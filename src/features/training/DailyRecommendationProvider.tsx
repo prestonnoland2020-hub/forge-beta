@@ -395,7 +395,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        how it ends. Easing back: the same session, lighter. */
     const eased=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric'):built;
     const bodyNote=bodyLog.sick&&!pinnedPosition?'You’re sick, so today is a rest day. Tell Forge when you feel better and it will ease you back in.'
-      :eased!==built?`Easing back in: loads ${EASE_PERCENT}% lighter and cardio kept easy today.`:undefined;
+      :eased!==built?`Easing back in · ${EASE_PERCENT}% lighter today`:undefined;
     if(!coachOverride)return bodyNote?{...eased,coachNote:bodyNote}:eased;
     const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(eased,coachOverride.minutes):eased;
     return{...fitted,coachNote:bodyNote||coachOverride.note||undefined};

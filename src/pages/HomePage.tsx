@@ -3,14 +3,13 @@ import { PartnersCard } from '../components/PartnersCard';
 import { ForgeNoticed } from '../components/ForgeNoticed';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { openCoachBubble } from '../features/training/coachService';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { StravaReviewModal } from '../components/StravaReviewModal';
 import { formatCardioSummary } from '../lib/cardioSession';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
-import { isSickNote } from '../lib/bodyLog';
+import { isSickNote, limitationIn } from '../lib/bodyLog';
 
 const todayIso = () => {
   const now = new Date();
@@ -50,17 +49,17 @@ export function HomePage() {
     <StravaReviewModal />
     {bufferedNotes.length > 0 && <Link className="buffer-banner" to="/coach">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 2.8 19.5a1 1 0 0 0 .87 1.5h16.66a1 1 0 0 0 .87-1.5L12 3Z"/><path d="M12 10v4M12 17.5v.5"/></svg>
-      <span>{bufferedNotes.some(isSickNote) ? 'Resting while you’re sick — tell Forge when you feel better' : `Training around ${bufferedNotes.map(note => note.area || note.kind).join(', ')} — check in on Coach`}</span>
+      <span>{bufferedNotes.some(isSickNote) ? 'Resting while you’re sick — tell Forge when you feel better' : `Training around ${Array.from(new Set(bufferedNotes.map(note => note.area || limitationIn(note.note || '') || (note.kind === 'fatigue' ? 'tiredness' : 'a limitation')))).join(', ')}`}</span>
     </Link>}
 
     {completedToday ? <section className="feed-card today-focus-card completed">
       <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon completed">✓</span><div><small>TODAY · COMPLETE</small><strong>{completedToday.title}</strong></div></div><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></header>
-      <div className="feed-metric-row">{(completedSets.length > 0 || completedToday.muscles.some(muscle => muscle !== 'Cardio')) && <div><strong>{completedSets.length || '✓'}</strong><span>{completedSets.length ? (completedSets.length === 1 ? 'Top set' : 'Top sets') : 'Strength'}</span></div>}<div><strong>{completedToday.cardioSessions?.length || 0}</strong><span>Cardio</span></div></div>
+      {/* Only what was done: a zero for cardio on a lifting day was a box saying nothing happened. */}<div className="feed-metric-row">{(completedSets.length > 0 || completedToday.muscles.some(muscle => muscle !== 'Cardio')) && <div><strong>{completedSets.length || '✓'}</strong><span>{completedSets.length ? (completedSets.length === 1 ? 'Top set' : 'Top sets') : 'Strength'}</span></div>}{(completedToday.cardioSessions?.length || 0) > 0 && <div><strong>{completedToday.cardioSessions!.length}</strong><span>Cardio</span></div>}</div>
       {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <div className="today-data-points">
         {completedSets.map((set, index) => <div key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><strong>{set.weight} {weightUnit} ×{set.reps}</strong></div>)}
         {(completedToday.cardioSessions || []).map(session => <div key={session.id}><span>{session.activity}</span><strong>{formatCardioSummary(session)}</strong></div>)}
       </div>}
-      <footer><Link className="button" to={`/workout?edit=${completedToday.id}`}>Edit workout</Link><Link className="feed-text-link" to="/history">Open history →</Link></footer>
+      <footer><Link className="button secondary" to={`/workout?edit=${completedToday.id}`}>Edit workout</Link></footer>
     </section> : /* THE HEADER ACTION HAS TO DO SOMETHING. This slot held a circular
          regenerate button, and today's card is a pure derivation — the split
          position, the block's prescription for that day, and the athlete's
@@ -87,7 +86,7 @@ export function HomePage() {
         {!recommendedSets.length && recommendation.splitDay.type !== 'rest' && recommendation.splitDay.type !== 'cardio' && recommendation.splitDay.type !== 'hyrox' && <Link className="feed-empty-row" to="/exercises"><span><small>STRENGTH</small><strong>Choose exercises for this split day</strong><em>Forge needs a strength exercise mapped to this day.</em></span><b>Fix →</b></Link>}
         {recommendation.cardio && <label className={recommendation.cardio.selected ? 'selected' : ''}><input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} /><span><small>{recommendation.splitDay.type === 'hyrox' ? 'HYROX' : 'CARDIO'}</small><strong>{recommendation.cardio.title}</strong><em>{cardioPlanSummary(recommendation.cardio.session.plan)}</em></span></label>}
       </div>
-      <footer><Link className="button" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} →</Link><button className="feed-coach-button" onClick={() => openCoachBubble('Explain today’s workout briefly and tell me the one thing that matters most.')}>Ask Forge</button></footer>
+      {/* One action. The coach has its own button on every screen. */}<footer><Link className="button feed-start" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} →</Link></footer>
     </section>}
 
     {/* THE COACH SPEAKS FIRST. One fact the engine noticed, ranked, shown once.
