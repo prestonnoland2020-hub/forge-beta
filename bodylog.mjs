@@ -40,7 +40,7 @@ check('and a run', /run/i.test(`${clean.cardio?.session.plan.activity} ${clean.c
 const held = build(knee);
 check('with a knee in the log the squat is held, bench and row stay', held.topSets.map(s => s.exercise).sort().join(',') === 'Barbell Row,Bench Press', held.topSets.map(s => s.exercise).join(','));
 check('the run becomes bike or row for the same minutes', /Bike or row/.test(held.cardio?.title || '') && held.cardio?.session.plan.activity === 'Bike', held.cardio?.title);
-check('and the card says what was left out and why', /Knee in your body log: Back Squat held, running swapped for bike or row/.test(held.bodyLogNote || ''), held.bodyLogNote);
+check('and the card says what was left out and why', /Knee: Back Squat held, running swapped for bike or row/.test(held.bodyLogNote || ''), held.bodyLogNote);
 const shoulder = build(bodyLogState([{ area: 'shoulder', kind: 'injury', status: 'active', bufferUntil: '2026-10-01' }], today));
 check('a shoulder note holds the bench and keeps the run', shoulder.topSets.map(s => s.exercise).sort().join(',') === 'Back Squat,Barbell Row' && !/Bike or row/.test(shoulder.cardio?.title || ''), `${shoulder.topSets.map(s => s.exercise).join(',')} / ${shoulder.cardio?.title}`);
 

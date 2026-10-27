@@ -23,7 +23,7 @@ const dismissModals = async () => { for (const label of ['Yes, that was real', '
 const go = async (hash) => { await p.evaluate(h => { location.hash = h; }, hash); await p.waitForTimeout(2000); await dismissModals(); return text(); };
 
 /* Every surface's reading of "today", from its own text. */
-const readHome = t => ({ day: between(t, 'NEXT IN YOUR SPLIT\n', 80).split('\n')[1], lift: between(t, 'NEXT IN YOUR SPLIT\n', 200).split('\n')[5] });
+const readHome = t => ({ day: between(t, 'UP NEXT\n', 80).split('\n')[1], lift: between(t, 'UP NEXT\n', 200).split('\n')[5] });
 const readPlan = t => { const block = between(t, 'TODAY ·', 200).split('\n'); const liftLine = block.find(line => /^Top set · |×/.test(line)) || ''; return { day: block[1], lift: liftLine.replace(/^Top set · /, '').split(/:| \d/)[0].trim() }; };
 const readLogger = t => ({ day: between(t, 'LOGGING ·', 60).split('\n')[1], position: between(t, 'SPLIT POSITION ', 3).trim() });
 const askCoach = async (question) => { await go('#/coach'); await p.fill('textarea', question); await tapText('Send'); await p.waitForTimeout(1200); return p.evaluate(() => window.__forgeCoachContext); };

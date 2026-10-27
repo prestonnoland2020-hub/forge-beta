@@ -22,7 +22,7 @@ const ins = await visibleInputs(); await ins[0].fill('275'); await ins[1].fill('
 await tapText('Save goal'); await p.waitForTimeout(600); await tapText('Continue →'); await p.waitForTimeout(800);
 await tapText('Enter Forge'); await p.waitForTimeout(2800); await killPill();
 let t = await text();
-const todayBefore = between(t, 'NEXT IN YOUR SPLIT\n', 60).split('\n')[1];
+const todayBefore = between(t, 'UP NEXT\n', 60).split('\n')[1];
 check(`Today starts as ${todayBefore}`, todayBefore === 'Chest & Back', todayBefore);
 
 console.log('\n"My knee hurts and I only have 30 minutes"');
@@ -42,8 +42,8 @@ check('the knee shows in TRAINING AROUND', /TRAINING AROUND\nKnee/i.test(t), bet
 console.log('\nToday changed');
 await p.evaluate(() => { location.hash = '#/'; }); await p.waitForTimeout(1800);
 t = await text();
-check('the Today card says it was trimmed', /Trimmed to fit 30 minutes/.test(t), between(t, 'NEXT IN YOUR SPLIT', 300));
-check('a chest day is untouched by a knee — no body-log line', !/in your body log/i.test(t) && /Bench Press/.test(t), between(t, 'NEXT IN YOUR SPLIT', 300));
+check('the Today card says it was trimmed', /Trimmed to fit 30 minutes/.test(t), between(t, 'UP NEXT', 300));
+check('a chest day is untouched by a knee — no body-log line', !/Knee:/.test(t) && /Bench Press/.test(t), between(t, 'UP NEXT', 300));
 
 console.log('\n"I need a rest day"');
 await p.evaluate(() => { location.hash = '#/coach'; }); await p.waitForTimeout(1500);
@@ -53,9 +53,9 @@ check('rest is proposed', /Today → Rest day/.test(t), between(t, 'FORGE WOULD 
 await tapText('Apply'); await p.waitForTimeout(900);
 await p.evaluate(() => { location.hash = '#/'; }); await p.waitForTimeout(1800);
 t = await text();
-const todayAfter = between(t, 'NEXT IN YOUR SPLIT\n', 60).split('\n')[1];
+const todayAfter = between(t, 'UP NEXT\n', 60).split('\n')[1];
 check('Today is now a rest day', todayAfter === 'Rest day' || /Recovery is next/.test(t), todayAfter);
-check('with the coach note on it', /Rest day — you asked the coach for it/.test(t), between(t, 'NEXT IN YOUR SPLIT', 200));
+check('with the coach note on it', /Rest day — you asked the coach for it/.test(t), between(t, 'UP NEXT', 200));
 
 console.log('\nA question changes nothing');
 await p.evaluate(() => { location.hash = '#/coach'; }); await p.waitForTimeout(1500);

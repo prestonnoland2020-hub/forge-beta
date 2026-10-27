@@ -1,5 +1,6 @@
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
-import { sickDayStatus } from '../lib/bodyLog';
+import { sickDayStatus, bodyLogState, exerciseBlocked, bodyLogReason } from '../lib/bodyLog';
+import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { EASE_PERCENT } from '../lib/coachActions';
 import { useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -246,6 +247,11 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
   /* Being sick reaches the week, not just Today: the days inside it read as
      rest, and the days after it as the same session, lighter. */
   const { notes } = useAthleteNotes();
+  /* AN INJURY OR LIMITATION REACHES THE WEEK TOO. Today held the lifts a note
+     ruled out; the days after it still showed them. Each coming day is read
+     against the notes still in force on that date. */
+  const { exercises: library } = useTrainingLibrary();
+  const musclesOf = (name: string) => library.find(item => item.name.toLowerCase() === name.toLowerCase())?.muscles || [];
   const easeStep = /kg/i.test(unit) ? 2.5 : 5;
   const eased = (weight: number) => Math.max(easeStep, Math.floor(weight * (1 - EASE_PERCENT / 100) / easeStep) * easeStep);
   return <section className="card pv-week">
@@ -258,6 +264,11 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
         const logged = records.find(record => record.date === iso && ((record.topSets || []).some(set => set.completed !== false) || (record.cardioSessions || []).length > 0 || record.muscles.some(muscle => muscle !== 'Cardio')));
         const health = !past && !logged ? sickDayStatus(notes, iso) : null;
         if (health === 'sick') session = { ...session, title: 'Rest — you’re sick', lifts: [], run: undefined, empty: 'rest', summary: undefined };
+        const limits = !past && !logged && health !== 'sick' ? bodyLogState(notes, iso) : null;
+        const heldLifts = limits ? session.lifts.filter(lift => exerciseBlocked({ name: lift.exercise, muscles: musclesOf(lift.exercise) }, limits)) : [];
+        const runSwapped = Boolean(limits?.blocksRunning && session.run && /run/i.test(`${session.run.kind} ${session.run.text}`));
+        if (heldLifts.length || runSwapped) session = { ...session, lifts: session.lifts.filter(lift => !heldLifts.includes(lift)), run: runSwapped && session.run ? { ...session.run, kind: 'Easy run', text: 'Bike or row, easy' } : session.run };
+        const adjustedFor = heldLifts.length || runSwapped ? bodyLogReason(limits!) : '';
         if (health === 'easing') session = { ...session, lifts: session.lifts.map(lift => lift.weight ? { ...lift, weight: eased(lift.weight) } : lift), run: session.run ? { ...session.run, kind: 'Easy run' } : undefined };
         const isRest = session.empty === 'rest' && !session.lifts.length && !session.run;
         const isOpenDay = session.empty === 'open' && !session.lifts.length && !session.run;
@@ -297,7 +308,7 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
                that read as a rendering bug and, worse, hid the real problem:
                that day has no top set waiting for it. Say that instead. */
             ].filter(Boolean).join(' · ') || session.summary || 'No top set prescribed';
-        const shownSummary = health === 'easing' && !logged ? `Easier · ${summary}` : summary;
+        const shownSummary = adjustedFor && !logged ? `Adjusted for ${adjustedFor.toLowerCase()} · ${summary}` : health === 'easing' && !logged ? `Easier · ${summary}` : summary;
         /* A logged day opens on what was logged; a day gone by with nothing on
            it has nothing to open. */
         const loggedLifts = (logged?.topSets || []).filter(set => set.completed !== false);

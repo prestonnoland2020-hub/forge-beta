@@ -31,7 +31,7 @@ const dueDay = async (records, cursor) => {
   await p.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded' });
   await p.waitForTimeout(2200);
   const text = await p.evaluate(() => document.body.innerText);
-  const day = text.match(/NEXT IN YOUR SPLIT\n(.+)/)?.[1] || text.match(/TODAY · [A-Z]+\n(.+)/)?.[1] || '(none)';
+  const day = text.match(/UP NEXT\n(.+)/)?.[1] || text.match(/TODAY · [A-Z]+\n(.+)/)?.[1] || '(none)';
   await p.close();
   return { day, text };
 };

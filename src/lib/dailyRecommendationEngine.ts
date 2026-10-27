@@ -9,7 +9,7 @@ import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
 import { liftPositions, rungFor } from './liftProgression';
 import { hyroxSession,hyroxSessionsDone,weeksUntil } from './hyroxSession';
-import { exerciseBlocked,EMPTY_BODY_LOG,type BodyLogState } from './bodyLog';
+import { exerciseBlocked,bodyLogReason,EMPTY_BODY_LOG,type BodyLogState } from './bodyLog';
 
 /* Bump this whenever the engine's OUTPUT changes shape or policy — the daily
    card is snapshotted to Supabase, and a stale snapshot with a matching
@@ -264,7 +264,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
     })()
     :{id:`cardio-${cardioCandidate.id}`,title:cardioCandidate.title,summary:hyrox?hyrox.summary:formatCardio(cardioCandidate),rationale:cardioCandidate.rationale,session:cardioCandidate,selected:true}:undefined;
   const bodyLogNote=heldByBodyLog.length||runBlocked
-    ?`${bodyLog.areas.join(' and ').replace(/^./,c=>c.toUpperCase())} in your body log: ${[heldByBodyLog.length?`${heldByBodyLog.join(', ')} held`:'',runBlocked?'running swapped for bike or row':''].filter(Boolean).join(', ')}.`
+    ?`${bodyLogReason(bodyLog)}: ${[heldByBodyLog.length?`${heldByBodyLog.join(', ')} held`:'',runBlocked?'running swapped for bike or row':''].filter(Boolean).join(', ')}.`
     :undefined;
   const lastCompletedDate=input.records.map(record=>record.date).sort().at(-1);
   const selectedCount=topSets.filter(set=>set.selected).length;

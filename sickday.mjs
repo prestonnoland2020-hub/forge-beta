@@ -30,6 +30,9 @@ check('"sick of" is not an illness', !a.some(action => action.area === SICK_AREA
 a = localActions('it is cold out today', ctx);
 check('"cold out" is weather, not a cold', a.length === 0, JSON.stringify(a));
 
+a = localActions('I\u2019m sick, should I run?', ctx);
+check('"I’m sick" with a curly apostrophe still acts', types(a) === 'rest_today,log_note', JSON.stringify(a));
+
 console.log('\nAnd hears when it is over');
 const sickCtx = { ...ctx, activeNoteAreas: [SICK_AREA] };
 a = localActions('feeling much better today', sickCtx);

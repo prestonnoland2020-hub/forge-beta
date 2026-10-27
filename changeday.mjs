@@ -1,4 +1,4 @@
-/* THE HEADER ACTION HAS TO DO SOMETHING. The slot beside "NEXT IN YOUR SPLIT"
+/* THE HEADER ACTION HAS TO DO SOMETHING. The slot beside "UP NEXT"
    held a circular regenerate button. Today's card is a pure derivation — the
    split position, the block's prescription for that day, the athlete's logged
    bests — so there was nothing to re-roll: pressing it rewrote the identical
