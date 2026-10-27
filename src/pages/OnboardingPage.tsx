@@ -14,6 +14,7 @@ import { LEGAL } from '../lib/legal';
 import { normalizeGoalValue } from '../lib/goalInput';
 import { success, tap, warning } from '../lib/haptics';
 import { createNote, extractArea, saveNote } from '../features/training/athleteNotesService';
+import { Icon } from '../components/Icon';
 
 /* ONE QUESTION A SCREEN. Setup was three dense screens — a form of six
    controls, the full goal builder, and a lift picker per day — headed by
@@ -481,7 +482,7 @@ function OnboardingForm() {
                 {optionsForDay(index).map(exercise => {
                   const selected = chosen.includes(exercise.name);
                   return <button type="button" key={exercise.id} aria-pressed={selected} className={selected ? 'muscle-chip active' : 'muscle-chip'} onClick={() => { tap(); toggleDayExercise(index, exercise.name); }}>
-                    {exercise.name}{goalLiftKeys.has(canonicalLiftKey(exercise.name)) ? <i className="setup-goal-flag" title="Goal lift"> ★</i> : null}</button>;
+                    {exercise.name}{goalLiftKeys.has(canonicalLiftKey(exercise.name)) ? <i className="setup-goal-flag" title="Goal lift"> <Icon name="star" size={12}/></i> : null}</button>;
                 })}
               </div>}
             </section>;

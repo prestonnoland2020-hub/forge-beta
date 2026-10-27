@@ -24,6 +24,12 @@ import { clockToSeconds } from './time';
    red out of reach. With nothing logged there is no bar to draw, and the goal
    says so rather than drawing a zero. */
 
+/* WHICH MAX A STRENGTH GOAL IS MEASURED BY. Calculated is the best estimate
+   from any completed set (Epley); tested is the heaviest completed single,
+   or the starting 1RM entered on the goal — the same evidence the goal's own
+   detail card calls a Real 1RM. A rep goal is reps either way. */
+export type MaxMode = 'calculated' | 'tested';
+
 export type GoalTone = 'reached' | 'on-track' | 'needs-work' | 'off-track' | 'unknown';
 export type GoalProgress = {
   /* 0–1, or null when nothing is known yet. */
@@ -46,19 +52,21 @@ const clock = (seconds: number) => {
 };
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
-function strengthCurrent(goal: CreatedGoal, records: WorkoutRecord[]): number | null {
+function strengthCurrent(goal: CreatedGoal, records: WorkoutRecord[], mode: MaxMode): number | null {
   const lift = goal.exercise || '';
   const reps = goal.unit === 'reps';
-  let best = 0;
+  const tested = mode === 'tested' && !reps;
+  let best = tested ? numeric(goal.current) : 0;
   for (const record of records) for (const set of record.topSets || []) {
     if (set.completed === false || !lift || !sameLift(set.lift, lift)) continue;
-    const value = reps ? Number(set.reps) || 0 : calculateEstimatedOneRepMax(Number(set.weight) || 0, Number(set.reps) || 0) || 0;
+    if (tested && Number(set.reps) !== 1) continue;
+    const value = reps ? Number(set.reps) || 0 : tested ? Number(set.weight) || 0 : calculateEstimatedOneRepMax(Number(set.weight) || 0, Number(set.reps) || 0) || 0;
     if (value > best) best = value;
   }
-  return best || numeric(goal.current) || null;
+  return best || (tested ? null : numeric(goal.current) || null);
 }
 
-export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdict: Feasibility | undefined, setup?: { startingWeight?: string; currentWeight?: string } | null): GoalProgress {
+export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdict: Feasibility | undefined, setup?: { startingWeight?: string; currentWeight?: string } | null, mode: MaxMode = 'calculated'): GoalProgress {
   const unit = goal.unit || String(goal.target || '').split(' ').slice(1).join(' ');
   const time = isTime(unit);
   const hoursFirst = /hh/i.test(unit);
@@ -68,7 +76,7 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
   let current: number | null = null;
   let share: number | null = null;
   if (goal.type === 'Strength') {
-    current = strengthCurrent(goal, records);
+    current = strengthCurrent(goal, records, mode);
     share = current && target ? clamp01(current / target) : null;
   } else if (goal.type === 'Body Composition') {
     const weighed = records.filter(record => Number(record.bodyWeight) > 0).sort((a, b) => a.date.localeCompare(b.date));
@@ -87,6 +95,6 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
     : verdict.verdict === 'reachable' ? 'on-track'
     : verdict.verdict === 'out-of-reach' ? 'off-track'
     : 'needs-work';
-  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? 'Log it to start' : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
+  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (goal.type === 'Strength' && mode === 'tested' && goal.unit !== 'reps' ? 'No tested max yet' : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
   return { share, current, currentText: current ? show(current) : '—', targetText: target ? show(target) : String(goal.target || ''), tone, label };
 }

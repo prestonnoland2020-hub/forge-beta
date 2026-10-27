@@ -61,8 +61,8 @@ const open = async title => {
   await page.evaluate(() => { location.hash = '#/plan'; });
   await page.waitForTimeout(3000);
   const card = await page.evaluate(() => {
-    const el = document.querySelector('.pv-today');
-    return el ? { text: el.innerText.replace(/\n/g, ' | '), swap: el.querySelector('.pv-today-swap')?.textContent || '' } : null;
+    const el = document.querySelector('.pv-row.today');
+    return el ? { text: el.innerText.replace(/\n/g, ' | '), swap: el.querySelector('.pv-row-swap')?.textContent || '' } : null;
   });
   await page.close();
   return card;

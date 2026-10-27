@@ -8,6 +8,7 @@ import { WAVE_REPS, WAVE_LENGTH } from '../features/training/aiPlanService';
 import { localDayIso } from '../lib/time';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import type { DailyRecommendation } from '../lib/dailyRecommendationEngine';
+import { Icon } from './Icon';
 
 /* THE PLAN TAB, AS SOMEONE WHO JUST WANTS TO TRAIN READS IT.
 
@@ -201,7 +202,7 @@ export function TodayCard({ session, unit, logged, workoutHref }: {
         ? <Link className="button ghost" to={`/workout?edit=${logged!.id}`}>Edit today</Link>
         : isRest
           ? <Link className="button ghost" to={workoutHref}>Log something anyway</Link>
-          : <Link className="button" to={workoutHref}>Start workout →</Link>}
+          : <Link className="button" to={workoutHref}>Start workout <Icon name="arrow"/></Link>}
     </footer>
   </section>;
 }
@@ -238,12 +239,16 @@ export function useWeekSwipe(onSwipe: { current: (direction: 1 | -1) => void }) 
   };
 }
 
-export function WeekList({ sessions, unit, records, title = 'This week', note }: {
+export function WeekList({ sessions, unit, records, title = 'This week', note, todayHref }: {
   sessions: PlanSession[]; unit: string; records: WorkoutRecord[]; title?: string;
   note?: ReactNode;
+  /* TODAY IS A ROW, NOT A SECOND CARD. The page drew today twice — a big
+     card over the week, then the same day in it. Today's row is the green
+     one, opens on its own, and carries the Start button. */
+  todayHref?: string;
 }) {
-  const [open, setOpen] = useState<string | null>(null);
   const todayIso = localDayIso();
+  const [open, setOpen] = useState<string | null>(todayIso);
   /* Being sick reaches the week, not just Today: the days inside it read as
      rest, and the days after it as the same session, lighter. */
   const { notes } = useAthleteNotes();
@@ -316,19 +321,25 @@ export function WeekList({ sessions, unit, records, title = 'This week', note }:
           ? loggedLifts.length + (logged.cardioSessions || []).length > 0
           : !past && !isRest && !isOpenDay && (session.lifts.length + (session.run ? 1 : 0) > 0 || Boolean(session.summary));
         return <div className={`pv-row${isToday ? ' today' : ''}${logged ? ' done' : ''}${missed ? ' missed' : ''}${isRest ? ' rest' : ''}${expanded ? ' open' : ''}`} key={iso}>
-          <button type="button" className="pv-row-main" onClick={() => canExpand && setOpen(current => current === iso ? null : iso)} aria-expanded={canExpand ? expanded : undefined} disabled={!canExpand}>
+          <div className="pv-row-line"><button type="button" className="pv-row-main" onClick={() => canExpand && setOpen(current => current === iso ? null : iso)} aria-expanded={canExpand ? expanded : undefined} disabled={!canExpand}>
             <span className="pv-row-date"><b>{weekdayShort(session.date)}</b><small>{dayNumber(session.date)}</small></span>
             <span className="pv-row-body">
               <strong>{heading}</strong>
               <small>{shownSummary}</small>
+              {/* Trained off-plan: what was done stands, and the plan's
+                  intention is said once, quietly (it used to live on the
+                  Today card this row replaced). */}
+              {logged && !isRest && session.title && !sameDayName(logged.title, session.title) && <small className="pv-row-swap">Planned {session.title}</small>}
             </span>
-            <span className="pv-row-state" aria-hidden="true">{logged ? '✓' : isToday ? 'Today' : canExpand ? '›' : ''}</span>
+            <span className="pv-row-state" aria-hidden="true">{logged ? <span className="pv-check"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17l9-10" /></svg></span> : isToday && !(todayHref && !isRest) ? 'Today' : canExpand && !isToday ? '›' : ''}</span>
           </button>
+          {isToday && !logged && !isRest && todayHref && <Link className="pv-row-start" to={todayHref}>Start</Link>}</div>
           {expanded && <div className="pv-row-detail">
             {logged
               ? <>
                   {loggedLifts.map((set, index) => <LiftLine key={set.id || `${set.lift}-${index}`} lift={{ exercise: set.lift, weight: set.weight, reps: set.reps }} unit={unit} />)}
                   {(logged.cardioSessions || []).map(cardio => <div className="pv-line" key={cardio.id}><span className="pv-line-name">{cardio.activity}</span><span className="pv-line-value">{cardio.summary?.replace(`${cardio.activity} · `, '')}</span></div>)}
+                  {isToday && <Link className="pv-row-edit" to={`/workout?edit=${logged.id}`}>Edit today</Link>}
                 </>
               : <>
                   {session.lifts.map((lift, index) => <LiftLine key={`${lift.exercise}-${index}`} lift={lift} unit={unit} />)}
@@ -363,7 +374,7 @@ export function PlanActions({ saved, savedAt, generating, canGenerate, onSave, o
   return <section className="pv-actions">
     <div className="pv-actions-row">
       {saved
-        ? <span className="pv-saved" title={savedAt ? `Saved ${stamp(savedAt)}` : undefined}>✓ Saved</span>
+        ? <span className="pv-saved" title={savedAt ? `Saved ${stamp(savedAt)}` : undefined}><Icon name="check" size={13}/> Saved</span>
         : <button type="button" className="button small-button" disabled={generating} onClick={onSave}>Save plan</button>}
       {canGenerate && <button type="button" className="button ghost small-button" disabled={generating} onClick={onRegenerate}>{generating ? 'Building…' : 'Regenerate'}</button>}
       {generatedAt && <small className="pv-stamp">Built {stamp(generatedAt)}</small>}

@@ -10,6 +10,7 @@ import { splitDayKey } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { primaryMusclesFor } from '../lib/liftAliases';
 import { DialField } from './NumberDial';
+import { Icon } from './Icon';
 
 /* A SYNCED ACTIVITY IS HALF A RECORD, AND IT DESERVES THE WHOLE SCREEN.
    Strava knows the athlete moved for 54 minutes. It does not know which split
@@ -293,8 +294,8 @@ export function StravaReviewModal() {
       {reflection && <small className="strava-review-reflection">{reflection}</small>}
 
       <footer>
-        <button type="button" className="button ghost" disabled={busy} onClick={close}>Looks right ✓</button>
-        <button type="button" className="button" disabled={busy || !hasAnswer} onClick={() => void save()}>{busy ? 'Reading it…' : 'Save this day →'}</button>
+        <button type="button" className="button ghost" disabled={busy} onClick={close}>Looks right <Icon name="check"/></button>
+        <button type="button" className="button" disabled={busy || !hasAnswer} onClick={() => void save()}>{busy ? 'Reading it…' : <>Save this day <Icon name="arrow"/></>}</button>
       </footer>
     </div>
   </div>;

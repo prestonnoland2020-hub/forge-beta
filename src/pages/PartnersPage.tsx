@@ -11,6 +11,7 @@ import {
   searchAthletes, addPartnerById, loadDiscoverable, setDiscoverable, type AthleteResult,
   type Partner, type PartnerRequest, type AddResult,
 } from '../features/friends/partnerService';
+import { Icon } from '../components/Icon';
 
 const MESSAGES: Record<AddResult, string> = {
   requested: 'Request sent. They will see it next time they open Forge.',
@@ -170,7 +171,7 @@ export function PartnersPage() {
                       {partner.trainedToday ? didToday(partner, unit) : lastTrainedLabel(partner.lastTrained)}
                     </span>
                   </div>
-                  {partner.trainedToday && <b aria-label="Trained today">✓</b>}
+                  {partner.trainedToday && <b aria-label="Trained today"><Icon name="check" size={12} stroke={3}/></b>}
                 </Link>
                 <button type="button" className="text-button partner-remove"
                   onClick={() => { if (window.confirm(`Remove ${partner.displayName} as a training partner?`)) void removePartner(partner.friendId).then(refresh); }}>Remove</button>

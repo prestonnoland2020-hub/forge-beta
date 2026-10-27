@@ -4,6 +4,7 @@ import { isProgrammableStrength, useTrainingLibrary } from '../features/training
 import { coreFirst, coreOnly, isCoreLift, isWeightedBodyweight, CORE_LIFT_LABELS } from '../lib/coreLifts';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { normalizeGoalValue, isTimeUnit, isPaceMetric } from '../lib/goalInput';
+import { Icon } from './Icon';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
 
@@ -220,7 +221,7 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
   if(inline)return <section className="goal-builder goal-builder-inline">
     <div className="goal-type-chips" role="radiogroup" aria-label="Goal type">{goalTypes.map(item=><button type="button" role="radio" aria-checked={type===item.id} className={type===item.id?'active':''} onClick={()=>chooseType(item.id)} key={item.id}>{item.label}</button>)}</div>
     {goalFields}
-    <footer>{onClose!==noop&&<button type="button" className="button ghost" onClick={onClose}>Cancel</button>}<button type="button" className="button" disabled={!canSave} onClick={()=>{const checked=checkValues();if(!checked.ok)return;saveGoal(checked)}}>{initialGoal?'Update goal ✓':'Save goal ✓'}</button></footer>
+    <footer>{onClose!==noop&&<button type="button" className="button ghost" onClick={onClose}>Cancel</button>}<button type="button" className="button" disabled={!canSave} onClick={()=>{const checked=checkValues();if(!checked.ok)return;saveGoal(checked)}}>{initialGoal?'Update goal':'Save goal'} <Icon name="check"/></button></footer>
   </section>;
   return <div className="goal-builder-backdrop" role="dialog" aria-modal="true" aria-label="Create a new goal">
 <section className="goal-builder">
@@ -258,7 +259,7 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 <span>Add disabled exercises, overwrite your split, or change completed workout history.</span>
 </div>
 </div>}
-    <footer>{step>1?<button className="button ghost" onClick={()=>setStep(step-1)}>Back</button>:<button className="button ghost" onClick={onClose}>Cancel</button>}<button className="button" disabled={step===2&&!canSave} onClick={()=>{if(step===2&&!checkValues().ok)return;if(step<3){setStep(step+1);return}saveGoal()}}>{step<3?'Continue →':initialGoal?'Update Goal ✓':'Create Goal ✓'}</button></footer>
+    <footer>{step>1?<button className="button ghost" onClick={()=>setStep(step-1)}>Back</button>:<button className="button ghost" onClick={onClose}>Cancel</button>}<button className="button" disabled={step===2&&!canSave} onClick={()=>{if(step===2&&!checkValues().ok)return;if(step<3){setStep(step+1);return}saveGoal()}}>{step<3?<>Continue <Icon name="arrow"/></>:<>{initialGoal?'Update Goal':'Create Goal'} <Icon name="check"/></>}</button></footer>
   </section>
 </div>;
 }

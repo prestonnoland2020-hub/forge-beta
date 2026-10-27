@@ -5,6 +5,7 @@ import { requestForgeCoach } from '../features/training/coachService';
 import { type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { type CircuitStation, type PlannedCardio } from './CardioPlanBuilder';
+import { Icon } from './Icon';
 
 type BuilderMode = 'manual' | 'forge';
 
@@ -186,7 +187,7 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
       </div>
 
       <details className="movement-multiselect">
-        <summary><span>Movement options</span><small>{requiredNames.length ? `${requiredNames.length} required` : mode === 'forge' ? 'Optional · let Forge choose' : 'Search and select movements'}</small><b>⌄</b></summary>
+        <summary><span>Movement options</span><small>{requiredNames.length ? `${requiredNames.length} required` : mode === 'forge' ? 'Optional · let Forge choose' : 'Search and select movements'}</small><b><Icon name="chevron"/></b></summary>
         <div className="movement-dropdown-panel">
           <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search movements" autoFocus />
           <div className="movement-dropdown-list">{visibleOptions.map(exercise => <label key={exercise.name}><input type="checkbox" checked={requiredNames.includes(exercise.name)} onChange={() => toggleRequired(exercise)} /><span><strong>{exercise.name}</strong><small>{exercise.detail}</small></span></label>)}</div>
@@ -197,7 +198,7 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
         <header><div><span className="eyebrow">STATIONS</span><h3>{stations.length ? `${stations.length} movements` : 'No movements yet'}</h3></div>{mode === 'manual' && <button className="button ghost add-station-button" onClick={addStation}>＋ Add station</button>}</header>
         {stations.length === 0 && <div className="empty-stations">{mode === 'forge' ? 'Ask Forge to build the circuit, or choose required movements above.' : 'Choose movements above or add a station.'}</div>}
         {stations.map((station, index) => <article key={station.id}>
-          <div className="station-order"><b>{index + 1}</b><button onClick={() => moveStation(index, -1)} disabled={index === 0}>↑</button><button onClick={() => moveStation(index, 1)} disabled={index === stations.length - 1}>↓</button></div>
+          <div className="station-order"><b>{index + 1}</b><button onClick={() => moveStation(index, -1)} disabled={index === 0} aria-label="Move up"><Icon name="up"/></button><button onClick={() => moveStation(index, 1)} disabled={index === stations.length - 1} aria-label="Move down"><Icon name="down"/></button></div>
           <label>Station<select value={station.name} onChange={event => changeMovement(station.id, event.target.value)}>{options.map(exercise => <option key={exercise.name}>{exercise.name}</option>)}</select></label>
           <label>Unit<span className="station-unit-readout">{station.unit}</span></label>
           <label>Distance / target<input value={station.target} onChange={event => updateStation(station.id, { target: event.target.value })} placeholder="Enter target" /></label>

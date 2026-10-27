@@ -4,12 +4,13 @@ import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
 import { goalFeasibility } from '../lib/goalFeasibility';
-import { goalProgress, type GoalProgress } from '../lib/goalProgress';
+import { goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { MileageCheckOnGoal } from '../components/MileageGate';
 import { tap } from '../lib/haptics';
+import { Icon } from '../components/Icon';
 
 /* THE GOALS PAGE IS THE CRUX, SO IT READS LIKE A SCOREBOARD.
 
@@ -69,7 +70,12 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     () => goals.map(goal => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts })[0]),
     [goals, records, setup?.maxWeeklyMileage, workouts],
   );
-  const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup)), [goals, records, verdicts, setup]);
+  /* CALCULATED OR TESTED, for every strength number on the page at once —
+     the cards, their bars and the overall ring. Remembered on this device. */
+  const [maxMode, setMaxMode] = useState<MaxMode>(() => { try { return localStorage.getItem('forge-goals-max-mode') === 'tested' ? 'tested' : 'calculated'; } catch { return 'calculated'; } });
+  const chooseMode = (mode: MaxMode) => { if (mode === maxMode) return; tap(); setMaxMode(mode); try { localStorage.setItem('forge-goals-max-mode', mode); } catch { /* per-device convenience */ } };
+  const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode)), [goals, records, verdicts, setup, maxMode]);
+  const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
   /* The bars start empty and fill one frame after the page mounts, so the
      width transition runs; each card is a beat behind the one above it. */
   const [filled, setFilled] = useState(false);
@@ -110,6 +116,10 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     {checking && <MileageCheckOnGoal goal={checking} onClose={() => setChecking(null)} />}
 
     {syncError && <p className="data-sync-error">{syncError}</p>}
+
+    {hasStrength && <div className="gx-mode" role="radiogroup" aria-label="Strength max">
+      {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Calculated max' : 'Tested max'}</button>)}
+    </div>}
 
     {goals.length > 0 && (() => {
       const known = progress.filter(item => item.share !== null);
@@ -156,8 +166,8 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
             <button className="gx-face" onClick={() => { tap(); toggleGoal(index); }} aria-expanded={isOpen}>
               <span className="gx-top"><strong className="gx-title">{goal.title}</strong><span className={`gx-pill tone-${item.tone}`}>{item.label}</span></span>
               <span className="gx-numbers">
-                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : 'now'}</small></span>
-                <span className="gx-arrow" aria-hidden="true">→</span>
+                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'calc max') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
+                <span className="gx-arrow" aria-hidden="true"><Icon name="arrow" size={14}/></span>
                 <span className="gx-target">{item.targetText}<small>goal</small></span>
               </span>
               <span className="gx-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct * 100)} aria-label={`${goal.title}: ${Math.round(pct * 100)}%`}>
