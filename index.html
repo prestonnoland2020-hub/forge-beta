@@ -41,13 +41,9 @@
     <link rel="alternate icon" href="./favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="apple-touch-icon" data-forge-icon="apple-touch-icon.png" sizes="180x180" href="./apple-touch-icon.png" />
     <title>Forge Training</title>
-    <!-- ARCHIVO for display, INTER for body and data. preconnect first: the
-         stylesheet lives on googleapis.com but the font files come from
-         gstatic.com, and without the second hint that TCP+TLS handshake does
-         not start until the CSS has been parsed. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" />
+    <!-- ARCHIVO for display, INTER for body and data — bundled from @fontsource
+         in main.tsx rather than linked from Google, so no request leaves this
+         origin before the athlete has agreed to anything. -->
     <!-- NO FLASH OF THE WRONG THEME.
 
          React mounts, reads localStorage and stamps data-theme — but that all

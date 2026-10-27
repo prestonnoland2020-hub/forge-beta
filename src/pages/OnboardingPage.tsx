@@ -10,6 +10,7 @@ import { type CreatedGoal } from '../components/GoalBuilder';
 import { isProgrammableStrength, useTrainingLibrary, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { coreFirst, coreOnly, CORE_LIFTS, CORE_LIFT_LABELS, isWeightedBodyweight } from '../lib/coreLifts';
+import { LEGAL } from '../lib/legal';
 import { normalizeGoalValue } from '../lib/goalInput';
 import { success, tap, warning } from '../lib/haptics';
 import { createNote, extractArea, saveNote } from '../features/training/athleteNotesService';
@@ -168,6 +169,14 @@ function OnboardingForm() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
+  /* CONSENT IS ASKED FOR, NOT ASSUMED. The sign-in screen's "by continuing
+     you agree" line is notice, not agreement — and the age gate it relied on
+     was never asked at all. Washington's health-data law also wants consent to
+     health data that is separate from accepting the terms, so it is its own
+     box. Both are stamped with the policy version onto the athlete's settings,
+     which sync to their account. */
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [healthConsent, setHealthConsent] = useState(false);
 
   /* THE GOAL IS HELD, NOT SAVED, until Enter Forge. Saving it on its own
      screen meant Back-and-change wrote a second goal; held here, the last
@@ -287,6 +296,8 @@ function OnboardingForm() {
   };
 
   const finish = async () => {
+    if (!isEditing && !agreedTerms) return fail('Confirm you are 18 or older and agree to the Terms to finish.');
+    if (!isEditing && !healthConsent) return fail('Forge needs your consent to use health data to build your plan.');
     if (!isEditing && !data.acceptedSafety) return fail('Tick the safety box to finish.');
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
@@ -330,7 +341,8 @@ function OnboardingForm() {
       /* A runner's days default to the cardio days in the split. Never more
          days than they train. */
       const runningDays = Math.min(data.trainingDays, data.runningDays || plannedCardioDays || 0);
-      const completed = { ...data, username, runningDays, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString() };
+      const completed = { ...data, username, runningDays, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString(),
+        ...(isEditing ? {} : { acceptedTermsAt: new Date().toISOString(), healthConsentAt: new Date().toISOString(), consentVersion: LEGAL.version }) };
       /* The goal lands after every await, so a failed save above can be
          retried without writing it twice. */
       if (pendingGoal && !goals.length) saveGoal(pendingGoal, null);
@@ -356,7 +368,7 @@ function OnboardingForm() {
 
   const nameReady = Boolean(data.displayName.trim());
   const targetReady = Boolean(goalTarget.trim()) && (goalExercise !== 'HYROX' || Boolean(division));
-  const safetyNeeded = !isEditing && !data.acceptedSafety;
+  const safetyNeeded = !isEditing && (!data.acceptedSafety || !agreedTerms || !healthConsent);
   const STEP_FORM = 'ob-step-form';
 
   /* Each screen is a body and, where something has to be confirmed rather
@@ -476,6 +488,8 @@ function OnboardingForm() {
           })}</div>
           <label className="setup-check"><input type="checkbox" checked={data.injuryConstraint} onChange={event => { tap(); set('injuryConstraint', event.target.checked); }} /><span><strong>I have an injury or limitation</strong><small>Forge will train around it.</small></span></label>
           {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
+          {!isEditing && <label className="setup-check"><input type="checkbox" checked={agreedTerms} onChange={event => { tap(); setError(''); setAgreedTerms(event.target.checked); }} /><span><strong>I’m 18 or older and I agree to the Terms of Use and Privacy Policy.</strong><small><a className="text-button" href="#/legal/terms" target="_blank" rel="noreferrer">Read the Terms</a> · <a className="text-button" href="#/legal/privacy" target="_blank" rel="noreferrer">Read the Privacy Policy</a></small></span></label>}
+          {!isEditing && <label className="setup-check"><input type="checkbox" checked={healthConsent} onChange={event => { tap(); setError(''); setHealthConsent(event.target.checked); }} /><span><strong>I consent to Forge using the health information I record — body weight, check-ins and injury notes — to build and adjust my training.</strong><small>Never sold, never used for ads. Withdraw any time by deleting it. <a className="text-button" href="#/legal/health" target="_blank" rel="noreferrer">Consumer Health Data Notice</a></small></span></label>}
           {!isEditing && <label className="setup-check safety"><input type="checkbox" checked={data.acceptedSafety} onChange={event => { tap(); set('acceptedSafety', event.target.checked); }} /><span><strong>I understand Forge is training guidance, not medical advice, and I’ll stop and report any pain.</strong><small><button type="button" className="text-button" onClick={() => setSafetyOpen(value => !value)}>{safetyOpen ? 'Hide details' : 'Read details'}</button></small></span></label>}
           {safetyOpen && <div className="disclaimer-copy">
             <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
@@ -484,7 +498,7 @@ function OnboardingForm() {
           </div>}
         </>,
         action: <>
-          {safetyNeeded && !error && <p className="ob-action-hint">Tick the safety box above to continue</p>}
+          {safetyNeeded && !error && <p className="ob-action-hint">Tick the three boxes above to continue</p>}
           <button className="button ob-next" disabled={saving || safetyNeeded} onClick={finish}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
         </>,
       };

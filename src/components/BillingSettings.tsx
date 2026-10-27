@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { ALWAYS_FREE, PRO_FEATURES, remaining } from '../features/billing/entitlements';
@@ -16,7 +17,7 @@ import { deleteMyAccount } from '../features/profile/profileService';
    the first thing to test downward, not the feature set. */
 const PRICES: Record<Plan, { label: string; price: string; note: string }> = {
   pro_monthly: { label: 'Monthly', price: '$9.99', note: 'per month' },
-  pro_annual: { label: 'Annual', price: '$59.99', note: 'per year · half the monthly rate' },
+  pro_annual: { label: 'Annual', price: '$59.99', note: 'per year · about $5 a month' },
 };
 
 const ENDPOINT_LABELS: Record<string, string> = {
@@ -53,6 +54,7 @@ export function BillingSettings() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteText, setDeleteText] = useState('');
   const rail = billingRail();
+  const stripeStillBilling = isPro && subscription?.source === 'stripe' && !subscription?.cancel_at_period_end;
 
   const run = async (key: string, action: () => Promise<void>) => {
     setBusy(key); setError(''); setMessage('');
@@ -112,13 +114,17 @@ export function BillingSettings() {
           <small>{PRICES[plan].label}</small>
           <strong>{PRICES[plan].price}</strong>
           <span>{PRICES[plan].note}</span>
-          <b>{busy === plan ? 'Opening…' : 'Choose'}</b>
+          <b>{busy === plan ? 'Opening…' : `Subscribe ${PRICES[plan].label.toLowerCase()}`}</b>
         </button>)}
       </div>
+      {/* Auto-renewal laws (California's among them) want the renewal, the
+          price and how to cancel stated where the athlete commits, not only in
+          the terms. */}
       <p className="billing-fineprint">
         {rail === 'apple'
-          ? 'Billed through your Apple ID. Cancel any time in App Store settings; a subscription renews unless cancelled at least 24 hours before the period ends.'
-          : 'Billed securely by Stripe. Cancel any time — card details never touch Forge.'}
+          ? 'Billed through your Apple ID. Renews automatically at the price shown unless cancelled at least 24 hours before the period ends. Cancel any time in App Store settings.'
+          : 'Renews automatically at the price shown, every month or year, until you cancel. Cancel any time with Manage payment and cancel; Pro stays on until the period ends. Billed by Stripe — card details never touch Forge.'}
+        {' '}<Link to="/legal/terms">Terms</Link> · <Link to="/legal/refunds">Refund Policy</Link>
       </p>
       <details className="billing-free-note">
         <summary>What stays free</summary>
@@ -153,8 +159,14 @@ export function BillingSettings() {
         word is the confirmation, because this is irreversible and cascades
         through every workout the athlete ever logged. */}
     <section className="card billing-danger">
-      <header><div><span className="eyebrow">DELETE ACCOUNT</span><h3>Permanently delete Forge</h3><p>This removes your profile, every workout, top set, cardio session, goal and connection. It cannot be undone, and it does not cancel a subscription bought through the App Store — cancel that in App Store settings first.</p></div></header>
-      {!confirmDelete
+      <header><div><span className="eyebrow">DELETE ACCOUNT</span><h3>Permanently delete Forge</h3><p>This removes your profile, every workout, top set, cardio session, goal and connection. It cannot be undone, and it does not cancel a subscription — cancel that first, in App Store settings or with Manage payment and cancel above.</p></div></header>
+      {/* Deleting the account removes the database rows but nothing tells
+          Stripe, so a live web subscription would go on charging a card for an
+          account that no longer exists. Until deletion cancels it server-side,
+          it has to be cancelled first. */}
+      {stripeStillBilling
+        ? <p className="billing-message error">Your web subscription is still set to renew. Cancel it with <strong>Manage payment and cancel</strong> above, then come back to delete your account.</p>
+        : !confirmDelete
         ? <button className="button danger-outline" onClick={() => setConfirmDelete(true)}>Delete my account</button>
         : <div className="billing-confirm">
             <label>Type <b>DELETE</b> to confirm
