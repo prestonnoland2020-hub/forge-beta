@@ -77,7 +77,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      can be live on the site while the icon on the phone still runs last
      night's engine. version.json is fetched uncached on open and whenever the
      app returns to the foreground; a mismatch surfaces one tap to reload. */
-  const [updateReady,setUpdateReady]=useState(false);
+  const [updateReady,setUpdateReady]=useState<string|false>(false);
   useEffect(()=>{
     let last=0;
     const check=async()=>{
@@ -86,16 +86,44 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         const response=await fetch(`version.json?t=${Date.now()}`,{cache:'no-store'});
         if(!response.ok)return;
         const data=await response.json() as {build?:string};
-        if(data.build&&data.build!==__FORGE_BUILD__)setUpdateReady(true);
+        if(data.build&&data.build!==__FORGE_BUILD__)setUpdateReady(data.build);
       }catch{/* offline — try again later */}
     };
     void check();
     const onVisible=()=>{if(document.visibilityState==='visible')void check()};
     document.addEventListener('visibilitychange',onVisible);
-    return()=>document.removeEventListener('visibilitychange',onVisible);
+    /* An app left open on a screen all day never returns to the foreground,
+       so it also looks every five minutes while it is on screen. */
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void check()},5*60000);
+    return()=>{document.removeEventListener('visibilitychange',onVisible);window.clearInterval(timer)};
   },[]);
 
   const location = useLocation();
+  /* A NEW BUILD TAKES OVER BY ITSELF, at a moment nobody loses anything to.
+     The pill asked for a tap most people never made, so a deploy reached them
+     only whenever they happened to reload. Now the app reloads on its own —
+     on moving between screens or coming back to the app — unless it is the
+     workout logger, a field has focus, or a sheet is open; then the pill is
+     the fallback. The reload adds ?v=<build> so GitHub Pages' ten-minute
+     cache of index.html cannot hand back the old shell, and each build is
+     tried once, so a deploy still propagating cannot loop the page. */
+  useEffect(()=>{
+    if(!updateReady)return;
+    const tryReload=()=>{
+      const busy=location.pathname==='/workout'
+        ||document.activeElement instanceof HTMLInputElement||document.activeElement instanceof HTMLTextAreaElement||document.activeElement instanceof HTMLSelectElement
+        ||Boolean(document.querySelector('[role="dialog"], .coach-bubble-panel.open'));
+      if(busy)return;
+      try{if(sessionStorage.getItem('forge-auto-update')===updateReady)return;sessionStorage.setItem('forge-auto-update',updateReady)}catch{return}
+      const url=new URL(window.location.href);
+      url.searchParams.set('v',updateReady);
+      window.location.replace(url.href);
+    };
+    tryReload();
+    const onVisible=()=>{if(document.visibilityState==='visible')tryReload()};
+    document.addEventListener('visibilitychange',onVisible);
+    return()=>document.removeEventListener('visibilitychange',onVisible);
+  },[updateReady,location.pathname,location.search]);
   const screenKey = `${location.pathname}?${new URLSearchParams(location.search).get('view') || ''}`;
   const lastScreen = useRef({ key: screenKey, depth: screenDepth(location.pathname, location.search) });
   /* Decided while rendering, not in an effect: the new screen's first frame
