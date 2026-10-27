@@ -8,6 +8,7 @@ import { WAVE_REPS, WAVE_LENGTH } from '../features/training/aiPlanService';
 import { localDayIso } from '../lib/time';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import type { DailyRecommendation } from '../lib/dailyRecommendationEngine';
+import { Icon } from './Icon';
 
 /* THE PLAN TAB, AS SOMEONE WHO JUST WANTS TO TRAIN READS IT.
 
@@ -201,7 +202,7 @@ export function TodayCard({ session, unit, logged, workoutHref }: {
         ? <Link className="button ghost" to={`/workout?edit=${logged!.id}`}>Edit today</Link>
         : isRest
           ? <Link className="button ghost" to={workoutHref}>Log something anyway</Link>
-          : <Link className="button" to={workoutHref}>Start workout →</Link>}
+          : <Link className="button" to={workoutHref}>Start workout <Icon name="arrow"/></Link>}
     </footer>
   </section>;
 }
@@ -373,7 +374,7 @@ export function PlanActions({ saved, savedAt, generating, canGenerate, onSave, o
   return <section className="pv-actions">
     <div className="pv-actions-row">
       {saved
-        ? <span className="pv-saved" title={savedAt ? `Saved ${stamp(savedAt)}` : undefined}>✓ Saved</span>
+        ? <span className="pv-saved" title={savedAt ? `Saved ${stamp(savedAt)}` : undefined}><Icon name="check" size={13}/> Saved</span>
         : <button type="button" className="button small-button" disabled={generating} onClick={onSave}>Save plan</button>}
       {canGenerate && <button type="button" className="button ghost small-button" disabled={generating} onClick={onRegenerate}>{generating ? 'Building…' : 'Regenerate'}</button>}
       {generatedAt && <small className="pv-stamp">Built {stamp(generatedAt)}</small>}

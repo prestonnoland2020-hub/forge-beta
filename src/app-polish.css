@@ -325,7 +325,7 @@ details.session-details[open] > summary { margin-bottom: 14px; }
 .gx-foot { display: flex; align-items: baseline; justify-content: space-between; }
 .gx-foot b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .gx-foot small { font-size: 13px; font-weight: 700; color: var(--ink-3, var(--muted)); }
-.tone-reached .gx-title::after { content: ' 🏆'; }
+.tone-reached .gx-title::after { content: ''; margin-left: 6px; color: var(--gx-good, #22a35a); display:inline-block;width:15px;height:15px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 4h8v5a4 4 0 0 1-8 0V4Z'/%3E%3Cpath d='M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 4h8v5a4 4 0 0 1-8 0V4Z'/%3E%3Cpath d='M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4'/%3E%3C/svg%3E") center/contain no-repeat;vertical-align:-2px; }
 .gx-card .goal-card-actions, .gx-card .goal-card-detail { padding: 0 16px 14px 20px; }
 
 .gx-empty { text-align: center; padding: 28px 20px; border-radius: 22px; background: var(--surface-1, var(--card)); border: 1px dashed var(--hairline-strong, var(--line)); }
@@ -378,3 +378,38 @@ details.session-details[open] > summary { margin-bottom: 14px; }
 .pv-row.rest .pv-row-body, .pv-row.rest .pv-row-date { opacity: .6; }
 .pv-row-swap { color: var(--ink-3, var(--muted)) !important; font-style: italic; }
 .pv-row-edit { display: inline-block; margin-top: 6px; font-weight: 800; color: var(--accent-text, var(--accent)); }
+
+/* ICONS. One stroke set (components/Icon) wherever a glyph or emoji was. */
+svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
+.button > svg.icon:last-child { margin-left: -8px; }
+.wk-prs span svg.icon { color: #b8860b; margin-right: 2px; }
+
+/* TODAY'S WORKOUT, ONE LINE A LIFT. Name on the left, today's top set in
+   bold on the right, a round tick that fills when it is in the session. */
+.today-focus-card .today-workout-items > .tw-row { grid-template-columns: 1fr auto auto; gap: 12px; min-height: 58px; padding: 11px 15px; position: relative; }
+.today-focus-card .tw-row input { position: absolute; opacity: 0; pointer-events: none; }
+.today-focus-card .tw-row .tw-name { display: grid; gap: 1px; min-width: 0; }
+.today-focus-card .tw-row .tw-name strong { font-size: 16px; font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today-focus-card .tw-row .tw-name small { font-size: 10px; font-weight: 800; letter-spacing: .1em; color: var(--muted); }
+.today-focus-card .tw-row .tw-name em { font-style: normal; font-size: 13px; color: var(--muted); }
+.today-focus-card .tw-load { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.today-focus-card .tw-load small { font-size: 12px; font-weight: 700; color: var(--muted); }
+.today-focus-card .tw-tick { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1.6px solid var(--hairline-strong, var(--line)); color: transparent; transition: background .18s ease, border-color .18s ease, color .18s ease; }
+.today-focus-card .tw-row.selected .tw-tick { background: var(--accent-strong, var(--accent)); border-color: var(--accent-strong, var(--accent)); color: var(--accent-ink, #fff); }
+.today-focus-card .tw-row:not(.selected) .tw-name strong, .today-focus-card .tw-row:not(.selected) .tw-load { color: var(--muted); }
+.today-focus-card .tw-row:active { background: var(--accent-wash); }
+.today-focus-card .tw-quiet { grid-template-columns: 1fr; cursor: default; }
+
+/* THE LIMITATION FLAG, ON BRAND. The coach's shield in an accent disc and
+   the brand wash behind it — Forge adjusting the plan, not a hazard sign. */
+.buffer-banner { border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--tint) 12%, var(--surface-1)), var(--surface-1)); border-radius: 16px; padding: 10px 14px 10px 10px; gap: 12px; min-height: 56px; box-shadow: inset 3px 0 var(--accent); }
+.buffer-banner-mark { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--accent-strong, var(--accent)); color: var(--accent-ink, #fff); font-style: normal; }
+.buffer-banner .buffer-banner-mark svg { color: inherit; width: 18px; height: 18px; }
+.buffer-banner > span { display: grid; gap: 1px; flex: 1; min-width: 0; font-size: 14px; font-weight: 700; line-height: 1.25; }
+.buffer-banner > span small { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+.buffer-banner svg.buffer-banner-go { width: 16px; height: 16px; color: var(--accent-text); transform: rotate(-90deg); }
+
+/* The week card opens on its rows, not on a band of padding over a label. */
+.pv > section.pv-week { padding: 0 8px 4px; }
+.pv > section.pv-week > header { padding: 12px 10px 4px; }
+.pv > section.pv-week > header h3 { font-size: 12px; }

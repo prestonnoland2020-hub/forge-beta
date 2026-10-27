@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
+import { Icon } from '../components/Icon';
 
 /* App Store Review Guideline 5.1.1(i) requires the privacy policy to be
    reachable INSIDE the app, not only as a URL in App Store Connect metadata,
@@ -122,6 +123,6 @@ export function LegalPage() {
       </nav>
     </header>
     <article className="legal-body">{isTerms ? <Terms /> : <Privacy />}</article>
-    <footer className="legal-foot"><Link to="/">← Back to Forge</Link></footer>
+    <footer className="legal-foot"><Link to="/"><Icon name="back" size={14}/> Back to Forge</Link></footer>
   </main>;
 }

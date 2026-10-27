@@ -18,6 +18,7 @@ import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
 import { tap } from '../lib/haptics';
+import { Icon } from './Icon';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
    standalone exercise library that duplicated what the Log screen already does;
@@ -307,7 +308,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     {coachOpen && <button className={coachExpanded ? 'coach-bubble-backdrop expanded' : 'coach-bubble-backdrop'} type="button" aria-label="Close Forge coach" onClick={() => { if (coachExpanded) setCoachExpanded(false); else setCoachOpen(false); }} />}
     <div className={`${coachExpanded ? 'coach-bubble-shell expanded' : 'coach-bubble-shell'}${location.pathname === '/coach' || location.pathname === '/workout' ? ' coach-bubble-hidden' : ''}`}>
       <section className={coachOpen ? 'coach-bubble-panel open' : 'coach-bubble-panel'} aria-hidden={!coachOpen} aria-label="Forge AI coach">
-        <header><div><span>AI COACH</span><strong>Ask Forge</strong></div><div className="coach-window-actions"><button type="button" onClick={() => setCoachExpanded(value => !value)} aria-label={coachExpanded ? 'Restore Forge coach' : 'Expand Forge coach'} title={coachExpanded ? 'Restore' : 'Expand'}>{coachExpanded ? '↙' : '↗'}</button><button type="button" onClick={() => { setCoachOpen(false); setCoachExpanded(false); }} aria-label="Close Forge coach">×</button></div></header>
+        <header><div><span>AI COACH</span><strong>Ask Forge</strong></div><div className="coach-window-actions"><button type="button" onClick={() => setCoachExpanded(value => !value)} aria-label={coachExpanded ? 'Restore Forge coach' : 'Expand Forge coach'} title={coachExpanded ? 'Restore' : 'Expand'}>{coachExpanded ? <Icon name="collapse"/> : <Icon name="expand"/>}</button><button type="button" onClick={() => { setCoachOpen(false); setCoachExpanded(false); }} aria-label="Close Forge coach">×</button></div></header>
         <div className="coach-bubble-content">{coach}</div>
       </section>
       <button type="button" className={coachOpen ? 'coach-bubble-toggle active' : 'coach-bubble-toggle'} onClick={() => { tap(); setCoachOpen(open => !open); if (coachOpen) setCoachExpanded(false); }} aria-expanded={coachOpen} aria-label={coachOpen ? 'Close Forge coach' : 'Open Forge coach'}>

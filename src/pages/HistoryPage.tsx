@@ -4,6 +4,7 @@ import { PageIntro } from '../components/AppShell';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
+import { Icon } from '../components/Icon';
 
 const formatDate=(date:string)=>new Date(`${date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -48,6 +49,6 @@ export function HistoryPage({embedded=false}:{embedded?:boolean}={}){
                 cursor into the split — useful in a bug report, meaningless on a
                 Tuesday. */}
             {selected.recommendationId&&<small className="recommendation-lineage">Forge planned this day</small>}<div className="simple-preview-results">{recordTopSets(selected).map((set,index)=><div key={`${set.lift}-${index}`}><strong>{set.lift}</strong><span>{set.weight} {weightUnit} ×{set.reps}</span></div>)}{recordTopSets(selected).length===0&&strengthMuscles(selected).length>0&&<div><strong>Strength workout</strong><span>{strengthMuscles(selected).join(' · ')} · no historical top set recorded</span></div>}{(selected.cardioSessions||[]).map(session=><div key={session.id}><strong>{session.activity}</strong><span>{formatCardioSummary(session)}</span></div>)}</div>{selected.notes&&<aside className="selected-day-notes"><span className="eyebrow">NOTES</span><p>{selected.notes}</p></aside>}</>:<p>No training is logged for this date.</p>}</section>
-    </>:<section className="card history-first-empty"><strong>No workouts yet</strong><span>Every workout you finish shows up here.</span><Link className="button" to="/workout?source=blank">Log a workout →</Link></section>}
+    </>:<section className="card history-first-empty"><strong>No workouts yet</strong><span>Every workout you finish shows up here.</span><Link className="button" to="/workout?source=blank">Log a workout <Icon name="arrow"/></Link></section>}
   </div>;
 }
