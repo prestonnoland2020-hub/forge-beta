@@ -41,13 +41,9 @@
     <link rel="alternate icon" href="./favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="apple-touch-icon" data-forge-icon="apple-touch-icon.png" sizes="180x180" href="./apple-touch-icon.png" />
     <title>Forge Training</title>
-    <!-- ARCHIVO for display, INTER for body and data. preconnect first: the
-         stylesheet lives on googleapis.com but the font files come from
-         gstatic.com, and without the second hint that TCP+TLS handshake does
-         not start until the CSS has been parsed. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" />
+    <!-- SAIRA and GEIST MONO — bundled from @fontsource in main.tsx rather than
+         linked from Google, so no request leaves this origin before the athlete
+         has agreed to anything. -->
     <!-- NO FLASH OF THE WRONG THEME.
 
          React mounts, reads localStorage and stamps data-theme — but that all
@@ -94,8 +90,39 @@
         } catch (error) { /* System and signal it is. */ }
       })();
     </script>
+    <!-- THE LAUNCH. Painted by the browser before any script runs, so a cold
+         open shows the mark at once instead of a blank screen while the bundle
+         loads. Just the F — no tile, no wordmark — assembling along its own 45°
+         cut in the 1.2s Strike, once. main.tsx clears it when the strike has
+         landed. It finishes on exactly what ForgeLoader
+         (src/components/ForgeLoader.tsx) draws, so if the app is still waiting
+         on the account the hand-over does not move.
+         Colours are literal: forge-theme.css has not loaded yet. -->
+    <style>
+      #forge-boot{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#f3f5f5}
+      @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #forge-boot{background:#131819}}
+      :root[data-theme="dark"] #forge-boot{background:#131819}
+      #forge-boot svg{width:120px;height:102px;overflow:visible}
+      #forge-boot .fb-arm1,#forge-boot .fb-arm2{fill:#259de2}
+      #forge-boot .fb-wedge{fill:#14181a}
+      #forge-boot .fb-base{fill:#7b807e}
+      @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #forge-boot .fb-wedge{fill:#f3f5f5}}
+      :root[data-theme="dark"] #forge-boot .fb-wedge{fill:#f3f5f5}
+      #forge-boot.is-leaving{pointer-events:none;transition:opacity 260ms cubic-bezier(.4,0,1,1);opacity:0}
+      @media (prefers-reduced-motion:no-preference){
+        #forge-boot svg g[class]{transform-box:view-box}
+        #forge-boot .fb-arm1{animation:fb-arm 520ms cubic-bezier(.16,1,.3,1) 120ms both}
+        #forge-boot .fb-arm2{animation:fb-arm 520ms cubic-bezier(.16,1,.3,1) 230ms both}
+        #forge-boot .fb-wedge{animation:fb-drop 460ms cubic-bezier(.16,1,.3,1) 360ms both}
+        #forge-boot .fb-base{animation:fb-rise 460ms cubic-bezier(.16,1,.3,1) 440ms both}
+      }
+      @keyframes fb-arm{from{opacity:0;transform:translate(260px,-260px)}}
+      @keyframes fb-drop{from{opacity:0;transform:translateY(-170px)}}
+      @keyframes fb-rise{from{opacity:0;transform:translate(-150px,150px)}}
+    </style>
   </head>
   <body>
+    <div id="forge-boot" role="status" aria-label="Opening Forge"><svg viewBox="0 0 732 620" aria-hidden="true"><g class="fb-base"><g transform="translate(-289,-339) translate(0,1254) scale(0.1,-0.1)"><path d="M5770 5109c-256-26-564-152-770-315-133-107-832-804-1165-1164-59-63-135-144-169-180-64-66-233-277-254-317-7-12-12-27-12-33l0-10 818 2 817 3 59 30c33 16 92 60 132 97l72 68 145 208c494 708 654 939 881 1272 184 270 194 283 261 315 30 15 55 28 55 30 0 5-810-1-870-6z"/></g></g><g class="fb-wedge"><g transform="translate(-289,-339) translate(0,1254) scale(0.1,-0.1)"><path d="M3052 6408c-19-19-14-53 9-74 42-37 434-479 522-588 56-69 67-88 98-176l24-65 5-675 5-675 10 1c14 1 397 521 964 1309 476 661 641 897 641 915 0 9-5 21-12 28l-12 12-1121 0-1121 0-12-12z"/></g></g><g class="fb-arm2"><g transform="translate(-289,-339) translate(0,1254) scale(0.1,-0.1)"><path d="M6250 6746c-26-6-63-22-83-35l-37-22-135-177c-74-97-180-235-235-307-55-71-269-353-476-625-207-272-407-533-444-580-37-47-188-245-336-440-148-195-291-385-319-421-27-36-122-160-209-275-88-115-195-254-239-309-110-137-113-144-21-45 153 165 815 847 951 981 195 191 355 331 449 391 125 80 331 163 507 205l112 26 825 6 825 6 65 23c36 13 97 42 135 64l70 41 96 96 95 96 66 105c35 58 176 283 313 500 384 613 405 647 405 667 0 10-5 24-12 31l-12 12-1155-1-1156 0-45-13z"/></g></g><g class="fb-arm1"><g transform="translate(-289,-339) translate(0,1254) scale(0.1,-0.1)"><path d="M4599 8986c-101-29-204-92-281-170l-63-64-125-193c-323-504-502-780-725-1119-82-124-195-296-252-382-56-87-103-166-103-177 0-11 7-27 16-35l15-16 1063 0 1064 0 33 14c40 17 80 57 104 105 30 59 114 168 162 211 52 46 140 90 229 117l59 18 1505 5 1505 5 63 26c149 63 266 163 365 313 371 558 829 1273 835 1303l4 21-21 21-21 21-2677-1-2678 0-76-23z"/></g></g></svg></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

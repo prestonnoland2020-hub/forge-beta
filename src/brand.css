@@ -1,0 +1,73 @@
+/* THE BRAND LAYER — titles, the wordmark and the loading screen.
+
+   Loaded after everything else, because it is the one place that decides how
+   a title looks. Titles are Saira at its widest useful setting: black, italic,
+   caps, tightly tracked, leaning the same way as the F. Everything else in the
+   app stays at Saira's normal width, so a title is always the loudest thing
+   on the screen and nothing else competes with it. */
+
+.topbar h1,
+.login-card h1,
+.onboarding-grid > aside h1,
+.ob-screen h1,
+.app-recovery h1 {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: var(--title-weight);
+  font-stretch: var(--title-stretch);
+  letter-spacing: var(--title-tracking);
+  text-transform: uppercase;
+}
+
+/* The wide titles need a little more room per letter than the old condensed
+   ones; these sizes keep the longest tab name on one line at 320px. */
+.topbar h1 { font-size: 24px; }
+.login-card h1 { line-height: .92; }
+@media (max-width: 760px) {
+  .topbar h1 { font-size: 20px; }
+}
+
+/* The wordmark is set, not drawn, so it follows the same rule as a title. */
+.login-brand .strike-word {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 118%;
+  letter-spacing: -.02em;
+}
+.login-brand { letter-spacing: 0; }
+
+/* ---- Loading screen ------------------------------------------------------
+   Just the F, centred on the page ground — the frame the launch animation in
+   index.html finishes on. No tile, no wordmark, no bar. */
+
+.forge-loader {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+}
+
+.forge-loader svg {
+  width: 120px;
+  height: 102px;
+  overflow: visible;
+}
+
+.forge-loader-arm1,
+.forge-loader-arm2 { fill: var(--accent); }
+.forge-loader-wedge { fill: var(--text); }
+.forge-loader-base { fill: var(--mark-shade); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
