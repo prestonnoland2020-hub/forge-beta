@@ -25,6 +25,9 @@ export type AthleteSetup = {
   splitSource:'Recommended'|'Custom'; splitDays:Array<{name:string;type:'Strength'|'Cardio'|'Mixed'|'Rest'|'Hyrox';muscles?:string[];exercises?:string[]}>;
   injuryConstraint:boolean; limitationNotes:string; wearableIntent:'Connect now'|'Connect later'|'Manual only';
   profileVisibility:'Private'|'Friends only'; acceptedSafety:boolean; completedAt:string;
+  /* When, and to which version of the legal documents (lib/legal.ts), the
+     athlete agreed. Absent for accounts set up before consent was asked. */
+  acceptedTermsAt?:string; healthConsentAt?:string; consentVersion?:string;
 };
 
 const legacyStorageKey='forge-athlete-setup-v1';

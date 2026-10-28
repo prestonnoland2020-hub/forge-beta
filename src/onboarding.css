@@ -158,7 +158,8 @@ textarea.ob-input{min-height:96px;resize:vertical}
 .ob-week .setup-day-head strong{font-size:16px}
 .ob-week .setup-day-head small{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ob-screen .setup-check{cursor:pointer}
-.ob-screen .setup-check input{width:22px;height:22px}
+/* flex:none — a long label otherwise squeezes the box narrower than its neighbours. */
+.ob-screen .setup-check input{width:22px;height:22px;flex:none}
 .ob-screen .setup-check strong{font-size:16px;line-height:1.4}
 .ob-screen .disclaimer-copy{font-size:14px;color:var(--muted);display:grid;gap:8px;line-height:1.5}
 .ob-screen .disclaimer-copy p{margin:0}
