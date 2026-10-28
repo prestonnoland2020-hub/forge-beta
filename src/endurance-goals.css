@@ -4,15 +4,15 @@
 
 .goal-fields .full-field small {
   display: block;
-  margin-top: 7px;
+  margin-top: 8px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
 .event-template {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: 16px;
   border: 1px solid var(--accent-dim);
   border-radius: 10px;
@@ -21,7 +21,7 @@
 
 .running-event-builder {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: 16px;
   border: 1px solid var(--hairline-strong);
   border-radius: 10px;
@@ -41,22 +41,22 @@
 .running-event-builder > div:first-child small,
 .event-summary small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
 .running-event-fields {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .event-summary {
   display: grid;
   grid-template-columns: auto auto 1fr;
   align-items: center;
-  gap: 9px;
-  padding: 11px;
+  gap: 8px;
+  padding: 12px;
   border-left: 3px solid var(--accent);
   background: color-mix(in srgb, var(--tint) 5%, transparent);
 }
@@ -67,20 +67,20 @@
 }
 
 .event-summary b {
-  font-size: 10px;
+  font-size: 12px;
   text-transform: uppercase;
 }
 
 .event-template-head {
   display: grid;
   grid-template-columns: 1fr minmax(190px, 0.8fr);
-  gap: 18px;
+  gap: 16px;
   align-items: end;
 }
 
 .event-template-head > div {
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .event-template-head strong {
@@ -92,14 +92,14 @@
 .event-template .template-note {
   margin: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .event-template ol {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 7px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -108,10 +108,10 @@
 .event-template li {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px;
+  gap: 8px;
+  padding: 8px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--surface-sunken);
 }
 
@@ -125,7 +125,7 @@
   color: var(--surface-sunken);
   font-style: normal;
   font-weight: 900;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .event-template li span {
@@ -134,12 +134,12 @@
 }
 
 .event-template li b {
-  font-size:11px;
+  font-size:12px;
 }
 
 .event-template li small {
   color: var(--muted);
-  font-size:11px;
+  font-size:12px;
 }
 
 @media (max-width: 620px) {

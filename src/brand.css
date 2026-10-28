@@ -71,3 +71,149 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ---- The system ----------------------------------------------------------
+   The guide's components, applied to the app's shared building blocks. Sizes
+   come only from the tokens in forge-theme.css; tools/snap-sizes.py keeps the
+   older stylesheets on the same scales. Page files may still place things,
+   but a card, a button, a field or a label looks the same everywhere. */
+
+/* Cards sit one step above the ground: surface-1, radius 20, flat. In light
+   tone a hairline keeps a white card off a near-white page; in dark tone the
+   step in surface does that on its own. */
+.card, .feed-card, .form-card, .compact-card, .kpi-tile {
+  border-radius: var(--r-lg);
+  box-shadow: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.card, .feed-card, .form-card, .compact-card, .kpi-tile, .gx-card, .gx-hero, .gx-empty, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections) { border-color: transparent !important; }
+}
+:root[data-theme="dark"] :is(.card, .feed-card, .form-card, .compact-card, .kpi-tile, .gx-card, .gx-hero, .gx-empty, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections) { border-color: transparent !important; }
+
+/* Buttons: radius 14, label 18 bold at every size, M by default. Press is
+   0.97 in 90 ms on the Strike curve. */
+.button {
+  min-height: var(--control-m);
+  padding: 0 var(--s5);
+  border-radius: var(--r-md);
+  font: 700 var(--fs-lead) var(--body);
+  letter-spacing: 0;
+  transition: transform var(--dur-tap) var(--ease-strike), background var(--dur-quick) var(--ease-respond), opacity var(--dur-quick) var(--ease-respond);
+}
+.button:active { transform: scale(.97); }
+.button.wide, .ob-next { min-height: var(--control-l); }
+.small-button, .button.small { min-height: var(--control-s); padding: 0 var(--s4); border-radius: var(--r-md); font: 700 var(--fs-lead) var(--body); }
+.button.secondary { background: var(--surface-2); color: var(--ink); border-color: transparent; }
+.button.secondary:hover { background: var(--surface-3); }
+.button.ghost { background: transparent; color: var(--ink-2); border-color: transparent; box-shadow: inset 0 0 0 1.5px var(--hairline-strong); }
+.button.ghost:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+.button.danger { background: color-mix(in srgb, var(--bad) 16%, var(--surface-1)); color: var(--bad); border-color: transparent; }
+.text-button { min-height: 44px; padding: 0 var(--s3); font: 700 var(--fs-body) var(--body); border-radius: var(--r-sm); }
+
+/* Fields: 48 tall, radius 12, a 1.5px inset edge; focus is a 2px signal
+   ring plus glow. Labels sit above in the guide's label style. */
+input:not([type=checkbox]):not([type=radio]):not([type=range]), select {
+  min-height: var(--field-h);
+  border-radius: var(--r-field);
+  font-weight: 500;
+}
+textarea { border-radius: var(--r-field); font-weight: 500; }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-wash);
+}
+
+/* Labels: 12, 600, caps, +0.12em — the guide's one small-caps style. */
+.eyebrow, .field-caption, label > span.field-caption, .feed-card-header small, .feed-identity small {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+/* Headings below the page title read in sentence case: H2 26/700, H3 the
+   guide's Title at 20/600. Only page titles and hero numbers shout. */
+h2 { font-family: var(--display); font-size: var(--fs-h2); font-weight: 700; line-height: 1.15; text-transform: none; letter-spacing: -.01em; }
+h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; line-height: 1.3; text-transform: none; letter-spacing: 0; }
+
+/* Numerals: Saira 800 italic, tabular — the Type page's Numeral role. */
+.kpi-tile b, .gx-now, .gx-ring strong, .week-score strong, .feed-metric-row strong {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.kpi-tile { padding: var(--s4); gap: var(--s1); }
+.kpi-tile b { font-size: var(--fs-h2); line-height: 1; }
+.kpi-tile span { font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.kpi-tile small { font-size: var(--fs-small); color: var(--ink-3); }
+
+/* Chips: pill, 36 tall, 14/700. */
+.muscle-chip, .question-chips button, .exercise-picker-filters button {
+  min-height: var(--control-s);
+  padding: 0 var(--s4);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-small);
+  font-weight: 700;
+}
+
+/* Segmented controls: a sunken track, the chosen segment filled in signal,
+   44 tall, label 18 bold — the Forms page's segmented control. */
+.gx-mode, .ic-toggle, .ic-range {
+  display: flex;
+  gap: var(--s1);
+  padding: var(--s1);
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+}
+.gx-mode button, .ic-toggle button, .ic-range button {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font: 700 var(--fs-body) var(--body);
+  transition: background var(--dur-standard) var(--ease-strike), color var(--dur-quick) var(--ease-respond);
+}
+.gx-mode button.active, .ic-toggle button.active, .ic-range button.active {
+  background: var(--accent-strong);
+  color: var(--accent-ink);
+}
+
+/* ---- Line charts ----------------------------------------------------------
+   Every line chart in the app, drawn the way the guide's Goals chart is: a
+   3.5 px signal line that draws itself left to right on the Strike curve in
+   the 1.2 s signature beat, a flat 10% area under it (no gradient), points
+   that land on the Settle curve one after another, and the latest point
+   ringed once. A forecast is always the violet dotted line and arrives after
+   the history it extends. Targets are a quiet dashed hairline.
+
+   The line uses pathLength="1", so one dash value draws any path. A chart
+   whose data changes is re-keyed by its renderer, which replays the draw. */
+.chart-grid line, .chart-grid { stroke: var(--hairline); stroke-width: 1; }
+.chart-axis { fill: var(--ink-3); font-family: var(--body); font-weight: 600; }
+.chart-area { fill: var(--chart-1); fill-opacity: .1; stroke: none; }
+.chart-line { fill: none; stroke: var(--chart-1); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.chart-point { fill: var(--chart-1); stroke: var(--surface-1); stroke-width: 2; transform-box: fill-box; transform-origin: center; }
+.chart-now { fill: var(--chart-1); stroke: var(--surface-1); stroke-width: 3; transform-box: fill-box; transform-origin: center; }
+.chart-halo { fill: var(--chart-1); transform-box: fill-box; transform-origin: center; opacity: 0; }
+.chart-forecast { fill: none; stroke: var(--info); stroke-width: 3; stroke-dasharray: 2 7; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.chart-forecast-label { fill: var(--info); }
+.chart-target { stroke: var(--hairline-strong); stroke-width: 1.5; stroke-dasharray: 5 5; vector-effect: non-scaling-stroke; }
+.chart-target-label { fill: var(--ink-3); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .chart-line { stroke-dasharray: 1; animation: chart-draw var(--dur-signature) var(--ease-strike) 200ms both; }
+  .chart-area { animation: chart-fade var(--dur-emphasis) var(--ease-respond) 700ms both; }
+  .chart-point { animation: chart-pop var(--dur-emphasis) var(--ease-settle) both; animation-delay: calc(300ms + var(--i, 0) * 60ms); }
+  .chart-now { animation: chart-pop var(--dur-emphasis) var(--ease-settle) 1100ms both; }
+  .chart-halo { animation: chart-halo 2s ease-out 1400ms 2; }
+  .chart-forecast, .chart-forecast-label { animation: chart-fade var(--dur-emphasis) var(--ease-respond) 1200ms both; }
+}
+@keyframes chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes chart-fade { from { opacity: 0; } }
+@keyframes chart-pop { from { transform: scale(0); } }
+@keyframes chart-halo { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(2.6); } }
