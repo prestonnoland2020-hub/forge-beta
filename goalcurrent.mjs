@@ -39,11 +39,11 @@ check('with its range underneath', /`\$\{formatValue\(outlook\.best\)\}–\$\{fo
 console.log('\nTO GO is measured from the projection');
 check('the comparison value is the projection for an endurance goal',
   /const comparisonValue = goal\.type==='Endurance' && !paceGoal \? \(projectedValue \|\| worthToday\)/.test(src));
-check('and the tile says so', /projectedOnly\?'Projected · ':''/.test(src));
+check('and the read-out leads with the projection by the event date', /Projected by \{formatDate\(goal\.date\)\}/.test(src));
 
 console.log('\nOne projection on the card, not two');
 check('the race-day footnote is gone', !/on race day, \{roadmap\.weeksRemaining\} weeks of training from here/.test(src));
-check('the lift forecast line stays', /strengthForecast && <p className="goal-outlook">/.test(src));
+check('the lift forecast range stays', /\$\{Math\.round\(strengthForecast\.low\)\}–\$\{Math\.round\(strengthForecast\.high\)\}/.test(src));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);
