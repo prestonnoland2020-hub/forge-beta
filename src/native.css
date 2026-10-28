@@ -46,7 +46,7 @@ input, textarea, select {
    app's chrome buttons were sized for a mouse. */
 @media (pointer: coarse) {
   button, .button, .bottom-nav a, .profile-tabs button {
-    min-height: 44px;
+    min-height: 48px;
   }
 }
 

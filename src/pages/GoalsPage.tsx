@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
@@ -79,8 +79,9 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   /* The bars start empty and fill one frame after the page mounts, so the
      width transition runs; each card is a beat behind the one above it. */
   const [filled, setFilled] = useState(false);
-  const mounted = useRef(false);
-  useEffect(() => { if (mounted.current) return; mounted.current = true; const frame = requestAnimationFrame(() => requestAnimationFrame(() => setFilled(true))); return () => cancelAnimationFrame(frame); }, []);
+  /* Both frames are cancelled on cleanup and nothing guards a second run, so
+     StrictMode's mount-unmount-mount still ends with the bars filled. */
+  useEffect(() => { let inner = 0; const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setFilled(true)); }); return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); }; }, []);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   /* Every goal's full read-out used to be open on the first goal the moment

@@ -3,57 +3,57 @@
    the contrast audit can vouch for it. */
 
 .partners-card{display:grid;gap:2px;padding:0;overflow:hidden}
-.partners-card>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 18px 8px}
-.partners-card h3,.partners-list h3,.partner-add h3,.partner-requests h3{margin:0;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.partners-card>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 16px 8px}
+.partners-card h3,.partners-list h3,.partner-add h3,.partner-requests h3{margin:0;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .partners-card>header a{color:var(--accent-text);font-size:12px;font-weight:800;text-decoration:none}
 .partner-rows{display:grid}
 
-.partner-row,.partner-full-main{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+.partner-row,.partner-full-main{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
 .partner-rows .partner-row:first-child{border-top:0}
 .partner-row>div,.partner-full-main>div{display:grid;gap:2px;min-width:0}
-.partner-row strong,.partner-full-main strong{font-size:15px;color:var(--ink)}
+.partner-row strong,.partner-full-main strong{font-size:16px;color:var(--ink)}
 .partner-row small,.partner-full-main small{font-size:12px;color:var(--ink-3)}
-.partner-row>b,.partner-full-main>b{color:var(--good);font-size:15px}
-.partner-mark{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);color:var(--ink-2);font:800 13px var(--display)}
+.partner-row>b,.partner-full-main>b{color:var(--good);font-size:16px}
+.partner-mark{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);color:var(--ink-2);font:800 14px var(--display)}
 .partner-row.trained .partner-mark,.partner-full.done .partner-mark{background:color-mix(in srgb,var(--good) 22%,var(--surface-3));color:var(--ink)}
-.partner-did{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.partner-quiet{font-size:13px;color:var(--ink-3)}
+.partner-did{font-size:14px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partner-quiet{font-size:14px;color:var(--ink-3)}
 
 /* ── The partner screen ─────────────────────────────────────────────────── */
-.partners-page{display:grid;gap:14px}
-.partner-add,.partner-requests{display:grid;gap:12px;padding:18px}
+.partners-page{display:grid;gap:16px}
+.partner-add,.partner-requests{display:grid;gap:12px;padding:16px}
 .partner-add label{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--ink-3)}
-.partner-add-row{display:flex;gap:8px;margin-top:6px}
+.partner-add-row{display:flex;gap:8px;margin-top:8px}
 .partner-add-row input{flex:1;min-width:0}
-.partner-message{margin:0;color:var(--ink-2);font-size:13px;line-height:1.5}
+.partner-message{margin:0;color:var(--ink-2);font-size:14px;line-height:1.5}
 .partner-invite{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line)}
 .partner-invite>div{display:grid;gap:2px;min-width:0}
 .partner-invite strong{font-size:14px;color:var(--ink)}
 .partner-invite small{font-size:12px;color:var(--ink-3);line-height:1.4}
 .partner-request{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .partner-request>div:first-child{display:grid;gap:2px}
-.partner-request strong{font-size:15px;color:var(--ink)}
+.partner-request strong{font-size:16px;color:var(--ink)}
 .partner-request small{font-size:12px;color:var(--ink-3)}
-.partner-request-actions{display:flex;align-items:center;gap:10px}
+.partner-request-actions{display:flex;align-items:center;gap:12px}
 .partners-list{padding:0;overflow:hidden}
-.partners-list>header{padding:16px 18px 8px}
+.partners-list>header{padding:16px 16px 8px}
 .partner-full{display:grid}
 .partner-full .partner-full-main{border-top:0}
-.partner-remove{justify-self:start;margin:0 18px 12px 68px;font-size:12px;color:var(--ink-3)}
-.partner-empty{margin:0;padding:0 18px 18px;color:var(--ink-2);font-size:14px;line-height:1.5}
-.partner-invite-prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px 16px;text-decoration:none;color:inherit}
+.partner-remove{justify-self:start;margin:0 16px 12px 64px;font-size:12px;color:var(--ink-3)}
+.partner-empty{margin:0;padding:0 16px 16px;color:var(--ink-2);font-size:14px;line-height:1.5}
+.partner-invite-prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px 16px;text-decoration:none;color:inherit}
 .partner-invite-prompt>div{display:grid;gap:2px;min-width:0}
-.partner-invite-prompt strong{font-size:15px;color:var(--ink)}
-.partner-invite-prompt small{font-size:12.5px;color:var(--ink-3);line-height:1.4}
+.partner-invite-prompt strong{font-size:16px;color:var(--ink)}
+.partner-invite-prompt small{font-size:12px;color:var(--ink-3);line-height:1.4}
 .partner-invite-prompt b{color:var(--ink-3);font-weight:400;font-size:18px}
 
 /* ── Search results ─────────────────────────────────────────────────────── */
 .partner-results{display:grid;border-top:1px solid var(--line);margin-top:2px}
-.partner-result{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:11px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;color:inherit;cursor:pointer;font:inherit}
+.partner-result{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;color:inherit;cursor:pointer;font:inherit}
 .partner-result:last-child{border-bottom:0}
 .partner-result:disabled{cursor:default}
 .partner-result>span:nth-child(2){display:grid;gap:1px;min-width:0}
-.partner-result strong{font-size:15px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partner-result strong{font-size:16px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .partner-result small{font-size:12px;color:var(--ink-3)}
 .partner-result>b{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--accent-text);white-space:nowrap}
 .partner-result:disabled>b{color:var(--ink-3)}
@@ -62,19 +62,19 @@
 /* Laid out like every other toggle in Forge — text left, switch right — and
    not as a <label>, whose global form styling stacks and centres its own
    children and threw this one off the side of the card. */
-.partner-discoverable{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:14px;border-top:1px solid var(--line)}
+.partner-discoverable{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:16px;border-top:1px solid var(--line)}
 .partner-discoverable>div{display:grid;gap:2px;min-width:0}
 .partner-discoverable strong{font-size:14px;color:var(--ink)}
 .partner-discoverable small{font-size:12px;color:var(--ink-3);line-height:1.4}
 .partner-discoverable input{flex:none;width:20px;height:20px}
 
 /* ── One partner, one chart ─────────────────────────────────────────────── */
-.partner-detail{display:grid;gap:14px}
-.partner-detail-head{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:center;padding:16px 18px}
-.partner-detail-head .partner-mark{width:44px;height:44px;font-size:15px}
+.partner-detail{display:grid;gap:16px}
+.partner-detail-head{display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;align-items:center;padding:16px 16px}
+.partner-detail-head .partner-mark{width:44px;height:44px;font-size:16px}
 .partner-detail-head>div{display:grid;gap:2px;min-width:0}
 .partner-detail-head strong{font:800 20px/1.15 var(--display);color:var(--ink)}
-.partner-detail-head small{font-size:12.5px;color:var(--ink-3)}
+.partner-detail-head small{font-size:12px;color:var(--ink-3)}
 
 /* THE COMPARISON CHART CAME OUT WHOLE.
 
@@ -89,21 +89,16 @@
    .partner-kinds, .partner-metrics, the whole .pchart family and the two series
    hues — is in the history if it is ever wanted back. */
 .partner-today{padding:0}
-.partner-today>header{padding:16px 18px 4px}
-.partner-today h3{margin:0;font:800 17px/1.2 var(--display);color:var(--ink)}
-.partner-today .pv-lines{padding:0 18px 8px}
-.partner-today .partner-empty{padding:4px 18px 18px}
+.partner-today>header{padding:16px 16px 4px}
+.partner-today h3{margin:0;font:800 18px/1.2 var(--display);color:var(--ink)}
+.partner-today .pv-lines{padding:0 16px 8px}
+.partner-today .partner-empty{padding:4px 16px 16px}
 
 /* ONE PAIR OF HUES, STILL. The head-to-head bar names the same two people in
-   every row, so the two halves cannot be allowed to drift; slot 1 and slot 2 of
-   the validated categorical order, each at the step meant for its own surface.
-   Blue and orange are validated against Forge's card surface in both tones:
-   worst-pair colour-blind separation 24.7 light / 26.8 dark against a target of
-   8, and both clear of 3:1 contrast. */
-.partner-detail{--s-mine:#2a78d6;--s-theirs:#eb6834}
-:root:not([data-theme="light"]) .partner-detail{--s-mine:#3987e5;--s-theirs:#d95926}
-@media(prefers-color-scheme: light){:root:not([data-theme="dark"]) .partner-detail{--s-mine:#2a78d6;--s-theirs:#eb6834}}
-:root[data-theme="dark"] .partner-detail{--s-mine:#3987e5;--s-theirs:#d95926}
+   every row, so the two halves cannot be allowed to drift. They are the brand
+   guide's data series 1 and 2 — signal blue and orange — resolved per tone in
+   forge-theme.css, so this chart matches every other one in the app. */
+.partner-detail{--s-mine:var(--chart-1);--s-theirs:var(--chart-2)}
 
 /* ---------------------------------------------------------- this week, both
 
@@ -114,8 +109,8 @@
    below — you blue, them orange — so identity survives across both. */
 .partner-week{display:grid;gap:2px;padding:16px 16px 12px}
 .partner-week>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px}
-.partner-week h3{margin:0;font:800 17px/1.2 var(--display);color:var(--ink)}
-.partner-week>header small{font-size:11px;color:var(--ink-3);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.partner-week h3{margin:0;font:800 18px/1.2 var(--display);color:var(--ink)}
+.partner-week>header small{font-size:12px;color:var(--ink-3);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 
 /* Flex, not grid, and every bar then starts and ends on the same two vertical
    lines. Sized with `auto` columns each row's bar took its own width from its
@@ -124,13 +119,13 @@
    back 18px wider than the space left for it on three rows out of four. A row
    of two fixed ends and one `flex:1 1 0` middle has no such argument with
    itself. */
-.h2h{display:flex;align-items:center;gap:10px;padding:9px 0}
+.h2h{display:flex;align-items:center;gap:12px;padding:8px 0}
 .h2h>.h2h-mine,.h2h>.h2h-theirs{flex:0 0 58px}
 .h2h>.h2h-track{flex:1 1 0}
 .h2h+.h2h{border-top:1px solid var(--line)}
 .h2h-mine,.h2h-theirs{display:grid;justify-items:center;gap:1px;min-width:0}
 .h2h b{font:800 20px/1 var(--display);font-variant-numeric:tabular-nums;color:var(--ink-2)}
-.h2h small{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-3);
+.h2h small{font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-3);
   max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The leader's own number is the one that darkens — never both, and never by
    colour alone: the footer says who is ahead in words. */
@@ -147,8 +142,8 @@
    the grid to stretch it, because the label above it is nowrap and was sizing
    the column to itself — which made every row's bar a different length and the
    comparison between rows meaningless. */
-.h2h-track{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0;width:100%}
-.h2h-label{font-size:11px;font-weight:700;color:var(--ink-3);text-align:center;
+.h2h-track{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0;width:100%}
+.h2h-label{font-size:12px;font-weight:700;color:var(--ink-3);text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* A 2px gap of the card's own surface between the two fills, so they read as
    two quantities rather than one bar with a colour change in it. */
@@ -162,6 +157,6 @@
 .h2h-fill-mine{background:var(--s-mine)}
 .h2h-fill-theirs{background:var(--s-theirs)}
 
-.partner-week-note{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+.partner-week-note{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
   font-size:12px;line-height:1.45;color:var(--ink-2)}
 

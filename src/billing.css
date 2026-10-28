@@ -19,7 +19,7 @@
 
 .billing-pill {
   flex: none;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: var(--r-pill);
   border: 1px solid var(--hairline-strong);
   color: var(--ink-2);
@@ -246,7 +246,7 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 18px 20px;
+  padding: 16px 24px;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: transparent;
