@@ -22,7 +22,7 @@
   justify-content: center;
   gap: var(--s3);
   width: 100%;
-  min-height: 52px;
+  min-height: 56px;
   padding: 0 var(--s4);
   border-radius: var(--r-sm);
   font-size: 1rem;
@@ -91,7 +91,7 @@
 
 .legal-nav { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .legal-nav a {
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-radius: var(--r-pill);
   border: 1px solid var(--hairline);
   color: var(--ink-2);
@@ -153,9 +153,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  min-height: 54px;
+  min-height: 56px;
   padding: 0 var(--s4, 16px);
   border: 0;
   border-radius: 10px;

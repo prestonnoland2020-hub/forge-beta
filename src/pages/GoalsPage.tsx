@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
@@ -79,8 +79,9 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   /* The bars start empty and fill one frame after the page mounts, so the
      width transition runs; each card is a beat behind the one above it. */
   const [filled, setFilled] = useState(false);
-  const mounted = useRef(false);
-  useEffect(() => { if (mounted.current) return; mounted.current = true; const frame = requestAnimationFrame(() => requestAnimationFrame(() => setFilled(true))); return () => cancelAnimationFrame(frame); }, []);
+  /* Both frames are cancelled on cleanup and nothing guards a second run, so
+     StrictMode's mount-unmount-mount still ends with the bars filled. */
+  useEffect(() => { let inner = 0; const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setFilled(true)); }); return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); }; }, []);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   /* Every goal's full read-out used to be open on the first goal the moment
@@ -175,6 +176,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               </span>
               <span className="gx-foot"><b>{item.share === null ? 'No data yet' : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
             </button>
+            {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
             {isOpen && <div className="goal-card-actions">
               <button onClick={() => openBuilder(index)} aria-label={`Edit ${goal.title}`}>Edit</button>
               <button
@@ -185,7 +187,6 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
                 {confirming === index ? 'Sure?' : 'Delete'}
               </button>
             </div>}
-            {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
           </li>;
         })}</ul>
       </section>;

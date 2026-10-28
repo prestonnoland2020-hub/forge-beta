@@ -11,14 +11,14 @@
 /* ── Where am I ─────────────────────────────────────────────────────────── */
 .pv-progress{display:grid;gap:8px;padding:2px 2px 0}
 .pv-progress-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.pv-progress-week{font:800 30px/1 var(--display);letter-spacing:-.01em;color:var(--ink)}
+.pv-progress-week{font:800 32px/1 var(--display);letter-spacing:-.01em;color:var(--ink)}
 .pv-progress-week small{font:700 14px var(--body);color:var(--ink-3);margin-left:4px;letter-spacing:0}
-.pv-progress-name{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text)}
+.pv-progress-name{font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text)}
 /* THE PIPS ARE THE WEEK PICKER. They were 6px tall and untouchable; a control
    a thumb has to hit needs a target, so each is a button 34px tall whose visible
    bar is still 6px — the padding does the catching. */
-.pv-dots{display:flex;gap:6px;align-items:stretch;margin:-11px 0}
-.pv-dot{flex:1;min-width:12px;border:0;background:none;padding:14px 0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pv-dots{display:flex;gap:8px;align-items:stretch;margin:-11px 0}
+.pv-dot{flex:1;min-width:12px;border:0;background:none;padding:16px 0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pv-dot::before{content:"";display:block;height:6px;border-radius:999px;background:var(--surface-3)}
 .pv-dot.done::before{background:color-mix(in srgb,var(--accent) 45%,var(--surface-3))}
 .pv-dot.now::before{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
@@ -29,42 +29,42 @@
    another one, so "where am I" survives browsing. */
 .pv-dot.here:not(.now)::before{background:color-mix(in srgb,var(--accent) 65%,var(--surface-3))}
 .pv-dot:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
-.pv-progress-back{justify-self:start;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);border-radius:999px;padding:6px 12px;font:700 12px var(--body);cursor:pointer}
-.pv-week-note{margin:0;padding:12px 18px 16px;border-top:1px solid var(--hairline);color:var(--ink-3);font-size:12.5px;line-height:1.5}
+.pv-progress-back{justify-self:start;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);border-radius:999px;padding:8px 12px;font:700 12px var(--body);cursor:pointer}
+.pv-week-note{margin:0;padding:12px 16px 16px;border-top:1px solid var(--hairline);color:var(--ink-3);font-size:12px;line-height:1.5}
 .pv-progress-sentence{margin:0;color:var(--ink-2);font-size:14px;line-height:1.45}
 
 /* ── Save / Regenerate ──────────────────────────────────────────────────── */
-.pv-actions{display:grid;gap:6px}
-.pv-actions-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.pv-saved{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--good);padding:6px 11px;border:1px solid color-mix(in srgb,var(--good) 40%,var(--line));border-radius:999px}
+.pv-actions{display:grid;gap:8px}
+.pv-actions-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pv-saved{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--good);padding:8px 12px;border:1px solid color-mix(in srgb,var(--good) 40%,var(--line));border-radius:999px}
 .pv-stamp{color:var(--ink-3);font-size:12px;margin-left:auto}
-.pv-request .text-button{font-size:13px;color:var(--ink-2)}
-.pv-request blockquote{margin:6px 0 0;padding:10px 14px;border-left:2px solid var(--line);color:var(--ink-2);font-size:13px;line-height:1.5}
-.pv-request blockquote span{display:block;margin-top:6px;color:var(--ink-3)}
+.pv-request .text-button{font-size:14px;color:var(--ink-2)}
+.pv-request blockquote{margin:8px 0 0;padding:12px 16px;border-left:2px solid var(--line);color:var(--ink-2);font-size:14px;line-height:1.5}
+.pv-request blockquote span{display:block;margin-top:8px;color:var(--ink-3)}
 .pv-error{color:var(--bad);font-size:12px}
 
 /* ── Today ──────────────────────────────────────────────────────────────── */
-.pv-today{display:grid;gap:12px;padding:17px;border-left:4px solid var(--accent)}
+.pv-today{display:grid;gap:12px;padding:16px;border-left:4px solid var(--accent)}
 .pv-today header{display:grid;gap:2px}
 .pv-today h2{margin:2px 0 0;font:800 clamp(19px,5.2vw,26px)/1.15 var(--display);letter-spacing:-.01em;color:var(--ink);text-transform:none;overflow-wrap:anywhere}
-.pv-today header small{color:var(--ink-3);font-size:13px}
+.pv-today header small{color:var(--ink-3);font-size:14px}
 .pv-today.done{border-left-color:var(--good)}
 .pv-today.done h2{color:var(--good)}
 .pv-today.rest{border-left-color:var(--line)}
-.pv-today-swap{justify-self:start;margin-top:6px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:var(--ink-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.pv-today-swap{justify-self:start;margin-top:8px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:var(--ink-3);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
 .pv-today-note{margin:0;color:var(--ink-2);line-height:1.5}
-.pv-today footer{display:flex;gap:10px}
+.pv-today footer{display:flex;gap:12px}
 .pv-today footer .button{flex:1;text-align:center;text-decoration:none}
 
 /* A lift or a run, as a row: name left, number right. Shared by every card. */
 .pv-lines{display:grid}
-.pv-line{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid var(--line);min-width:0}
+.pv-line{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line);min-width:0}
 .pv-line:first-child{border-top:0;padding-top:0}
 /* A flex item will not shrink below its content unless it is told it may, which
    is how "Smith Machine Shoulder Press" pushed its own weight off the right
    edge of the phone rather than wrapping. */
 .pv-line-name{color:var(--ink);font-weight:700;min-width:0;overflow-wrap:anywhere}
-.pv-line-value{color:var(--ink);font:800 17px var(--display);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;min-width:0;flex-shrink:0}
+.pv-line-value{color:var(--ink);font:800 18px var(--display);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;min-width:0;flex-shrink:0}
 
 /* A RUN IS A SENTENCE, NOT A NUMBER. The value column was written for lift
    loads — "435 lb × 6" — which are short, tabular and must never break across
@@ -74,27 +74,27 @@
    phone they stack under their own label so the full session is readable. */
 .pv-line-run{flex-wrap:wrap}
 .pv-line-run .pv-line-name{flex:0 0 auto}
-.pv-line-run .pv-line-value{white-space:normal;flex:1 1 auto;text-align:right;overflow-wrap:anywhere;font-size:15px;line-height:1.4}
+.pv-line-run .pv-line-value{white-space:normal;flex:1 1 auto;text-align:right;overflow-wrap:anywhere;font-size:16px;line-height:1.4}
 @media (max-width:520px){
   .pv-line-run{flex-direction:column;align-items:flex-start;gap:2px}
   .pv-line-run .pv-line-value{text-align:left;width:100%}
 }
-.pv-line-value small{font:700 11px var(--body);color:var(--ink-3);margin:0 1px}
-.pv-today .pv-line-value{font-size:19px;white-space:normal}
+.pv-line-value small{font:700 12px var(--body);color:var(--ink-3);margin:0 1px}
+.pv-today .pv-line-value{font-size:20px;white-space:normal}
 
 /* ── This week ──────────────────────────────────────────────────────────── */
 .pv-week{padding:0;overflow:hidden}
-.pv-week>header{padding:16px 18px 10px}
-.pv-week h3{margin:0;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.pv-week>header{padding:16px 16px 12px}
+.pv-week h3{margin:0;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .pv-week-rows{display:grid}
 .pv-row{border-top:1px solid var(--line)}
-.pv-row-main{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:start;width:100%;padding:12px 18px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
+.pv-row-main{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:start;width:100%;padding:12px 16px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
 .pv-row-main:disabled{cursor:default}
 .pv-row-date{display:grid;line-height:1.1;text-align:center}
-.pv-row-date b{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
-.pv-row-date small{font:800 17px var(--display);color:var(--ink-2)}
+.pv-row-date b{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.pv-row-date small{font:800 18px var(--display);color:var(--ink-2)}
 .pv-row-body{display:grid;gap:2px;min-width:0}
-.pv-row-body strong{font-size:15px;color:var(--ink)}
+.pv-row-body strong{font-size:16px;color:var(--ink)}
 /* A DAY'S DESCRIPTION CUT MID-WORD IS WORSE THAN NO DESCRIPTION. One line
    with an ellipsis turned "Chest + Back strength · map an exercise for a
    prescription" into "Chest + Back strength · map …". Two lines fit it. */
@@ -103,7 +103,7 @@
    the clamp ended in "..." while the ones that did not wrapped — so the list
    had no rhythm to scan down at all. The summary is a glance, not a session:
    one line, elided, and the whole session is one tap away. */
-.pv-row-body small{color:var(--ink-2);font-size:13px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-row-body small{color:var(--ink-2);font-size:14px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pv-row-state{font-size:12px;font-weight:800;color:var(--ink-3);min-width:16px;text-align:right;white-space:nowrap}
 .pv-row.today{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .pv-row.today .pv-row-date b,.pv-row.today .pv-row-date small,.pv-row.today .pv-row-state{color:var(--accent-text)}
@@ -112,13 +112,13 @@
 .pv-row.missed .pv-row-body strong,.pv-row.missed .pv-row-body small{color:var(--ink-3)}
 .pv-row.rest .pv-row-body strong{color:var(--ink-3);font-weight:600}
 .pv-row.rest .pv-row-body small{color:var(--ink-3)}
-.pv-row.open .pv-row-main{padding-bottom:6px}
+.pv-row.open .pv-row-main{padding-bottom:8px}
 /* AND AN OPEN ROW SAYS EACH THING ONCE. The elided teaser and the detail under
    it are the same session — "Hard run Short fartlek …" sitting directly above
    "Hard run / Short fartlek — 6 × 1 min …" is the row telling you twice, worse
    the first time. Open it and the summary gives way to the real thing. */
 .pv-row.open .pv-row-body small{display:none}
-.pv-row-detail{padding:0 18px 14px 74px}
+.pv-row-detail{padding:0 16px 16px 64px}
 .pv-row-detail .pv-line{padding:8px 0}
 /* AND THE EXPANSION IS DETAIL, NOT A SECOND SET OF HEADINGS. The value column
    wears the display face at 800 because a lift load is the point of its row —
@@ -126,29 +126,29 @@
    wraps to three bold lines under a bold label and out-shouts the day it
    belongs to, which is what made an opened row read as heavier than the five
    closed ones around it. Lifts keep their weight; sentences read as prose. */
-.pv-row-detail .pv-line-value{font-size:15px}
-.pv-row-detail .pv-line-run .pv-line-name{color:var(--ink-2);font-weight:700;font-size:13px}
+.pv-row-detail .pv-line-value{font-size:16px}
+.pv-row-detail .pv-line-run .pv-line-name{color:var(--ink-2);font-weight:700;font-size:14px}
 .pv-row-detail .pv-line-run .pv-line-value{font:500 14px var(--body);color:var(--ink);line-height:1.45}
-.pv-row-detail p{margin:0;color:var(--ink-2);font-size:13px;line-height:1.5}
+.pv-row-detail p{margin:0;color:var(--ink-2);font-size:14px;line-height:1.5}
 
 /* ── The whole block ────────────────────────────────────────────────────── */
 .pv-block{padding:0;overflow:hidden}
-.pv-block-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:16px 18px;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
+.pv-block-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:16px 16px;border:0;background:none;color:inherit;text-align:left;cursor:pointer}
 .pv-block-toggle span{display:grid;gap:2px}
-.pv-block-toggle strong{font-size:15px;color:var(--ink)}
+.pv-block-toggle strong{font-size:16px;color:var(--ink)}
 .pv-block-toggle small{color:var(--ink-3);font-size:12px}
 .pv-block-toggle b{font-size:20px;color:var(--ink-3);font-weight:400}
 .pv-block-weeks{display:grid;border-top:1px solid var(--line)}
 .pv-block-week{border-bottom:1px solid var(--line)}
 .pv-block-week:last-of-type{border-bottom:0}
-.pv-block-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 18px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
+.pv-block-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 16px;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
 .pv-block-num{display:grid;text-align:center;line-height:1.1}
-.pv-block-num b{font:800 17px var(--display);color:var(--ink-2)}
-.pv-block-num small{font-size:10px;color:var(--ink-3);white-space:nowrap}
+.pv-block-num b{font:800 18px var(--display);color:var(--ink-2)}
+.pv-block-num small{font-size:12px;color:var(--ink-3);white-space:nowrap}
 .pv-block-body{display:grid;gap:2px;min-width:0}
 .pv-block-body strong{font-size:14px;color:var(--ink)}
 .pv-block-body strong em{font-style:normal;color:var(--accent-text)}
-.pv-block-body small{color:var(--ink-2);font-size:12.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+.pv-block-body small{color:var(--ink-2);font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
 .pv-block-state{font-size:12px;font-weight:800;color:var(--ink-3)}
 .pv-block-week.past .pv-block-body strong,.pv-block-week.past .pv-block-num b{color:var(--ink-3)}
 .pv-block-week.past .pv-block-state{color:var(--good)}
@@ -156,25 +156,25 @@
 .pv-block-week.now .pv-block-num b{color:var(--accent-text)}
 .pv-block-week.max .pv-block-body strong{color:var(--accent-text)}
 .pv-block-week.light .pv-block-body strong{color:var(--ink-2)}
-.pv-block-days{display:grid;gap:12px;padding:4px 18px 16px}
+.pv-block-days{display:grid;gap:12px;padding:4px 16px 16px}
 .pv-block-day{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start}
 .pv-block-day>div{display:grid;min-width:0}
 .pv-block-day>div>strong{font-size:14px;color:var(--ink);margin-bottom:2px}
-.pv-block-day>div>small{color:var(--ink-3);font-size:12.5px}
-.pv-block-day .pv-line{padding:5px 0;border-top:0}
+.pv-block-day>div>small{color:var(--ink-3);font-size:12px}
+.pv-block-day .pv-line{padding:4px 0;border-top:0}
 .pv-block-day .pv-line-value{font-size:14px}
 .pv-block-day.rest>div>strong{color:var(--ink-3);font-weight:600}
-.pv-block-note{margin:0;padding:12px 18px 16px;color:var(--ink-3);font-size:12.5px;line-height:1.5;border-top:1px solid var(--line)}
+.pv-block-note{margin:0;padding:12px 16px 16px;color:var(--ink-3);font-size:12px;line-height:1.5;border-top:1px solid var(--line)}
 
 /* ── Pre-plan states ────────────────────────────────────────────────────── */
-.pv-state{display:grid;gap:12px;padding:20px}
-.pv-state h3{margin:0;font:800 22px/1.15 var(--display);color:var(--ink)}
+.pv-state{display:grid;gap:12px;padding:24px}
+.pv-state h3{margin:0;font:800 20px/1.15 var(--display);color:var(--ink)}
 .pv-state p{margin:0;color:var(--ink-2);line-height:1.5}
 .pv-state .button{justify-self:start;text-decoration:none}
 .pv-state.busy h3{color:var(--accent-text)}
 .pv-eta{color:var(--ink-3);font-size:12px}
 .pv-checklist{display:grid;gap:8px}
-.pv-checklist>div{display:flex;align-items:flex-start;gap:10px;color:var(--ink-2);font-size:14px;line-height:1.4}
+.pv-checklist>div{display:flex;align-items:flex-start;gap:12px;color:var(--ink-2);font-size:14px;line-height:1.4}
 .pv-checklist>div b{color:var(--ink-3);font-weight:700}
 .pv-checklist>div.done{color:var(--ink-3)}
 .pv-checklist>div.done b{color:var(--good)}
@@ -186,7 +186,7 @@
      it did not arrive at. Sparse placement leaves the grid cursor past the
      today card by the time it reads the week, so the week started a row late
      and the top of column two was blank. */
-  .pv{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);align-items:start;column-gap:18px;grid-auto-flow:row dense}
+  .pv{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);align-items:start;column-gap:16px;grid-auto-flow:row dense}
   /* THE RIGHT HALF WAS EMPTY. The side-by-side was written by listing the bands
      that span and letting auto-placement sort out the rest, and auto-placement
      cannot: every card not on the list landed in whichever cell came next, so
@@ -221,7 +221,7 @@
 
 /* One line saying why the week is shaped the way it is. Quiet by design: it is
    an explanation, not an alert, and it sits above the week it explains. */
-.pv-collision{margin:0 0 10px;padding:10px 12px;border-left:2px solid var(--accent,#2f6fd0);background:var(--surface-2,rgba(127,127,127,.06));border-radius:0 8px 8px 0;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.pv-collision{margin:0 0 12px;padding:12px 12px;border-left:2px solid var(--accent,#2f6fd0);background:var(--surface-2,rgba(127,127,127,.06));border-radius:0 10px 10px 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
 
 /* NOTES ABOUT THE WEEK, NOT THE WEEK.
 
@@ -231,11 +231,11 @@
    says how many there are, they cost nothing until the athlete wants them.
    Closed by default: the week is what the screen is for. */
 .pv-notes{margin:0;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-2);overflow:hidden}
-.pv-notes>summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ink-2);font-size:12.5px;font-weight:700}
+.pv-notes>summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ink-2);font-size:12px;font-weight:700}
 .pv-notes>summary::-webkit-details-marker{display:none}
 .pv-notes>summary::after{content:"›";color:var(--ink-3);font-weight:800;transition:transform .15s ease}
 .pv-notes[open]>summary::after{transform:rotate(90deg)}
 .pv-notes[open]>summary{border-bottom:1px solid var(--hairline)}
-.pv-notes p{margin:0;padding:11px 14px;border-top:1px solid var(--hairline);color:var(--ink-2);font-size:13px;line-height:1.5}
+.pv-notes p{margin:0;padding:12px 16px;border-top:1px solid var(--hairline);color:var(--ink-2);font-size:14px;line-height:1.5}
 .pv-notes p:first-of-type{border-top:0}
 @media(prefers-reduced-motion:reduce){.pv-notes>summary::after{transition:none}}

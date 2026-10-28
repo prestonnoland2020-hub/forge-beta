@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type CSSProperties } from 'react';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
@@ -258,19 +258,20 @@ export function InsightsClassic() {
     if (dense) lineD = 'M ' + pts.map(point => `${point.x},${point.y}`).join(' L ');
     else for (let i = 1; i < pts.length; i++) { const point = pts[i]; const isLast = i === pts.length - 1; const endX = isLast ? point.x : (point.x + pts[i + 1].x) / 2; const endY = isLast ? point.y : (point.y + pts[i + 1].y) / 2; lineD += ` Q ${point.x},${point.y} ${endX},${endY}`; }
     const areaD = `${lineD} L ${pts[pts.length - 1].x},${H - PB} L ${pts[0].x},${H - PB} Z`;
-    const gid = `icGrad-${id}`;
     const last = pts[pts.length - 1];
     const mid = minX + (maxX - minX) / 2;
     const dateLabel = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return <>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150, display: 'block' }} role="img">
-        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.28" /><stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" /></linearGradient></defs>
-        {ticks.map((tick, index) => <g key={index}><line x1={PL} y1={y(tick)} x2={W - PR} y2={y(tick)} stroke="var(--hairline)" strokeWidth="1" /><text x={PL - 6} y={y(tick) + 3} fontSize="9" textAnchor="end" fill="var(--ink-3)">{step >= 1 ? Math.round(tick) : tick}</text></g>)}
-        <path d={areaD} fill={`url(#${gid})`} stroke="none" />
-        <path d={lineD} fill="none" stroke="var(--chart-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {!dense && pts.slice(0, -1).map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="2.4" fill="var(--chart-1)" />)}
-        <circle cx={last.x} cy={last.y} r="7" fill="var(--chart-1)" opacity="0.18" />
-        <circle cx={last.x} cy={last.y} r="4" fill="var(--chart-1)" stroke="var(--surface-1)" strokeWidth="1.5" />
+      {/* Keyed by the series, so switching lift, metric or range redraws
+          the line instead of snapping to the new one. Styles and motion:
+          .chart-* in brand.css. */}
+      <svg key={`${id}-${points.length}-${ts[0]}-${ts[ts.length - 1]}-${points[points.length - 1].value}`} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 150, display: 'block' }} role="img">
+        {ticks.map((tick, index) => <g key={index}><line className="chart-grid" x1={PL} y1={y(tick)} x2={W - PR} y2={y(tick)} /><text className="chart-axis" x={PL - 6} y={y(tick) + 3} fontSize="9" textAnchor="end">{step >= 1 ? Math.round(tick) : tick}</text></g>)}
+        <path className="chart-area" d={areaD} />
+        <path className="chart-line" d={lineD} pathLength={1} />
+        {!dense && pts.slice(0, -1).map((point, index) => <circle className="chart-point" key={index} cx={point.x} cy={point.y} r="3" style={{ '--i': index } as CSSProperties} />)}
+        <circle className="chart-halo" cx={last.x} cy={last.y} r="5" />
+        <circle className="chart-now" cx={last.x} cy={last.y} r="5" />
       </svg>
       <div className="ic-datebar"><span>{dateLabel(minX)}</span><span>{dateLabel(mid)}</span><span>{dateLabel(maxX)}</span></div>
     </>;

@@ -44,7 +44,7 @@
 .pick-card:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
 
 .pick-meta { display: grid; gap: 3px; }
-.pick-meta strong { font-family: var(--display); font-size: 15px; letter-spacing: .01em; }
+.pick-meta strong { font-family: var(--display); font-size: 16px; letter-spacing: .01em; }
 .pick-meta small { color: var(--ink-2); font-size: .8rem; line-height: 1.4; }
 .pick-meta em {
   margin-top: 2px;
@@ -70,7 +70,7 @@
   position: relative;
   display: grid;
   align-content: end;
-  gap: 5px;
+  gap: 4px;
   height: 84px;
   padding: var(--s3);
   border-radius: var(--r-sm);
@@ -113,7 +113,7 @@
   min-width: 0;
   display: grid;
   align-content: end;
-  gap: 5px;
+  gap: 4px;
   padding: var(--s3) 10px;
   background: var(--bg);
 }
@@ -184,7 +184,7 @@
   background: var(--accent-strong);
   color: var(--accent-ink);
   height: 18px;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: .12em;
   display: grid;
@@ -213,7 +213,7 @@
   box-shadow: var(--shadow-1);
 }
 .icon-card strong { font-size: 12px; font-weight: 700; }
-.icon-card small { font-size: 10px; color: var(--ink-3); }
+.icon-card small { font-size: 12px; color: var(--ink-3); }
 
 /* "Match my accent" is not a sixth icon, it is a rule, so it gets a fan of the
    ones it can resolve to rather than one tile pretending to be special. Every

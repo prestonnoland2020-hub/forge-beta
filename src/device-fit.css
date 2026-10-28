@@ -35,8 +35,8 @@
      23px. At 820px the same expression is 49px, so every heading on the screen
      arrived a third larger than the design and the page read as zoomed. Capped
      to what it reaches at the top of the phone range. */
-  .page-intro h2 { font-size: 28px; }
-  .kpi-tile b { font-size: 24px; }
+  .page-intro h2 { font-size: 26px; }
+  .kpi-tile b { font-size: 26px; }
 }
 
 /* ── And above it, columns ─────────────────────────────────────────────── */
