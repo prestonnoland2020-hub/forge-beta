@@ -413,3 +413,23 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .pv > section.pv-week { padding: 0 8px 4px; }
 .pv > section.pv-week > header { padding: 12px 10px 4px; }
 .pv > section.pv-week > header h3 { font-size: 12px; }
+
+/* AN OPEN GOAL IS ONE ANSWER: where you will be on the day. Brand wash,
+   one big number, the bar to the target, one line on the margin. */
+.gx-card .goal-card-detail { border-top: 0; padding: 0 14px 6px 18px; }
+.goal-progress-card.gp-simple { display: grid; gap: 8px; margin: 0; padding: 13px 14px 12px; border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 18px; background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 11%, var(--surface-1)), var(--surface-1) 70%); box-shadow: none; --gp: var(--gx-good, #22a35a); }
+.gp-simple.tone-work { --gp: var(--gx-work, #e3a008); }
+.gp-simple.tone-off { --gp: var(--gx-off, #dc4a3d); }
+.gp-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+/* Smaller than the card's own number above it — this is the follow-up, not the headline. */
+.gp-hero { font: 800 24px/1.1 var(--display); letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.gp-track { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); margin-bottom: 18px; }
+.gp-track i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--gp) 60%, #fff), var(--gp)); transition: width .9s cubic-bezier(.2,.8,.2,1); }
+.gp-track::after { content: ''; position: absolute; right: 0; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: var(--ink); }
+.gp-track b { position: absolute; right: 0; top: 17px; font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.gp-line { margin: 0; font-size: 14px; font-weight: 650; color: var(--ink-2); }
+.gp-line b { color: var(--gp); font-weight: 800; }
+.gp-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.gx-card .goal-card-actions { padding: 6px 16px 14px 20px; background: transparent; box-shadow: none; }
+.gx-card .goal-card-actions button { height: 32px; min-height: 32px; border: 0; padding: 0 4px; color: var(--accent-text); }
+.gx-card .goal-card-actions button.danger { color: var(--ink-3); }

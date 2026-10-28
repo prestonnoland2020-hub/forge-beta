@@ -175,6 +175,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               </span>
               <span className="gx-foot"><b>{item.share === null ? 'No data yet' : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
             </button>
+            {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
             {isOpen && <div className="goal-card-actions">
               <button onClick={() => openBuilder(index)} aria-label={`Edit ${goal.title}`}>Edit</button>
               <button
@@ -185,7 +186,6 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
                 {confirming === index ? 'Sure?' : 'Delete'}
               </button>
             </div>}
-            {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
           </li>;
         })}</ul>
       </section>;

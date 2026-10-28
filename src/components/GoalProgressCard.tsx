@@ -367,49 +367,35 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
     setCoachLoading(false);
   };
 
-  return <article className={`goal-progress-card goal-tracker-simple${goal.type==='Endurance'?' endurance-goal':''}${goalReached?' goal-complete':''}`}>
-    <header><div><span>{goal.type.toUpperCase()}{goal.type==='Body Composition'?(goal.metric?` · ${goal.metric}`:''):` · ${goal.exercise||goal.metric}`}</span><h3>{goal.title}</h3></div><div className="goal-head-side"><b className={goalReached ? 'on-track' : ''}>{goalReached ? 'Goal reached' : 'In progress'}</b><small>{roadmap.weeksRemaining} wks left · {formatDate(goal.date)}</small></div></header>
-    {/* IS THIS REACHABLE, SAID OUT LOUD. The card showed the gap in four tiles
-        and left the athlete to judge it. Preston had a 4:59 mile, a 10:59
-        two-mile and an 18:59 5K all due in sixteen weeks off a 5:48 mile and
-        thirteen miles a week, and Forge never once said that two of them were
-        not going to happen — it just kept reporting how far away they were
-        while prescribing half the volume he was already running. A verdict is
-        the one thing on this card that can change what he does on Monday. */}
-    {verdict && <div className={`goal-verdict ${verdict.verdict}`}>
-      <strong>{verdict.verdict === 'reachable' ? 'On the numbers, yes' : verdict.verdict === 'needs-more' ? (verdict.reason === 'evidence' ? 'Too early to call' : 'Not on this training') : 'Not by this date'}</strong>
-      <p>{verdict.say}</p>
-      {verdict.insteadOf && <p className="goal-verdict-instead">{verdict.insteadOf}</p>}
-    </div>}
-    <section className="goal-stat-tiles">
-      <div className="gst current"><span>CURRENT</span><strong>{currentText}</strong><small>{worthSource?.date?formatDate(worthSource.date):goal.type==='Endurance'&&worthToday?'Worth today':'Best logged evidence'}</small></div>
-      <div className="gst projected"><span>PROJECTED</span><strong>{goal.type==='Endurance'?(paceGoal?(calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):outlook?formatValue(outlook.likely):aiEstimateLoading?'…':calculated?calculatedText:enduranceProjection?formatValue(enduranceProjection):'—'):(predictedAtDeadline?formatValue(predictedAtDeadline):calculatedText)}</strong><small>{goal.type==='Endurance'&&!paceGoal&&outlook?`${formatValue(outlook.best)}–${formatValue(outlook.likely)} on race day`:goal.type==='Endurance'?(band?`${formatValue(band.low)}–${formatValue(band.high)}`:'Off your logged running'):`${trendPointCount} data points`}</small></div>
-      <div className="gst"><span>TARGET</span><strong>{formatGoalTarget(goal.target,goal.metric,goal.unit)}</strong><small>{formatDate(goal.date)}</small></div>
-      <div className={`gst difference ${differenceStatus}`}><span>TO GO</span><strong>{differenceText.replace(/ to go$/, '')}</strong><small>{projectedOnly?'Projected · ':''}{roadmap.weeksRemaining} weeks left</small></div>
-    </section>
-    <details className="goal-sources-details"><summary>Where these numbers come from</summary>
-      <div><span>CURRENT</span><p>{currentSource}{worthSource?.date ? ` · ${formatDate(worthSource.date)}` : ''}. {goal.type==='Endurance'&&!paceGoal&&legacyPrediction?`What your best recent hard running is worth at this distance today${band?` (${formatValue(band.low)}–${formatValue(band.high)})`:''}. A run at exactly this distance replaces it only if it is faster.`:'The best performance your logged data demonstrates.'}</p></div>
-      <div><span>PROJECTED</span><p>{projectedSource}. A goal-specific projection — it never substitutes unrelated workouts.</p></div>
-      {/* What the volume argument actually is. On the card it was a third
-          paragraph of verdict; here it is the answer to "why". */}
-      {verdict?.change ? <div><span>WHAT WOULD CHANGE IT</span><p>{verdict.change}</p></div> : null}
-      {strengthForecast?.reason ? <div><span>FORECAST</span><p>{strengthForecast.reason}</p></div> : null}
-      <div><span>STATUS</span><p>{trajectoryStatus}.</p></div>
-    </details>
-    
-    {/* ONE LINE, NOT A SECOND TABLE. This card carried a FORGE ASSESSMENT
-        block underneath the tiles whose rows were "Where you are", "Worth
-        today" and "Gap to target" — which are the CURRENT, PROJECTED and TO GO
-        tiles directly above it, in words instead of numbers. It said the same
-        three things twice and made the card twice as tall.
+  /* ONE QUESTION, ANSWERED BIG: WHERE WILL I BE ON THE DAY?
 
-        What was only in that block, and is worth keeping, is the pair of
-        forward-looking ranges: what race day is worth as against today, and
-        how wide a lift forecast really is. Those are one line each. */}
-    {/* The race-day range now lives under the PROJECTED tile, where it is the
-        projection rather than a second one. Only the lift forecast is left. */}
-    {strengthForecast && <p className="goal-outlook">
-      <span><b>{formatValue(strengthForecast.low)}–{formatValue(strengthForecast.high)}</b> by {formatDate(goal.date)} · {strengthForecast.confidence.toLowerCase()} confidence.</span>
-    </p>}
+     The open goal used to be a header, a verdict paragraph, four tiles
+     (current, projected, target, to go), a sources drawer and a forecast
+     line — and CURRENT disagreed with the number on the card it opened from.
+     Preston: simplify it to the max, keep the projection by the event date,
+     that is what is important. So it is one number, the bar from it to the
+     target, and one line saying by how much it clears or misses. */
+  const projectedNumber = goal.type==='Endurance'
+    ? (paceGoal ? (calculated || enduranceProjection || 0) : (outlook ? outlook.likely : (calculated || enduranceProjection || 0)))
+    : (predictedAtDeadline || calculated || 0);
+  const projectedText = goal.type==='Endurance'&&!paceGoal&&outlook?formatValue(outlook.likely):aiEstimateLoading&&!projectedNumber?'…':projectedNumber?formatValue(projectedNumber):'—';
+  const range = goal.type==='Endurance'&&!paceGoal&&outlook?`${formatValue(outlook.best)}–${formatValue(outlook.likely)} on race day`
+    : strengthForecast && Math.round(strengthForecast.high) > Math.round(strengthForecast.low) ? `${Math.round(strengthForecast.low)}–${Math.round(strengthForecast.high)} ${goal.unit || ''} likely`.replace(/\s+likely$/, ' likely') : '';
+  const clears = Boolean(projectedNumber && target && (lowerIsBetter ? projectedNumber <= target : projectedNumber >= target));
+  const gap = projectedNumber && target ? Math.abs(projectedNumber - target) : 0;
+  const gapText = !gap ? '' : timeGoal ? formatClock(gap, hoursFirst) : paceGoal ? `${decimalMinutesToClock(gap)} ${paceSuffix}` : `${Math.round(gap * 10) / 10} ${goal.unit || ''}`.trim();
+  const share = projectedNumber && target ? Math.max(0.04, Math.min(1, lowerIsBetter ? target / projectedNumber : projectedNumber / target)) : 0;
+  const tone = goalReached || clears ? 'good' : verdict?.verdict === 'out-of-reach' ? 'off' : 'work';
+
+  return <article className={`goal-progress-card gp-simple tone-${tone}${goalReached?' goal-complete':''}`}>
+    <span className="gp-eyebrow">Projected by {formatDate(goal.date)}</span>
+    {/* No verdict pill: the card this opens from already says it. */}
+    <strong className="gp-hero">{projectedText}</strong>
+    <div className="gp-track" role="img" aria-label={`Projected ${projectedText} against a target of ${formatGoalTarget(goal.target,goal.metric,goal.unit)}`}>
+      <i style={{ width: `${share * 100}%` }} />
+      <b>{formatGoalTarget(goal.target,goal.metric,goal.unit)}</b>
+    </div>
+    <p className="gp-line">{goalReached ? 'Already there — hold it to the date.' : !projectedNumber ? 'Log it once and Forge projects the day.' : clears ? <>Clears it by <b>{gapText}</b></> : <><b>{gapText}</b> short on the day</>}</p>
+    <p className="gp-meta">{/* The card it opens from already shows where a lift is now; a second, different "now" (demonstrated vs calculated) only argued with it. */}{goal.type!=='Strength' && <span>Now {currentText}</span>}{range && <span>{range}</span>}<span>{roadmap.weeksRemaining} wks left</span></p>
   </article>;
 }
