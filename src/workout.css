@@ -23,7 +23,7 @@
 .muscle-chip { border: 1px solid var(--hairline-strong); background: var(--panel-2); color: var(--ink-2); border-radius: 999px; padding: 9px 14px; font-weight: 700; font-size: 12px; }
 .muscle-chip.active { background: var(--accent-strong); border-color: var(--accent); color: var(--accent-ink); }
 .compact-title { padding-bottom: 14px; }
-.compact-title h3 small { font: 600 12px Inter; text-transform: none; color: var(--muted); }
+.compact-title h3 small { font: 600 12px var(--body); text-transform: none; color: var(--muted); }
 .cardio-entry { background: var(--surface-sunken); border: 1px solid var(--hairline-strong); border-radius: 10px; padding: 17px; display: grid; gap: 16px; }
 .auto-result { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 13px; }
 .auto-result span { font-size: 10px; letter-spacing: .12em; color: var(--muted); font-weight: 800; }

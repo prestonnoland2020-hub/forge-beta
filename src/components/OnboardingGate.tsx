@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { isEditingSplit, onSplitEditingChange } from '../features/profile/splitEditing';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useGoals } from '../features/goals/GoalsProvider';
+import { ForgeLoader } from './ForgeLoader';
 
 /* A GOAL IS PART OF BEING SET UP. Forge's whole claim is that it programs
    toward something; without a goal there is no wave to run, no mileage to ramp
@@ -21,7 +22,7 @@ export function OnboardingGate(){
   /* Re-read on every editor mount and unmount rather than only on navigation. */
   const [editingSplitNow,setEditingSplitNow]=useState(isEditingSplit);
   useEffect(()=>onSplitEditingChange(()=>setEditingSplitNow(isEditingSplit())),[]);
-  if(loading||!hydrated)return <main className="profile-loading"><span className="forge-mark">—</span><strong>FORGE</strong><p>Loading your training profile…</p></main>;
+  if(loading||!hydrated)return <ForgeLoader label="Loading your training profile…"/>;
   if(!completed)return <Navigate to="/onboarding" replace state={{from:location.pathname}}/>;
   /* Set up before the goal step existed: finish the part that is missing. */
   if(!goals.length)return <Navigate to="/onboarding" replace state={{from:location.pathname,needsGoal:true}}/>;
