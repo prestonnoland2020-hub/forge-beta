@@ -431,3 +431,16 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .gx-card .goal-card-actions { padding: 6px 16px 14px 20px; background: transparent; box-shadow: none; }
 .gx-card .goal-card-actions button { height: 32px; min-height: 32px; border: 0; padding: 0 4px; color: var(--accent-text); }
 .gx-card .goal-card-actions button.danger { color: var(--ink-3); }
+
+/* THE SIMPLE DIAL. One size drives everything (--dial-item matches
+   ITEM_HEIGHT in NumberDial): five rows of wheel, two rows of pad above and
+   below, the band exactly one row tall in the exact middle. */
+.dial-simple { --dial-item: 52px; gap: 6px; }
+.dial-simple .dial-columns { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; height: calc(var(--dial-item) * 5); margin: 4px 0 6px; }
+.dial-simple .dial-band { position: absolute; left: 0; right: 0; top: calc(var(--dial-item) * 2); height: var(--dial-item); transform: none; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dial-simple .dial-wheel { display: block; position: relative; height: calc(var(--dial-item) * 5); min-width: 96px; scroll-snap-type: y mandatory; }
+.dial-simple .dial-pad { height: calc(var(--dial-item) * 2); }
+.dial-simple .dial-value { display: block; width: 100%; height: var(--dial-item); line-height: var(--dial-item); min-height: 0; padding: 0; scroll-snap-align: center; font: 700 22px/var(--dial-item) var(--display-font, var(--display)); color: var(--ink-3, var(--muted)); opacity: .5; transform: none; transition: opacity .12s, color .12s; }
+.dial-simple .dial-value.active { font-size: 30px; font-weight: 800; color: var(--ink, var(--text)); opacity: 1; transform: none; }
+.dial-simple .dial-point { font: 800 26px var(--display-font, var(--display)); color: var(--ink, var(--text)); align-self: center; }
+.dial-simple .dial-suffix { position: relative; align-self: center; min-width: 0; font: 800 15px var(--body, inherit); letter-spacing: .02em; text-transform: none; color: var(--accent-text); }
