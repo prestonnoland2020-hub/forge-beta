@@ -24,6 +24,8 @@ check('a set logged on a blank day carries the ticked muscles', /const dayMuscle
 check('a blank day can be finished with only muscles ticked', /&&!blankMuscles\.length\)\{/.test(page));
 check('and that day is saved with those muscles', /\(blankMuscles\.length\|\|exerciseDriven\.length\)\?Array\.from\(new Set\(\[\.\.\.blankMuscles,\.\.\.exerciseDriven\]\)\)/.test(page));
 
+check('and a day already saved by its cardio keeps the ticked muscles at Finish', /draft\.muscles=Array\.from\(new Set\(\[\.\.\.existingDay\.muscles\.filter\(muscle=>muscle!=='Cardio'\),\.\.\.blankMuscles,/.test(page));
+
 console.log('\nThe chips still do their other jobs');
 check('they filter the lifts offered', /const sourceMuscles=usingSplit\?\(plannedDay\?\.muscles\?\?\[\]\):freeMuscles;/.test(page));
 check('and they name the day', /const dayLabel=usingSplit\?\(plannedDay\?\.name\|\|''\):written\?\.name\|\|freeMuscles/.test(page));
