@@ -474,7 +474,11 @@ function WorkoutEditor() {
        workout — Colton's chest-and-back badge on a legs day, seen from the
        other side. */
     if(existingDay&&!editingRecord&&!dayOverride){
-      draft.muscles=Array.from(new Set([...existingDay.muscles.filter(muscle=>muscle!=='Cardio'),...exerciseDriven,...(hasCardio||existingDay.hasCardio?['Cardio']:[])]));
+      /* The ticked muscles ride along too. Logging cardio saves the day early
+         with only "Cardio" on it, so a custom day of a run plus chest and back
+         ticked — no top set — reached Finish as an existing day and lost the
+         chest and back: no strength dot in Activities, nothing in frequency. */
+      draft.muscles=Array.from(new Set([...existingDay.muscles.filter(muscle=>muscle!=='Cardio'),...blankMuscles,...exerciseDriven,...(hasCardio||existingDay.hasCardio?['Cardio']:[])]));
       draft.recommendationId=existingDay.recommendationId;draft.splitId=existingDay.splitId;draft.splitDayId=existingDay.splitDayId;draft.splitPosition=existingDay.splitPosition;
     }
     /* THE LOGGED DAY'S SPLIT IDENTITY FOLLOWS ITS CONTENT, not the queue.
