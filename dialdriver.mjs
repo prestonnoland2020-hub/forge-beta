@@ -2,7 +2,7 @@
    One driver, shared, so a change to the dial updates every test at once
    rather than leaving each to rot in its own way. */
 
-/* A weight is two wheels — hundreds and remainder — so 315 is 300 + 15. */
+/* A weight is one wheel in plate steps now, so 315 is a value on it. */
 export async function setWeightDial(page, label, total) {
   await page.evaluate(text => {
     const field = [...document.querySelectorAll('.dial-field')]
@@ -11,16 +11,12 @@ export async function setWeightDial(page, label, total) {
     field?.querySelector('.dial-field-button')?.click();
   }, label);
   await page.waitForTimeout(450);
-  const hundreds = Math.floor(Number(total) / 100) * 100;
-  const remainder = Number(total) - hundreds;
-  const picked = await page.evaluate(([h, r]) => {
-    const wheels = document.querySelectorAll('.dial-wheel');
-    const a = [...wheels[0].querySelectorAll('.dial-value')].find(el => el.textContent === String(h));
-    const b = [...wheels[1].querySelectorAll('.dial-value')].find(el => el.textContent === String(r));
-    a?.click(); b?.click();
-    return Boolean(a && b);
-  }, [hundreds, remainder]);
-  if (!picked) throw new Error(`The ${label} wheels do not offer ${total}`);
+  const picked = await page.evaluate(value => {
+    const item = [...document.querySelectorAll('.dial-wheel')[0].querySelectorAll('.dial-value')].find(el => el.textContent === String(value));
+    item?.click();
+    return Boolean(item);
+  }, total);
+  if (!picked) throw new Error(`The ${label} wheel does not offer ${total}`);
   await page.waitForTimeout(250);
   await page.evaluate(() => document.querySelector('.dial-ok').click());
   await page.waitForTimeout(350);

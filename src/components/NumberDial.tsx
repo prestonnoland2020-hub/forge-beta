@@ -26,18 +26,13 @@ const COLUMNS: Record<DialKind, (unit?: string) => Column[]> = {
      is a hundred and eighty values — reaching 315 meant a spin long enough to
      be worse than typing. Hundreds on the left, the remainder on the right,
      so any load in the range is two short flicks: 3, then 15. */
-  weight: unit => [
-    { values: range(0, unit === 'kg' ? 400 : 900, 100) },
-    { values: range(0, unit === 'kg' ? 97.5 : 95, unit === 'kg' ? 2.5 : 5) },
-    { values: [], suffix: unit || 'lb' },
-  ],
+  /* ONE WHEEL, IN PLATE STEPS. Two wheels (hundreds + remainder) with
+     nudge buttons and preset chips was four controls for one number; the
+     wheel opens on the current value, so the load is a short flick away. */
+  weight: unit => [{ values: range(0, unit === 'kg' ? 400 : 900, unit === 'kg' ? 2.5 : 5), suffix: unit || 'lb' }],
   /* A body weight moves by ones, not fives — 187 is a real weigh-in and the
      barbell's five-pound plates have nothing to do with it. */
-  bodyweight: unit => [
-    { values: range(0, unit === 'kg' ? 300 : 700, 100) },
-    { values: range(0, 99, 1) },
-    { values: [], suffix: unit || 'lb' },
-  ],
+  bodyweight: unit => [{ values: range(unit === 'kg' ? 30 : 60, unit === 'kg' ? 300 : 600, 1), suffix: unit || 'lb' }],
   reps: () => [{ values: range(1, 50, 1), suffix: 'reps' }],
   /* Miles to a hundredth: the whole part and the fraction are separate
      wheels, exactly as a distance is read aloud. */
@@ -65,7 +60,10 @@ function range(from: number, to: number, step: number): number[] {
   return out;
 }
 
-const ITEM_HEIGHT = 44;
+/* Every size in the wheel derives from this one number, in CSS as well
+   (--dial-item), so the band, the pads and the snap points cannot drift
+   apart — they did: the band sat a few pixels off the selected value. */
+const ITEM_HEIGHT = 52;
 
 /* One spinning column. Scroll snapping does the physics; the browser is far
    better at inertial scrolling than any hand-rolled drag handler. */
@@ -133,14 +131,14 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
   onCancel: () => void; onConfirm: (value: string) => void;
 }) {
   const columns = useMemo(() => COLUMNS[kind](unit), [kind, unit]);
-  const numeric = Number(value) || 0;
-  const weightLike = kind === 'weight' || kind === 'bodyweight';
+  /* An empty field opens somewhere a person actually is — an empty body
+     weight opened the wheel at its 60 lb floor, an empty load at an empty bar. */
+  const emptyStart: Partial<Record<DialKind, number>> = unit === 'kg' ? { weight: 60, bodyweight: 80, reps: 5 } : { weight: 135, bodyweight: 180, reps: 5 };
+  const numeric = Number(value) || (value ? 0 : emptyStart[kind] || 0);
   const [whole, setWhole] = useState(() => {
     if (kind === 'distance' && isShortUnit(unit)) return Math.round(numeric / 25) * 25;
     if (kind === 'distance') return Math.floor(numeric);
     if (kind === 'clock') return Number(String(value || '').split(':')[0]) || 0;
-    /* 315 opens as 300 on the hundreds wheel and 15 on the remainder. */
-    if (weightLike) return Math.floor(numeric / 100) * 100;
     const values = COLUMNS[kind](unit)[0].values;
     /* Snap an existing odd value to the nearest offered one, so a 227 lb
        import does not open the wheel at zero. */
@@ -149,87 +147,50 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
   const [fraction, setFraction] = useState(() => {
     if (kind === 'distance') return isShortUnit(unit) ? 0 : Math.round((numeric - Math.floor(numeric)) * 100);
     if (kind === 'clock') return Number(String(value || '').split(':')[1]) || 0;
-    if (kind === 'bodyweight') return Math.round(numeric - Math.floor(numeric / 100) * 100);
-    if (kind === 'weight') {
-      const step = unit === 'kg' ? 2.5 : 5;
-      /* Snap an odd imported load (227) to the nearest step the wheel offers. */
-      return Math.round((numeric - Math.floor(numeric / 100) * 100) / step) * step;
-    }
     return 0;
   });
 
   const shown = kind === 'distance' ? (isShortUnit(unit) ? String(whole) : `${whole}.${String(fraction).padStart(2, '0')}`)
     : kind === 'clock' ? `${whole}:${String(fraction).padStart(2, '0')}`
-    : weightLike ? String(Math.round((whole + fraction) * 10) / 10)
     : String(whole);
   const confirm = () => onConfirm(kind === 'distance' ? String(Number(shown)) : shown);
+  const suffix = kind === 'clock' ? 'min : sec' : kind === 'distance' ? (unit || 'mi') : kind === 'reps' ? (whole === 1 ? 'rep' : 'reps') : columns[0].suffix || unit || '';
 
-  /* THE WEIGHT DIAL IS AN INSTRUMENT, NOT A FORM. The number is the screen:
-     large, live, and readable at arm's length between sets. Under it, the
-     moves a lifter actually makes — a plate up, a plate down — as buttons,
-     the loads a bar is usually at as one tap, and the wheels for anything
-     else. Cancel and Done sit where iOS puts them, at the top of the sheet. */
-  const metric = unit === 'kg';
-  const step = kind === 'bodyweight' ? 1 : metric ? 2.5 : 5;
-  const maxLoad = kind === 'bodyweight' ? (metric ? 399 : 799) : (metric ? 497.5 : 995);
-  const setTotal = (next: number) => {
-    const clamped = Math.max(0, Math.min(maxLoad, Math.round(next / step) * step));
-    const hundreds = Math.floor(clamped / 100) * 100;
-    setWhole(hundreds);
-    setFraction(Math.round((clamped - hundreds) * 10) / 10);
-  };
-  const total = whole + fraction;
-  const nudges = kind === 'bodyweight' ? [-5, -1, 1, 5] : metric ? [-5, -2.5, 2.5, 5] : [-10, -5, 5, 10];
-  const presets = kind === 'weight' ? (metric ? [20, 40, 60, 80, 100, 120, 140] : [45, 95, 135, 185, 225, 275, 315]) : [];
-  const unitLabel = kind === 'clock' ? '' : kind === 'reps' ? (Number(shown) === 1 ? 'rep' : 'reps') : columns.find(column => column.suffix)?.suffix || unit || '';
-
+  /* THE DIAL IS A PICKER, NOTHING ELSE. Cancel and Done where iOS puts them,
+     the wheels, and the unit beside the selected value. The big readout,
+     the plate nudges and the preset chips all said or did what the wheel
+     already does. */
   /* Same rule as every other backdrop in the app: a click that started inside
      the sheet is never a click on the backdrop, whatever unmounts along the
      way. See the note in TopSetSheet for what the stopPropagation version
      costs. */
   return <div className="dial-backdrop" role="dialog" aria-modal="true" aria-label={title}
     onClick={event => { if (event.target === event.currentTarget) onCancel(); }}>
-    <div className={weightLike ? 'dial-sheet dial-pro weight-like' : 'dial-sheet dial-pro'}>
+    <div className="dial-sheet dial-pro dial-simple">
       <span className="dial-grabber" aria-hidden="true" />
       <header className="dial-head">
         <button type="button" className="dial-cancel" onClick={onCancel}>Cancel</button>
         <strong>{title}</strong>
         <button type="button" className="dial-ok" onClick={() => { tap(); confirm(); }}>Done</button>
       </header>
-      <div className="dial-readout dial-preview" aria-live="polite"><b key={shown}>{shown}</b>{unitLabel && <span>{unitLabel}</span>}</div>
-      {weightLike && <div className="dial-nudges">{nudges.map(amount =>
-        <button type="button" key={amount} onClick={() => { tap(); setTotal(total + amount); }} disabled={amount < 0 ? total <= 0 : total >= maxLoad}>{amount > 0 ? '+' : '−'}{Math.abs(amount)}</button>)}</div>}
-      <div className="dial-columns">
+      <div className="dial-columns" aria-live="polite">
         {/* The highlighted band is the selection, exactly as a picker reads. */}
         <div className="dial-band" aria-hidden="true" />
-        {weightLike
-          ? <>
-              <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />
-              <span className="dial-plus">+</span>
-              <Wheel values={columns[1].values} selected={fraction} onSelect={setFraction} />
-              <span className="dial-suffix">{unit || 'lb'}</span>
-            </>
-          : kind === 'clock'
+        {kind === 'clock'
           ? <>
               <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />
               <span className="dial-point">:</span>
               <Wheel values={columns[1].values} selected={fraction} onSelect={setFraction} format={item => String(item).padStart(2, '0')} />
-              <span className="dial-suffix">mm:ss</span>
             </>
-          : kind === 'distance'
+          : kind === 'distance' && columns[1].values.length > 0
           ? <>
               <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />
-              {columns[1].values.length > 0 && <><span className="dial-point">.</span>
-              <Wheel values={columns[1].values} selected={fraction} onSelect={setFraction} format={item => String(item).padStart(2, '0')} /></>}
-              <span className="dial-suffix">{unit || 'mi'}</span>
+              <span className="dial-point">.</span>
+              <Wheel values={columns[1].values} selected={fraction} onSelect={setFraction} format={item => String(item).padStart(2, '0')} />
             </>
-          : <>
-              <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />
-              <span className="dial-suffix">{columns[0].suffix}</span>
-            </>}
+          : <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />}
+        {suffix && <span className="dial-suffix">{suffix}</span>}
       </div>
-      {presets.length > 0 && <div className="dial-presets" aria-label="Common loads">{presets.map(load =>
-        <button type="button" key={load} className={total === load ? 'active' : ''} onClick={() => { tap(); setTotal(load); }}>{load}</button>)}</div>}
     </div>
   </div>;
 }

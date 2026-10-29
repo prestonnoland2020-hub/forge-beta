@@ -63,47 +63,43 @@ await p.waitForTimeout(500);
 check('tapping it raises the dial', Boolean(await p.$('.dial-backdrop')));
 check('the dial shows a selection band', Boolean(await p.$('.dial-band')));
 
-/* 3. A WEIGHT IS TWO WHEELS. One wheel from 0 to 900 in fives is 181 values —
-   reaching 315 was a spin long enough to be worse than typing. */
+/* 3. A WEIGHT IS ONE WHEEL IN PLATE STEPS, opening on the current value
+   (or a loaded bar when empty), so the load is a short flick away. */
 const wheelCount = await p.evaluate(() => document.querySelectorAll('.dial-wheel').length);
-check('weight is picked on two wheels, not one long one', wheelCount === 2, `${wheelCount} wheel(s)`);
-const hundreds = await p.evaluate(() => [...document.querySelectorAll('.dial-wheel')[0].querySelectorAll('.dial-value')].map(v => Number(v.textContent)));
-const remainder = await p.evaluate(() => [...document.querySelectorAll('.dial-wheel')[1].querySelectorAll('.dial-value')].map(v => Number(v.textContent)));
-check('the left wheel steps in hundreds', hundreds[1] - hundreds[0] === 100, `${hundreds[0]} → ${hundreds[1]}`);
-check('the left wheel is a short spin', hundreds.length <= 12, `${hundreds.length} values`);
-check('the right wheel moves in fives', remainder[1] - remainder[0] === 5, `${remainder[0]} → ${remainder[1]}`);
-check('the right wheel stops before the next hundred', remainder[remainder.length - 1] === 95, String(remainder[remainder.length - 1]));
-check('together they reach a real deadlift', hundreds[hundreds.length - 1] + 95 >= 700, String(hundreds[hundreds.length - 1] + 95));
-check('any load is two flicks, not a hundred', hundreds.length + remainder.length <= 40, `${hundreds.length} + ${remainder.length}`);
+check('weight is picked on one wheel', wheelCount === 1, `${wheelCount} wheel(s)`);
+const loads = await p.evaluate(() => [...document.querySelectorAll('.dial-wheel')[0].querySelectorAll('.dial-value')].map(v => Number(v.textContent)));
+check('the wheel moves in fives', loads[1] - loads[0] === 5, `${loads[0]} → ${loads[1]}`);
+check('it reaches a real deadlift', loads[loads.length - 1] >= 700, String(loads[loads.length - 1]));
+check('the band sits exactly on the selected value', await p.evaluate(() => {
+  const band = document.querySelector('.dial-band').getBoundingClientRect();
+  const active = document.querySelector('.dial-value.active').getBoundingClientRect();
+  return Math.abs((band.top + band.height / 2) - (active.top + active.height / 2)) <= 1;
+}));
 
-/* 4. The two wheels add up, and the choice is previewed before it commits. */
-const pickWeight = (h, r) => p.evaluate(([a, b]) => {
-  const wheels = document.querySelectorAll('.dial-wheel');
-  [...wheels[0].querySelectorAll('.dial-value')].find(v => v.textContent === String(a))?.click();
-  [...wheels[1].querySelectorAll('.dial-value')].find(v => v.textContent === String(b))?.click();
-}, [h, r]);
-await pickWeight(200, 25);
-await p.waitForTimeout(400);
-const preview = await p.evaluate(() => document.querySelector('.dial-preview')?.textContent);
-check('300 + 15 style addition previews correctly', /225/.test(preview || ''), preview);
+/* 4. Picking a value and confirming writes it to the field. */
+const pickWeight = value => p.evaluate(v => {
+  [...document.querySelectorAll('.dial-wheel')[0].querySelectorAll('.dial-value')].find(item => item.textContent === String(v))?.click();
+}, value);
+await pickWeight(225);
+await p.waitForTimeout(300);
 await p.evaluate(() => document.querySelector('.dial-cancel').click());
 await p.waitForTimeout(400);
 check('cancel leaves the field alone', !(await p.$('.dial-backdrop')));
 
 await openField('Weight');
 await p.waitForTimeout(500);
-await pickWeight(300, 15);
+await pickWeight(315);
 await p.waitForTimeout(300);
 await p.evaluate(() => document.querySelector('.dial-ok').click());
 await p.waitForTimeout(500);
 check('OK closes the dial', !(await p.$('.dial-backdrop')));
 const shown = await p.evaluate(() => [...document.querySelectorAll('.dial-field')].find(el => el.querySelector('.dial-field-label')?.textContent?.includes('Weight'))?.querySelector('.dial-field-button b')?.textContent);
-check('the two wheels sum into the field', shown === '315', shown);
+check('the picked load lands in the field', shown === '315', shown);
 
 /* Reopening starts where the field already is, not at zero. */
 await openField('Weight');
 await p.waitForTimeout(500);
-const reopened = await p.evaluate(() => document.querySelector('.dial-preview')?.textContent);
+const reopened = await p.evaluate(() => document.querySelector('.dial-value.active')?.textContent);
 check('reopening lands on the current value', /315/.test(reopened || ''), reopened);
 await p.evaluate(() => document.querySelector('.dial-cancel').click());
 await p.waitForTimeout(300);
