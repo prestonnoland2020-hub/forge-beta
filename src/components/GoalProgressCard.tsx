@@ -13,6 +13,7 @@ import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { localDayIso } from '../lib/time';
 import { goalFeasibility } from '../lib/goalFeasibility';
 import { raceDayOutlook } from '../lib/raceDay';
+import { expectedRunMiles } from '../lib/goalProgress';
 
 type GoalEvidence = { date: string; value: number; label: string };
 type GoalCoachTurn = { question: string; answer: string; source: 'ai' | 'local' | 'limit' };
@@ -34,21 +35,6 @@ const formatClock = (seconds: number, hoursFirst = false) => {
   return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}`;
 };
 const formatDate = (date: string) => { const value = new Date(`${date}T12:00:00`); return Number.isFinite(value.getTime()) ? value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'no date'; };
-const expectedRunMiles = (goal: CreatedGoal) => {
-  if (goal.eventDistance) {
-    const distance = Number(goal.eventDistance);
-    return goal.eventDistanceUnit?.toLowerCase().startsWith('kilo') ? distance * 0.621371 : distance;
-  }
-  const name = `${goal.exercise || ''} ${goal.title}`.toLowerCase();
-  if (name.includes('half marathon')) return 13.1094;
-  if (name.includes('marathon')) return 26.2188;
-  if (name.includes('10k')) return 6.21371;
-  if (name.includes('5k')) return 3.10686;
-  const namedMiles=name.match(/\b(\d+(?:\.\d+)?)\s*miles?\b/);
-  if(namedMiles)return Number(namedMiles[1]);
-  if (/\b1\s*mile|\bmile\b/.test(name)) return 1;
-  return null;
-};
 const best = (items: GoalEvidence[], lowerIsBetter: boolean) => items.reduce<GoalEvidence | undefined>((winner, item) => !winner || (lowerIsBetter ? item.value < winner.value : item.value > winner.value) ? item : winner, undefined);
 const distanceInMiles=(distance:number,unit:unknown)=>String(unit||'miles').toLowerCase().startsWith('kilo')?distance*0.621371:distance;
 const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b);if(!sorted.length)return 0;const middle=Math.floor(sorted.length/2);return sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2};

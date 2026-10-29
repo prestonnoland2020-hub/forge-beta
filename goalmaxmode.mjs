@@ -25,7 +25,7 @@ check('a rep goal is reps in either mode', goalProgress(reps, [{ date: '2026-10-
 
 console.log('\nThe page');
 const page = readFileSync('./src/pages/GoalsPage.tsx', 'utf8');
-check('every goal is measured in the chosen mode', /goalProgress\(goal, records, verdicts\[index\], setup, maxMode\)/.test(page));
+check('every goal is measured in the chosen mode', /goalProgress\(goal, records, verdicts\[index\], setup, maxMode[,)]/.test(page));
 check('the choice is remembered on the device', /localStorage\.setItem\('forge-goals-max-mode', mode\)/.test(page));
 check('the switch shows only when a strength goal can use it', /\{hasStrength && <div className="gx-mode"/.test(page));
 
