@@ -4,7 +4,8 @@ import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
 import { goalFeasibility } from '../lib/goalFeasibility';
-import { goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
+import { expectedRunMiles, goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
+import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -74,7 +75,14 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      the cards, their bars and the overall ring. Remembered on this device. */
   const [maxMode, setMaxMode] = useState<MaxMode>(() => { try { return localStorage.getItem('forge-goals-max-mode') === 'tested' ? 'tested' : 'calculated'; } catch { return 'calculated'; } });
   const chooseMode = (mode: MaxMode) => { if (mode === maxMode) return; tap(); setMaxMode(mode); try { localStorage.setItem('forge-goals-max-mode', mode); } catch { /* per-device convenience */ } };
-  const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode)), [goals, records, verdicts, setup, maxMode]);
+  /* What logged running is worth at each endurance goal's distance today —
+     the same predictor the goal detail calls CURRENT. */
+  const enduranceNow = useMemo(() => goals.map(goal => {
+    if (goal.type !== 'Endurance') return null;
+    const miles = expectedRunMiles(goal);
+    return miles ? predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null : null;
+  }), [goals, records, setup?.excludedEfforts, workouts]);
+  const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
   /* The bars start empty and fill one frame after the page mounts, so the
      width transition runs; each card is a beat behind the one above it. */

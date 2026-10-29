@@ -66,7 +66,30 @@ function strengthCurrent(goal: CreatedGoal, records: WorkoutRecord[], mode: MaxM
   return best || (tested ? null : numeric(goal.current) || null);
 }
 
-export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdict: Feasibility | undefined, setup?: { startingWeight?: string; currentWeight?: string } | null, mode: MaxMode = 'calculated'): GoalProgress {
+/* The race distance a goal is for, in miles — from its event distance, or
+   read off its name (5K, half marathon, "2 miles"). Shared with the goal
+   detail, so the card and the detail ask the predictor the same question. */
+export const expectedRunMiles = (goal: CreatedGoal) => {
+  if (goal.eventDistance) {
+    const distance = Number(goal.eventDistance);
+    return goal.eventDistanceUnit?.toLowerCase().startsWith('kilo') ? distance * 0.621371 : distance;
+  }
+  const name = `${goal.exercise || ''} ${goal.title}`.toLowerCase();
+  if (name.includes('half marathon')) return 13.1094;
+  if (name.includes('marathon')) return 26.2188;
+  if (name.includes('10k')) return 6.21371;
+  if (name.includes('5k')) return 3.10686;
+  const namedMiles=name.match(/\b(\d+(?:\.\d+)?)\s*miles?\b/);
+  if(namedMiles)return Number(namedMiles[1]);
+  if (/\b1\s*mile|\bmile\b/.test(name)) return 1;
+  return null;
+};
+
+/* `enduranceNow` is what the athlete's logged running is worth at the goal
+   distance today, in seconds (the race predictor's number). An endurance
+   card used to read only a time typed into the goal, so with months of runs
+   logged it still said "Log it to start · No data yet". */
+export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdict: Feasibility | undefined, setup?: { startingWeight?: string; currentWeight?: string } | null, mode: MaxMode = 'calculated', enduranceNow?: number | null): GoalProgress {
   const unit = goal.unit || String(goal.target || '').split(' ').slice(1).join(' ');
   const time = isTime(unit);
   const hoursFirst = /hh/i.test(unit);
@@ -85,7 +108,10 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
     if (current && start && target) share = start === target ? 1 : clamp01((start - current) / (start - target));
   } else {
     const entered = time ? clockToSeconds(goal.current || '', hoursFirst) : numeric(goal.current);
-    current = entered || null;
+    /* For a time goal the predictor wins over a typed starting time — it is
+       built from what was actually run, and the goal detail already shows it
+       as CURRENT. A typed time stays the fallback when nothing is logged. */
+    current = (time && enduranceNow ? enduranceNow : entered) || null;
     if (current && target) share = clamp01(time ? target / current : current / target);
   }
 
