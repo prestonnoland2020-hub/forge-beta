@@ -444,3 +444,15 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .dial-simple .dial-value.active { font-size: 30px; font-weight: 800; color: var(--ink, var(--text)); opacity: 1; transform: none; }
 .dial-simple .dial-point { font: 800 26px var(--display-font, var(--display)); color: var(--ink, var(--text)); align-self: center; }
 .dial-simple .dial-suffix { position: relative; align-self: center; min-width: 0; font: 800 15px var(--body, inherit); letter-spacing: .02em; text-transform: none; color: var(--accent-text); }
+
+/* Activities: custom days that lost their muscles, one tap from fixing. */
+.muscle-review { display: grid; gap: 10px; border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 10%, var(--surface-1)), var(--surface-1) 70%); }
+.muscle-review header { display: grid; gap: 4px; }
+.muscle-review h3 { margin: 0; font-size: 18px; text-transform: none; }
+.muscle-review p { margin: 0; font-size: 13px; color: var(--muted); }
+.muscle-review ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.muscle-review li { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.muscle-review li a { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface-1); border: 1px solid var(--line); color: inherit; }
+.muscle-review li a span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muscle-review li a b { font-size: 13px; color: var(--accent-text); }
+.muscle-review li button { border: 0; background: none; color: var(--ink-3, var(--muted)); font-size: 12px; font-weight: 700; padding: 8px 4px; }
