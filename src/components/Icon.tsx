@@ -17,6 +17,7 @@ const paths: Record<string, ReactNode> = {
   search: <><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.4-4.4" /></>,
   expand: <path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7" />,
   collapse: <path d="M4 14h6v6M10 14l-7 7M20 10h-6V4M14 10l7-7" />,
+  close: <path d="M6 6l12 12M18 6L6 18" />,
   external: <path d="M7 17 17 7M9 7h8v8" />,
   circle: <circle cx="12" cy="12" r="7.5" />,
   shield: <><path d="M12 3 5 6v5.5c0 4.4 3 7.9 7 9.5 4-1.6 7-5.1 7-9.5V6l-7-3Z" /><path d="m9 12 2 2 4-4" /></>,

@@ -453,3 +453,10 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .muscle-review li a span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .muscle-review li a b { font-size: 13px; color: var(--accent-text); }
 .muscle-review li button { border: 0; background: none; color: var(--ink-3, var(--muted)); font-size: 12px; font-weight: 700; padding: 8px 4px; }
+
+/* One-tap check-in: four answers as a 2×2 grid. */
+.coach-checkin-one { grid-template-columns: 1fr 1fr; }
+/* Forge noticed, as a pop-up. */
+.forge-noticed.coach-checkin { border-left: 3px solid var(--accent); }
+.forge-noticed-head { align-items: center; }
+.forge-noticed-close { display: grid; place-items: center; width: 32px; height: 32px; margin: -6px -8px -6px 0; border: 0; border-radius: 999px; background: none; color: var(--ink-3); }

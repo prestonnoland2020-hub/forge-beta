@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
 import { CoachCheckIn } from './CoachCheckIn';
+import { ForgeNoticed } from './ForgeNoticed';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { syncKeyboardState } from '../features/shell/nativeChrome';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
@@ -350,6 +351,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     <EffortCheck />
     <CoachCheckIn />
     <MileageStartupCheck />
+    {/* What Forge noticed comes last and only now and again: it waits for any
+        of the dialogs above to be answered first. */}
+    <ForgeNoticed />
     {/* Open, the coach is a sheet over a dimmed screen, and tapping the dim
         closes it — on a phone always, on a desktop when expanded. */}
     {coachOpen && <button className={coachExpanded ? 'coach-bubble-backdrop expanded' : 'coach-bubble-backdrop'} type="button" aria-label="Close Forge coach" onClick={() => { if (coachExpanded) setCoachExpanded(false); else setCoachOpen(false); }} />}
