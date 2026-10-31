@@ -126,8 +126,14 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
 
     {syncError && <p className="data-sync-error">{syncError}</p>}
 
-    {hasStrength && <div className="gx-mode" role="radiogroup" aria-label="Strength max">
-      {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Calculated max' : 'Tested max'}</button>)}
+    {/* A switch should look like one: a label saying what it switches, a thumb that slides, and a line saying what the chosen side counts. */}
+    {hasStrength && <div className="gx-mode" data-mode={maxMode}>
+      <span className="gx-mode-label" id="gx-mode-label">Strength goals use</span>
+      <div className="gx-mode-track" role="radiogroup" aria-labelledby="gx-mode-label">
+        <i className="gx-mode-thumb" aria-hidden="true" />
+        {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Calculated max' : 'Tested max'}</button>)}
+      </div>
+      <p className="gx-mode-hint">{maxMode === 'calculated' ? 'Estimated from your best rep sets.' : 'Only singles you actually lifted.'}</p>
     </div>}
 
     {goals.length > 0 && (() => {
