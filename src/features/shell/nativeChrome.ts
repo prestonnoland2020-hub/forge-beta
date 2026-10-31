@@ -30,6 +30,15 @@ const isTextEntry = (element: EventTarget | null) => {
   return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'].includes(element.type);
 };
 
+/* The keyboard is up only while a text field really has focus. Called on
+   every screen change, because a focused field that is removed from the page
+   never fires focusout and the class would otherwise stay on — the tab bar
+   hidden and untappable until the app was restarted. */
+export function syncKeyboardState(): void {
+  if (typeof document === 'undefined') return;
+  if (!isTextEntry(document.activeElement)) document.documentElement.classList.remove('keyboard-open');
+}
+
 export function startNativeChrome(): () => void {
   if (typeof window === 'undefined') return () => undefined;
   applyHomeIndicatorFallback();
@@ -43,6 +52,9 @@ export function startNativeChrome(): () => void {
   const onFocusOut = () => { blurTimer = window.setTimeout(() => { if (!isTextEntry(document.activeElement)) setKeyboard(false); }, 120); };
   const onShow = () => setKeyboard(true);
   const onHide = () => setKeyboard(false);
+  /* Same check on any touch while the class is on: a sheet with a field in it
+     can close without a screen change, and the next touch brings the bar back. */
+  const onTouch = () => { if (root.classList.contains('keyboard-open')) syncKeyboardState(); };
 
   const media = window.matchMedia?.('(prefers-color-scheme: dark)');
   const syncStatusBar = () => {
@@ -60,6 +72,7 @@ export function startNativeChrome(): () => void {
   const remeasure = () => applyHomeIndicatorFallback();
   document.addEventListener('focusin', onFocusIn);
   document.addEventListener('focusout', onFocusOut);
+  document.addEventListener('touchstart', onTouch, { passive: true });
   window.addEventListener('keyboardWillShow', onShow);
   window.addEventListener('keyboardWillHide', onHide);
   window.addEventListener('orientationchange', remeasure);
@@ -69,6 +82,7 @@ export function startNativeChrome(): () => void {
     media?.removeEventListener?.('change', syncStatusBar);
     document.removeEventListener('focusin', onFocusIn);
     document.removeEventListener('focusout', onFocusOut);
+    document.removeEventListener('touchstart', onTouch);
     window.removeEventListener('keyboardWillShow', onShow);
     window.removeEventListener('keyboardWillHide', onHide);
     window.removeEventListener('orientationchange', remeasure);

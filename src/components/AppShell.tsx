@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
 import { CoachCheckIn } from './CoachCheckIn';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { syncKeyboardState } from '../features/shell/nativeChrome';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -99,6 +100,16 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   },[]);
 
   const location = useLocation();
+  const navigate = useNavigate();
+  /* A TAB ANSWERS THE FIRST TAP. On iOS a tap that lands while the page is
+     still coasting from a scroll only stops the scroll — the click never
+     comes, so the bar felt stuck until it was tapped again. Touch events do
+     arrive, so a short, still touch on a tab switches on touchend. */
+  const tabTouch = useRef<{ x: number; y: number } | null>(null);
+  /* And a field that vanished while focused (a sheet closing, a screen
+     changing) never sends its blur, which left the bar hidden as if the
+     keyboard were up. Every screen change re-reads the real state. */
+  useEffect(() => { syncKeyboardState(); }, [location.pathname, location.search]);
   /* A NEW BUILD TAKES OVER BY ITSELF, at a moment nobody loses anything to.
      The pill asked for a tap most people never made, so a deploy reached them
      only whenever they happened to reload. Now the app reloads on its own —
@@ -317,7 +328,15 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     <nav className={hideTabs ? 'tab-bar away' : 'tab-bar'} aria-label="Tabs" style={{ '--tab-index': Math.max(0, activeTab) } as CSSProperties}>
       {activeTab >= 0 && <span className="tab-indicator" aria-hidden="true" />}
       {tabs.map((tab, index) => <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className={index === activeTab ? 'tab active' : 'tab'} aria-current={index === activeTab ? 'page' : undefined}
-        onClick={() => { if (index !== activeTab) tap(); }}><NavGlyph name={tab.icon}/><small>{tab.label}</small></NavLink>)}
+        onClick={() => { if (index !== activeTab) tap(); }}
+        onTouchStart={event => { const point = event.touches[0]; tabTouch.current = point ? { x: point.clientX, y: point.clientY } : null; }}
+        onTouchEnd={event => {
+          const start = tabTouch.current; tabTouch.current = null;
+          const point = event.changedTouches[0];
+          if (!start || !point || Math.hypot(point.clientX - start.x, point.clientY - start.y) > 10) return;
+          event.preventDefault();
+          if (index !== activeTab) { tap(); navigate(tab.to); }
+        }}><NavGlyph name={tab.icon}/><small>{tab.label}</small></NavLink>)}
     </nav>
     {/* THE COACH SPEAKS FIRST WHEN IT HAS SOMETHING THAT MATTERS. An athlete
         whose goal cannot be reached on the running they do is told on the way
