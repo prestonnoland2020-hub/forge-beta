@@ -342,9 +342,6 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .gx-hero.ring-work .gx-ring-fill { stroke: var(--warn); }
 .gx-hero.ring-off .gx-ring-fill { stroke: var(--bad); }
 .gx-hero.ring-none .gx-ring-fill { stroke: var(--ink-3); }
-.gx-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink, #000) 7%, transparent); }
-.gx-mode button { min-height: 48px; border: 0; border-radius: 10px; background: none; color: var(--ink-2, var(--text)); font-size: 16px; font-weight: 800; transition: background-color .15s ease; }
-.gx-mode button.active { background: var(--surface-1, #fff); color: var(--ink, var(--text)); box-shadow: 0 1px 3px rgb(0 0 0 / .14); }
 
 /* ── LAST WEEK, DRAWN ─────────────────────────────────────────────────── */
 .wk { display: grid; gap: 12px; margin: 4px 0 2px; }
