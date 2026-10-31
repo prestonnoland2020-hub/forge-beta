@@ -17,7 +17,14 @@
   :root {
     --tab-h: 64px;
     --tab-gap: 12px;
-    --tab-clear: calc(var(--tab-h) + var(--tab-gap) + var(--safe-b, env(safe-area-inset-bottom)));
+    /* THE BAR FLOATS ABOVE THE HOME-INDICATOR STRIP, NOT IN IT. iOS keeps
+       about the bottom 54pt for its own swipe and delivers no touch from it —
+       measured in the simulator: a tap at 55pt from the bottom reached the
+       page, one at 52pt never did. The bar's bottom edge sat 28pt up, so its
+       labels were in that strip and a tap on "Goals" did nothing until it
+       landed on the icon. Preston's "navigation bar gets sticky at times". */
+    --tab-lift: 16px;
+    --tab-clear: calc(var(--tab-h) + var(--tab-gap) + var(--tab-lift) + var(--safe-b, env(safe-area-inset-bottom)));
     --chrome-clear: calc(var(--tab-clear) + 28px);
     --spring: cubic-bezier(.32, 1.25, .5, 1);
     --glide: cubic-bezier(.2, .8, .2, 1);
@@ -27,7 +34,7 @@
   .tab-bar {
     position: fixed; z-index: 30;
     left: 14px; right: 14px;
-    bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) - 6px);
+    bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + var(--tab-lift));
     height: var(--tab-h);
     padding: 8px;
     display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
