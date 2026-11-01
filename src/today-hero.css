@@ -9,14 +9,6 @@
 .forge-feed.today { display: grid; gap: var(--s5); }
 
 /* ---- The week ---------------------------------------------------------- */
-.today .td-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); margin: 0; padding: 0; list-style: none; }
-.today .td-week li { position: relative; display: grid; justify-items: center; gap: var(--s1); }
-.today .td-week small { font-size: var(--fs-label); font-weight: 600; color: var(--ink-3); }
-.today .td-week b { display: grid; place-items: center; width: 100%; max-width: 40px; aspect-ratio: 1; border-radius: var(--r-sm); background: var(--surface-1); font-size: var(--fs-small); font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink-2); }
-.today .td-week i { width: 6px; height: 6px; border-radius: var(--r-pill); background: transparent; }
-.today .td-week li.logged i { background: var(--good); }
-.today .td-week li.today small { color: var(--accent-text); }
-.today .td-week li.today b { background: var(--accent-strong); color: var(--accent-ink); }
 
 /* ---- The session card -------------------------------------------------- */
 .today .td-card { display: grid; gap: var(--s4); padding: var(--s5); border-radius: var(--r-lg); background: var(--surface-1); border: 1px solid var(--hairline); }
@@ -61,7 +53,7 @@
 
 /* Arrivals come in on the mark's 45° line, one after another. */
 @media (prefers-reduced-motion: no-preference) {
-  .today > :is(.td-week, .td-card, .partners-card) { animation: td-rise var(--dur-emphasis) var(--ease-strike) both; }
+  .today > :is(.td-card, .partners-card) { animation: td-rise var(--dur-emphasis) var(--ease-strike) both; }
   .today > .td-card { animation-delay: 60ms; }
   .today > .partners-card { animation-delay: 120ms; }
 }
