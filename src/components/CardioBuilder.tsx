@@ -574,7 +574,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       const provider = syncedProvider(entry) || 'Your watch';
       const confirmed = Boolean(entry.prescription.confirmed);
       const syncedFrom = entry.prescription.syncedFrom as { note?: unknown; summary?: unknown } | undefined;
-      const watchName = String(syncedFrom?.note ?? entry.prescription.note ?? '').replace(/^Strava:\s*/, '').replace(/^Imported from \w+$/, '');
+      const watchName = String(syncedFrom?.note ?? entry.prescription.note ?? '').replace(/^(Strava|Garmin):\s*/, '').replace(/^Imported from \w+$/, '');
       const ownNote = syncedFrom && entry.prescription.note !== syncedFrom.note ? String(entry.prescription.note || '') : '';
       return <article className={`cardio-synced${confirmed ? ' confirmed' : ''}${describing === entry.id ? ' describing' : ''}${justLogged === entry.id ? ' just-logged' : ''}`} key={entry.id}>
         <header>
