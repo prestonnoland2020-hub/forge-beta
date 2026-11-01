@@ -24,6 +24,7 @@ import { importStravaActivities } from '../features/training/stravaImportService
 import { getGarminConnection, syncGarmin } from '../features/training/garminConnectionService';
 import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
+import { ForgeMark } from './ForgeStrikeMark';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
    standalone exercise library that duplicated what the Log screen already does;
@@ -320,7 +321,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   return <div className="app-frame">
     {updateReady&&<button type="button" className="update-ready-pill" onClick={()=>window.location.reload()}>Forge updated · tap to refresh</button>}
     <aside className="sidebar">
-      <NavLink className="brand" to="/" aria-label="Forge home"><span className="brand-mark"><i /></span></NavLink>
+      <NavLink className="brand" to="/" aria-label="Forge home"><ForgeMark /></NavLink>
       <nav className="side-nav" aria-label="Primary navigation">
         {primaryNav.map(([to, label, icon]) => <NavLink key={to} to={to} end={to === '/'}><NavGlyph name={icon}/>{label}</NavLink>)}
       </nav>
@@ -331,7 +332,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         <div className="top-title">
           {chrome.back && <Link className="top-back" to={chrome.back} state={chrome.backState} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
           {/* The logo heads every screen; the screen's name stays for screen readers. */}
-          <NavLink className="top-brand" to="/" aria-label="Forge home"><span className="brand-mark" aria-hidden="true"><i /></span></NavLink>
+          <NavLink className="top-brand" to="/" aria-label="Forge home"><ForgeMark /></NavLink>
           <h1 className="sr-only">{chrome.title}</h1>
         </div>
         <div className="top-actions">
