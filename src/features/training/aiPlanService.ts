@@ -1195,17 +1195,47 @@ export function weekCycleDays(startIso: string, weekIndex: number, splitDays: Sp
    drawing the week asks here which exposure carries the attempt: the cheapest
    day — the one not already carrying the long run or the quality session.
    Keyed canonically, so "Squat" and "Back Squat" cannot each claim one. */
-export function chooseMaxAttemptDays(
-  days: Array<{ exercise?: string; reps?: number; hasHold?: boolean; cost: number }>,
-): Set<number> {
+/* ONE ATTEMPT PER GOAL LIFT PER MAX WEEK — CHOSEN PER LIFT, NOT PER DAY.
+   A rolling split shorter than seven days lands the same day twice in a week,
+   and each landing carried the lift's 1RM attempt. The attempt goes to that
+   lift's cleanest session (no long run, no quality work; the earliest on a
+   tie) and every other appearance drops back to the heavy double.
+
+   This used to look at each day's FIRST top set only. A Chest & Back day
+   carrying Bench and then Pull Ups never counted Pull Ups, so Plan showed a
+   Pull Ups attempt on both Chest & Back days that week, and Today — which
+   asked whether the DAY held the attempt — tested every goal lift on Bench's
+   day. Every set on every day is weighed, and the answer is a day per lift.
+
+   A single already in the log this week settles it: that lift's attempt is
+   the day it was taken, so a PR on Monday is not asked for again on Thursday. */
+export type AttemptDay = { iso?: string; sets: Array<{ exercise?: string; reps?: number; hasHold?: boolean }>; cost: number };
+export function chooseMaxAttempts(days: AttemptDay[], singlesLogged?: Map<string, Set<string>>): Map<string, number> {
   const best = new Map<string, { index: number; cost: number }>();
-  days.forEach((day, index) => {
-    if (!day.exercise || day.reps !== 1 || !day.hasHold) return;
-    const key = canonicalLiftKey(day.exercise);
+  days.forEach((day, index) => day.sets.forEach(set => {
+    if (!set.exercise || set.reps !== 1 || !set.hasHold) return;
+    const key = canonicalLiftKey(set.exercise);
     const held = best.get(key);
     if (!held || day.cost < held.cost) best.set(key, { index, cost: day.cost });
-  });
-  return new Set([...best.values()].map(entry => entry.index));
+  }));
+  const attempts = new Map<string, number>();
+  for (const [key, { index }] of best) {
+    const takenOn = days.findIndex(day => Boolean(day.iso && singlesLogged?.get(key)?.has(day.iso)));
+    attempts.set(key, takenOn >= 0 ? takenOn : index);
+  }
+  return attempts;
+}
+
+/* The days each lift has a completed single on, keyed canonically. */
+export function loggedSinglesByLift(records: Array<{ date: string; topSets?: Array<{ lift: string; reps: number; completed?: boolean }> }>): Map<string, Set<string>> {
+  const singles = new Map<string, Set<string>>();
+  records.forEach(record => (record.topSets || []).forEach(set => {
+    if (set.completed === false || Number(set.reps) !== 1) return;
+    const key = canonicalLiftKey(set.lift);
+    if (!singles.has(key)) singles.set(key, new Set());
+    singles.get(key)!.add(record.date);
+  }));
+  return singles;
 }
 
 /* ONE RESOLVED WEEK, SHARED BY EVERY SURFACE. The stored block is raw model
