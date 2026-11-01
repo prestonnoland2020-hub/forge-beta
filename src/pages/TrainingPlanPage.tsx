@@ -33,6 +33,20 @@ const TEMPLATES:Array<{id:string;label:string;copy:string;days:Array<[string,Day
   {id:'hybrid',label:'Hybrid',copy:'4 days · lifting and running',days:[['Upper','strength',['Chest','Back','Shoulders']],['Quality Run','cardio',[]],['Lower','strength',['Quads','Hamstrings','Glutes']],['Long Run','cardio',[]]]},
 ];
 const DAY_TYPES:Array<[DayType,string]>=[['strength','Lift'],['cardio','Run'],['mixed','Both'],['rest','Rest'],['hyrox','HYROX']];
+/* CARDIO IS A TAP, NOT A FORM. Choosing your own session meant a policy
+   switch, a builder over the sheet, four session shapes, seven activities and
+   a dial for every number — to say "easy run". Most planned sessions are one
+   of these; tapping one puts it on the day as it stands, and Edit opens the
+   full builder on it for anyone who wants to change a number. Distances
+   follow the athlete's units. */
+const cardioPresets=(metric:boolean):Array<{label:string;plan:Omit<PlannedCardio,'id'>}>=>{const unit=metric?'kilometers':'miles';return[
+  {label:'Easy 30 min run',plan:{activity:'Run',structure:'Steady',targetSource:'Goal generated',duration:'30',distanceUnit:unit,pace:'Easy'}},
+  {label:metric?'Tempo 6 km':'Tempo 4 mi',plan:{activity:'Run',structure:'Steady',targetSource:'Goal generated',distance:metric?'6':'4',distanceUnit:unit,pace:'Tempo'}},
+  {label:'6 × 400 m',plan:{activity:'Run',structure:'Intervals',targetSource:'Goal generated',repeats:'6',intervalBasis:'Distance',workDistance:'400',workUnit:'meters',pace:'5K pace',rest:'90',recoveryType:'Jog',warmup:metric?'1.5 km':'1 mile',cooldown:metric?'1.5 km':'1 mile'}},
+  {label:metric?'Long run 12 km':'Long run 8 mi',plan:{activity:'Run',structure:'Steady',targetSource:'Goal generated',distance:metric?'12':'8',distanceUnit:unit,pace:'Easy'}},
+  {label:'Easy 45 min bike',plan:{activity:'Bike',structure:'Steady',targetSource:'Goal generated',duration:'45',distanceUnit:unit,pace:'Zone 2'}},
+  {label:'20 min row',plan:{activity:'Rowing',structure:'Steady',targetSource:'Goal generated',duration:'20',distanceUnit:'meters',pace:'Steady'}},
+]};
 
 const muscles=['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps','Triceps','Forearms','Abs'];
 type CardioPolicy='none'|'forge'|'planned';
@@ -127,10 +141,13 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const addExercise=(exercise:string)=>{if(!exercise||active.exercises.includes(exercise))return;const next=[...active.exercises,exercise];updateDay({exercises:next,muscles:Array.from(new Set([...active.muscles,...musclesForExercises(next)]))})};
   const removeExercise=(exercise:string)=>{const next=active.exercises.filter(item=>item!==exercise);const remaining=musclesForExercises(next);const removedMuscles=strengthExercises.find(item=>item.name===exercise)?.muscles||[];updateDay({exercises:next,muscles:active.muscles.filter(muscle=>remaining.includes(muscle)||!removedMuscles.includes(muscle))})};
   const toggleExercise=(exercise:string)=>active.exercises.includes(exercise)?removeExercise(exercise):addExercise(exercise);
-  const setPolicy=(policy:CardioPolicy)=>updateDay({cardioPolicy:policy});
   const setDayType=(dayType:DayType)=>updateDay({dayType,...(dayType==='strength'?{cardioPolicy:active.cardioPolicy==='planned'?'planned' as const:'forge' as const} : dayType==='cardio'?{muscles:[],exercises:[],cardioPolicy:'forge' as const}:dayType==='hyrox'?{muscles:[],exercises:[],cardioPolicy:'forge' as const,cardio:[]}:dayType==='mixed'?{cardioPolicy:active.cardioPolicy==='none'?'forge' as const:active.cardioPolicy}:{muscles:[],exercises:[],cardioPolicy:'none' as const,cardio:[]})});
   const saveCardio=(plan:PlannedCardio)=>{if(!cardioEditor)return;setDays(items=>items.map((day,index)=>{if(index!==cardioEditor.dayIndex)return day;const cardio=cardioEditor.cardioIndex===null?[...day.cardio,plan]:day.cardio.map((entry,entryIndex)=>entryIndex===cardioEditor.cardioIndex?plan:entry);return{...day,cardio,maxDuration:durationForDay(day,cardio)}}));setCardioEditor(null)};
-  const removeCardio=(cardioIndex:number)=>{const cardio=active.cardio.filter((_,index)=>index!==cardioIndex);updateDay({cardio,maxDuration:durationForDay(active,cardio)})};
+  /* Removing the last session hands the day back to Forge, so a day can never
+     sit on "planned" with nothing planned. */
+  const removeCardio=(cardioIndex:number)=>{const cardio=active.cardio.filter((_,index)=>index!==cardioIndex);updateDay({cardio,...(cardio.length?{}:{cardioPolicy:'forge' as const}),maxDuration:durationForDay(active,cardio)})};
+  const addPresetCardio=(plan:Omit<PlannedCardio,'id'>)=>{const cardio=[...active.cardio,{...plan,id:Date.now()}];updateDay({cardio,cardioPolicy:'planned',maxDuration:durationForDay(active,cardio)})};
+  const letForgePlan=()=>updateDay({cardio:[],cardioPolicy:'forge',maxDuration:durationForDay(active,[])});
   const attachLibraryCardio=(workoutId:string)=>{const workout=cardioWorkouts.find(item=>String(item.id)===workoutId);if(workout?.plan){const cardio=[...active.cardio,{...workout.plan,id:Date.now()}];updateDay({cardio,cardioPolicy:'planned',maxDuration:durationForDay(active,cardio)})}};
   const reviewFindings=useMemo(()=>{const findings:string[]=[];const strengthDays=days.filter(day=>day.dayType==='strength'||day.dayType==='mixed');const cardioDays=days.filter(day=>day.cardioPolicy!=='none');const restDays=days.filter(day=>day.dayType==='rest');const emptyStrength=strengthDays.filter(day=>!day.exercises.length);if(emptyStrength.length)findings.push(`${emptyStrength.length} strength day${emptyStrength.length===1?' has':'s have'} no exercises selected.`);if(!cardioDays.length&&goals.some(goal=>goal.type==='Endurance'))findings.push('An endurance goal is active, but no split day currently permits cardio.');if(!restDays.length)findings.push('The cycle has no dedicated recovery day.');restDays.filter(day=>day.recoveryStyle==='Full rest'&&day.cardioPolicy!=='none').forEach(day=>findings.push(`${day.name} is marked Full rest but also permits cardio; confirm that is intentional.`));days.filter(day=>day.cardioPolicy==='planned'&&!day.cardio.length).forEach(day=>findings.push(`${day.name} expects planned cardio but has no attached option.`));return findings},[days,goals]);
   const openSplitReview=()=>{setReviewOpen(true);setTimeout(()=>document.getElementById('splitReviewPanel')?.scrollIntoView({behavior:'smooth',block:'start'}),0)};
@@ -153,8 +170,9 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const downloadPlan=()=>{const weeks=buildLongRangePlan(goals,profile,24,records);const lines=['FORGE ADAPTIVE TRAINING PLAN',`${splitName} · ${rhythm==='rolling'?'Rolling cycle':'Weekly schedule'}`,`${weeks.length}-week goal-driven progression`,'',`Starting running volume: ${profile.weeklyMileage} mi/week`,`Running availability: ${profile.runningDays} days`,`Active goals: ${goals.map(goal=>goal.title).join(' · ')||'Baseline development'}`,'','AUTHORIZED SPLIT',...days.flatMap((day,index)=>[`${index+1}. ${day.name}${rhythm==='weekly'?` · ${day.weekday}`:''} · ${day.dayType.toUpperCase()}`,`   Focus: ${day.muscles.join(', ')||'Not set'}`,`   Strength: ${day.exercises.join(', ')||'None'}`,`   Cardio: ${policyLabel(day)}`]),'','LONG-RANGE ROADMAP',...weeks.flatMap(week=>[`WEEK ${week.week} · ${week.start} · ${week.phase}`,`   Weekly volume: ${week.mileage} mi${week.change?` · ${week.change>0?'+':''}${week.change}%`:''}`,`   Strength priority: ${week.topSet}`,`   Quality session: ${week.quality}`,`   Long run: ${week.longRun}`,`   Easy / recovery: ${week.easy}`,`   Coaching rationale: ${week.why} ${week.adjustment}`,'']),'ADAPTATION POLICY','Forge may change upcoming volume, interval structure, target load, session timing, substitutions, recovery work, deloads, and taper timing.','Forge will not silently change goals, protected rest days, assigned muscle groups, injury constraints, completed history, or an athlete-authored workout.'];const blob=new Blob([lines.join('\n')],{type:'text/plain'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='forge-adaptive-training-plan.txt';link.click();URL.revokeObjectURL(url)};
   const [sheetDay,setSheetDay]=useState<number|null>(null);
   const [editMuscles,setEditMuscles]=useState(false);
+  const [browseLifts,setBrowseLifts]=useState(false);
   const [showTemplates,setShowTemplates]=useState(()=>days.length<=1&&!days[0]?.exercises.length);
-  const openDay=(index:number)=>{tap();setSelectedDay(index);setEditMuscles(false);setExerciseQuery('');setSheetDay(index)};
+  const openDay=(index:number)=>{tap();setSelectedDay(index);setEditMuscles(false);setBrowseLifts(false);setExerciseQuery('');setSheetDay(index)};
   const closeSheet=()=>setSheetDay(null);
   /* Two core lifts per day from the muscles it trains, so a template arrives
      ready to train rather than as seven empty days. */
@@ -163,6 +181,13 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
      legs, whatever muscle the library lists first (Back) — without this an
      Upper day was handed a Deadlift. */
   const mainMuscle=(exercise:{name:string;muscles:string[]})=>/deadlift/i.test(exercise.name)?'Hamstrings':exercise.muscles[0];
+  /* SUGGESTED FOR THIS DAY. The day sheet opened on the whole library in a
+     box that scrolled inside a sheet that scrolled. A day already says what
+     it trains, so it offers the few lifts that fit — what the athlete has
+     logged lately first, then the core lifts — one tap each, and the full
+     list waits behind "Browse all". */
+  const recentLifts=useMemo(()=>{const seen:string[]=[];[...records].sort((a,b)=>b.date.localeCompare(a.date)).forEach(record=>(record.topSets||[]).forEach(set=>{if(set.lift&&!seen.includes(set.lift))seen.push(set.lift)}));return seen},[records]);
+  const suggestedLifts=(()=>{const byMain=strengthExercises.filter(exercise=>!dayMuscles.length||dayMuscles.includes(mainMuscle(exercise)));const fits=(byMain.length?byMain:strengthExercises.filter(exercise=>exercise.muscles.some(muscle=>dayMuscles.includes(muscle)))).map(exercise=>exercise.name);return Array.from(new Set([...recentLifts.filter(name=>fits.includes(name)),...coreFirst(fits)])).filter(name=>!active.exercises.includes(name)).slice(0,5)})();
   const liftsFor=(dayMuscles:string[],taken:Set<string>)=>{const fits=strengthExercises.filter(exercise=>dayMuscles.includes(mainMuscle(exercise))).map(exercise=>exercise.name);const picked=coreFirst(fits).filter(name=>!taken.has(name)).slice(0,2);picked.forEach(name=>taken.add(name));return picked};
   const applyTemplate=(id:string)=>{const template=TEMPLATES.find(item=>item.id===id);if(!template)return;if(days.some(day=>day.exercises.length)&&!window.confirm('Replace your current split with this template?'))return;tap();const taken=new Set<string>();setDays(template.days.map(([name,dayType,dayMuscles],index)=>({name,weekday:['MON','TUE','WED','THU','FRI','SAT','SUN'][index%7],dayType,muscles:dayMuscles,exercises:dayType==='strength'?liftsFor(dayMuscles,taken):[],cardioPolicy:dayType==='strength'?'none':'forge',cardio:[],recoveryStyle:'Full rest',strengthDuration:'60',maxDuration:'60'})));setSelectedDay(0);setShowTemplates(false);if(splitName==='New split')setSplitName(template.label)};
   const daySummary=(day:TrainingDay)=>day.dayType==='rest'?(day.recoveryStyle==='Full rest'?'Rest':day.recoveryStyle):day.dayType==='hyrox'?'HYROX · Forge writes it':day.dayType==='cardio'?(day.cardioPolicy==='planned'&&day.cardio.length?cardioPlanSummary(day.cardio[0]):'Run · Forge plans it'):[day.exercises.slice(0,3).join(' · ')||'No lifts yet',day.dayType==='mixed'?'+ run':''].filter(Boolean).join(' ');
@@ -220,24 +245,44 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
                 line under the lifts, editable but rarely needed. */}
             <p className="ss-trains">Trains {active.muscles.length?active.muscles.join(' · '):'—'} <button type="button" className="text-button" onClick={()=>setEditMuscles(open=>!open)}>{editMuscles?'Done':'Edit'}</button></p>
             {editMuscles&&<div className="ss-chips">{muscles.map(muscle=><button type="button" key={muscle} className={active.muscles.includes(muscle)?'active':''} onClick={()=>{tap();toggleMuscle(muscle)}}>{muscle}</button>)}</div>}
-            <SearchField className="ss-search" value={exerciseQuery} onChange={setExerciseQuery} placeholder="Search lifts" aria-label="Search lifts"/>
-            <div className="ss-lifts">{visibleExercises.length?visibleExercises.map(exercise=>{const selected=active.exercises.includes(exercise);return <button type="button" key={exercise} aria-pressed={selected} className={selected?'selected':''} onClick={()=>{tap();toggleExercise(exercise)}}><span className="ss-check" aria-hidden="true">{selected?<Icon name="check" size={14} stroke={3}/>:''}</span>{exercise}</button>}):<p className="ss-empty">{exerciseQuery.trim()?'No lifts match that search.':'No lifts in your library for these muscles yet.'}</p>}</div>
-            <div className="ss-block-head"><strong>Time</strong></div>
-            <div className="ss-chips">{['30','45','60','75','90'].map(value=><button type="button" key={value} className={(active.strengthDuration||'60')===value?'active':''} onClick={()=>{tap();updateDay({strengthDuration:value})}}>{value} min</button>)}</div>
+            {!browseLifts&&<>
+              {active.exercises.length>0&&<div className="ss-lifts">{active.exercises.map(exercise=><button type="button" key={exercise} aria-pressed="true" className="selected" onClick={()=>{tap();removeExercise(exercise)}}><span className="ss-check" aria-hidden="true"><Icon name="check" size={14} stroke={3}/></span>{exercise}</button>)}</div>}
+              {suggestedLifts.length>0&&<div className="ss-suggest"><small>{active.exercises.length?'Add another':'Suggested for this day'}</small><div className="ss-chips">{suggestedLifts.map(exercise=><button type="button" key={exercise} onClick={()=>{tap();addExercise(exercise)}}>＋ {exercise}</button>)}</div></div>}
+              <button type="button" className="ss-browse" onClick={()=>{tap();setBrowseLifts(true)}}>Browse all lifts <span aria-hidden="true">›</span></button>
+            </>}
+            {browseLifts&&<>
+              <SearchField className="ss-search" value={exerciseQuery} onChange={setExerciseQuery} placeholder="Search lifts" aria-label="Search lifts"/>
+              <div className="ss-lifts all">{visibleExercises.length?visibleExercises.map(exercise=>{const selected=active.exercises.includes(exercise);return <button type="button" key={exercise} aria-pressed={selected} className={selected?'selected':''} onClick={()=>{tap();toggleExercise(exercise)}}><span className="ss-check" aria-hidden="true">{selected?<Icon name="check" size={14} stroke={3}/>:''}</span>{exercise}</button>}):<p className="ss-empty">{exerciseQuery.trim()?'No lifts match that search.':'No lifts in your library for these muscles yet.'}</p>}</div>
+              <button type="button" className="ss-browse" onClick={()=>{tap();setBrowseLifts(false);setExerciseQuery('')}}>Done browsing</button>
+            </>}
           </section>}
+          {/* A lifting day takes cardio without the athlete first learning that
+              "Both" is a day type: one button turns it into one. */}
+          {active.dayType==='strength'&&<button type="button" className="ss-add-cardio" onClick={()=>{tap();setDayType('mixed')}}>＋ Add cardio to this day</button>}
           {(active.dayType==='cardio'||active.dayType==='mixed')&&<section className="ss-block">
-            <div className="ss-block-head"><strong>Running</strong></div>
-            <div className="ss-segment two"><button type="button" className={active.cardioPolicy!=='planned'?'active':''} onClick={()=>{tap();setPolicy('forge')}}>Forge plans it</button><button type="button" className={active.cardioPolicy==='planned'?'active':''} onClick={()=>{tap();setPolicy('planned')}}>My own workout</button></div>
-            {active.cardioPolicy==='planned'&&<div className="planned-cardio-list">{active.cardio.map((plan,index)=><article key={plan.id}><div><strong>{cardioPlanSummary(plan)}</strong></div><div><button onClick={()=>setCardioEditor({dayIndex:selectedDay,cardioIndex:index})}>Edit</button><button onClick={()=>removeCardio(index)}>Remove</button></div></article>)}{cardioWorkouts.length>0&&<label className="attach-library-cardio">Saved workouts<select value="" onChange={event=>attachLibraryCardio(event.target.value)}><option value="">Choose one</option>{cardioWorkouts.map(workout=><option value={workout.id} key={workout.id}>{workout.name} · {workout.summary}</option>)}</select></label>}<button onClick={()=>setCardioEditor({dayIndex:selectedDay,cardioIndex:null})}>＋ Build a workout</button></div>}
+            <div className="ss-block-head"><strong>Cardio</strong>{active.dayType==='mixed'&&<button type="button" className="text-button" onClick={()=>{tap();updateDay({dayType:'strength',cardio:[],cardioPolicy:'none'})}}>No cardio</button>}</div>
+            {/* NO POLICY SWITCH. Forge planning it is the default and needs no
+                tap; picking a session is what makes it yours, and removing it
+                (or "Let Forge plan it") hands it back. */}
+            {active.cardio.length?<div className="planned-cardio-list">{active.cardio.map((plan,index)=><article key={plan.id}><div><strong>{cardioPlanSummary(plan)}</strong></div><div><button onClick={()=>setCardioEditor({dayIndex:selectedDay,cardioIndex:index})}>Edit</button><button onClick={()=>removeCardio(index)}>Remove</button></div></article>)}<button type="button" className="text-button ss-forge-plan" onClick={()=>{tap();letForgePlan()}}>Let Forge plan it instead</button></div>
+            :<><p className="ss-forge-default"><Icon name="check" size={14} stroke={3}/> Forge plans it from your goal — nothing to set.</p>
+              <div className="ss-suggest"><small>Or pick a session</small><div className="ss-chips">{cardioPresets(setup?.units==='Metric').map(preset=><button type="button" key={preset.label} onClick={()=>{tap();addPresetCardio(preset.plan)}}>{preset.label}</button>)}</div></div>
+              <div className="ss-cardio-more"><button type="button" className="text-button" onClick={()=>setCardioEditor({dayIndex:selectedDay,cardioIndex:null})}>Build your own</button>{cardioWorkouts.length>0&&<label className="attach-library-cardio">Saved workouts<select value="" onChange={event=>attachLibraryCardio(event.target.value)}><option value="">Choose one</option>{cardioWorkouts.map(workout=><option value={workout.id} key={workout.id}>{workout.name} · {workout.summary}</option>)}</select></label>}</div></>}
           </section>}
           {active.dayType==='hyrox'&&<p className="ss-note">Forge writes this session: stations at race distance and runs paced off your threshold. Set a HYROX goal for your division and date.</p>}
           {active.dayType==='rest'&&<section className="ss-block"><div className="ss-block-head"><strong>Rest day</strong></div><div className="ss-segment three">{(['Full rest','Mobility','Active recovery'] as const).map(style=><button type="button" key={style} className={active.recoveryStyle===style?'active':''} onClick={()=>{tap();updateDay({recoveryStyle:style})}}>{style==='Active recovery'?'Active':style}</button>)}</div></section>}
+          {/* MORE OPTIONS. Session length, order and delete are set once and
+              rarely touched; they sat open under every pick, with a red Delete
+              pinned to the bottom of the sheet. */}
+          <details className="ss-more"><summary><span><strong>More options</strong><small>{[(active.dayType==='strength'||active.dayType==='mixed')&&`${active.strengthDuration||'60'} min lifting`,'order','delete'].filter(Boolean).join(' · ')}</small></span></summary><div>
+            {(active.dayType==='strength'||active.dayType==='mixed')&&<><div className="ss-block-head"><strong>Lifting time</strong></div><div className="ss-chips">{['30','45','60','75','90'].map(value=><button type="button" key={value} className={(active.strengthDuration||'60')===value?'active':''} onClick={()=>{tap();updateDay({strengthDuration:value})}}>{value} min</button>)}</div></>}
+            <div className="ss-more-actions">
+              <button type="button" onClick={()=>{tap();moveDay(-1);setSheetDay(Math.max(0,selectedDay-1))}} disabled={selectedDay===0}><Icon name="up" size={15}/> Earlier</button>
+              <button type="button" onClick={()=>{tap();moveDay(1);setSheetDay(Math.min(days.length-1,selectedDay+1))}} disabled={selectedDay===days.length-1}><Icon name="down" size={15}/> Later</button>
+              <button type="button" className="danger" disabled={days.length===1} onClick={()=>{if(!window.confirm(`Delete ${active.name}?`))return;removeDay();closeSheet()}}>Delete</button>
+            </div>
+          </div></details>
         </div>
-        <footer className="ss-sheet-foot">
-          <button type="button" onClick={()=>{tap();moveDay(-1);setSheetDay(Math.max(0,selectedDay-1))}} disabled={selectedDay===0}><Icon name="up" size={15}/> Earlier</button>
-          <button type="button" onClick={()=>{tap();moveDay(1);setSheetDay(Math.min(days.length-1,selectedDay+1))}} disabled={selectedDay===days.length-1}><Icon name="down" size={15}/> Later</button>
-          <button type="button" className="danger" disabled={days.length===1} onClick={()=>{if(!window.confirm(`Delete ${active.name}?`))return;removeDay();closeSheet()}}>Delete</button>
-        </footer>
       </section>
     </div>}
   </div>;

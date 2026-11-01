@@ -274,6 +274,34 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-sheet-foot button { min-height: 48px; border-radius: 12px; border: 0; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); color: var(--ink, var(--text)); font-weight: 800; font-size: 16px; }
 .ss-sheet-foot button.danger { color: var(--bad); }
 .ss-sheet-foot button:disabled { opacity: .35; }
+/* SUGGESTED, NOT LISTED. The day sheet leads with the lifts and sessions a
+   day is likely to want as one-tap chips; the library and the rarely-touched
+   settings sit behind a row each. With no footer, the body keeps the safe area. */
+.ss-sheet-body { padding-bottom: calc(16px + var(--safe-b, env(safe-area-inset-bottom))); }
+.ss-lifts.all { max-height: none; overflow: visible; }
+.ss-suggest { display: grid; gap: 8px; }
+.ss-suggest > small { color: var(--ink-3, var(--muted)); font-weight: 800; font-size: 13px; letter-spacing: .02em; }
+.ss-suggest .ss-chips button { min-height: 44px; padding: 8px 14px; font-size: 15px; }
+.ss-browse { justify-self: stretch; min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-radius: 14px; border: 1.5px dashed var(--hairline-strong, var(--line)); background: transparent; color: var(--ink-2, var(--text)); font-weight: 800; font-size: 15px; }
+.ss-browse span { font-size: 20px; color: var(--ink-3, var(--muted)); }
+.ss-add-cardio { min-height: 48px; border-radius: 14px; border: 1.5px dashed var(--hairline-strong, var(--line)); background: transparent; color: var(--accent); font-weight: 800; font-size: 15px; }
+.ss-block-head .text-button { font-size: 14px; font-weight: 800; color: var(--ink-3, var(--muted)); }
+.ss-forge-default { margin: 0; display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 9%, transparent); color: var(--ink, var(--text)); font-weight: 700; font-size: 14px; }
+.ss-forge-default svg { color: var(--accent); flex: none; }
+.ss-cardio-more { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ss-cardio-more .text-button, .ss-forge-plan { font-weight: 800; font-size: 15px; justify-self: start; }
+.ss-more { border-top: 1px solid var(--hairline, var(--line)); padding-top: 12px; }
+.ss-more > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 44px; }
+.ss-more > summary::-webkit-details-marker { display: none; }
+.ss-more > summary > span { display: grid; gap: 2px; }
+.ss-more > summary small { color: var(--ink-3, var(--muted)); font-weight: 600; }
+.ss-more > summary::after { content: '›'; font-size: 20px; color: var(--ink-3, var(--muted)); transition: transform .2s ease; }
+.ss-more[open] > summary::after { transform: rotate(90deg); }
+.ss-more > div { display: grid; gap: 12px; padding-top: 12px; }
+.ss-more-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.ss-more-actions button { min-height: 48px; border-radius: 12px; border: 0; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); color: var(--ink, var(--text)); font-weight: 800; font-size: 16px; }
+.ss-more-actions button.danger { color: var(--bad); }
+.ss-more-actions button:disabled { opacity: .35; }
 @media (prefers-reduced-motion: reduce) { .ss-sheet, .ss-backdrop { animation: none; } }
 
 /* ── GOALS ───────────────────────────────────────────────────────────────
