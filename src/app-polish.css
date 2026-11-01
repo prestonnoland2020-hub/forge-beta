@@ -568,3 +568,13 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .cx-brand:has(.provider-logo img) .provider-logo img { max-height: 24px; }
 /* A long name ("Fitbit & Pixel Watch") wraps rather than losing its end. */
 .cx-grid .cx-brand strong { white-space: normal; overflow: visible; line-height: 1.25; }
+
+/* Garmin history upload, inside the Garmin card. */
+.cx-upload { display: grid; gap: 8px; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.cx-upload-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.cx-upload-row > div { display: grid; gap: 2px; min-width: 0; }
+.cx-upload-row strong { font-size: 14px; font-weight: 800; color: var(--ink, var(--text)); }
+.cx-upload-row span { font-size: 13px; line-height: 1.4; color: var(--muted); }
+.cx-howto-toggle { justify-self: start; background: none; border: 0; padding: 2px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-text, var(--accent)); cursor: pointer; }
+.cx-howto { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.cx-howto b { color: var(--ink, var(--text)); }

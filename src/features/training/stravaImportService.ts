@@ -196,18 +196,21 @@ const distanceSport = (activity: string) => !/weight training|workout|yoga|cross
 const paceText = (minutes: number, miles: number) => { const pace = minutes / miles; const whole = Math.floor(pace); const seconds = Math.round((pace - whole) * 60); return `${whole}:${String(seconds === 60 ? 0 : seconds).padStart(2, '0')} /mi`; };
 const clock = (minutes: number) => { const whole = Math.round(minutes * 60); const m = Math.floor(whole / 60); const s = whole % 60; return `${m}:${String(s).padStart(2, '0')}`; };
 
+/* Garmin's live connection and a Garmin export file are both Garmin. */
+const isGarmin = (row: { provider?: string }) => row.provider === 'garmin' || row.provider === 'garmin-export';
+
 /* What the watch measured, as the session keeps it: the heart-rate model reads
    effort from here, so every imported run carries it, not only the ones that
    filled a hand-logged entry. */
 const watchRecord = (row: ExternalRow, minutes: number, miles: number): NonNullable<CardioLogDraft['recorded']> => ({
-  source: row.provider === 'garmin' ? 'Garmin' : 'Strava', externalId: String(row.external_id),
+  source: isGarmin(row) ? 'Garmin' : 'Strava', externalId: String(row.external_id),
   ...(minutes > 0 ? { minutes } : {}), ...(miles > 0 ? { miles } : {}),
   ...(row.average_heartrate ? { averageHr: Math.round(row.average_heartrate) } : {}),
   ...(row.max_heartrate ? { maxHr: Math.round(row.max_heartrate) } : {}),
 });
 
 export function externalToSession(row: ExternalRow): { date: string; session: CardioLogDraft } {
-  const source = row.provider === 'garmin' ? 'Garmin' : 'Strava';
+  const source = isGarmin(row) ? 'Garmin' : 'Strava';
   const localStart = row.local_start || row.raw_summary?.start_date_local || row.started_at;
   const date = String(localStart).slice(0, 10);
   const activity = activityName(row.activity_type);
@@ -219,7 +222,7 @@ export function externalToSession(row: ExternalRow): { date: string; session: Ca
   return {
     date,
     session: {
-      id: `${row.provider === 'garmin' ? 'garmin' : 'strava'}-${row.external_id}`,
+      id: `${isGarmin(row) ? 'garmin' : 'strava'}-${row.external_id}`,
       structure: 'steady',
       activity,
       summary,
@@ -237,7 +240,8 @@ export function externalToSession(row: ExternalRow): { date: string; session: Ca
    imported so it is settled once and never re-offered. */
 const SAME_START_MS = 5 * 60_000;
 export function dropCrossSourceDuplicates<T extends { id: string; provider?: string; activity_type: string; started_at: string; imported_to_workout: boolean | null }>(rows: T[]): { kept: T[]; duplicateIds: string[] } {
-  const rank = (row: T) => (row.imported_to_workout ? 0 : 2) + (row.provider === 'garmin' ? 1 : 0);
+  /* The copy already in the log, then Strava's, then Garmin's live record, then a row from a Garmin export file. */
+  const rank = (row: T) => (row.imported_to_workout ? 0 : 3) + (row.provider === 'garmin' ? 1 : row.provider === 'garmin-export' ? 2 : 0);
   const ordered = [...rows].sort((a, b) => rank(a) - rank(b));
   const kept: T[] = []; const duplicateIds: string[] = [];
   for (const row of ordered) {
@@ -269,7 +273,7 @@ export async function importStravaActivities(
     const { data, error } = await supabase
       .from('external_activities')
       .select(columns)
-      .in('provider', ['strava', 'garmin'])
+      .in('provider', ['strava', 'garmin', 'garmin-export'])
       .order('started_at', { ascending: true })
       .range(page * pageSize, page * pageSize + pageSize - 1);
     if (error) return { imported: 0, skipped: 0, enriched: 0 };
@@ -297,7 +301,7 @@ export async function importStravaActivities(
      log from a watch carry no `recorded` — the import used to drop it — so
      each one is matched back to its row by id and given the watch's numbers.
      Once, quietly: a session that has them is left alone. */
-  const rowBySessionId = new Map(rows.map(row => [`${row.provider === 'garmin' ? 'garmin' : 'strava'}-${row.external_id}`, row]));
+  const rowBySessionId = new Map(rows.map(row => [`${isGarmin(row) ? 'garmin' : 'strava'}-${row.external_id}`, row]));
   /* A year back is all the heart-rate model reads (max HR over a year, the
      trend over twelve weeks); re-saving older days would only queue hundreds
      of writes for nothing. */
