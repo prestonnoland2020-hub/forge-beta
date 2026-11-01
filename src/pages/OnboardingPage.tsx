@@ -357,7 +357,7 @@ function OnboardingForm() {
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
     if (!goals.length && !pendingGoal) return fail('Set a goal first. Forge builds the plan around it.');
-    if (unmappedDays.length) return fail(`Pick a movement for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
+    if (unmappedDays.length) return fail(`Select your top sets for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
     const weight = Number(data.currentWeight);
     const weightGiven = Boolean(String(data.currentWeight || '').trim()) && Number.isFinite(weight) && weight > 0;
     setSaving(true); setError('');
@@ -548,7 +548,7 @@ function OnboardingForm() {
       case 'week': return {
         body: <>
           <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
-          <p className="ob-lead">Forge picked a lift for each day. Tap any day to change it — or just start.</p>
+          <p className="ob-lead">Forge picked a top set for each day. Tap any day to select your own — or just start.</p>
           {/* The stored title is the builder's ("5K Run · 24:30 mm:ss") so Goals
               reads it the same; this card says it the way a person would. */}
           {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small></div>}
@@ -559,7 +559,7 @@ function OnboardingForm() {
             return <section className={open ? 'setup-day open' : 'setup-day'} key={`${day.name}-${index}`}>
               <button type="button" className="setup-day-head" onClick={() => { if (!lifting) return; tap(); setOpenDay(open ? -1 : index); }} aria-expanded={lifting ? open : undefined} disabled={!lifting}>
                 <span className="ob-day-number">{index + 1}</span>
-                <span className="ob-day-text"><strong>{day.name}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick a movement') : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
+                <span className="ob-day-text"><strong>{day.name}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Select your top sets') : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
                 {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Change'}</span>}
               </button>
               {open && <div className="muscle-picker compact-muscle-picker setup-day-options">
