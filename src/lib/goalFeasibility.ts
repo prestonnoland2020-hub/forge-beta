@@ -4,6 +4,7 @@ import { weeklyRunVolume } from './cardioPrediction';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
+import { startingNumbers } from './startingNumbers';
 import { isRaceEvidence } from './runQuality';
 import { predictRaceFromLegacyMethod, raceEvidenceEfforts } from './cardioPrediction';
 import type { Effort as CurveEffort } from './fitnessCurve';
@@ -61,7 +62,17 @@ export type Feasibility = {
   };
   /* The single change that matters most, when there is one. */
   change?: string;
+  /* THE NUMBERS BEHIND THE VERDICT, so the prediction can be stored when the
+     goal is set and checked against what happened on the goal date
+     (goalPredictionLog.ts). `start` is where Forge puts the athlete today;
+     `typical` and `ceiling` are where the two curves land by the date. For a
+     race lower is better, for a lift higher. */
+  prediction?: GoalPrediction;
 };
+export type GoalPrediction = { start: number; typical: number; ceiling: number; target: number; better: 'higher' | 'lower'; weeks: number };
+/* Bumped whenever a rate changes, so each prediction is scored against the
+   model that made it. */
+export const GOAL_MODEL_VERSION = '2026-11-01';
 
 const DAY = 86_400_000;
 export const weeksUntil = (deadline: string) => {
@@ -268,16 +279,18 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
   /* What the horizon actually buys, stated as the number it is — saying "it
      takes about 16 weeks" to someone who has 16 weeks is not an answer. */
   const affordable = 1 - reachableSeconds(1, weeks, pace.rate, distance);
+  const predicted: GoalPrediction = { start: Math.round(nowAtDistance), target: targetSeconds, better: 'lower', weeks: Math.round(weeks),
+    ceiling: Math.round(ceiling), typical: Math.round(reachableSeconds(nowAtDistance, weeks, pace.rate * 0.6 / raceGainScale(distance).rate, distance)) };
 
   if (targetSeconds >= nowAtDistance) {
-    return { goal: goal.title, verdict: 'reachable',
+    return { goal: goal.title, prediction: predicted, verdict: 'reachable',
       say: `Already within reach — ${from} is worth about ${clock(nowAtDistance)} here.`,
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: volume < volumeNeeded * 0.7 ? `Hold ${Math.round(volumeNeeded)} miles a week and race it.` : undefined };
   }
 
   if (targetSeconds < ceiling) {
-    return { goal: goal.title, verdict: 'out-of-reach',
+    return { goal: goal.title, prediction: predicted, verdict: 'out-of-reach',
       say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are worth about ${clock(nowAtDistance)} today, so this asks for ${Math.round(shortfall * 100)}% — and ${Math.round(weeks)} weeks ${!pace.measured ? 'of good training' : (pace.secondsPerMilePerWeek || 0) > 0.5 ? `at the rate your heart rate shows you improving (${pace.secondsPerMilePerWeek} s/mi a week)` : 'at your recent rate — pace at the same heart rate has held flat lately —'} buys about ${Math.round(affordable * 100)}%.`,
       insteadOf: `${clock(ceiling)} is the reachable target for this date. Keep ${clock(targetSeconds)} for next year.`,
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
@@ -288,12 +301,12 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
 
   /* Reachable on the clock, but the volume behind it may not be there. */
   if (volume < volumeNeeded * 0.7) {
-    return { goal: goal.title, verdict: 'needs-more',
+    return { goal: goal.title, prediction: predicted, verdict: 'needs-more',
       say: `Reachable, but not on ${volume.toFixed(0)} miles a week. ${clock(goalPace)}/mi is normally built on about ${Math.round(volumeNeeded)}.`,
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: `Build to ${Math.round(volumeNeeded)} miles a week over the next ${Math.min(8, Math.round(weeks / 2))} weeks, no more than 10% up per week.` };
   }
-  return { goal: goal.title, verdict: 'reachable',
+  return { goal: goal.title, prediction: predicted, verdict: 'reachable',
     say: `On the numbers this holds: ${clock(nowAtDistance)} today, ${clock(targetSeconds)} needed, ${Math.round(weeks)} weeks to find ${Math.round(shortfall * 100)}%.`,
     needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
     change: `Keep the volume and put the quality work at ${clock(goalPace)}/mi.` };
@@ -370,31 +383,40 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
     const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
     if (max > 0) sets.push({ date: record.date, max });
   }));
-  const best = sets.reduce((top, set) => Math.max(top, set.max), 0);
+  /* NOTHING LOGGED YET IS NOT NOTHING KNOWN. The best entered with the goal
+     and the starting set from setup are the numbers the rest of Goals already
+     shows; the prediction starts from them until a real set replaces them. */
+  const entered = sets.length ? 0 : Math.max(
+    Number.parseFloat(String(goal.current || '').replace(/[^0-9.]/g, '')) || 0,
+    ...startingNumbers().filter(item => sameLift(item.lift, String(goal.exercise))).map(item => calculateEstimatedOneRepMax(item.weight, item.reps) || 0));
+  const best = sets.reduce((top, set) => Math.max(top, set.max), 0) || entered;
   if (!best) {
     return { goal: goal.title, verdict: 'needs-more',
       say: `No ${goal.exercise} on file, so there is nothing to project from.`,
       change: `Log one heavy set of ${goal.exercise} and this becomes a real number.` };
   }
-  if (best >= target) return { goal: goal.title, verdict: 'reachable', say: `Reached — your best ${goal.exercise} already estimates ${Math.round(best)}.` };
-  const newLift = new Set(sets.map(set => set.date)).size < NEW_LIFT_SESSIONS;
+  if (best >= target) return { goal: goal.title, verdict: 'reachable', say: `Reached — your best ${goal.exercise} already estimates ${Math.round(best)}.`,
+    prediction: { start: Math.round(best), typical: Math.round(best), ceiling: Math.round(best), target, better: 'higher', weeks: Math.max(0, Math.round(weeksUntil(goal.date))) } };
+  /* An entered best is a lift they already know, not one they are learning. */
+  const newLift = sets.length > 0 && new Set(sets.map(set => set.date)).size < NEW_LIFT_SESSIONS;
   const ceiling = liftCeiling(best, weeks, newLift);
+  const measured = measuredLiftRate(sets);
+  const typical = liftTypical(best, weeks, measured);
+  const predicted: GoalPrediction = { start: Math.round(best), typical: Math.round(typical), ceiling: Math.round(ceiling), target, better: 'higher', weeks: Math.round(weeks) };
   const needed = (target - best) / best;
   const by = new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   if (target > ceiling) {
     const weeksNeeded = weeksToLift(best, target, newLift);
-    return { goal: goal.title, verdict: 'out-of-reach',
+    return { goal: goal.title, prediction: predicted, verdict: 'out-of-reach',
       say: `Not by ${by}. You are at ${Math.round(best)} and ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks is more than training finds${weeksNeeded ? ` — about ${weeksNeeded} weeks is` : ''}.`,
       insteadOf: `${Math.round(ceiling / 5) * 5} is the reachable target for this date.` };
   }
-  const measured = measuredLiftRate(sets);
-  const typical = liftTypical(best, weeks, measured);
   if (target > typical) {
-    return { goal: goal.title, verdict: 'reachable',
+    return { goal: goal.title, prediction: predicted, verdict: 'reachable',
       say: `Ambitious but possible: ${Math.round(best)} today, ${Math.round(target)} by ${by} is ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks. ${measured !== undefined ? `You have been gaining about ${(measured * 100).toFixed(1)}% a week` : newLift ? 'A new lift climbs fast for a few weeks, then settles under ½% a week' : 'Most lifters gain under ½% a week'}, so it takes your best training.`,
       change: `${Math.round(typical / 5) * 5} is where ${measured !== undefined ? 'your current rate' : 'a typical block'} lands by then.` };
   }
-  return { goal: goal.title, verdict: 'reachable',
+  return { goal: goal.title, prediction: predicted, verdict: 'reachable',
     say: `On the numbers this holds: ${Math.round(best)} today, ${Math.round(target)} needed, ${Math.round(weeks)} weeks to find ${Math.round(needed * 100)}%.` };
 }
 

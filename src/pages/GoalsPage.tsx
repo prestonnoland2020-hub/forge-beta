@@ -3,6 +3,7 @@ import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
+import { GoalPredictionCard } from '../components/GoalPredictionCard';
 import { goalFeasibility } from '../lib/goalFeasibility';
 import { expectedRunMiles, goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
@@ -194,6 +195,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               </span>
               <span className="gx-foot"><b>{item.share === null ? (goal.type === 'Strength' ? 'Starts with your first set' : goal.type === 'Body Composition' ? 'Starts with a weigh-in' : 'Starts with your first run') : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
             </button>
+            {isOpen && verdicts[index]?.prediction && <GoalPredictionCard verdict={verdicts[index]} date={goal.date} unit={setup?.units === 'Metric' ? 'kg' : 'lb'} hoursFirst={String(goal.unit || '').includes('hh:mm:ss')} />}
             {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
             {isOpen && <div className="goal-card-actions">
               <button onClick={() => openBuilder(index)} aria-label={`Edit ${goal.title}`}>Edit</button>
