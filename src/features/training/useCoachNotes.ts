@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
+import { withHyroxPaces } from '../../lib/hyroxSession';
 import { useGoals } from '../goals/GoalsProvider';
 import { useProfileSetup } from '../profile/ProfileSetupProvider';
 import { useAdaptiveTraining } from './AdaptiveTrainingProvider';
@@ -102,7 +103,9 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
     const excluded = setup?.excludedEfforts || [];
     const basePaces = paceModel(records, runGoal, todayIso, medianWeeklyMiles(records), excluded);
     const judged = sessionVerdicts(records, stored, split, { ...athlete, paces: basePaces }, todayIso);
-    const paces = paceModel(records, runGoal, todayIso, medianWeeklyMiles(records), excluded, workoutEfforts(judged));
+    /* The same paces the Plan draws, HYROX table included, so the coach never
+       quotes a pace the week does not show. */
+    const paces = withHyroxPaces(paceModel(records, runGoal, todayIso, medianWeeklyMiles(records), excluded, workoutEfforts(judged)), goals);
     const { moves } = progressionLevels({
       weeklyMiles: medianWeeklyMiles(records),
       qualityShare: QUALITY_MAX_SHARE,

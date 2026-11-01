@@ -138,40 +138,6 @@
   font-size: 16px;
 }
 
-.google-button {
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  border-radius: 10px;
-  /* Google requires its sign-in button on white or its own blue, so this
-     one surface does NOT follow the theme. Left literal on purpose. */
-  background: #ffffff;
-  color: #1f1f1f;
-  transition: transform 150ms ease, filter 150ms ease;
-}
-
-.google-button:hover:not(:disabled) {
-  filter: brightness(1.03);
-  transform: translateY(-1px);
-}
-
-.google-button:disabled {
-  cursor: wait;
-  opacity: 0.72;
-}
-
-.google-mark {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #dadce0;
-  border-radius: 50%;
-  font-weight: 800;
-}
-
 .login-note,
 .login-footer {
   color: var(--ink-3);

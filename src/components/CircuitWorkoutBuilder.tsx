@@ -12,12 +12,13 @@ type BuilderMode = 'manual' | 'forge';
 
 const unitFor = (exercise?: LibraryExercise) => exercise?.defaultUnit || (exercise?.kind === 'Cardio' ? 'meters' : 'reps');
 
-export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSave }: {
+export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSave, onDelete }: {
   mode: BuilderMode;
   initial?: PlannedCardio;
   exercises: LibraryExercise[];
   onClose: () => void;
   onSave: (plan: PlannedCardio) => void;
+  onDelete?: () => void;
 }) {
   const { goals } = useGoals();
   const { setup } = useProfileSetup();
@@ -208,7 +209,7 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
         </article>)}
       </section>
 
-      <footer><button className="button ghost" onClick={onClose}>Cancel</button><button className="button" disabled={!name.trim() || !stations.length} onClick={() => onSave(plan)}>Save circuit</button></footer>
+      <footer>{onDelete && <button className="button ghost danger" onClick={onDelete}>Delete</button>}<button className="button ghost" onClick={onClose}>Cancel</button><button className="button" disabled={!name.trim() || !stations.length} onClick={() => onSave(plan)}>Save circuit</button></footer>
     </section>
   </div>;
 }

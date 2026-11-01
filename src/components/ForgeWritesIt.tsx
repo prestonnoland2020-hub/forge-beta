@@ -5,7 +5,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useTrainingLibrary, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { requestForgeCoach } from '../features/training/coachService';
-import { hyroxSession, hyroxSessionsDone, weeksUntil } from '../lib/hyroxSession';
+import { hyroxGoalOf, hyroxSession, hyroxSessionsDone, weeksUntil } from '../lib/hyroxSession';
 import { paceModel } from '../lib/paceModel';
 import { enduranceTarget } from '../lib/qualitySession';
 import { medianWeeklyMiles } from '../lib/goalTrajectory';
@@ -44,9 +44,9 @@ export function ForgeWritesIt({ dateIso, session, onSession }: { dateIso: string
 
   const writeHyrox = () => {
     const runGoal = enduranceTarget(goals);
-    const hyroxGoal = goals.find(goal => /hyrox/i.test(`${goal.exercise || ''} ${goal.title}`));
+    const hyroxGoal = hyroxGoalOf(goals);
     const threshold = paceModel(records, runGoal, dateIso, medianWeeklyMiles(records), setup?.excludedEfforts || []).threshold;
-    const written = hyroxSession({ sessionIndex: hyroxSessionsDone(records, dateIso), thresholdSecondsPerMile: threshold || 0, division: hyroxGoal?.eventDivision, weeksToRace: weeksUntil(hyroxGoal?.date, dateIso), readiness: recovery.confidence === 'Low' ? undefined : recovery.readiness, metric });
+    const written = hyroxSession({ sessionIndex: hyroxSessionsDone(records, dateIso), thresholdSecondsPerMile: threshold || 0, division: hyroxGoal?.eventDivision, goalTarget: hyroxGoal?.target, weeksToRace: weeksUntil(hyroxGoal?.date, dateIso), readiness: recovery.confidence === 'Low' ? undefined : recovery.readiness, metric });
     onSession({ name: written.title, plan: written.plan, summary: written.summary, rationale: written.rationale });
   };
 
@@ -96,7 +96,8 @@ export function ForgeWritesIt({ dateIso, session, onSession }: { dateIso: string
   return <section className="card forge-writes-it">
     <div className="section-title compact-title"><div><h3>Or let Forge write it</h3><p>A session that is not in your split, built for today.</p></div></div>
     <div className="forge-writes-chips">
-      <button type="button" className={kind === 'hyrox' ? 'active' : ''} onClick={() => pick('hyrox')} disabled={busy}>HYROX</button>
+      {/* HYROX work is for a HYROX goal; without one the chip is not offered. */}
+      {hyroxGoalOf(goals) && <button type="button" className={kind === 'hyrox' ? 'active' : ''} onClick={() => pick('hyrox')} disabled={busy}>HYROX</button>}
       <button type="button" className={kind === 'circuit' ? 'active' : ''} onClick={() => pick('circuit')} disabled={busy}>{busy && kind === 'circuit' ? 'Writing…' : 'Circuit'}</button>
       <button type="button" className={kind === 'custom' ? 'active' : ''} onClick={() => { setKind('custom'); setError(''); }} disabled={busy}>Your words</button>
     </div>

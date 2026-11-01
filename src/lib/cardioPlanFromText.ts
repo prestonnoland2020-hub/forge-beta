@@ -41,10 +41,47 @@ export type PlanShape = {
   intervalBasis?: 'Distance' | 'Time';
   workDistance?: string;
   workUnit?: string;
+  rest?: string;
+  recoveryType?: string;
   warmup?: string;
   cooldown?: string;
   customTarget?: string;
 };
+
+/* THE RECOVERY AND THE PACE ARE IN THE SENTENCE TOO. "6x400m with 90s jog"
+   became six 400s on the builder's default two minutes of standing rest — the
+   rows carry the work and nothing else, so the words between the reps were
+   dropped. They are read from the sentence itself, and only when stated: a
+   bare "6x400m" keeps whatever the athlete already had. */
+const RECOVERY_KIND: Record<string, string> = { jog: 'Jog', walk: 'Walk', easy: 'Easy movement', rest: 'Rest', recovery: 'Rest', float: 'Easy movement' };
+export function recoveryFromSentence(sentence: string): { rest: string; recoveryType: string } | null {
+  const text = sentence.toLowerCase();
+  /* "90s jog", "2 min walk", "2:00 rest", or the other way round, "rest 90s".
+     The rep count in "8x200 rest 60s" is the work, never the recovery. A bare metre count ("400m jog") is a distance, not a recovery, so "m" is
+     never read as minutes here. */
+  const before = text.match(/(?<![x×\d.:])(\d+(?::\d{2})?(?:\.\d+)?)\s*(s|secs?|seconds?|mins?|minutes?)?\s*(?:of\s+)?(jog|walk|easy|rest|recovery|float)\b/);
+  const after = text.match(/\b(jog|walk|easy|rest|recovery|float)\s*(?:of\s+|for\s+)?(\d+(?::\d{2})?(?:\.\d+)?)(?!\s*(?:m|mi|miles?|km|k|meters?|metres?|yards?|yd)\b)\s*(s|secs?|seconds?|mins?|minutes?)?\b/);
+  const found = before ? { value: before[1], unit: before[2] || '', kind: before[3] } : after ? { value: after[2], unit: after[3] || '', kind: after[1] } : null;
+  if (!found) return null;
+  const [whole, part] = found.value.split(':');
+  const seconds = part !== undefined ? Number(whole) * 60 + Number(part)
+    : /^m/.test(found.unit) ? Number(whole) * 60
+    : found.unit ? Number(whole)
+    /* No unit: a number a recovery could be in seconds (45, 90) is seconds;
+       a small one (2, 3) is minutes, the way it is said aloud. */
+    : Number(whole) >= 10 ? Number(whole) : Number(whole) * 60;
+  if (!(seconds > 0)) return null;
+  return { rest: String(Math.round(seconds)), recoveryType: RECOVERY_KIND[found.kind] || 'Rest' };
+}
+
+/* "at 7:10 pace", "@ 5:45/mi", "at 5K pace", "at tempo". A clock pace keeps
+   its clock; a named effort keeps its name. */
+export function paceFromSentence(sentence: string): string | null {
+  const clockPace = sentence.match(/(?:@|\bat)\s*(\d{1,2}:\d{2})\s*(\/\s*(?:mi|mile|km)|per\s+(?:mile|km)|pace|min\/mi)?/i);
+  if (clockPace && (clockPace[2] || /pace|@/i.test(clockPace[0]))) return `${clockPace[1]}/${/km/i.test(clockPace[2] || '') ? 'km' : 'mi'}`;
+  const named = sentence.match(/\b(?:at|@)\s+((?:\d+(?:\.\d+)?\s*k|5k|10k|half(?:[- ]marathon)?|marathon|mile|tempo|threshold|goal|race)\s*(?:pace|effort)?|zone\s*\d|z\d|easy|hard)\b/i);
+  return named ? named[1].replace(/\s+/g, ' ').trim().replace(/^\w/, letter => letter.toUpperCase()) : null;
+}
 
 const TIME_UNITS = new Set(['minutes', 'seconds', 'min', 'sec']);
 export const isTimeUnit = (unit: string) => TIME_UNITS.has(String(unit || '').trim().toLowerCase());
@@ -94,6 +131,7 @@ export function planFromParsedRows(rows: ParsedRow[], sentence: string): PlanSha
     if (row.timeMinutes > 0) steady.duration = round(row.timeMinutes, 1);
     /* A pace is only real when both halves of it were stated. */
     if (miles > 0 && row.timeMinutes > 0) steady.pace = `${clock(row.timeMinutes / miles)}/mi`;
+    else { const stated = paceFromSentence(sentence); if (stated) steady.pace = stated; }
     return steady;
   }
 
@@ -127,5 +165,9 @@ export function planFromParsedRows(rows: ParsedRow[], sentence: string): PlanSha
   const cooldown = after.length ? asLeg(after[0]) : '';
   if (warmup) plan.warmup = warmup;
   if (cooldown) plan.cooldown = cooldown;
+  const recovery = recoveryFromSentence(sentence);
+  if (recovery) { plan.rest = recovery.rest; plan.recoveryType = recovery.recoveryType; }
+  const pace = paceFromSentence(sentence);
+  if (pace) plan.pace = pace;
   return plan;
 }

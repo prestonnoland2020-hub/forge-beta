@@ -483,28 +483,32 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .td-nudge .td-nudge-later { background: none; border: 0; padding: 2px 4px; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
 @media (max-width: 420px) { .td-nudge { flex-wrap: wrap; } .td-nudge .td-nudge-actions { grid-auto-flow: column; width: 100%; justify-content: end; align-items: center; } }
 
-/* Provider marks on Connections: the brand's own colour as the tile, its
-   mark knocked out in white. Brands without published artwork get a quiet
-   initials tile that does not pretend to be a logo. */
-.provider-mark { width: 56px; height: 36px; flex: none; border-radius: 10px; display: inline-grid; place-items: center; background: var(--brand, var(--ink-2)); color: #fff; box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent); }
-.provider-mark svg { width: 22px; height: 22px; }
-.provider-mark.wordmark svg { width: 46px; height: 16px; }
-.provider-mark-plain { background: var(--surface-2, var(--panel-2)); color: var(--muted); border: 1px solid var(--line); box-shadow: none; font-size: 12px; font-weight: 900; letter-spacing: .04em; }
-.simple-connections article:has(> .provider-mark) { display: flex; align-items: center; gap: 12px; }
-.simple-connections article:has(> .provider-mark) > div:first-of-type { flex: 1; min-width: 0; }
+/* PROVIDER LOGOS ON CONNECTIONS: each brand's own logo sits bare in the row,
+   no tile or border, so the list reads like the brands' own artwork. Every
+   logo fits the same 76×24 slot, centred, so wide wordmarks (WHOOP, Polar)
+   and square marks (Strava, COROS) line the names up in one column. Brands
+   drawn in black carry a white variant; the theme decides which one shows,
+   following the same system-or-chosen rule as every other colour. */
+.provider-logo { width: 76px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.provider-logo img { display: block; max-width: 76px; max-height: 24px; width: auto; height: auto; }
+.provider-logo .logo-on-dark { display: none; }
+:root[data-theme="dark"] .provider-logo .logo-on-light { display: none; }
+:root[data-theme="dark"] .provider-logo .logo-on-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .provider-logo .logo-on-light { display: none; }
+  :root:not([data-theme="light"]) .provider-logo .logo-on-dark { display: block; }
+}
+.provider-logo-plain { color: var(--muted); font-size: 13px; font-weight: 900; letter-spacing: .06em; }
+.simple-connections article:has(> .provider-logo) { display: flex; align-items: center; gap: 12px; }
+.simple-connections article:has(> .provider-logo) > div:first-of-type { flex: 1; min-width: 0; }
 .brand-heading { display: flex; align-items: center; gap: 10px; }
-.brand-heading .provider-mark { width: 30px; height: 30px; border-radius: 8px; }
-.brand-heading .provider-mark svg { width: 18px; height: 18px; }
-/* Row text styles colour every span in a connection row muted; the tile is
-   a span too, and its mark must stay white on the brand colour. */
-.simple-connections article .provider-mark:not(.provider-mark-plain), .brand-heading .provider-mark:not(.provider-mark-plain) { color: #fff; }
-.simple-connections article .provider-mark { display: inline-grid; margin: 0; padding: 0; }
+.simple-connections article .provider-logo { margin: 0; padding: 0; }
 
 /* The Garmin prompt on open: the review sheet's frame, Garmin's tile above
    the title, one primary action and two quiet ways out. */
 .garmin-prompt { gap: 16px; }
 .garmin-prompt header > div { gap: 8px; }
-.garmin-prompt .provider-mark { color: #fff; margin-bottom: 4px; }
+.garmin-prompt .provider-logo { margin-bottom: 4px; justify-content: flex-start; }
 .strava-review-sheet.garmin-prompt .garmin-prompt-actions { display: grid; grid-template-columns: 1fr; gap: 4px; justify-items: stretch; }
 .strava-review-sheet.garmin-prompt .garmin-prompt-actions .button { width: 100%; min-height: 48px; margin-bottom: 4px; }
 .garmin-prompt-later, .garmin-prompt-never { background: none; border: 0; min-height: 40px; color: var(--muted); font-weight: 800; font-size: 14px; cursor: pointer; }
