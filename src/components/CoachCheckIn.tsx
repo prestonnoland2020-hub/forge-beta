@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useCheckIns } from '../features/training/CheckInProvider';
+import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { dueCheckIn } from '../lib/checkInSchedule';
@@ -77,6 +78,10 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
      either. That one is rare, specific and consequential; this one comes round
      again in three days and loses nothing by waiting. */
   const mileageAsking = useMileageCheckPending();
+  /* AND NOT AT ALL WHEN A WATCH IS ANSWERING. Sleep, HRV and resting heart
+     rate say how they pulled up more reliably than a tap does; asking anyway
+     is the question a coach with the data in hand does not need to ask. */
+  const { watchConnected } = useAdaptiveTraining();
   /* WHAT THE COACH SAW, so it can open with that rather than with small talk.
      "How did you pull up" is a question anyone could ask; "you faded over the
      last few reps — was that the legs or did it go out hot" is the reason an
@@ -103,10 +108,10 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   }, [records, goals, setup, today]);
 
   const due = useMemo(
-    () => (loading || historyLoading || !setup?.completedAt || interrupting || mileageAsking
+    () => (loading || historyLoading || !setup?.completedAt || interrupting || mileageAsking || watchConnected
       ? null
       : dueCheckIn(records, checkIns, today, verdictFor, readSnooze())),
-    [loading, historyLoading, setup?.completedAt, interrupting, mileageAsking, records, checkIns, today, verdictFor],
+    [loading, historyLoading, setup?.completedAt, interrupting, mileageAsking, watchConnected, records, checkIns, today, verdictFor],
   );
   /* LATCHED THE MOMENT IT OPENS. Answering writes today's check-in, which makes
      dueCheckIn correctly say there is nothing to ask — and unmounted the card

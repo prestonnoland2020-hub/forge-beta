@@ -8,11 +8,19 @@ const percent=(value:number,baseline:number,inverse=false)=>baseline?clamp(100+(
 export function deriveRecoveryState(today:DailyHealthSnapshot,history:DailyHealthSnapshot[],strengthLoad7d:number,injuryConstraint:boolean):RecoveryState{
   const strengthFatigue=strengthLoad7d>=22?'High':strengthLoad7d>=11?'Moderate':'Low';
   if(today.provider==='Unavailable')return{date:today.date,readiness:100,confidence:'Low',sleepScore:0,autonomicScore:0,loadScore:0,strengthFatigue,reasons:['No smartwatch data synced','Recovery is not being used to change coaching or training'],hardTrainingAllowed:!injuryConstraint};
-  const prior=history.filter(item=>item.date<today.date).slice(-28);const hrvBase=mean(prior.map(x=>x.hrvRmssd||0).filter(Boolean));const rhrBase=mean(prior.map(x=>x.restingHr||0).filter(Boolean));const sleepBase=mean(prior.map(x=>x.sleepMinutes||0).filter(Boolean));
-  const sleepDuration=clamp((today.sleepMinutes/480)*100);const sleepConsistency=sleepBase?percent(today.sleepMinutes,sleepBase):75;const sleepScore=Math.round(sleepDuration*.75+sleepConsistency*.25);
-  const hrvScore=today.hrvRmssd?percent(today.hrvRmssd,hrvBase):70;const rhrScore=today.restingHr?percent(today.restingHr,rhrBase,true):70;const autonomicScore=Math.round(hrvScore*.65+rhrScore*.35);
-  const acuteLoad=(today.acuteLoad||0)+strengthLoad7d;const loadScore=Math.round(clamp(100-acuteLoad*2.1,30,100));const missing=[today.hrvRmssd,today.restingHr,today.sleepMinutes].filter(value=>!value).length;const confidence=missing===0&&prior.length>=14?'High':missing<=1&&prior.length>=7?'Medium':today.sleepMinutes?'Medium':'Low';
-  let readiness=missing===3?100:Math.round(sleepScore*.38+autonomicScore*.37+loadScore*.25);if(injuryConstraint)readiness=Math.min(readiness,35);const reasons=missing===3?['Smartwatch sync is missing today','Recovery is not being used to change coaching or training']:[`${Math.round(today.sleepMinutes/60*10)/10} hr sleep`,today.hrvRmssd?`HRV ${Math.round(today.hrvRmssd)} ms vs ${Math.round(hrvBase||today.hrvRmssd)} baseline`:'HRV unavailable',today.restingHr?`Resting HR ${Math.round(today.restingHr)} bpm`:'Resting HR unavailable',`${strengthLoad7d.toFixed(0)} strength-load points in 7 days`];if(injuryConstraint)reasons.unshift('Injury constraint active');
+  const prior=history.filter(item=>item.date<today.date&&item.provider!=='Unavailable').slice(-28);const hrvBase=mean(prior.map(x=>x.hrvRmssd||0).filter(Boolean));const rhrBase=mean(prior.map(x=>x.restingHr||0).filter(Boolean));const sleepBase=mean(prior.map(x=>x.sleepMinutes||0).filter(Boolean));
+  /* SCORED ON WHAT THE WATCH SENT, NOT ON WHAT IT DIDN'T. A day with resting
+     heart rate but no sleep summary yet (Garmin sends sleep separately, and
+     not always) was scored as zero hours of sleep — readiness in the 40s for
+     an athlete who slept fine. Each part counts only when its reading arrived,
+     and the weights are shared among the parts that did. */
+  const hasSleep=today.sleepMinutes>0,hasHrv=Boolean(today.hrvRmssd),hasRhr=Boolean(today.restingHr);
+  const sleepDuration=clamp((today.sleepMinutes/480)*100);const sleepConsistency=sleepBase?percent(today.sleepMinutes,sleepBase):75;const sleepScore=hasSleep?Math.round(sleepDuration*.75+sleepConsistency*.25):0;
+  const hrvScore=hasHrv?percent(today.hrvRmssd!,hrvBase):0;const rhrScore=hasRhr?percent(today.restingHr!,rhrBase,true):0;const autonomicScore=Math.round(hasHrv&&hasRhr?hrvScore*.65+rhrScore*.35:hasHrv?hrvScore:rhrScore);
+  const acuteLoad=(today.acuteLoad||0)+strengthLoad7d;const loadScore=Math.round(clamp(100-acuteLoad*2.1,30,100));const missing=[hasHrv,hasRhr,hasSleep].filter(value=>!value).length;const confidence=missing===0&&prior.length>=14?'High':missing<=1&&prior.length>=7?'Medium':missing<3?'Medium':'Low';
+  const parts:[boolean,number,number][]=[[hasSleep,sleepScore,.38],[hasHrv||hasRhr,autonomicScore,.37],[true,loadScore,.25]];const weight=parts.reduce((sum,[present,,w])=>sum+(present?w:0),0);
+  let readiness=missing===3?100:Math.round(parts.reduce((sum,[present,score,w])=>sum+(present?score*w:0),0)/weight);if(injuryConstraint)readiness=Math.min(readiness,35);
+  const reasons=missing===3?['Smartwatch sync is missing today','Recovery is not being used to change coaching or training']:[hasSleep?`${Math.round(today.sleepMinutes/60*10)/10} hr sleep`:'Last night’s sleep has not synced yet',hasHrv?`HRV ${Math.round(today.hrvRmssd!)} ms vs ${Math.round(hrvBase||today.hrvRmssd!)} baseline`:'HRV unavailable',hasRhr?`Resting HR ${Math.round(today.restingHr!)} bpm${rhrBase?` vs ${Math.round(rhrBase)} baseline`:''}`:'Resting HR unavailable',`${strengthLoad7d.toFixed(0)} strength-load points in 7 days`];if(injuryConstraint)reasons.unshift('Injury constraint active');
   return{date:today.date,readiness,confidence,sleepScore,autonomicScore,loadScore,strengthFatigue,reasons,hardTrainingAllowed:!injuryConstraint&&(missing===3||readiness>=60)};
 }
 
