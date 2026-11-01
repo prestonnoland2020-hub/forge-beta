@@ -3,13 +3,16 @@ import { localDayIso } from './time';
    the web fire while Forge is open (or installed) and permission is granted;
    the Coach tab is the always-reliable in-app surface for the same messages. */
 
-export type NotificationPrefs = { morningWorkout: boolean; injuryFollowUp: boolean; partnerTrained: boolean };
+export type NotificationPrefs = { morningWorkout: boolean; injuryFollowUp: boolean; partnerTrained: boolean; watchSynced: boolean };
 const prefsKey = 'forge-notification-prefs-v1';
 const sentKey = 'forge-notifications-sent-v1';
 
+/* The sync push is on by default on the server for every device already
+   registered, so the switch reads on wherever notifications are allowed. */
+const syncDefault = () => typeof Notification !== 'undefined' && Notification.permission === 'granted';
 export const loadNotificationPrefs = (): NotificationPrefs => {
-  try { return { morningWorkout: false, injuryFollowUp: false, partnerTrained: false, ...JSON.parse(localStorage.getItem(prefsKey) || '{}') }; }
-  catch { return { morningWorkout: false, injuryFollowUp: false, partnerTrained: false }; }
+  try { return { morningWorkout: false, injuryFollowUp: false, partnerTrained: false, watchSynced: syncDefault(), ...JSON.parse(localStorage.getItem(prefsKey) || '{}') }; }
+  catch { return { morningWorkout: false, injuryFollowUp: false, partnerTrained: false, watchSynced: syncDefault() }; }
 };
 export const saveNotificationPrefs = (prefs: NotificationPrefs) => localStorage.setItem(prefsKey, JSON.stringify(prefs));
 
