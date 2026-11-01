@@ -40,18 +40,22 @@ console.log('\nA run value wraps instead of running off the screen');
 const runValue = (css.match(/\.pv-line-run \.pv-line-value\s*\{([^}]*)\}/) || [, ''])[1];
 check('the run override exists at all', Boolean(runValue.trim()), runValue.trim().slice(0, 80));
 check('and it turns wrapping back on', /white-space:\s*normal/.test(runValue));
-check('long unbroken text breaks rather than overflowing', /overflow-wrap:\s*anywhere/.test(runValue));
+check('long unbroken text breaks rather than overflowing', /overflow-wrap:\s*(break-word|anywhere)/.test(runValue));
 
 console.log('\nNothing in the row refuses to shrink');
 check('the row may shrink', /min-width:\s*0/.test(rule('.pv-line')), rule('.pv-line').trim().slice(0, 60));
 check('and so may the name beside the value', /min-width:\s*0/.test(rule('.pv-line-name')));
-check('a long exercise name wraps rather than pushing the value off',
-  /overflow-wrap:\s*anywhere/.test(rule('.pv-line-name')));
+/* break-word, not anywhere: "anywhere" let a squeezed name break between
+   every letter and read vertically down the row. */
+check('a long exercise name wraps between words rather than pushing the value off',
+  /overflow-wrap:\s*break-word/.test(rule('.pv-line-name')));
+check('the name takes the rest of the row beside the value',
+  /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/.test(rule('.pv-line')));
 
 console.log('\nOn a phone the session gets the full width');
 const narrow = css.slice(css.indexOf('@media (max-width:520px)'));
 check('there is a narrow-width rule', css.includes('@media (max-width:520px)'));
-check('the run line stacks', /\.pv-line-run\s*\{[^}]*flex-direction:\s*column/.test(narrow));
+check('the run line stacks', /\.pv-line-run\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;?\s*row-gap/.test(narrow));
 check('and the session reads left-aligned under its label',
   /\.pv-line-run \.pv-line-value\s*\{[^}]*text-align:\s*left/.test(narrow));
 
