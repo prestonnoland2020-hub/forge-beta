@@ -13,7 +13,7 @@ import { deleteWorkoutDay,findWorkoutDayId,loadWorkoutHistory,saveWorkoutDay } f
    later, so it is recorded here, beside the result. Undefined means free
    training: no prescription was outstanding, and none was answered. */
 export type LoggedTopSet = { id?:string; recommendationTopSetId?:string; muscle:string; lift:string; weight:number; reps:number; calculatedMax?:number; completed?:boolean; prescribedReps?:number; prescribedWeight?:number };
-export type WorkoutRecord = { id:string; date:string; title:string; muscles:string[]; topSets?:LoggedTopSet[]; lift?:string; weight?:number; reps?:number; calculatedMax?:number; hasCardio:boolean; cardioSessions?:CardioLogDraft[]; effort?:string; notes?:string; bodyWeight?:number; recommendationId?:string; selectedRecommendationTopSetIds?:string[]; splitId?:string; splitDayId?:string; splitPosition?:number };
+export type WorkoutRecord = { id:string; date:string; title:string; muscles:string[]; topSets?:LoggedTopSet[]; lift?:string; weight?:number; reps?:number; calculatedMax?:number; hasCardio:boolean; cardioSessions?:CardioLogDraft[]; effort?:string; notes?:string; bodyWeight?:number; recommendationId?:string; selectedRecommendationTopSetIds?:string[]; splitId?:string; splitDayId?:string; splitPosition?:number; durationMinutes?:number };
 const seedRecords:WorkoutRecord[]=[];
 type AddResult={ok:true;record:WorkoutRecord}|{ok:false;duplicate:WorkoutRecord};
 type UpdateResult={ok:true;record:WorkoutRecord}|{ok:false;missing:true};

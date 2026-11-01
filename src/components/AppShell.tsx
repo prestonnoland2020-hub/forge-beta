@@ -21,6 +21,7 @@ import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
+import { getGarminConnection } from '../features/training/garminConnectionService';
 import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
 
@@ -171,7 +172,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const { setup } = useProfileSetup();
   const { failures: syncFailures, retryAll } = useSyncStatus();
   const { user } = useAuth();
-  const { loading: historyLoading, syncing, syncError, retrySync, records: stravaRecords, addRecord: stravaAddRecord } = useWorkoutHistory();
+  const { loading: historyLoading, syncing, syncError, retrySync, records: stravaRecords, addRecord: stravaAddRecord, updateRecord: stravaUpdateRecord } = useWorkoutHistory();
   /* STRAVA SYNC RUNS WHEN THE ATHLETE LOOKS. A six-hour throttle meant a run
      recorded on the watch could sit unseen for most of a day: post it, open
      Forge, and it is not there — which reads as a broken integration, not a
@@ -189,13 +190,16 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     const throttleKey = 'forge-strava-auto-sync';
     if (Date.now() - Number(localStorage.getItem(throttleKey) || 0) < SYNC_FLOOR_MS) return;
     try {
-      const status = await getActivityConnection();
-      if (!status.connected) return;
+      /* Garmin needs no pull — its activities arrive by push — but they only
+         reach the log through this import, so a Garmin-only athlete runs it
+         too. */
+      const [strava, garmin] = await Promise.all([getActivityConnection().catch(() => null), getGarminConnection().catch(() => null)]);
+      if (!strava?.connected && !garmin?.connected) return;
       localStorage.setItem(throttleKey, String(Date.now()));
-      await syncStravaActivities();
-      await importStravaActivities(stravaRecords, stravaAddRecord);
+      if (strava?.connected) await syncStravaActivities().catch(() => undefined);
+      await importStravaActivities(stravaRecords, stravaAddRecord, stravaUpdateRecord);
     } catch { /* silent — manual sync remains in Profile → Connections */ }
-  }, [historyLoading, stravaRecords, stravaAddRecord]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [historyLoading, stravaRecords, stravaAddRecord, stravaUpdateRecord]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void syncStravaNow(); }, [historyLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     /* Coming back from Strava is the most likely moment a new activity

@@ -13,7 +13,7 @@ export type GarminConnection = {
   owner_id: string; garmin_user_id?: string | null; status?: string;
   access_token?: string | null; refresh_token?: string | null; expires_at?: string | null;
   oauth_state?: string | null; code_verifier?: string | null; redirect_uri?: string | null;
-  last_synced_at?: string | null; last_push_at?: string | null;
+  last_synced_at?: string | null; last_push_at?: string | null; history_requested_at?: string | null;
 } | null;
 
 export const garminCredentials = () => {
@@ -149,6 +149,9 @@ export const ACTIVITY_KINDS = ['activities', 'manuallyUpdatedActivities'];
 export const BACKFILL_KINDS = ['activities', 'dailies', 'sleeps', 'hrv'];
 /* Activity API §7: one historical request may span at most one month. */
 export const BACKFILL_MAX_DAYS = 30;
+/* How far back a full history reaches. Garmin answers a window older than it
+   keeps with an error, and the walk stops there; this is only the ceiling. */
+export const HISTORY_YEARS = 10;
 /* A multisport parent (isParent) sums its legs, which also arrive as their
    own activities; storing both would count the triathlon twice. */
 export const isMultisportParent = (item: Summary) => item.isParent === true;

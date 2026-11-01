@@ -45,7 +45,8 @@ check('a plain "Easy" still means an easy run', decide(['Easy'], ['Run']).length
 /* 2. The importer consults the hand log before adding, and settles what it skips. */
 check('a hand-logged class blocks the import when it covers it', /day\?\.classes\.has\(group\)/.test(src) && /if \(covered\)/.test(src));
 check('superseded rows are marked settled', /settledRowIds = \[\.\.\.importedRowIds, \.\.\.supersededRowIds\]/.test(src));
-check('only typed sessions count as hand-logged', /startsWith\('strava-'\)\) continue;/.test(src));
+/* Any watch import (strava-, garmin-, …) is skipped through syncedProvider. */
+check('only typed sessions count as hand-logged', /if \(syncedProvider\(session\)\) continue;/.test(src));
 
 /* 3. The decision table, end to end. */
 check('manual Easy beats a Strava Run', decide(['Easy'], ['Run']).length === 0);
