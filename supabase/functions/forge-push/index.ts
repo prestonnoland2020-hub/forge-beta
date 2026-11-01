@@ -198,6 +198,17 @@ async function nextUpFor(pairs: Array<[string, string]>): Promise<Map<string, Ne
   return out;
 }
 
+/* Athletes whose watch has sent a health summary in the last three days —
+   the same rule the app uses to stop asking how they feel. */
+async function watchSyncing(pairs: Array<[string, string]>): Promise<Set<string>> {
+  if (!pairs.length) return new Set();
+  const owners = [...new Set(pairs.map(pair => pair[0]))];
+  const earliest = [...new Set(pairs.map(pair => pair[1]))].sort()[0];
+  const since = dayBefore(dayBefore(dayBefore(earliest)));
+  const { data } = await admin.from('health_daily_snapshots').select('owner_id').in('owner_id', owners).gte('snapshot_date', since);
+  return new Set((data || []).map(row => String(row.owner_id)));
+}
+
 const dayBefore = (date: string) => {
   const parsed = new Date(`${date}T12:00:00Z`);
   parsed.setUTCDate(parsed.getUTCDate() - 1);
@@ -294,6 +305,7 @@ Deno.serve(async request => {
     const told = await sentDays(kind, pairs);
     const answered = await answeredToday(pairs);
     const nextUp = await nextUpFor(pairs);
+    const watched = await watchSyncing(pairs);
     for (const { row, date } of due) {
       const key = pairKey(row.owner_id, date);
       if (told.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already sent today' }); continue; }
@@ -305,7 +317,9 @@ Deno.serve(async request => {
          job is only to get them to open it. The brief itself still stands down
          once they have trained. */
       const yesterday = days.get(pairKey(row.owner_id, dayBefore(date)));
-      const needsCheckIn = Boolean(yesterday) && !answered.has(key);
+      /* A watch that is syncing answers this itself — the app stops asking
+         how they feel, so the lock screen does too. */
+      const needsCheckIn = Boolean(yesterday) && !answered.has(key) && !watched.has(row.owner_id);
       if (!needsCheckIn && days.has(key)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already trained' }); continue; }
       const payload = needsCheckIn && yesterday
         ? {

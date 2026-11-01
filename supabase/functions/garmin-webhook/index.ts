@@ -54,6 +54,12 @@ async function process(payload: Record<string, unknown>) {
     return owners.get(userId) || null;
   };
 
+  /* WHAT ARRIVED, ONE LINE PER DELIVERY. Activities and daily summaries were
+     landing while sleep and HRV never did, and nothing recorded which types
+     Garmin was actually sending — so "is sleep switched on in the Garmin
+     portal" could only be guessed at. Counts only; no athlete data. */
+  console.log(`garmin-webhook received ${Object.entries(payload).map(([kind, value]) => `${kind}:${Array.isArray(value) ? value.length : '?'}`).join(' ') || 'nothing'}`);
+
   for (const [kind, value] of Object.entries(payload)) {
     if (!Array.isArray(value)) continue;
     try {
@@ -62,7 +68,7 @@ async function process(payload: Record<string, unknown>) {
         continue;
       }
       const isActivity = ACTIVITY_KINDS.includes(kind);
-      if (!isActivity && !HEALTH_KINDS.includes(kind)) continue;
+      if (!isActivity && !HEALTH_KINDS.includes(kind)) { console.log(`garmin-webhook ignored kind ${kind}`); continue; }
 
       /* Group by athlete: one upsert per athlete per summary type. */
       const byUser = new Map<string, Summary[]>();
@@ -83,6 +89,8 @@ async function process(payload: Record<string, unknown>) {
             const token = await freshAccessToken(call, owner);
             const response = await fetch(callback, { headers: { Authorization: `Bearer ${token}` } });
             if (response.ok) { const pulled = await response.json(); if (Array.isArray(pulled)) summaries.push(...pulled); }
+            /* A refused callback dropped the summary without a word. */
+            else console.error(`garmin-webhook ${kind} callback ${response.status}: ${(await response.text()).slice(0, 200)}`);
           } else summaries.push(entry);
         }
         if (!summaries.length) continue;
