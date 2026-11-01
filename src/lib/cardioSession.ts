@@ -31,6 +31,10 @@ export type CardioLogDraft={
   prescription:Record<string,unknown>;
   intervalActuals?:IntervalActual[];
   circuitStations?:Array<{name:string;value:string;unit:string}>;
+  /* What a watch recorded for this session, when the athlete logged it by
+     hand and the watch saw it too: kept beside the athlete's own numbers,
+     never instead of them. */
+  recorded?:{source:string;externalId:string;minutes?:number;miles?:number;averageHr?:number};
 };
 
 export type LegacyCardioInterval={cardioType?:string;activity?:string;unit?:string;distanceUnit?:string;distance?:number|string;time?:number|string};

@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { BACKFILL_KINDS, BACKFILL_MAX_DAYS, GARMIN_API, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
+import { BACKFILL_KINDS, BACKFILL_MAX_DAYS, GARMIN_API, HISTORY_YEARS, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: cors });
@@ -22,6 +24,36 @@ async function requestBackfill(accessToken: string, days: number) {
     return [kind, ok] as const;
   }));
   return Object.fromEntries(results).activities === true;
+}
+
+/* EVERY ACTIVITY THE ATHLETE EVER RECORDED. Garmin backfills at most one
+   month per request, so a whole history is a walk backwards, a month at a
+   time, until Garmin says there is nothing older (any refusal other than
+   "already requested") or the ceiling is reached. Requests go one after
+   another: the client-wide limit is 10,000 days a minute, and one athlete's
+   decade is 3,650 of them. Activities only — sleep and HRV from years ago do
+   not change today's readiness, and the connect backfill already asked for
+   the last month of those.
+
+   Garmin answers each request at once and delivers the data to
+   garmin-webhook over the following minutes; the import's dedupe settles it
+   against everything already in the log. Returns whether the walk finished,
+   so an interrupted one (rate limit, network) is tried again on next sync. */
+async function requestHistory(accessToken: string): Promise<boolean> {
+  const day = 86400;
+  let end = Math.floor(Date.now() / 1000) - BACKFILL_MAX_DAYS * day;
+  const floor = Math.floor(Date.now() / 1000) - HISTORY_YEARS * 365 * day;
+  while (end > floor) {
+    const start = Math.max(floor, end - BACKFILL_MAX_DAYS * day);
+    const response = await fetch(`${GARMIN_API}/backfill/activities?summaryStartTimeInSeconds=${start}&summaryEndTimeInSeconds=${end}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (response.status === 429) return false;
+    if (!response.ok && response.status !== 409) {
+      console.warn(`garmin history stopped at ${new Date(start * 1000).toISOString().slice(0, 10)}: ${response.status} ${(await response.text()).slice(0, 200)}`);
+      return true;
+    }
+    end = start;
+  }
+  return true;
 }
 
 Deno.serve(async request => {
@@ -75,6 +107,9 @@ Deno.serve(async request => {
          baseline and paces need past runs. Ask for it now. */
       await requestBackfill(token.access_token, BACKFILL_MAX_DAYS).catch(() => false);
       await call('garmin_connection_synced', { p_owner: auth.user.id, p_synced: new Date().toISOString() });
+      /* The rest of the history, after the athlete is already back in Forge. */
+      const owner = auth.user.id;
+      EdgeRuntime.waitUntil(requestHistory(token.access_token).then(done => done ? call('garmin_connection_history_requested', { p_owner: owner, p_at: new Date().toISOString() }) : undefined).catch(error => console.error('garmin history:', error)));
       return json({ connected: true });
     }
 
@@ -87,6 +122,12 @@ Deno.serve(async request => {
       const requested = await requestBackfill(accessToken, 7);
       const syncedAt = new Date().toISOString();
       await call('garmin_connection_synced', { p_owner: auth.user.id, p_synced: syncedAt });
+      /* Connected before full history existed, or the walk was cut short:
+         finish it now, once. */
+      if (!row.history_requested_at) {
+        const owner = auth.user.id;
+        EdgeRuntime.waitUntil(requestHistory(accessToken).then(done => done ? call('garmin_connection_history_requested', { p_owner: owner, p_at: new Date().toISOString() }) : undefined).catch(error => console.error('garmin history:', error)));
+      }
       return json({ connected: true, requested, lastSyncedAt: syncedAt });
     }
 
