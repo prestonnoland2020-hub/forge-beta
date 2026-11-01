@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { BrandMark, hasWordmark } from '../features/training/brandLogos';
+import { BrandMark, hasLogo, hasWordmark } from '../features/training/brandLogos';
 import { connectionCatalog } from '../features/training/connectionCatalog';
 import type { GarminConnectionStatus } from '../features/training/garminConnectionService';
 import type { ActivityConnectionStatus } from '../features/training/activityConnectionService';
@@ -39,10 +39,13 @@ const ago = (iso?: string) => {
 };
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
+/* A wordmark alone; a symbol with its name; a name alone where Forge has no
+   artwork (Apple's rules bar its logo, and the others' official marks come
+   from their brand kits). Never a tile or a box around any of them. */
 function Name({ id, name }: { id: string; name: string }) {
-  return hasWordmark(id)
-    ? <span className="cx-brand" title={name}><BrandMark id={id} name={name} /><span className="cx-sr">{name}</span></span>
-    : <span className="cx-brand"><BrandMark id={id} name={name} /><strong>{name}</strong></span>;
+  if (hasWordmark(id)) return <span className="cx-brand" title={name}><BrandMark id={id} name={name} /><span className="cx-sr">{name}</span></span>;
+  if (hasLogo(id)) return <span className="cx-brand"><BrandMark id={id} name={name} /><strong>{name}</strong></span>;
+  return <span className="cx-brand cx-brand-text"><strong>{name}</strong></span>;
 }
 
 export function ConnectionsView({ garmin, garminBusy, garminMessage, onGarmin, strava, stravaBusy, stravaMessage, onStrava }: Props) {
