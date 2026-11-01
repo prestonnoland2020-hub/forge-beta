@@ -76,8 +76,10 @@
   }
   .tab-bar .tab .nav-icon { width: 26px; height: 26px; display: grid; place-items: center; border: 0; background: none; }
   .tab-bar .tab .nav-icon svg { width: 23px; height: 23px; transition: transform .28s var(--spring); }
+  /* 11px, a hair tight, as iOS's own tab labels are: "Activities" at 12px
+     bold filled its pill edge to edge, and on a 375pt phone ran past it. */
   .tab-bar .tab small {
-    font-size: 12px; font-weight: 700; letter-spacing: 0;
+    font-size: 11px; font-weight: 700; letter-spacing: -.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
   }
   .tab-bar .tab.active { color: var(--accent-text, var(--accent)); }
