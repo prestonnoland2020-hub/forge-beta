@@ -19,7 +19,7 @@ import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
-import { tap } from '../lib/haptics';
+import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
@@ -107,6 +107,13 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      comes, so the bar felt stuck until it was tapped again. Touch events do
      arrive, so a short, still touch on a tab switches on touchend. */
   const tabTouch = useRef<{ x: number; y: number } | null>(null);
+  /* SLIDE ACROSS THE BAR. A finger that moves sideways along the tab bar
+     changes page as it crosses each tab, with a detent tick for every one,
+     the way a picker wheel feels. The first change is a normal navigation and
+     the rest replace it, so Back returns to where the slide began rather than
+     stepping through every tab the finger passed. */
+  const scrub = useRef<{ x: number; y: number; index: number; active: boolean; moved: boolean } | null>(null);
+  const [scrubbing, setScrubbing] = useState(false);
   /* And a field that vanished while focused (a sheet closing, a screen
      changing) never sends its blur, which left the bar hidden as if the
      keyboard were up. Every screen change re-reads the real state. */
@@ -338,7 +345,26 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       </div>}
       <main className={`page screen-${motion.current}`} key={screenKey}><Outlet /></main>
     </div>
-    <nav className={hideTabs ? 'tab-bar away' : 'tab-bar'} aria-label="Tabs" style={{ '--tab-index': Math.max(0, activeTab) } as CSSProperties}>
+    <nav className={`tab-bar${hideTabs ? ' away' : ''}${scrubbing ? ' scrubbing' : ''}`} aria-label="Tabs" style={{ '--tab-index': Math.max(0, activeTab) } as CSSProperties}
+      onTouchStart={event => { const point = event.touches[0]; scrub.current = point ? { x: point.clientX, y: point.clientY, index: activeTab, active: false, moved: false } : null; }}
+      onTouchMove={event => {
+        const state = scrub.current; const point = event.touches[0];
+        if (!state || !point) return;
+        if (!state.active) {
+          const dx = Math.abs(point.clientX - state.x), dy = Math.abs(point.clientY - state.y);
+          if (dx < 12 || dx < dy) return;
+          state.active = true; setScrubbing(true);
+        }
+        const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('.tab'));
+        const index = items.findIndex(item => { const box = item.getBoundingClientRect(); return point.clientX >= box.left && point.clientX < box.right; });
+        if (index < 0 || index === state.index) return;
+        state.index = index;
+        tick();
+        navigate(tabs[index].to, { replace: state.moved });
+        state.moved = true;
+      }}
+      onTouchEnd={() => { if (scrub.current?.active) setScrubbing(false); scrub.current = null; }}
+      onTouchCancel={() => { if (scrub.current?.active) setScrubbing(false); scrub.current = null; }}>
       {activeTab >= 0 && <span className="tab-indicator" aria-hidden="true" />}
       {tabs.map((tab, index) => <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className={index === activeTab ? 'tab active' : 'tab'} aria-current={index === activeTab ? 'page' : undefined}
         onClick={() => { if (index !== activeTab) tap(); }}

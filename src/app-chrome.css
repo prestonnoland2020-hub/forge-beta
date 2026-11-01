@@ -60,6 +60,12 @@
     transform: translateX(calc(var(--tab-index, 0) * 100%));
     transition: transform .42s var(--spring);
   }
+  /* Sliding a finger along the bar: the browser must not take the sideways
+     drag as a scroll or a back-swipe, and while the finger is down the bar
+     lifts a little and the pill follows quickly, so it reads as held. */
+  .tab-bar { touch-action: none; }
+  .tab-bar.scrubbing { transform: scale(1.03); }
+  .tab-bar.scrubbing .tab-indicator { transition-duration: .2s; background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .tab-bar .tab {
     position: relative; z-index: 1;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
