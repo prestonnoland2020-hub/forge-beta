@@ -287,7 +287,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
 /* A LIFT GOAL IS THE SAME QUESTION WITH DIFFERENT ARITHMETIC. Around 1% a week
    on a calculated max is a strong block for an intermediate lifter; a beginner
    can beat it and an advanced lifter will not come close. */
-const STRENGTH_WEEKLY_GAIN = 0.01;
+export const STRENGTH_WEEKLY_GAIN = 0.01;
 function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibility | null {
   const target = Number.parseFloat(String(goal.target).replace(/[^0-9.]/g, ''));
   if (!target || !goal.exercise) return null;
