@@ -13,7 +13,8 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF,EXPOSURES_BEFORE_MAX} from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttempts,loggedSinglesByLift,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF,EXPOSURES_BEFORE_MAX} from './aiPlanService';
+import { localDayIso } from '../../lib/time';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
@@ -317,19 +318,24 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const qualityIndex=windowDays.findIndex(day=>day.name===week.qualityDay);
     const easyNames=new Set(week.easyDays||[]);
     const easySet=new Set(windowDays.map((day,index)=>easyNames.has(day.name)?index:-1).filter(index=>index>=0));
-    const attemptDays=chooseMaxAttemptDays(windowDays.map((day,index)=>{
-      const set=(week.topSets||[]).find(entry=>entry.splitDay===day.name);
-      const key=set?canonicalLiftKey(set.exercise):'';
-      const best=key?liveBests.get(key)||0:0;
-      const setTests=set?testsOneRepMax(set.exercise,goalLifts):false;
-      const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX}):null;
+    const weekStart=new Date(`${storedPlan.startDate}T12:00:00`);
+    weekStart.setDate(weekStart.getDate()+currentWeekIndex(storedPlan)*7);
+    /* Every set on every day, so a second goal lift on a day is weighed too,
+       and the answer is a day per lift (see chooseMaxAttempts). */
+    const attempts=chooseMaxAttempts(windowDays.map((day,index)=>{
+      const dayIso=new Date(weekStart);dayIso.setDate(weekStart.getDate()+index);
       return{
-        exercise:set?.exercise,
-        reps:live?.reps,
-        hasHold:Boolean(live?.isMax),
+        iso:localDayIso(dayIso),
+        sets:(week.topSets||[]).filter(entry=>entry.splitDay===day.name).map(set=>{
+          const key=canonicalLiftKey(set.exercise);
+          const best=liveBests.get(key)||0;
+          const setTests=testsOneRepMax(set.exercise,goalLifts);
+          const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX}):null;
+          return{exercise:set.exercise,reps:live?.reps,hasHold:Boolean(live?.isMax)};
+        }),
         cost:(index===longIndex?2:0)+(index===qualityIndex?3:0)+(easySet.has(index)?1:0),
       };
-    }));
+    }),loggedSinglesByLift(records));
     /* WHICH SLOT OF THE WINDOW TODAY ACTUALLY IS.
 
        This asked attemptDays.has(0). windowDays starts at the PLAN WEEK'S
@@ -339,16 +345,15 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        handed out a 1RM attempt the Plan tab showed as a double, or printed
        "the attempt is scheduled on another day this week" over the day the
        Plan tab had chosen. */
-    const weekStart=new Date(`${storedPlan.startDate}T12:00:00`);
-    weekStart.setDate(weekStart.getDate()+currentWeekIndex(storedPlan)*7);
     const noon=new Date();noon.setHours(12,0,0,0);
     const todayIndex=Math.max(0,Math.min(6,Math.round((noon.getTime()-weekStart.getTime())/86400000)));
-    const todayHoldsTheAttempt=attemptDays.has(todayIndex);
     const isMaxWeek=waveSlot(waveIdx).isMax;
     const waveFor=(exercise:string,fallback:{weight:number;reps:number})=>{
       const key=canonicalLiftKey(exercise);
       const live={best:liveBests.get(key)||0,single:liveSingles.get(key)||0};
       const tests=testsOneRepMax(exercise,goalLifts);
+      /* This lift's own attempt day, not whether the day holds any attempt. */
+      const todayHoldsTheAttempt=attempts.get(key)===todayIndex;
       /* No logged history for this lift yet: nothing to wave off, so the
          engine's baseline stands and the card still asks for a first set. */
       if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
