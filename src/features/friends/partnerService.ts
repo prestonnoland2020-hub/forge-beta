@@ -105,11 +105,33 @@ export function inviteLink(username: string): string {
 export type AthleteResult = { id: string; username: string; displayName: string; relation: 'none' | 'requested' | 'waiting' | 'partner' };
 
 export async function searchAthletes(query: string): Promise<AthleteResult[]> {
-  if (isDemoMode || query.trim().length < 2) return [];
+  if (query.trim().length < 2) return [];
+  /* The preview build searches its example athletes, so the search can be
+     tried without an account. */
+  if (isDemoMode) { const needle = query.trim().toLowerCase(); return DEMO_ATHLETES.filter(person => person.displayName.toLowerCase().includes(needle) || person.username.includes(needle)); }
   const { data, error } = await supabase.rpc('forge_search_athletes', { query });
   if (error) throw error;
   return ((data || []) as Array<{ id: string; username: string; display_name: string; relation: string }>)
     .map(row => ({ id: row.id, username: row.username, displayName: row.display_name || row.username, relation: row.relation as AthleteResult['relation'] }));
+}
+
+/* Who to show before anything is typed: partners of your partners, then
+   athletes with your goal. See forge_suggest_athletes. The preview build has
+   no other athletes, so it shows a few named examples instead of an empty
+   list. */
+export type SuggestedAthlete = AthleteResult & { mutuals: number };
+const DEMO_ATHLETES: SuggestedAthlete[] = [
+  { id: 'demo-jordan', username: 'jordan', displayName: 'Jordan Reyes', relation: 'none', mutuals: 2 },
+  { id: 'demo-sam', username: 'samlifts', displayName: 'Sam Patel', relation: 'none', mutuals: 1 },
+  { id: 'demo-casey', username: 'caseyruns', displayName: 'Casey Morgan', relation: 'none', mutuals: 0 },
+];
+
+export async function suggestAthletes(): Promise<SuggestedAthlete[]> {
+  if (isDemoMode) return DEMO_ATHLETES;
+  const { data, error } = await supabase.rpc('forge_suggest_athletes');
+  if (error) throw error;
+  return ((data || []) as Array<{ id: string; username: string; display_name: string; mutuals: number }>)
+    .map(row => ({ id: row.id, username: row.username, displayName: row.display_name || row.username, relation: 'none', mutuals: Number(row.mutuals) || 0 }));
 }
 
 export async function addPartnerById(id: string): Promise<AddResult> {

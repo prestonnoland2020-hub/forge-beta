@@ -58,12 +58,14 @@
 
 /* A lift or a run, as a row: name left, number right. Shared by every card. */
 .pv-lines{display:grid}
-.pv-line{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line);min-width:0}
+.pv-line{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:16px;padding:12px 0;border-top:1px solid var(--line);min-width:0}
 .pv-line:first-child{border-top:0;padding-top:0}
-/* A flex item will not shrink below its content unless it is told it may, which
-   is how "Smith Machine Shoulder Press" pushed its own weight off the right
-   edge of the phone rather than wrapping. */
-.pv-line-name{color:var(--ink);font-weight:700;min-width:0;overflow-wrap:anywhere}
+/* NAME TAKES WHAT IS LEFT, AND BREAKS ONLY BETWEEN WORDS. It used to be
+   allowed to break anywhere while the load beside it never shrank, so on a
+   narrow row "Smith Machine Shoulder Press" was squeezed to a column a letter
+   or two wide and read vertically down the screen. A grid gives the name the
+   rest of the row; break-word only splits a word that cannot fit on its own. */
+.pv-line-name{color:var(--ink);font-weight:700;min-width:0;overflow-wrap:break-word}
 .pv-line-value{color:var(--ink);font:800 18px var(--display);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;min-width:0;flex-shrink:0}
 
 /* A RUN IS A SENTENCE, NOT A NUMBER. The value column was written for lift
@@ -72,15 +74,14 @@
    that to one line ran it straight off the screen with the pace and the label
    the athlete actually needed hidden past the edge. Run lines wrap, and on a
    phone they stack under their own label so the full session is readable. */
-.pv-line-run{flex-wrap:wrap}
-.pv-line-run .pv-line-name{flex:0 0 auto}
-.pv-line-run .pv-line-value{white-space:normal;flex:1 1 auto;text-align:right;overflow-wrap:anywhere;font-size:16px;line-height:1.4}
+.pv-line-run{grid-template-columns:auto minmax(0,1fr)}
+.pv-line-run .pv-line-value{white-space:normal;text-align:right;overflow-wrap:break-word;font-size:16px;line-height:1.4}
 @media (max-width:520px){
-  .pv-line-run{flex-direction:column;align-items:flex-start;gap:2px}
-  .pv-line-run .pv-line-value{text-align:left;width:100%}
+  .pv-line-run{grid-template-columns:minmax(0,1fr);row-gap:2px}
+  .pv-line-run .pv-line-value{text-align:left}
 }
 .pv-line-value small{font:700 12px var(--body);color:var(--ink-3);margin:0 1px}
-.pv-today .pv-line-value{font-size:20px;white-space:normal}
+.pv-today .pv-line-value{font-size:20px}
 
 /* ── This week ──────────────────────────────────────────────────────────── */
 .pv-week{padding:0;overflow:hidden}
@@ -119,6 +120,7 @@
    the first time. Open it and the summary gives way to the real thing. */
 .pv-row.open .pv-row-body small{display:none}
 .pv-row-detail{padding:0 16px 16px 64px}
+@media (max-width:520px){.pv-row-detail{padding-left:16px}}
 .pv-row-detail .pv-line{padding:8px 0}
 /* AND THE EXPANSION IS DETAIL, NOT A SECOND SET OF HEADINGS. The value column
    wears the display face at 800 because a lift load is the point of its row —
@@ -198,13 +200,10 @@
   .pv>.untrained-goal-banner,.pv>.pv-progress,.pv>.pv-actions,.pv>.pv-block,
   .pv>.pv-footnote,.pv>.pv-state,.pv>.plan-pressure,
   .pv>.mileage-gate,.pv>.pv{grid-column:1/-1}
-  /* The today card and the notes about the week stack in column one; the week
-     itself takes column two across both of their rows. The notes fold must NOT
-     span here — a band across both columns occupies the row, so the week could
-     only start below it and a desktop got a hole the height of the today card
-     under the today card. */
-  .pv>.pv-today,.pv>.pv-notes{grid-column:1}
-  .pv>.pv-week{grid-column:2;grid-row:span 2}
+  /* The today card is a row of the week now and the notes about the week
+     are gone, so nothing is left to sit beside the week: it takes the row. */
+  .pv>.pv-today{grid-column:1}
+  .pv>.pv-week{grid-column:1/-1}
   .pv-today{position:sticky;top:12px}
 }
 
@@ -222,20 +221,3 @@
 /* One line saying why the week is shaped the way it is. Quiet by design: it is
    an explanation, not an alert, and it sits above the week it explains. */
 .pv-collision{margin:0 0 12px;padding:12px 12px;border-left:2px solid var(--accent,#2f6fd0);background:var(--surface-2,rgba(127,127,127,.06));border-radius:0 10px 10px 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
-
-/* NOTES ABOUT THE WEEK, NOT THE WEEK.
-
-   Three of these used to stack between the today card and the week list, one
-   paragraph each, and together they were most of the screen — advice nobody
-   reads because there is too much of it to start. Folded into one line that
-   says how many there are, they cost nothing until the athlete wants them.
-   Closed by default: the week is what the screen is for. */
-.pv-notes{margin:0;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-2);overflow:hidden}
-.pv-notes>summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ink-2);font-size:12px;font-weight:700}
-.pv-notes>summary::-webkit-details-marker{display:none}
-.pv-notes>summary::after{content:"›";color:var(--ink-3);font-weight:800;transition:transform .15s ease}
-.pv-notes[open]>summary::after{transform:rotate(90deg)}
-.pv-notes[open]>summary{border-bottom:1px solid var(--hairline)}
-.pv-notes p{margin:0;padding:12px 16px;border-top:1px solid var(--hairline);color:var(--ink-2);font-size:14px;line-height:1.5}
-.pv-notes p:first-of-type{border-top:0}
-@media(prefers-reduced-motion:reduce){.pv-notes>summary::after{transition:none}}

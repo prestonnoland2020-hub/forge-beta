@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
 import { CoachCheckIn } from './CoachCheckIn';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { ForgeNoticed } from './ForgeNoticed';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { syncKeyboardState } from '../features/shell/nativeChrome';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useAuth } from '../features/auth/AuthProvider';
@@ -17,7 +19,7 @@ import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
-import { tap } from '../lib/haptics';
+import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
@@ -77,7 +79,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      can be live on the site while the icon on the phone still runs last
      night's engine. version.json is fetched uncached on open and whenever the
      app returns to the foreground; a mismatch surfaces one tap to reload. */
-  const [updateReady,setUpdateReady]=useState(false);
+  const [updateReady,setUpdateReady]=useState<string|false>(false);
   useEffect(()=>{
     let last=0;
     const check=async()=>{
@@ -86,16 +88,61 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         const response=await fetch(`version.json?t=${Date.now()}`,{cache:'no-store'});
         if(!response.ok)return;
         const data=await response.json() as {build?:string};
-        if(data.build&&data.build!==__FORGE_BUILD__)setUpdateReady(true);
+        if(data.build&&data.build!==__FORGE_BUILD__)setUpdateReady(data.build);
       }catch{/* offline — try again later */}
     };
     void check();
     const onVisible=()=>{if(document.visibilityState==='visible')void check()};
     document.addEventListener('visibilitychange',onVisible);
-    return()=>document.removeEventListener('visibilitychange',onVisible);
+    /* An app left open on a screen all day never returns to the foreground,
+       so it also looks every five minutes while it is on screen. */
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void check()},5*60000);
+    return()=>{document.removeEventListener('visibilitychange',onVisible);window.clearInterval(timer)};
   },[]);
 
   const location = useLocation();
+  const navigate = useNavigate();
+  /* A TAB ANSWERS THE FIRST TAP. On iOS a tap that lands while the page is
+     still coasting from a scroll only stops the scroll — the click never
+     comes, so the bar felt stuck until it was tapped again. Touch events do
+     arrive, so a short, still touch on a tab switches on touchend. */
+  const tabTouch = useRef<{ x: number; y: number } | null>(null);
+  /* SLIDE ACROSS THE BAR. A finger that moves sideways along the tab bar
+     changes page as it crosses each tab, with a detent tick for every one,
+     the way a picker wheel feels. The first change is a normal navigation and
+     the rest replace it, so Back returns to where the slide began rather than
+     stepping through every tab the finger passed. */
+  const scrub = useRef<{ x: number; y: number; index: number; active: boolean; moved: boolean } | null>(null);
+  const [scrubbing, setScrubbing] = useState(false);
+  /* And a field that vanished while focused (a sheet closing, a screen
+     changing) never sends its blur, which left the bar hidden as if the
+     keyboard were up. Every screen change re-reads the real state. */
+  useEffect(() => { syncKeyboardState(); }, [location.pathname, location.search]);
+  /* A NEW BUILD TAKES OVER BY ITSELF, at a moment nobody loses anything to.
+     The pill asked for a tap most people never made, so a deploy reached them
+     only whenever they happened to reload. Now the app reloads on its own —
+     on moving between screens or coming back to the app — unless it is the
+     workout logger, a field has focus, or a sheet is open; then the pill is
+     the fallback. The reload adds ?v=<build> so GitHub Pages' ten-minute
+     cache of index.html cannot hand back the old shell, and each build is
+     tried once, so a deploy still propagating cannot loop the page. */
+  useEffect(()=>{
+    if(!updateReady)return;
+    const tryReload=()=>{
+      const busy=location.pathname==='/workout'
+        ||document.activeElement instanceof HTMLInputElement||document.activeElement instanceof HTMLTextAreaElement||document.activeElement instanceof HTMLSelectElement
+        ||Boolean(document.querySelector('[role="dialog"], .coach-bubble-panel.open'));
+      if(busy)return;
+      try{if(sessionStorage.getItem('forge-auto-update')===updateReady)return;sessionStorage.setItem('forge-auto-update',updateReady)}catch{return}
+      const url=new URL(window.location.href);
+      url.searchParams.set('v',updateReady);
+      window.location.replace(url.href);
+    };
+    tryReload();
+    const onVisible=()=>{if(document.visibilityState==='visible')tryReload()};
+    document.addEventListener('visibilitychange',onVisible);
+    return()=>document.removeEventListener('visibilitychange',onVisible);
+  },[updateReady,location.pathname,location.search]);
   const screenKey = `${location.pathname}?${new URLSearchParams(location.search).get('view') || ''}`;
   const lastScreen = useRef({ key: screenKey, depth: screenDepth(location.pathname, location.search) });
   /* Decided while rendering, not in an effect: the new screen's first frame
@@ -111,7 +158,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      last page's scroll and opened Goals halfway down an empty page. */
   const firstScreen = useRef(true);
   useEffect(() => { if (firstScreen.current) { firstScreen.current = false; return; } window.scrollTo(0, 0); }, [screenKey]);
-  const activeTab = tabs.findIndex(tab => tab.owns(location.pathname));
+  /* A partner opened from Today is still inside Today, so Today stays lit. */
+  const cameFromToday = location.pathname.startsWith('/partners') && (location.state as { origin?: string } | null)?.origin === '/';
+  const activeTab = cameFromToday ? 0 : tabs.findIndex(tab => tab.owns(location.pathname));
   /* A workout in progress and the full coach are tasks, not places: the tab
      bar steps aside for them the way a native app's does. */
   const hideTabs = location.pathname === '/workout' || location.pathname === '/coach';
@@ -163,10 +212,20 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      under Profile has to draw its own breadcrumb and no screen is a dead end.
      Sub-screens inside Profile are named by the header too, which is what
      lets the page below stop repeating its own name in 26px type. */
-  const chrome = ((): { title: string; back?: string } => {
+  /* WHERE A STEP IN STARTED. Partners belong to Profile, but Today links
+     straight to them; a screen reached from Today carries { origin: '/' }, so
+     back returns to Today instead of stranding the athlete in Profile, and
+     the Today tab stays lit while they are in there. The list passes it on to
+     a partner it opens, with { viaList } so back from that partner returns
+     to the list first. */
+  const navState = (location.state || {}) as { origin?: string; viaList?: boolean };
+  const chrome = ((): { title: string; back?: string; backState?: { origin?: string } } => {
     const params = new URLSearchParams(location.search);
-    /* A partner's own screen is a step in from the list. */
-    if (/^\/partners\/.+/.test(location.pathname)) return { title: 'Partner', back: '/partners' };
+    /* A partner's own screen is a step in from the list, or from Today. */
+    if (/^\/partners\/.+/.test(location.pathname)) {
+      if (navState.origin && !navState.viaList) return { title: 'Partner', back: navState.origin };
+      return { title: 'Partner', back: '/partners', backState: navState.origin ? { origin: navState.origin } : undefined };
+    }
     switch (location.pathname) {
       case '/': return { title: 'Today' };
       case '/plan': return { title: 'Plan' };
@@ -177,7 +236,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       case '/coach': return { title: 'Ask Forge', back: '/' };
       case '/split': return { title: 'Your split', back: '/profile' };
       case '/exercises': return { title: 'Exercise library', back: '/profile' };
-      case '/partners': return { title: 'Partners', back: '/profile' };
+      case '/partners': return { title: 'Partners', back: navState.origin || '/profile' };
       case '/profile': {
         const view = params.get('view');
         const names: Record<string, string> = { settings: 'Settings', appearance: 'Appearance', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Recovery', faq: 'FAQ' };
@@ -257,7 +316,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     <div className="app-main">
       <header className="topbar">
         <div className="top-title">
-          {chrome.back && <Link className="top-back" to={chrome.back} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
+          {chrome.back && <Link className="top-back" to={chrome.back} state={chrome.backState} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
           <div><span className="eyebrow">FORGE</span><h1>{chrome.title}</h1></div>
         </div>
         <div className="top-actions">
@@ -286,10 +345,37 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       </div>}
       <main className={`page screen-${motion.current}`} key={screenKey}><Outlet /></main>
     </div>
-    <nav className={hideTabs ? 'tab-bar away' : 'tab-bar'} aria-label="Tabs" style={{ '--tab-index': Math.max(0, activeTab) } as CSSProperties}>
+    <nav className={`tab-bar${hideTabs ? ' away' : ''}${scrubbing ? ' scrubbing' : ''}`} aria-label="Tabs" style={{ '--tab-index': Math.max(0, activeTab) } as CSSProperties}
+      onTouchStart={event => { const point = event.touches[0]; scrub.current = point ? { x: point.clientX, y: point.clientY, index: activeTab, active: false, moved: false } : null; }}
+      onTouchMove={event => {
+        const state = scrub.current; const point = event.touches[0];
+        if (!state || !point) return;
+        if (!state.active) {
+          const dx = Math.abs(point.clientX - state.x), dy = Math.abs(point.clientY - state.y);
+          if (dx < 12 || dx < dy) return;
+          state.active = true; setScrubbing(true);
+        }
+        const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('.tab'));
+        const index = items.findIndex(item => { const box = item.getBoundingClientRect(); return point.clientX >= box.left && point.clientX < box.right; });
+        if (index < 0 || index === state.index) return;
+        state.index = index;
+        tick();
+        navigate(tabs[index].to, { replace: state.moved });
+        state.moved = true;
+      }}
+      onTouchEnd={() => { if (scrub.current?.active) setScrubbing(false); scrub.current = null; }}
+      onTouchCancel={() => { if (scrub.current?.active) setScrubbing(false); scrub.current = null; }}>
       {activeTab >= 0 && <span className="tab-indicator" aria-hidden="true" />}
       {tabs.map((tab, index) => <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className={index === activeTab ? 'tab active' : 'tab'} aria-current={index === activeTab ? 'page' : undefined}
-        onClick={() => { if (index !== activeTab) tap(); }}><NavGlyph name={tab.icon}/><small>{tab.label}</small></NavLink>)}
+        onClick={() => { if (index !== activeTab) tap(); }}
+        onTouchStart={event => { const point = event.touches[0]; tabTouch.current = point ? { x: point.clientX, y: point.clientY } : null; }}
+        onTouchEnd={event => {
+          const start = tabTouch.current; tabTouch.current = null;
+          const point = event.changedTouches[0];
+          if (!start || !point || Math.hypot(point.clientX - start.x, point.clientY - start.y) > 10) return;
+          event.preventDefault();
+          if (index !== activeTab) { tap(); navigate(tab.to); }
+        }}><NavGlyph name={tab.icon}/><small>{tab.label}</small></NavLink>)}
     </nav>
     {/* THE COACH SPEAKS FIRST WHEN IT HAS SOMETHING THAT MATTERS. An athlete
         whose goal cannot be reached on the running they do is told on the way
@@ -303,6 +389,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     <EffortCheck />
     <CoachCheckIn />
     <MileageStartupCheck />
+    {/* What Forge noticed comes last and only now and again: it waits for any
+        of the dialogs above to be answered first. */}
+    <ForgeNoticed />
     {/* Open, the coach is a sheet over a dimmed screen, and tapping the dim
         closes it — on a phone always, on a desktop when expanded. */}
     {coachOpen && <button className={coachExpanded ? 'coach-bubble-backdrop expanded' : 'coach-bubble-backdrop'} type="button" aria-label="Close Forge coach" onClick={() => { if (coachExpanded) setCoachExpanded(false); else setCoachOpen(false); }} />}

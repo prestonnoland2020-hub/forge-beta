@@ -20,39 +20,22 @@ const writeSnooze = (iso: string) => { try { localStorage.setItem(SNOOZE_KEY, is
 
 /* THE COACH ASKS, AND THE ANSWER CHANGES SOMETHING.
 
-   Three questions, one tap each, and the next one appears as the last is
-   answered — so there is one thing on screen at a time and the whole exchange
-   is about four seconds. A form with fifteen radio buttons gets dismissed; a
-   question gets answered.
+   One question, one tap. Three in a row (legs, then energy, then sleep) read
+   as a survey after a hard session, so each answer now carries all three
+   readings at once, set so the readiness it produces lands where the old
+   three answers did: Feeling good is go, A bit sore is go, Pretty tired eases
+   the volume, Beat up backs the day off.
 
-   The last card is the part that makes it worth doing: it says what Forge is
-   going to do differently, in the athlete's own numbers. A check-in that
-   vanishes without visible consequence teaches people that answering is
-   pointless, and then the data stops. */
+   When the answer changes the day, the card says so in the athlete's terms
+   before closing. When it changes nothing, it just closes. */
 
-type Step = 'legs' | 'energy' | 'sleep' | 'done';
-
-const LEGS: Array<{ label: string; value: CheckInScale }> = [
-  { label: 'Fresh', value: 1 },
-  { label: 'A bit sore', value: 3 },
-  { label: 'Beat up', value: 5 },
+type Answer = { label: string; legs: CheckInScale; energy: CheckInScale; sleep: CheckInScale };
+const ANSWERS: Answer[] = [
+  { label: 'Feeling good', legs: 1, energy: 5, sleep: 5 },
+  { label: 'A bit sore', legs: 3, energy: 3, sleep: 3 },
+  { label: 'Pretty tired', legs: 4, energy: 2, sleep: 3 },
+  { label: 'Beat up', legs: 5, energy: 1, sleep: 1 },
 ];
-const ENERGY: Array<{ label: string; value: CheckInScale }> = [
-  { label: 'Good', value: 5 },
-  { label: 'Okay', value: 3 },
-  { label: 'Flat', value: 1 },
-];
-const SLEEP: Array<{ label: string; value: CheckInScale }> = [
-  { label: 'Slept well', value: 5 },
-  { label: 'Okay', value: 3 },
-  { label: 'Badly', value: 1 },
-];
-
-const QUESTION: Record<Exclude<Step, 'done'>, string> = {
-  legs: 'How do the legs feel?',
-  energy: 'Energy today?',
-  sleep: 'And last night?',
-};
 
 /* What the answer actually buys, said plainly. These are the thresholds the
    engine really uses — below 55 hard training is off, below 70 volume is
@@ -79,9 +62,6 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   const { goals } = useGoals();
   const { pathname } = useLocation();
   const today = localDayIso();
-  const [step, setStep] = useState<Step>('legs');
-  const [legs, setLegs] = useState<CheckInScale>(3);
-  const [energy, setEnergy] = useState<CheckInScale>(3);
   const [closed, setClosed] = useState(false);
 
   /* ASKED ONLY WHEN THERE IS A REASON, and never off half-loaded history — "how
@@ -139,27 +119,20 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   const [result, setResult] = useState<number | null>(null);
   if (!ask || closed) return null;
 
-  const finish = (sleep: CheckInScale) => {
-    const checkIn = { date: today, legs, energy, sleep, aboutRecordId: ask.aboutRecordId, prompt: ask.prompt };
-    answer(checkIn);
-    setResult(readinessFromCheckIn(checkIn));
-    setStep('done');
-  };
-
-  const pick = (current: Step, value: CheckInScale) => {
-    if (current === 'legs') { setLegs(value); setStep('energy'); return; }
-    if (current === 'energy') { setEnergy(value); setStep('sleep'); return; }
-    finish(value);
-  };
-
   const dismiss = () => { setClosed(true); writeSnooze(today); onClose?.(); };
-  const options = step === 'legs' ? LEGS : step === 'energy' ? ENERGY : SLEEP;
+  const pick = (choice: Answer) => {
+    const checkIn = { date: today, legs: choice.legs, energy: choice.energy, sleep: choice.sleep, aboutRecordId: ask.aboutRecordId, prompt: ask.prompt };
+    answer(checkIn);
+    const readiness = readinessFromCheckIn(checkIn);
+    if (readiness >= 70) { setClosed(true); onClose?.(); return; }
+    setResult(readiness);
+  };
   const said = result === null ? null : outcome(result);
 
   return <div className="coach-checkin-backdrop" role="dialog" aria-modal="true" aria-label="Check in with your coach">
     <section className="card coach-checkin">
       <span className="eyebrow">Forge</span>
-      {step === 'done' && said ? <>
+      {said ? <>
         <p className="coach-checkin-ask">{said.headline}</p>
         <p className="coach-checkin-detail">{said.detail}</p>
         <div className="coach-checkin-actions">
@@ -167,12 +140,11 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
         </div>
       </> : <>
         <p className="coach-checkin-ask">{ask.prompt}</p>
-        <p className="coach-checkin-detail">{QUESTION[step as Exclude<Step, 'done'>]}</p>
-        <div className="coach-checkin-options">
-          {options.map(option => <button type="button" key={option.label} onClick={() => pick(step, option.value)}>{option.label}</button>)}
+        <div className="coach-checkin-options coach-checkin-one">
+          {ANSWERS.map(choice => <button type="button" key={choice.label} onClick={() => pick(choice)}>{choice.label}</button>)}
         </div>
         <div className="coach-checkin-foot">
-          <i aria-hidden="true" className="coach-checkin-progress">{step === 'legs' ? '1' : step === 'energy' ? '2' : '3'} of 3</i>
+          <span />
           <button type="button" className="text-button" onClick={dismiss}>Not now</button>
         </div>
       </>}

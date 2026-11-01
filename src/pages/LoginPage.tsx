@@ -69,7 +69,7 @@ export function LoginPage() {
         {/* Guideline 5.1.1(i) wants the privacy policy reachable inside the
             app, and sign-in is the first screen where it can be. */}
         <p className="login-legal">
-          By continuing you agree to the <a href="#/legal/terms">Terms</a> and <a href="#/legal/privacy">Privacy Policy</a>.
+          By continuing you agree to the <a href="#/legal/terms">Terms</a> and <a href="#/legal/privacy">Privacy Policy</a>. See also the <a href="#/legal/health">Consumer Health Data Notice</a> and <a href="#/legal/cookies">Cookie Policy</a>.
         </p>
       </section>
 

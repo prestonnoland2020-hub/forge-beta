@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageIntro, Metric } from '../components/AppShell';
 import { openCoachBubble } from '../features/training/coachService';
@@ -115,6 +115,15 @@ function WorkoutEditor() {
   /* Start-fresh days are defined by the muscles the athlete picks. */
   const [freeMuscles,setFreeMuscles]=useState<string[]>([]);
   const toggleFreeMuscle=(muscle:string)=>setFreeMuscles(current=>current.includes(muscle)?current.filter(item=>item!==muscle):[...current,muscle]);
+  /* A SAVED CUSTOM DAY CAN SAY WHAT IT TRAINED. Days logged before the
+     cardio-first fix lost the muscles that were ticked on them, and nothing
+     kept a copy — not this device, not the server. Editing a day that is not
+     assigned to a split day now shows the same chips, opened on what the day
+     holds, so the athlete can put back what was lost in one tap each. */
+  const editingCustom=Boolean(editingRecord&&!editingRecord.splitPosition);
+  const editChipsFor=useRef('');
+  useEffect(()=>{if(!editingRecord||!editingCustom||editChipsFor.current===editingRecord.id)return;editChipsFor.current=editingRecord.id;setFreeMuscles((editingRecord.muscles||[]).filter(muscle=>muscle!=='Cardio'))},[editingRecord,editingCustom]);
+  const chipMuscles=()=>(editingRecord?editingCustom:workoutSource!=='plan'&&workoutSource!=='split'&&!written)?freeMuscles.filter(muscle=>muscle!=='Cardio'):[];
   /* Both split-backed modes share every rule about exercises, muscles and
      identity; they differ only in whether the recommendation chose the day. */
   const usingSplit=workoutSource==='plan'||workoutSource==='split';
@@ -398,7 +407,7 @@ function WorkoutEditor() {
       });
       const {id,...savedDay}=sameDay;
       const first=remaining[0];
-      const chips=!usingSplit&&!written?freeMuscles.filter(muscle=>muscle!=='Cardio'):[];
+      const chips=chipMuscles();
       const muscles=Array.from(new Set([...chips,...remaining.map(item=>item.muscle),...(sameDay.hasCardio?['Cardio']:[])]));
       /* The last set gone takes its muscles with it. Falling back to the old
          list left a day with nothing logged still listed as Chest + Back —
@@ -435,7 +444,7 @@ function WorkoutEditor() {
     /* A BLANK DAY WITH MUSCLES TICKED IS A WORKOUT. Not every session gets a top
        set typed in; "I trained chest and back" is the athlete's own statement,
        and it counts in Activities and in muscle frequency. */
-    const blankMuscles=!usingSplit&&!written?freeMuscles.filter(muscle=>muscle!=='Cardio'):[];
+    const blankMuscles=chipMuscles();
     if(!editingRecord&&!completedTopSets.length&&!savedTopSetKeys.length&&!hasCardio&&!quickLoggedKeys.length&&!bodyWeightToSave&&!notes.trim()&&!effort&&!blankMuscles.length){setSaveMessage('Log a top set or a cardio session first — Finish Day saves what you did.');return}
     /* Once the day exists its title stands. Logging cardio creates the day up
        front, which advances the split cursor — recomputing the title here
@@ -466,7 +475,9 @@ function WorkoutEditor() {
     const assignedDayMuscles=(editingRecord
       ?(dayOverride?savedDays[selectedPlanDay]?.muscles:editingRecord.splitPosition?savedDays[editingRecord.splitPosition-1]?.muscles:undefined)
       :((usingSplit||dayOverride)?plannedDay?.muscles:undefined))?.filter(muscle=>muscle!=='Cardio');
-    const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:(blankMuscles.length||exerciseDriven.length)?Array.from(new Set([...blankMuscles,...exerciseDriven])):(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
+    /* Editing a custom day takes the chips as they now stand — unticking one
+       removes it — plus whatever the logged lifts train. */
+    const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:editingCustom?Array.from(new Set([...blankMuscles,...exerciseDriven])):(blankMuscles.length||exerciseDriven.length)?Array.from(new Set([...blankMuscles,...exerciseDriven])):(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
     const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id))};
     /* A second session added to an already-saved day keeps THAT DAY's identity.
        Without this, the split cursor has advanced by the time the athlete comes
@@ -474,7 +485,11 @@ function WorkoutEditor() {
        workout — Colton's chest-and-back badge on a legs day, seen from the
        other side. */
     if(existingDay&&!editingRecord&&!dayOverride){
-      draft.muscles=Array.from(new Set([...existingDay.muscles.filter(muscle=>muscle!=='Cardio'),...exerciseDriven,...(hasCardio||existingDay.hasCardio?['Cardio']:[])]));
+      /* The ticked muscles ride along too. Logging cardio saves the day early
+         with only "Cardio" on it, so a custom day of a run plus chest and back
+         ticked — no top set — reached Finish as an existing day and lost the
+         chest and back: no strength dot in Activities, nothing in frequency. */
+      draft.muscles=Array.from(new Set([...existingDay.muscles.filter(muscle=>muscle!=='Cardio'),...blankMuscles,...exerciseDriven,...(hasCardio||existingDay.hasCardio?['Cardio']:[])]));
       draft.recommendationId=existingDay.recommendationId;draft.splitId=existingDay.splitId;draft.splitDayId=existingDay.splitDayId;draft.splitPosition=existingDay.splitPosition;
     }
     /* THE LOGGED DAY'S SPLIT IDENTITY FOLLOWS ITS CONTENT, not the queue.
@@ -549,6 +564,7 @@ function WorkoutEditor() {
     {editingRecord&&<section className="coach-loaded"><div><span>EDITING COMPLETED SESSION</span><strong>{editingRecord.title}</strong><small>Saving replaces this session on {todayShort}; it will not create a duplicate.</small></div><div className="button-row"><Link to="/history">Cancel</Link><button type="button" className="text-button danger" onClick={removeWorkout}>Delete workout</button></div></section>}
     {editingRecord&&savedDays.length>0&&<section className="card form-card edit-split-assign"><label className="plan-day-picker">Split day for this workout<select value={dayOverride?String(selectedPlanDay):(editingRecord.splitPosition?String(editingRecord.splitPosition-1):'')} onChange={event=>{if(event.target.value===''){setDayOverride(false);return}const index=Number(event.target.value);setSelectedPlanDay(index);setDayOverride(true)}}><option value="">Not assigned</option>{savedDays.map((day,index)=><option key={`${day.name}-${index}`} value={index}>{day.name}{editingRecord.splitPosition===index+1?' · currently assigned':''}</option>)}</select></label><small>Assigning a split day counts this session toward it and the cycle continues from there.</small></section>}
     {/* "SAVED DAILY RECOMMENDATION · Today, Log, and Coach are using recommendation 3f2a…" was the engine talking to itself. */}{!editingRecord&&<section className="card workout-source-card compact-workout-source"><div className="workout-date"><div><span className="eyebrow">{todayShort}</span><strong>{workoutSource==='plan'?(plannedDay?.name||'Today’s workout'):workoutSource==='split'?(savedDay?.name||'Choose a day'):written?.name||'Blank workout'}</strong></div><button type="button" className="text-button workout-change" onClick={()=>setShowSources(open=>!open)} aria-expanded={showSources||workoutSource!=='plan'}>{showSources||workoutSource!=='plan'?'Done':'Change'}</button></div>{(showSources||workoutSource!=='plan')&&<div className="source-options"><button className={workoutSource==='plan'?'active':''} onClick={()=>{setWorkoutSource('plan');setDayOverride(false);setSelectedPlanDay(recommendationIndex);setTopSets(keepingTodaysWork(recommendationTopSets))}}><b>Today’s plan</b></button><button className={workoutSource==='split'?'active':''} onClick={()=>{setWorkoutSource('split');setDayOverride(true);setTopSets(keepingTodaysWork(prescribeSplitDay(selectedPlanDay)))}}><b>Pick a day</b></button><button className={workoutSource==='blank'?'active':''} onClick={()=>{setWorkoutSource('blank');setDayOverride(false);setTopSets([])}}><b>Blank</b></button></div>}{workoutSource==='split'&&(savedDays.length>0?<label className="plan-day-picker">Which day of your split<select value={selectedPlanDay} onChange={event=>{const index=Number(event.target.value);setSelectedPlanDay(index);setDayOverride(true);setTopSets(keepingTodaysWork(prescribeSplitDay(index)))}}>{savedDays.map((day,index)=><option key={`${day.name}-${index}`} value={index}>{day.name}{recommendation&&index===recommendationIndex?' · due today':''}</option>)}</select></label>:<p className="empty-history">Build a split in Plan first — then its days appear here.</p>)}{/* The "Split position 1 · Chest · Back · Synced with Today and Coach." card said the day's name a third time; the title above and the picker already do. */}{workoutSource==='blank'&&!written&&<div className="free-muscle-picker"><div><span className="field-caption">WHAT DID YOU TRAIN?</span><small>Pick the muscle groups — they decide which exercises are offered and what this day counts toward.</small></div><div className="muscle-picker">{muscleOptions.filter(muscle=>muscle!=='Cardio').map(muscle=><button type="button" className={freeMuscles.includes(muscle)?'muscle-chip active':'muscle-chip'} onClick={()=>toggleFreeMuscle(muscle)} key={muscle}>{muscle}</button>)}</div>{!freeMuscles.length&&<small className="free-muscle-hint">Cardio-only day? Leave these empty and log it below.</small>}</div>}</section>}
+    {editingCustom&&<section className="card workout-source-card compact-workout-source edit-muscles"><div className="free-muscle-picker"><div><span className="field-caption">WHAT DID YOU TRAIN?</span><small>These decide what this day counts toward in Activities and muscle frequency.</small></div><div className="muscle-picker">{muscleOptions.filter(muscle=>muscle!=='Cardio').map(muscle=><button type="button" className={freeMuscles.includes(muscle)?'muscle-chip active':'muscle-chip'} onClick={()=>toggleFreeMuscle(muscle)} key={muscle}>{muscle}</button>)}</div></div></section>}
     {/* LOGGING IS LINEAR AND SMALL. The old screen opened on a full entry form —
         lift dropdown, history browser, two dials, a calculated-max card — all
         for a set that had not happened yet. The day now reads as a compact list;

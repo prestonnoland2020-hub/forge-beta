@@ -97,6 +97,7 @@ import './app-polish.css';
 /* Titles, the wordmark and the loading screen. Last, because it is the one
    file that decides how a title looks. */
 import './brand.css';
+import './today-hero.css';
 import { startNativeChrome } from './features/shell/nativeChrome';
 
 // OAuth providers return to the public app URL before the hash route. Send the

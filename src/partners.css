@@ -1,30 +1,37 @@
-/* TRAINING PARTNERS. One line per person: who, where they are in their block,
-   what they did today. Tokens only, so it holds in every tone and accent and
-   the contrast audit can vouch for it. */
+/* TRAINING PARTNERS. The guide's card and rows: surface-1 at radius 20, a
+   label header, and one 64 px row per person — their mark, their name, and
+   one line of what happened. Someone who trained today wears the good chip.
+   Tokens only, so it holds in every tone and accent. */
 
-.partners-card{display:grid;gap:2px;padding:0;overflow:hidden}
-.partners-card>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 16px 8px}
-.partners-card h3,.partners-list h3,.partner-add h3,.partner-requests h3{margin:0;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
-.partners-card>header a{color:var(--accent-text);font-size:12px;font-weight:800;text-decoration:none}
-.partner-rows{display:grid}
+.partners-card{display:grid;padding:var(--s2) 0;border-radius:var(--r-lg);background:var(--surface-1);border:1px solid var(--hairline);overflow:hidden}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .partners-card{border-color:transparent}}
+:root[data-theme="dark"] .partners-card{border-color:transparent}
+.partners-card>header{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:var(--s3) var(--s5) var(--s2)}
+.partners-card h3,.partners-list h3,.partner-add h3,.partner-requests h3{margin:0;font-size:var(--fs-label);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.partners-card>header a{color:var(--accent-text);font-size:var(--fs-small);font-weight:700;text-decoration:none}
+.partner-rows{display:grid;margin:0;padding:0;list-style:none}
+.partner-rows li+li .partner-row{position:relative}
+.partner-rows li+li .partner-row::before{content:'';position:absolute;top:0;left:calc(var(--s5) + 52px);right:0;height:1px;background:var(--hairline)}
 
-.partner-row,.partner-full-main{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
-.partner-rows .partner-row:first-child{border-top:0}
+.partner-row,.partner-full-main{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:var(--s3);align-items:center;min-height:64px;padding:var(--s2) var(--s5);color:inherit;text-decoration:none;
+  transition:background var(--dur-quick) var(--ease-respond)}
+.partner-row:hover,.partner-full-main:hover{background:var(--surface-2)}
+.partner-row:active,.partner-full-main:active{background:var(--surface-2)}
 .partner-row>div,.partner-full-main>div{display:grid;gap:2px;min-width:0}
-.partner-row strong,.partner-full-main strong{font-size:16px;color:var(--ink)}
-.partner-row small,.partner-full-main small{font-size:12px;color:var(--ink-3)}
-.partner-row>b,.partner-full-main>b{color:var(--good);font-size:16px}
-.partner-mark{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);color:var(--ink-2);font:800 14px var(--display)}
-.partner-row.trained .partner-mark,.partner-full.done .partner-mark{background:color-mix(in srgb,var(--good) 22%,var(--surface-3));color:var(--ink)}
-.partner-did{font-size:14px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.partner-quiet{font-size:14px;color:var(--ink-3)}
+.partner-row strong,.partner-full-main strong{font-size:var(--fs-body);font-weight:700;color:var(--ink)}
+.partner-row small,.partner-full-main small{font-size:var(--fs-label);color:var(--ink-3)}
+.partner-full-main>b{color:var(--good);font-size:var(--fs-body)}
+.partner-mark{width:40px;height:40px;border-radius:var(--r-sm);display:grid;place-items:center;background:var(--surface-2);color:var(--ink-2);font:italic 800 var(--fs-small) var(--display);letter-spacing:-.02em}
+.partner-row.trained .partner-mark,.partner-full.done .partner-mark{background:color-mix(in srgb,var(--good) 18%,var(--surface-1));color:var(--good)}
+.partner-did{font-size:var(--fs-small);color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partner-quiet{font-size:var(--fs-small);color:var(--ink-3)}
+.partner-chip{display:inline-flex;align-items:center;gap:var(--s1);padding:var(--s1) var(--s3);border-radius:var(--r-pill);background:color-mix(in srgb,var(--good) 16%,var(--surface-1));color:var(--good);font-size:var(--fs-label);font-weight:800}
+.partner-go,.partner-invite-prompt>svg{color:var(--ink-3);transform:rotate(-90deg)}
 
 /* ── The partner screen ─────────────────────────────────────────────────── */
 .partners-page{display:grid;gap:16px}
 .partner-add,.partner-requests{display:grid;gap:12px;padding:16px}
 .partner-add label{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--ink-3)}
-.partner-add-row{display:flex;gap:8px;margin-top:8px}
-.partner-add-row input{flex:1;min-width:0}
 .partner-message{margin:0;color:var(--ink-2);font-size:14px;line-height:1.5}
 .partner-invite{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line)}
 .partner-invite>div{display:grid;gap:2px;min-width:0}
@@ -41,22 +48,25 @@
 .partner-full .partner-full-main{border-top:0}
 .partner-remove{justify-self:start;margin:0 16px 12px 64px;font-size:12px;color:var(--ink-3)}
 .partner-empty{margin:0;padding:0 16px 16px;color:var(--ink-2);font-size:14px;line-height:1.5}
-.partner-invite-prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px 16px;text-decoration:none;color:inherit}
+.partner-invite-prompt{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:var(--s3);min-height:64px;padding:var(--s2) var(--s5) var(--s3);text-decoration:none;color:inherit}
 .partner-invite-prompt>div{display:grid;gap:2px;min-width:0}
-.partner-invite-prompt strong{font-size:16px;color:var(--ink)}
-.partner-invite-prompt small{font-size:12px;color:var(--ink-3);line-height:1.4}
-.partner-invite-prompt b{color:var(--ink-3);font-weight:400;font-size:18px}
+.partner-invite-prompt strong{font-size:var(--fs-body);color:var(--ink)}
+.partner-invite-prompt small{font-size:var(--fs-small);color:var(--ink-3);line-height:1.4}
 
 /* ── Search results ─────────────────────────────────────────────────────── */
-.partner-results{display:grid;border-top:1px solid var(--line);margin-top:2px}
-.partner-result{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;color:inherit;cursor:pointer;font:inherit}
-.partner-result:last-child{border-bottom:0}
+/* Results and suggestions, as one iOS-style list: no rule above it, rows
+   divided by a line that starts where the name starts, and Add as a small
+   tinted pill the thumb can find. */
+.partner-results{display:grid;margin-top:var(--s1)}
+.partner-results-label{padding:var(--s2) 0 var(--s1);font-size:var(--fs-label);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.partner-result{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:var(--s3);align-items:center;width:100%;min-height:56px;padding:var(--s2) 0;border:0;background:none;text-align:left;color:inherit;cursor:pointer}
+.partner-result+.partner-result::before{content:'';position:absolute;top:0;left:52px;right:0;height:1px;background:var(--hairline)}
 .partner-result:disabled{cursor:default}
-.partner-result>span:nth-child(2){display:grid;gap:1px;min-width:0}
-.partner-result strong{font-size:16px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.partner-result small{font-size:12px;color:var(--ink-3)}
-.partner-result>b{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--accent-text);white-space:nowrap}
-.partner-result:disabled>b{color:var(--ink-3)}
+.partner-result>span:nth-child(2){display:grid;gap:2px;min-width:0}
+.partner-result strong{font-size:var(--fs-body);font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.partner-result small{font-size:var(--fs-small);color:var(--ink-3)}
+.partner-result>b{padding:var(--s1) var(--s3);border-radius:var(--r-pill);background:color-mix(in srgb,var(--accent) 14%,var(--surface-1));font-size:var(--fs-small);font-weight:700;color:var(--accent-text);white-space:nowrap}
+.partner-result:disabled>b{background:var(--surface-2);color:var(--ink-3)}
 .partner-result:active:not(:disabled){opacity:.7}
 
 /* Laid out like every other toggle in Forge — text left, switch right — and

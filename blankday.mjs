@@ -24,12 +24,19 @@ check('a set logged on a blank day carries the ticked muscles', /const dayMuscle
 check('a blank day can be finished with only muscles ticked', /&&!blankMuscles\.length\)\{/.test(page));
 check('and that day is saved with those muscles', /\(blankMuscles\.length\|\|exerciseDriven\.length\)\?Array\.from\(new Set\(\[\.\.\.blankMuscles,\.\.\.exerciseDriven\]\)\)/.test(page));
 
+check('and a day already saved by its cardio keeps the ticked muscles at Finish', /draft\.muscles=Array\.from\(new Set\(\[\.\.\.existingDay\.muscles\.filter\(muscle=>muscle!=='Cardio'\),\.\.\.blankMuscles,/.test(page));
+
 console.log('\nThe chips still do their other jobs');
 check('they filter the lifts offered', /const sourceMuscles=usingSplit\?\(plannedDay\?\.muscles\?\?\[\]\):freeMuscles;/.test(page));
 check('and they name the day', /const dayLabel=usingSplit\?\(plannedDay\?\.name\|\|''\):written\?\.name\|\|freeMuscles/.test(page));
 
 console.log('\nDeleting the last set takes only the sets\' muscles with it');
-check('the ticked muscles stay on the day', /const chips=!usingSplit&&!written\?freeMuscles/.test(page) && /new Set\(\[\.\.\.chips,\.\.\.remaining\.map/.test(page));
+check('the ticked muscles stay on the day', /const chips=chipMuscles\(\);/.test(page) && /new Set\(\[\.\.\.chips,\.\.\.remaining\.map/.test(page));
+
+console.log('\nAn old custom day can be given its muscles back');
+check('editing a day not on the split shows the chips', /\{editingCustom&&<section[^>]*edit-muscles/.test(page));
+check('opened on what the day holds', /setFreeMuscles\(\(editingRecord\.muscles\|\|\[\]\)\.filter\(muscle=>muscle!=='Cardio'\)\)/.test(page));
+check('and saving takes the chips as they stand', /editingCustom\?Array\.from\(new Set\(\[\.\.\.blankMuscles,\.\.\.exerciseDriven\]\)\)/.test(page));
 check('anything else empties, unless assigned to a split day', /muscles:muscles\.length\?muscles:savedDay\.splitPosition\?savedDay\.muscles:\[\]/.test(page));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');

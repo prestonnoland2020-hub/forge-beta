@@ -141,6 +141,7 @@
   font-size: .78rem;
   line-height: 1.5;
 }
+.billing-fineprint a { color: var(--ink-2); text-decoration: underline; }
 
 .billing-free-note { margin-top: var(--s3); }
 .billing-free-note summary {

@@ -89,7 +89,7 @@
   font-size: 1.4rem;
 }
 
-.legal-nav { display: flex; gap: var(--s2); }
+.legal-nav { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .legal-nav a {
   padding: 8px 12px;
   border-radius: var(--r-pill);
@@ -124,6 +124,12 @@
 .legal-body ul { margin: 0 0 var(--s4); padding-left: var(--s5); display: grid; gap: var(--s2); }
 .legal-body li { color: var(--ink-2); }
 .legal-body a { color:var(--accent-text); }
+
+/* The storage table in the cookie policy. Three short columns that all wrap,
+   so it fits a phone without a horizontal scroller. */
+.legal-table { width: 100%; border-collapse: collapse; margin: 0 0 var(--s4); font-size: .9rem; }
+.legal-table th, .legal-table td { text-align: left; vertical-align: top; padding: var(--s2) var(--s2) var(--s2) 0; border-bottom: 1px solid var(--hairline); color: var(--ink-2); }
+.legal-table th { color: var(--ink); font-weight: 700; }
 
 .legal-meta {
   color: var(--ink-3) !important;

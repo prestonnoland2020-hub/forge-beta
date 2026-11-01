@@ -342,9 +342,6 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .gx-hero.ring-work .gx-ring-fill { stroke: var(--warn); }
 .gx-hero.ring-off .gx-ring-fill { stroke: var(--bad); }
 .gx-hero.ring-none .gx-ring-fill { stroke: var(--ink-3); }
-.gx-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink, #000) 7%, transparent); }
-.gx-mode button { min-height: 48px; border: 0; border-radius: 10px; background: none; color: var(--ink-2, var(--text)); font-size: 16px; font-weight: 800; transition: background-color .15s ease; }
-.gx-mode button.active { background: var(--surface-1, #fff); color: var(--ink, var(--text)); box-shadow: 0 1px 3px rgb(0 0 0 / .14); }
 
 /* ── LAST WEEK, DRAWN ─────────────────────────────────────────────────── */
 .wk { display: grid; gap: 12px; margin: 4px 0 2px; }
@@ -411,3 +408,55 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .pv > section.pv-week { padding: 0 8px 4px; }
 .pv > section.pv-week > header { padding: 12px 12px 4px; }
 .pv > section.pv-week > header h3 { font-size: 12px; }
+
+/* AN OPEN GOAL IS ONE ANSWER: where you will be on the day. Brand wash,
+   one big number, the bar to the target, one line on the margin. */
+.gx-card .goal-card-detail { border-top: 0; padding: 0 16px 8px 16px; }
+.goal-progress-card.gp-simple { display: grid; gap: 8px; margin: 0; padding: 12px 16px 12px; border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 20px; background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 11%, var(--surface-1)), var(--surface-1) 70%); box-shadow: none; --gp: var(--gx-good, #22a35a); }
+.gp-simple.tone-work { --gp: var(--gx-work, #e3a008); }
+.gp-simple.tone-off { --gp: var(--gx-off, #dc4a3d); }
+.gp-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+/* Smaller than the card's own number above it — this is the follow-up, not the headline. */
+.gp-hero { font: 800 26px/1.1 var(--display); letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.gp-track { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); margin-bottom: 16px; }
+.gp-track i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--gp) 60%, #fff), var(--gp)); transition: width .9s cubic-bezier(.2,.8,.2,1); }
+.gp-track::after { content: ''; position: absolute; right: 0; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: var(--ink); }
+.gp-track b { position: absolute; right: 0; top: 17px; font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.gp-line { margin: 0; font-size: 14px; font-weight: 650; color: var(--ink-2); }
+.gp-line b { color: var(--gp); font-weight: 800; }
+.gp-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.gx-card .goal-card-actions { padding: 8px 16px 16px 24px; background: transparent; box-shadow: none; }
+.gx-card .goal-card-actions button { height: 32px; min-height: 36px; border: 0; padding: 0 4px; color: var(--accent-text); }
+.gx-card .goal-card-actions button.danger { color: var(--ink-3); }
+
+/* THE SIMPLE DIAL. One size drives everything (--dial-item matches
+   ITEM_HEIGHT in NumberDial): five rows of wheel, two rows of pad above and
+   below, the band exactly one row tall in the exact middle. */
+.dial-simple { --dial-item: 52px; gap: 8px; }
+.dial-simple .dial-columns { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; height: calc(var(--dial-item) * 5); margin: 4px 0 8px; }
+.dial-simple .dial-band { position: absolute; left: 0; right: 0; top: calc(var(--dial-item) * 2); height: var(--dial-item); transform: none; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dial-simple .dial-wheel { display: block; position: relative; height: calc(var(--dial-item) * 5); min-width: 96px; scroll-snap-type: y mandatory; }
+.dial-simple .dial-pad { height: calc(var(--dial-item) * 2); }
+.dial-simple .dial-value { display: block; width: 100%; height: var(--dial-item); line-height: var(--dial-item); min-height: 0; padding: 0; scroll-snap-align: center; font: 700 20px/var(--dial-item) var(--display-font, var(--display)); color: var(--ink-3, var(--muted)); opacity: .5; transform: none; transition: opacity .12s, color .12s; }
+.dial-simple .dial-value.active { font-size: 32px; font-weight: 800; color: var(--ink, var(--text)); opacity: 1; transform: none; }
+.dial-simple .dial-point { font: 800 26px var(--display-font, var(--display)); color: var(--ink, var(--text)); align-self: center; }
+.dial-simple .dial-suffix { position: relative; align-self: center; min-width: 0; font: 800 16px var(--body, inherit); letter-spacing: .02em; text-transform: none; color: var(--accent-text); }
+
+/* Activities: custom days that lost their muscles, one tap from fixing. */
+.muscle-review { display: grid; gap: 12px; border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 10%, var(--surface-1)), var(--surface-1) 70%); }
+.muscle-review header { display: grid; gap: 4px; }
+.muscle-review h3 { margin: 0; font-size: 18px; text-transform: none; }
+.muscle-review p { margin: 0; font-size: 14px; color: var(--muted); }
+.muscle-review ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.muscle-review li { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.muscle-review li a { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 12px; border-radius: 12px; background: var(--surface-1); border: 1px solid var(--line); color: inherit; }
+.muscle-review li a span { font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muscle-review li a b { font-size: 14px; color: var(--accent-text); }
+.muscle-review li button { border: 0; background: none; color: var(--ink-3, var(--muted)); font-size: 12px; font-weight: 700; padding: 8px 4px; }
+
+/* One-tap check-in: four answers as a 2×2 grid. */
+.coach-checkin-one { grid-template-columns: 1fr 1fr; }
+/* Forge noticed, as a pop-up. */
+.forge-noticed.coach-checkin { border-left: 3px solid var(--accent); }
+.forge-noticed-head { align-items: center; }
+.forge-noticed-close { display: grid; place-items: center; width: 32px; height: 32px; margin: -6px -8px -6px 0; border: 0; border-radius: 999px; background: none; color: var(--ink-3); }

@@ -26,21 +26,31 @@ article .connection-message { padding: 4px 0 0; border-top: 0; }
 
    html's background always covers the canvas, at any scroll position and any
    content height. So the ground goes there and body carries none. */
+/* A HUE, NOT GRAPH PAPER. The ground was a 42px grid; it read as a
+   spreadsheet behind every card. It is now one soft wash of the brand blue
+   from the top of the screen, fading to the plain ground by mid-page, with a
+   fainter second wash on the right so it is not a single flat spotlight. */
 html {
   background-color: var(--surface-sunken) !important;
-  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) !important;
-  background-size: 42px 42px !important;
+  background-image:
+    radial-gradient(120% 60% at 10% -8%, color-mix(in srgb, var(--accent) var(--hue-strength, 16%), transparent), transparent 72%),
+    radial-gradient(80% 45% at 105% 18%, color-mix(in srgb, var(--accent) calc(var(--hue-strength, 16%) * .6), transparent), transparent 70%) !important;
+  background-size: 100% 100lvh !important;
+  background-repeat: no-repeat !important;
 }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --hue-strength: 22%; } }
+:root[data-theme="dark"] { --hue-strength: 22%; }
 body { background: transparent !important; }
 /* The ambient glow is a DARK-mode device: on a white ground the same wash
    reads as a green stain, which is exactly the olive cast this theme pass
    was undoing. --page-glow is transparent in light, so this line now costs
    nothing there. */
 .app-main { background: radial-gradient(circle at 92% 0, var(--page-glow), transparent 26rem); }
-/* Every card is the brand guide's card: surface-1, radius 20, a hairline
-   edge in light tone and none in dark (brand.css clears it there). */
+/* Every card is the brand guide's card: surface-1, radius 20, no edge. In
+   light tone it lifts on --shadow-card (brand.css); in dark the step in
+   surface does it. */
 .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections {
-  border-color: var(--hairline) !important;
+  border-color: transparent !important;
   border-radius: var(--r-lg) !important;
   background-color: var(--surface-1) !important;
 }

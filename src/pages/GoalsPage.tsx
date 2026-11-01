@@ -4,7 +4,8 @@ import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
 import { goalFeasibility } from '../lib/goalFeasibility';
-import { goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
+import { expectedRunMiles, goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
+import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -74,7 +75,14 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      the cards, their bars and the overall ring. Remembered on this device. */
   const [maxMode, setMaxMode] = useState<MaxMode>(() => { try { return localStorage.getItem('forge-goals-max-mode') === 'tested' ? 'tested' : 'calculated'; } catch { return 'calculated'; } });
   const chooseMode = (mode: MaxMode) => { if (mode === maxMode) return; tap(); setMaxMode(mode); try { localStorage.setItem('forge-goals-max-mode', mode); } catch { /* per-device convenience */ } };
-  const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode)), [goals, records, verdicts, setup, maxMode]);
+  /* What logged running is worth at each endurance goal's distance today —
+     the same predictor the goal detail calls CURRENT. */
+  const enduranceNow = useMemo(() => goals.map(goal => {
+    if (goal.type !== 'Endurance') return null;
+    const miles = expectedRunMiles(goal);
+    return miles ? predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null : null;
+  }), [goals, records, setup?.excludedEfforts, workouts]);
+  const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
   /* The bars start empty and fill one frame after the page mounts, so the
      width transition runs; each card is a beat behind the one above it. */
@@ -118,8 +126,17 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
 
     {syncError && <p className="data-sync-error">{syncError}</p>}
 
-    {hasStrength && <div className="gx-mode" role="radiogroup" aria-label="Strength max">
-      {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Calculated max' : 'Tested max'}</button>)}
+    {/* The switch and the overview share one tight block, so the goals start
+       near the top of a phone; on a wide screen they sit side by side. */}
+    <div className="gx-head">
+    {/* A switch should look like one: a label saying what it switches, a thumb that slides, and a line saying what the chosen side counts. */}
+    {hasStrength && <div className="gx-mode" data-mode={maxMode}>
+      <span className="gx-mode-label" id="gx-mode-label">Strength goals use</span>
+      <div className="gx-mode-track" role="radiogroup" aria-labelledby="gx-mode-label">
+        <i className="gx-mode-thumb" aria-hidden="true" />
+        {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Calculated max' : 'Tested max'}</button>)}
+      </div>
+      <p className="gx-mode-hint">{maxMode === 'calculated' ? 'Estimated from your best rep sets.' : 'Only singles you actually lifted.'}</p>
     </div>}
 
     {goals.length > 0 && (() => {
@@ -146,6 +163,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
         </div>
       </section>;
     })()}
+    </div>
 
     {goals.length === 0 && <section className="gx-empty">
       <div className="gx-empty-art" aria-hidden="true">{CATEGORIES.map(category => <span key={category.type} className={category.className}><Glyph d={category.icon} /></span>)}</div>
@@ -176,6 +194,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               </span>
               <span className="gx-foot"><b>{item.share === null ? 'No data yet' : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
             </button>
+            {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
             {isOpen && <div className="goal-card-actions">
               <button onClick={() => openBuilder(index)} aria-label={`Edit ${goal.title}`}>Edit</button>
               <button
@@ -186,7 +205,6 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
                 {confirming === index ? 'Sure?' : 'Delete'}
               </button>
             </div>}
-            {isOpen && roadmaps[index] && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
           </li>;
         })}</ul>
       </section>;
