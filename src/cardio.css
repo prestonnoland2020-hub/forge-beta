@@ -44,3 +44,19 @@
   .cardio-log-saved>div>button{grid-row:2}
   .cardio-log-saved>div>button:first-of-type{grid-column:1/2}
 }
+
+/* THE LOGGER LINE: type chips across the top, distance and time side by side
+   beneath, the unit a small switch under the distance. */
+.cardio-log-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+.cardio-log-type{grid-column:1/-1;display:grid;gap:8px;min-width:0}
+.cardio-log-label{font:800 12px var(--display-font);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.cardio-type-chips{display:flex;flex-wrap:wrap;gap:6px}
+.cardio-type-chips button{min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface-1);color:var(--text);font-weight:700;font-size:13px}
+.cardio-type-chips button.active{background:var(--accent-strong);border-color:var(--accent-strong);color:var(--accent-ink)}
+.cardio-log-distance{display:grid;gap:4px;min-width:0}
+.cardio-log-line select.cardio-log-unit-inline{min-height:0;width:auto;justify-self:start;padding:2px 20px 2px 2px;border:0;background-color:transparent;color:var(--accent-text);font-size:12px;font-weight:800}
+.cardio-log-time{align-self:start}
+@media(max-width:760px){
+  .cardio-log-line{grid-template-columns:1fr 1fr}
+  .cardio-log-line select.cardio-log-unit-inline{background-color:transparent}
+}

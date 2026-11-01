@@ -85,6 +85,22 @@ check('a movement with no logged history is left out rather than shown as 0 × 0
   !unlogged.topSets.some(row => row.exercise === 'Cable Fly'),
   unlogged.topSets.map(r => r.exercise).join(', '));
 
+/* The model can still WRITE a row for a lift with no history — a second
+   lift on a day, or a goal lift the server added. Its number is the model's
+   guess, and the screen used to show it as the program. Both goal lifts are
+   on the day, so the goal-lift repair leaves the Cable Fly row alone. */
+const guessed = (weekIndex) => resolvePlanWeek({ ...WEEK, topSets: [...WEEK.topSets, { splitDay: 'Chest & Back 2', exercise: 'Pull Ups', weight: 90, reps: 8 }, { splitDay: 'Chest & Back 2', exercise: 'Cable Fly', weight: 185, reps: 8 }] },
+  [{ ...SPLIT[0], exercises: [...SPLIT[0].exercises, 'Cable Fly'] }], ATHLETE,
+  { weekIndex, blockWeeks: 10 },
+  { bests: history.bests, singles: history.singles, goalLifts: GOAL_LIFTS, anchors: history.anchors,
+    sessions: history.sessions, misses: history.misses, lastAt: history.lastAt }).topSets.find(row => row.exercise === 'Cable Fly');
+const fly = guessed(0);
+check('a model-written row with no logged history drops the model\'s weight',
+  fly && fly.weight === 0 && fly.unlogged === true, fly ? `${fly.weight}×${fly.reps} unlogged=${fly.unlogged}` : 'missing');
+check('and carries the week\'s reps', fly?.reps === 8, String(fly?.reps));
+const flyMax = guessed(4);
+check('max week holds it at a double — nothing to attempt a single from', flyMax?.reps === 2 && flyMax.weight === 0, flyMax ? `${flyMax.weight}×${flyMax.reps}` : 'missing');
+
 console.log('\n  max week does not turn the accessories into singles');
 const maxWeek = resolve(4).topSets.filter(row => row.splitDay === 'Chest & Back 2');
 check('no accessory is asked for a single', maxWeek.filter(row => !GOAL_LIFTS.has(row.exercise.toLowerCase())).every(row => row.reps > 1),

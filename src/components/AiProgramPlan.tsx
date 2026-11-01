@@ -144,7 +144,7 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
       runText = miles ? `${miles} ${distanceUnit} @ ${week.easyPace}` : `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`;
       runStress = 'Low';
     }
-    const setText = (item: AiPlanTopSet) => `${item.exercise}: ${item.weight} × ${item.reps}`;
+    const setText = (item: AiPlanTopSet) => item.unlogged ? `${item.exercise}: find your weight` : `${item.exercise}: ${item.weight} × ${item.reps}`;
     const strengthText = topSet
       ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${[setText(topSet), ...extraSets.map(setText)].join(' · ')}`
       : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · no exercise mapped yet` : '';

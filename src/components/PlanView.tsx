@@ -29,7 +29,7 @@ import { Icon } from './Icon';
    rest. Every component here is shared by the AI program and the pre-program
    fallback, so the tab looks like one thing whichever is showing. */
 
-export type PlanLift = { exercise: string; weight: number; reps: number };
+export type PlanLift = { exercise: string; weight: number; reps: number; unlogged?: boolean };
 export type PlanRun = { kind: 'Long run' | 'Hard run' | 'Easy run'; text: string };
 export type PlanSession = {
   date: Date;
@@ -79,7 +79,7 @@ const longDate = (date: Date) => date.toLocaleDateString('en-US', { weekday: 'lo
 export function LiftLine({ lift, unit }: { lift: PlanLift; unit: string }) {
   return <div className="pv-line">
     <span className="pv-line-name">{lift.exercise}</span>
-    <span className="pv-line-value">{lift.weight ? <>{lift.weight} <small>{unit}</small> × {lift.reps}</> : lift.reps === 1 ? 'Max attempt' : `${lift.reps} reps`}</span>
+    <span className="pv-line-value">{lift.unlogged ? <>Find your weight × {lift.reps}</> : lift.weight ? <>{lift.weight} <small>{unit}</small> × {lift.reps}</> : lift.reps === 1 ? 'Max attempt' : `${lift.reps} reps`}</span>
   </div>;
 }
 export function RunLine({ run }: { run: PlanRun }) {

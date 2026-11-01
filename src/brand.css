@@ -332,31 +332,18 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 }
 
 /* ---- Exercise library -----------------------------------------------------
-   Filters are pills, rows are a grouped list with inset dividers and a drawn
-   chevron, and On/Off is a switch — the control iOS uses for exactly this —
-   instead of an outlined word. The button keeps its aria-label, so it still
-   says what it does. */
-.library-filters button { min-height: var(--control-s); padding: 0 var(--s4); border: 0; border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink-2); font: 700 var(--fs-small) var(--body); }
-.library-filters button.active { background: var(--accent-strong); color: var(--accent-ink); }
+   Rows are Profile's grouped list (above). "Use in my plans" in the editor is
+   a switch — the control iOS uses for exactly this — instead of an outlined
+   word; it is role="switch", so it still says what it does. */
 .library-table-card > header { display: grid; gap: var(--s3); }
-.exercise-mobile-row { position: relative; padding: 0 var(--s4) 0 var(--s5); border-top: 0 !important; }
-.exercise-mobile-row + .exercise-mobile-row::before { content: ''; position: absolute; top: 0; left: var(--s5); right: 0; height: 1px; background: var(--hairline); }
-.exercise-mobile-main { min-height: 56px; padding: var(--s2) 0; }
-.exercise-mobile-main strong { font-size: var(--fs-body); font-weight: 700; }
-.exercise-mobile-main small { font-size: var(--fs-small); color: var(--ink-3); }
-.exercise-mobile-main > b { width: 16px; height: 16px; font-size: 0; color: var(--ink-3); background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/contain no-repeat; }
-.exercise-mobile-row.disabled { opacity: 1; }
-.exercise-mobile-row.disabled .exercise-mobile-main strong { color: var(--ink-3); }
-:is(.exercise-mobile-row, .library-table) button.table-status.table-status { position: relative; flex: none; width: 48px; min-width: 48px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: var(--r-pill);
+.exercise-use-row button.table-status.table-status { position: relative; flex: none; width: 48px; min-width: 48px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: var(--r-pill);
   background: var(--surface-3); font-size: 0; color: transparent; cursor: pointer; transition: background var(--dur-quick) var(--ease-respond); }
-:is(.exercise-mobile-row, .library-table) button.table-status.table-status::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: var(--r-pill); background: #fff;
+.exercise-use-row button.table-status.table-status::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: var(--r-pill); background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform var(--dur-standard) var(--ease-strike); }
-:is(.exercise-mobile-row, .library-table) button.table-status.table-status.on { background: var(--good); }
-:is(.exercise-mobile-row, .library-table) button.table-status.table-status.on::after { transform: translateX(20px); }
+.exercise-use-row button.table-status.table-status.on { background: var(--good); }
+.exercise-use-row button.table-status.table-status.on::after { transform: translateX(20px); }
 /* The switch is drawn 28 tall; its hit area is the guide's 44. */
-:is(.exercise-mobile-row, .library-table) button.table-status.table-status::before { content: ''; position: absolute; inset: -8px; }
+.exercise-use-row button.table-status.table-status::before { content: ''; position: absolute; inset: -8px; }
 
 /* Month arrows on History: a true circle with a stroke chevron. They were the
    ‹ › characters at 26px in a condensed face, in a 34px button the tap-target

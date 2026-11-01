@@ -1,56 +1,48 @@
 import { useMemo, useState } from 'react';
-import { openCoachBubble } from '../features/training/coachService';
-import { exerciseCategories, exerciseCategory, useTrainingLibrary, type ExerciseCategory, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
+import { exerciseCategory, useTrainingLibrary, type ExerciseCategory, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { SearchField } from './SearchField';
 
-const filters = ['All', 'Strength', 'Cardio', 'HYROX', 'CrossFit'] as const;
-const muscles = ['Chest', 'Back', 'Shoulders', 'Quads', 'Glutes', 'Hamstrings', 'Biceps', 'Triceps', 'Forearms', 'Abs', 'Cardio'];
+/* STRENGTH FIRST. Most athletes come here for a lift, so lifts head the page;
+   the event and conditioning movements follow. */
+const groups: ExerciseCategory[] = ['Strength', 'HYROX', 'CrossFit', 'Cardio'];
+const muscles = ['Chest', 'Back', 'Shoulders', 'Quads', 'Glutes', 'Hamstrings', 'Calves', 'Biceps', 'Triceps', 'Forearms', 'Abs', 'Cardio'];
 
 export function ExerciseLibrary() {
-  const [filter, setFilter] = useState<(typeof filters)[number]>('All');
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ExerciseCategory>('Strength');
   const [selectedMuscles, setSelectedMuscles] = useState<string[]>([]);
   const [defaultUnit, setDefaultUnit] = useState('reps');
-  const { exercises, addExercise, updateExercise, removeExercise, toggleExercise } = useTrainingLibrary();
-  /* Where it sorts (its first claim) versus everything it belongs to. The
-     deadlift is a barbell lift and a CrossFit movement, so it sorts with the
-     lifts and appears under both filters. */
-  const section = (item: LibraryExercise) => exerciseCategory(item);
-  const belongsTo = (item: LibraryExercise, bucket: ExerciseCategory) => exerciseCategories(item).includes(bucket);
+  const [enabled, setEnabled] = useState(true);
+  const { exercises, addExercise, updateExercise, removeExercise } = useTrainingLibrary();
   const canSave = Boolean(name.trim() && selectedMuscles.length);
+  /* ONE LIST, GROUPED. Headings replace the old filter pills: each movement
+     sits under the category it claims first, and search reaches the rest. */
   const shown = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return exercises
-      .filter(item => (filter === 'All' || belongsTo(item, filter)) && (!term || `${item.name} ${item.kind} ${item.muscles.join(' ')}`.toLowerCase().includes(term)))
-      .sort((a, b) => section(a).localeCompare(section(b)) || a.name.localeCompare(b.name));
-  }, [exercises, filter, query]);
+    const matches = exercises.filter(item => !term || `${item.name} ${exerciseCategory(item)} ${item.muscles.join(' ')}`.toLowerCase().includes(term));
+    return groups.map(group => ({ group, items: matches.filter(item => exerciseCategory(item) === group).sort((a, b) => a.name.localeCompare(b.name)) })).filter(({ items }) => items.length);
+  }, [exercises, query]);
   const editingExercise = editing ? exercises.find(item => item.id === editing) : undefined;
-  const isCardio = editingExercise?.kind === 'Cardio' || /\b(run|jog|row|rowing|bike|cycling|ski\s*erg|skierg|swim|double unders?)\b/i.test(name);
+  const isCardio = category === 'Cardio' || editingExercise?.kind === 'Cardio' || /\b(run|jog|row|rowing|bike|cycling|ski\s*erg|skierg|swim|double unders?)\b/i.test(name);
 
   const open = (exercise?: LibraryExercise) => {
     setEditing(exercise?.id ?? 0);
     setName(exercise?.name || '');
-    setCategory(exercise ? section(exercise) : 'Strength');
+    setCategory(exercise ? exerciseCategory(exercise) : 'Strength');
     setSelectedMuscles(exercise?.muscles || []);
     setDefaultUnit(exercise?.defaultUnit || 'reps');
+    setEnabled(exercise?.enabled ?? true);
   };
-  const close = () => {
-    setEditing(null);
-    setName('');
-    setCategory('Strength');
-    setSelectedMuscles([]);
-    setDefaultUnit('reps');
-  };
+  const close = () => setEditing(null);
   const toggleMuscle = (muscle: string) => setSelectedMuscles(items => items.includes(muscle) ? items.filter(item => item !== muscle) : [...items, muscle]);
   const save = () => {
     if (!canSave) return;
     /* Choosing a category in the editor makes that the movement's only one —
        an explicit choice replaces a multi-category tag rather than silently
        keeping it. */
-    const value = { name: name.trim(), kind: isCardio ? 'Cardio' as const : 'Strength' as const, muscles: selectedMuscles, detail: `${category} · ${isCardio ? 'Cardio measurement' : 'Weight + reps'}`, categories: [category], enabled: true, custom: true, ...(isCardio ? { defaultUnit } : {}) };
+    const value = { name: name.trim(), kind: isCardio ? 'Cardio' as const : 'Strength' as const, muscles: selectedMuscles, detail: `${category} · ${isCardio ? 'Cardio measurement' : 'Weight + reps'}`, categories: [category], enabled, custom: true, ...(isCardio ? { defaultUnit } : {}) };
     if (editing) updateExercise(editing, value); else addExercise(value);
     close();
   };
@@ -62,24 +54,22 @@ export function ExerciseLibrary() {
   };
 
   return <div className="exercise-library stack-lg">
-    <section className="simple-library-head">
-      <div className="button-row"><button className="button" onClick={() => open()}>＋ Add exercise</button><button className="button ghost" onClick={() => openCoachBubble('Help me create an exercise for my library.')}>Ask Forge</button></div>
-    </section>
+    <div className="exercise-library-head"><SearchField value={query} onChange={setQuery} placeholder="Search exercises" aria-label="Search exercises" /><button className="button" onClick={() => open()}>＋ Add exercise</button></div>
     {editing !== null && <div className="mobile-editor-backdrop" role="presentation">
       <section className="card custom-exercise" role="dialog" aria-modal="true" aria-label={editing ? 'Edit exercise' : 'Add exercise'}>
-        <div className="card-head"><div><span className="eyebrow">{editing ? 'EDIT EXERCISE' : 'NEW EXERCISE'}</span><h3>{editing ? 'Update exercise' : 'Add an exercise'}</h3></div><button className="text-button" onClick={close}>Close</button></div>
-        <div className="field-grid"><label>Name<input value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Belt Squat" /></label><label>Category<select value={category} onChange={event => setCategory(event.target.value as typeof category)}><option>Strength</option><option>HYROX</option><option>CrossFit</option></select></label></div>
+        <div className="card-head"><div><span className="eyebrow">{editing ? 'EDIT EXERCISE' : 'NEW EXERCISE'}</span><h3>{editing ? editingExercise?.name : 'Add an exercise'}</h3></div><button className="text-button" onClick={close}>Close</button></div>
+        <div className="field-grid"><label>Name<input value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Belt Squat" /></label><label>Category<select value={category} onChange={event => setCategory(event.target.value as ExerciseCategory)}>{groups.map(group => <option key={group}>{group}</option>)}</select></label></div>
         {isCardio && <label>Unit of measure<select value={defaultUnit} onChange={event => setDefaultUnit(event.target.value)}><option value="miles">Miles</option><option value="meters">Meters</option><option value="calories">Calories</option><option value="seconds">Seconds</option><option value="minutes">Minutes</option><option value="reps">Reps</option></select></label>}
-        <label>Muscle groups · required<div className="muscle-picker">{muscles.map(muscle => <button type="button" className={selectedMuscles.includes(muscle) ? 'muscle-chip active' : 'muscle-chip'} onClick={() => toggleMuscle(muscle)} key={muscle}>{muscle}</button>)}</div></label>
-        {!selectedMuscles.length && <small className="required-mapping">Choose at least one muscle group so Forge can place it correctly.</small>}
-        <div className="button-row"><button className="button" disabled={!canSave} onClick={save}>Save exercise</button>{Boolean(editing) && <button className="button ghost danger" onClick={() => remove(exercises.find(item => item.id === editing)!)}>Delete</button>}</div>
+        <label>Muscle groups<div className="muscle-picker">{muscles.map(muscle => <button type="button" className={selectedMuscles.includes(muscle) ? 'muscle-chip active' : 'muscle-chip'} onClick={() => toggleMuscle(muscle)} key={muscle}>{muscle}</button>)}</div></label>
+        {!selectedMuscles.length && <small className="required-mapping">Pick at least one muscle.</small>}
+        <div className="exercise-use-row"><div><strong>Use in my plans</strong><small>Off keeps it out of anything Forge programs for you.</small></div><button type="button" role="switch" aria-checked={enabled} aria-label="Use in my plans" className={enabled ? 'table-status on' : 'table-status'} onClick={() => setEnabled(value => !value)} /></div>
+        <div className="button-row"><button className="button" disabled={!canSave} onClick={save}>Save exercise</button>{editingExercise && <button className="button ghost danger" onClick={() => remove(editingExercise)}>Delete</button>}</div>
       </section>
     </div>}
-    <section className="card library-table-card">
-      <header><div className="library-filters">{filters.map(value => <button className={filter === value ? 'active' : ''} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div><SearchField value={query} onChange={setQuery} placeholder="Search exercises" aria-label="Search exercises" /></header>
-      <div className="exercise-mobile-list">{shown.map(item => <article className={item.enabled ? 'exercise-mobile-row' : 'exercise-mobile-row disabled'} key={item.id}><button className="exercise-mobile-main" onClick={() => open(item)}><span><strong>{item.name}</strong><small>{section(item)} · {item.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Needs mapping'}</small></span><b>›</b></button><button aria-label={`${item.enabled ? 'Disable' : 'Enable'} ${item.name}`} className={item.enabled ? 'table-status on' : 'table-status'} onClick={() => toggleExercise(item.id)}>{item.enabled ? 'On' : 'Off'}</button></article>)}</div>
-      <div className="library-table-scroll"><table className="library-table exercise-table"><thead><tr><th>Exercise</th><th>Category</th><th>Muscle groups</th><th>Status</th><th>Action</th></tr></thead><tbody>{shown.map(item => <tr className={item.enabled ? '' : 'disabled'} key={item.id}><td><strong>{item.name}</strong><small>{item.detail}{item.kind === 'Cardio' && item.defaultUnit ? ` · Unit ${item.defaultUnit}` : ''}</small></td><td>{section(item)}</td><td>{item.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Not mapped'}</td><td><button className={item.enabled ? 'table-status on' : 'table-status'} onClick={() => toggleExercise(item.id)}>{item.enabled ? 'Enabled' : 'Disabled'}</button></td><td><button onClick={() => open(item)}>Edit</button><button className="danger" onClick={() => remove(item)}>Delete</button></td></tr>)}</tbody></table></div>
-      {!shown.length && <div className="library-table-empty">No exercises match these filters.</div>}
-    </section>
+    {shown.map(({ group, items }) => <section className="exercise-group" key={group}>
+      <span className="eyebrow">{group}</span>
+      <div className="simple-settings-list">{items.map(item => <button type="button" className={item.enabled ? '' : 'off'} onClick={() => open(item)} key={item.id}><div><strong>{item.name}</strong><span>{item.enabled ? '' : 'Off · '}{item.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Needs a muscle group'}</span></div><b>›</b></button>)}</div>
+    </section>)}
+    {!shown.length && <p className="library-table-empty">Nothing matches “{query.trim()}”.</p>}
   </div>;
 }

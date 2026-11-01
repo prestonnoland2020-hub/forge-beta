@@ -40,24 +40,15 @@ export function HomePage() {
   const selectedCount = selectedSets.length + (recommendation.cardio?.selected ? 1 : 0);
   const startUrl = `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}`;
 
-  /* THE WEEK, AS THE GUIDE DRAWS IT: Monday to Sunday, today filled in signal,
-     a logged day marked with a dot. It answers "am I keeping up" without a
-     chart. */
-  const monday = (() => { const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return date; })();
-  const iso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  const loggedDays = new Set(records.map(record => record.date));
-  const week = Array.from({ length: 7 }, (_, index) => { const date = new Date(monday); date.setDate(monday.getDate() + index); return { iso: iso(date), letter: date.toLocaleDateString('en-US', { weekday: 'narrow' }), day: date.getDate() }; });
-
   const dayType = recommendation.splitDay.type;
   const quiet = !recommendedSets.length && !recommendation.cardio && (dayType === 'rest' || dayType === 'cardio');
 
   return <div className="forge-feed today">
 
-    <ol className="td-week" aria-label="This week">
-      {week.map(day => <li key={day.iso} className={`${day.iso === currentDate ? 'today' : ''}${loggedDays.has(day.iso) ? ' logged' : ''}`} aria-current={day.iso === currentDate ? 'date' : undefined}>
-        <small>{day.letter}</small><b>{day.day}</b><i aria-hidden="true" />
-      </li>)}
-    </ol>
+    {/* NO WEEK STRIP. Seven date squares sat over the card, drawn like tabs,
+        and tapping one did nothing — Today never left today. Plan's week
+        list is where the days live, so the strip only promised a picker
+        that was not there. */}
 
     {syncError && <div className="save-confirmation save-warning">Your workout is ready here. Account sync will retry automatically.</div>}
     <StravaReviewModal />

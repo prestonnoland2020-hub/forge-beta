@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import { ExerciseLibrary } from '../components/ExerciseLibrary';
 import { WorkoutLibrary } from '../components/WorkoutLibrary';
 
 export function ExerciseLibraryPage(){
-  const [tab,setTab]=useState<'exercises'|'cardio'>('exercises');
-  return <div className="stack-xl"><nav className="plan-tabs"><button className={tab==='exercises'?'active':''} onClick={()=>setTab('exercises')}>Exercises</button><button className={tab==='cardio'?'active':''} onClick={()=>setTab('cardio')}>Cardio & circuits</button></nav>{tab==='exercises'?<ExerciseLibrary/>:<WorkoutLibrary/>}</div>;
+  return <div className="stack-xl"><ExerciseLibrary/><WorkoutLibrary/></div>;
 }

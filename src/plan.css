@@ -61,3 +61,60 @@
 .split-page-back{display:flex;align-items:center;gap:12px}
 .split-page-back a{color:var(--accent-text);font-weight:800;text-decoration:none;font-size:14px}
 .split-page-back strong{font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+
+/* THE CARDIO SESSION SHEET. Above the split's day sheet (50) and the tab bar
+   (30), below the number dial (80) it opens. On a phone it is a bottom sheet
+   with Save pinned to its foot, so the action is never under the tab bar. */
+.cardio-plan-backdrop{z-index:70}
+.cardio-plan-sheet{gap:20px;padding-bottom:0}
+.cardio-plan-sheet>header{align-items:flex-start;padding-bottom:12px}
+.cardio-plan-sheet>header h2{margin:4px 0 0}
+.cardio-plan-group{display:grid;gap:8px}
+.ss-segment.four{grid-template-columns:repeat(4,1fr)}
+.cardio-plan-sheet .ss-segment button{min-height:44px;font-size:14px;padding:0 4px}
+.cardio-plan-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cardio-plan-chips button{min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface-sunken);color:var(--text);font-weight:700;font-size:14px}
+.cardio-plan-chips button.active{background:var(--accent-strong);border-color:var(--accent-strong);color:var(--accent-ink)}
+.cardio-plan-chips.small button{min-height:32px;padding:0 12px;font-size:12px}
+.cardio-plan-sheet .cardio-plan-fields{gap:12px;padding:12px}
+.cardio-plan-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end}
+.cardio-plan-row.with-unit{grid-template-columns:1fr 128px}
+.cardio-plan-row.reps{grid-template-columns:96px auto 1fr}
+.cardio-plan-row.reps>b{padding-bottom:16px;color:var(--muted);font:800 18px var(--display-font)}
+.cardio-unit-pick,.cardio-plan-text{display:grid;gap:8px;min-width:0;margin:0}
+.cardio-unit-pick select,.cardio-plan-text input{height:58px;min-height:58px}
+.circuit-stations.compact{gap:8px}
+.circuit-stations.compact article{grid-template-columns:auto 1fr auto;gap:8px;padding:8px}
+.circuit-stations.compact .station-order{grid-template-columns:28px;gap:2px}
+.circuit-stations.compact .station-order b{font-size:16px;height:24px}
+.circuit-stations.compact .station-order button{padding:4px;display:grid;place-items:center}
+.station-main{display:grid;gap:6px;min-width:0}
+.station-main input,.station-main select{padding:8px 10px;min-height:40px}
+.station-target{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.station-more summary{cursor:pointer;color:var(--muted);font-size:12px;font-weight:700;list-style:none}
+.station-more summary::-webkit-details-marker{display:none}
+.station-more summary::after{content:' · edit';color:var(--accent-text)}
+.station-more[open] summary::after{content:''}
+.station-more>div{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding-top:6px}
+.station-more label{font-size:12px;margin:0}
+.circuit-stations.compact .remove-station{grid-column:auto;border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 6px}
+.cardio-plan-footer{position:sticky;bottom:0;display:grid;gap:12px;margin:0 -32px;padding:16px 32px calc(16px + env(safe-area-inset-bottom));background:var(--surface-1);border-top:1px solid var(--line)}
+.cardio-plan-sheet .cardio-plan-preview{padding:0;background:none;border:0}
+.cardio-plan-sheet .cardio-plan-preview span{color:var(--accent-text)}
+.cardio-plan-sheet .cardio-plan-preview strong{font-size:14px}
+.cardio-plan-adapt{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0;cursor:pointer}
+.cardio-plan-adapt input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--accent-strong)}
+.cardio-plan-adapt span{display:grid;gap:2px}
+.cardio-plan-adapt b{font-size:14px}
+.cardio-plan-adapt small{color:var(--muted);font-size:12px}
+.cardio-plan-actions{display:grid;grid-template-columns:1fr 2fr;gap:8px}
+.cardio-plan-actions .button{width:100%}
+@media(max-width:620px){
+  .cardio-plan-backdrop{padding:0;place-items:end stretch;overflow:hidden}
+  .cardio-plan-sheet{width:100%;max-height:94dvh;border-radius:20px 20px 0 0;border-bottom:0;padding:20px 16px 0}
+  .cardio-plan-footer{margin:0 -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+  .cardio-plan-modal .cardio-plan-row{grid-template-columns:1fr 1fr}
+  .cardio-plan-modal .cardio-plan-row.with-unit{grid-template-columns:1fr 112px}
+  .cardio-plan-modal .cardio-plan-row.reps{grid-template-columns:84px auto 1fr}
+}
+.circuit-stations.compact .add-station{color:var(--accent-text);font-weight:800}

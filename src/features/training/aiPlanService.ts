@@ -25,7 +25,10 @@ const runningPeaks = (phase: string | undefined) => {
 /* hold is client-side only: when a goal lift lands on a max week twice (the
    split runs the same day twice a cycle), only ONE instance is the attempt —
    the other carries the double it falls back to. */
-export type AiPlanTopSet = { splitDay: string; exercise: string; weight: number; reps: number; hold?: { weight: number; reps: number } };
+/* `unlogged` marks a lift the athlete has no logged set on: the resolver
+   has nothing to compute a load from, so the row carries the week's reps and
+   asks them to find the weight instead of showing a number. */
+export type AiPlanTopSet = { splitDay: string; exercise: string; weight: number; reps: number; hold?: { weight: number; reps: number }; unlogged?: boolean };
 export type AiPlanWeek = {
   /* Two vocabularies, because a stored block written by the planner speaks the
      old one and the resolver writes the new one. normalizePhase reads either;
@@ -1343,7 +1346,18 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
     const set = forced && canonicalLiftKey(forced) !== canonicalLiftKey(raw.exercise) ? { ...raw, exercise: forced } : raw;
     if (set !== raw) adjusted = true;
     const best = lookup(strength.bests, set.exercise);
-    if (!best) return set;
+    /* NO LOGGED SET, NO NUMBER. This used to hand back whatever the model
+       wrote, and the baseline gate only asks for one logged lift per day — so
+       the second lift on a day, or a goal lift the server added by copying a
+       neighbour's load, showed an invented weight as the athlete's program.
+       Today already says "Find your weight" here; Plan says the same. The
+       reps follow the week, and a max week holds at a double: there is no
+       evidence to attempt a single from. */
+    if (!best) {
+      const reps = Math.max(2, waveSlot(block.waveIndex ?? block.weekIndex).reps);
+      if (set.weight !== 0 || set.reps !== reps || !set.unlogged) adjusted = true;
+      return { ...set, weight: 0, reps, hold: undefined, unlogged: true };
+    }
     const tests = testsOneRepMax(set.exercise, strength.goalLifts);
     /* THE RUNG IS THE LIFT'S, NOT THE BLOCK'S. One wave index for the whole
        week meant Today and Plan could never agree — Today counted sessions per
