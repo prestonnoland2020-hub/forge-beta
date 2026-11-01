@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { backfillKinds, BACKFILL_MAX_DAYS, GARMIN_API, HISTORY_YEARS, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
+import { backfillKinds, BACKFILL_MAX_DAYS, GARMIN_API, HISTORY_YEARS, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminActivityType, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -118,6 +118,47 @@ Deno.serve(async request => {
       ]);
       return json({ configured, connected: row?.status === 'active', lastSyncedAt: row?.last_push_at || row?.last_synced_at, importedActivities: activities || 0, healthDays: days || 0, historyComplete: historyDone(row?.history_requested_at), historyBlocked: historyBlocked(row?.history_requested_at) });
     }
+    /* A GARMIN HISTORY, FROM GARMIN'S OWN EXPORT. Garmin backfills past data
+       only to Enterprise programs; any athlete can download their history
+       from Garmin Connect, and the app parses it on the phone and sends it
+       here in batches. Needs no Garmin credentials or connection.
+
+       From the full data export each activity carries Garmin's activityId and
+       is stored as provider 'garmin' under that id — so when the live
+       connection later pushes the same activity, it lands on the same row.
+       The Activities CSV carries no id; those rows are 'garmin-export', and
+       the import's cross-source dedupe settles them against Garmin and Strava. */
+    if (action === 'import') {
+      const items = Array.isArray(body.activities) ? body.activities.slice(0, 500) : [];
+      const num = (value: unknown, max: number) => { const n = Number(value); return Number.isFinite(n) && n > 0 && n < max ? n : null; };
+      const rows = items.map((item: Record<string, unknown>) => {
+        const provider = item.provider === 'garmin' ? 'garmin' : 'garmin-export';
+        const id = String(item.id || '').replace(/[^\w.-]/g, '').slice(0, 80);
+        const startedAt = new Date(String(item.startUtc || ''));
+        const local = String(item.startLocal || '').slice(0, 19);
+        if (!id || Number.isNaN(startedAt.getTime()) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(local)) return null;
+        const type = garminActivityType(item.type);
+        return {
+          owner_id: auth.user.id, provider, external_id: id,
+          activity_type: type, activity_name: String(item.name || type).slice(0, 120),
+          started_at: startedAt.toISOString(),
+          distance_meters: num(item.distanceMeters, 1_000_000),
+          moving_seconds: num(item.movingSeconds, 86_400 * 3),
+          elapsed_seconds: num(item.elapsedSeconds, 86_400 * 3),
+          average_heartrate: num(item.averageHr, 250),
+          max_heartrate: num(item.maxHr, 250),
+          raw_summary: { source: 'garmin-export', start_date_local: local },
+          updated_at: new Date().toISOString(),
+        };
+      }).filter(Boolean);
+      if (!rows.length) return json({ stored: 0 });
+      /* A row the live connection already filled keeps its fuller summary:
+         only rows not yet stored are inserted. */
+      const { error } = await admin.from('external_activities').upsert(rows, { onConflict: 'owner_id,provider,external_id', ignoreDuplicates: true });
+      if (error) throw new Error(`Garmin history could not be stored: ${error.message}`);
+      return json({ stored: rows.length });
+    }
+
     if (!configured) throw new Error('Garmin setup is not finished yet. Add GARMIN_CLIENT_ID and GARMIN_CLIENT_SECRET to the Supabase function secrets.');
 
     if (action === 'authorize') {

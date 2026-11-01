@@ -3,6 +3,7 @@ import { BrandMark, hasLogo, hasWordmark } from '../features/training/brandLogos
 import { connectionCatalog } from '../features/training/connectionCatalog';
 import type { GarminConnectionStatus } from '../features/training/garminConnectionService';
 import type { ActivityConnectionStatus } from '../features/training/activityConnectionService';
+import { GarminHistoryUpload } from './GarminHistoryUpload';
 
 /* CONNECTIONS, LAID OUT BY WHAT THE ATHLETE CAN DO.
 
@@ -72,6 +73,9 @@ export function ConnectionsView({ garmin, garminBusy, garminMessage, onGarmin, s
         <button type="button" className="cx-secondary" disabled={garminBusy} onClick={() => onGarmin('sync')}>{garminBusy ? 'Syncing…' : 'Sync now'}</button>
         <button type="button" className="cx-quiet" disabled={garminBusy} onClick={() => onGarmin('disconnect')}>Disconnect</button>
       </footer>
+      {/* Past activities: only Garmin's export can bring them until the
+          program has Garmin's historical data. */}
+      {!garmin.historyComplete && <GarminHistoryUpload />}
     </article>);
   } else if (garminLive) {
     available.push(<article key="garmin" className="cx-row">
@@ -92,13 +96,10 @@ export function ConnectionsView({ garmin, garminBusy, garminMessage, onGarmin, s
         <button type="button" className="cx-quiet" disabled={stravaBusy} onClick={() => onStrava('disconnect')}>Disconnect</button>
       </footer>
     </article>);
-  } else if (stravaLive) {
-    available.push(<article key="strava" className="cx-row">
-      <div><Name id="strava" name="Strava" /><p>Activities you record in the Strava app.</p></div>
-      <button type="button" className="cx-primary" disabled={stravaBusy} onClick={() => onStrava('connect')}>Connect</button>
-      {stravaMessage && <p className="cx-note" role="status">{stravaMessage}</p>}
-    </article>);
   }
+  /* STRAVA IS FOR THOSE ALREADY ON IT. Forge reads watches directly now;
+     new athletes are not offered Strava, and an athlete who connected it
+     earlier keeps the card above to sync or disconnect. */
 
   /* Everything not live yet, watches first. Garmin leaves this list the
      moment its connection is switched on. */

@@ -376,7 +376,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         : { key: `${day.name}-exercises`, label: `Choose the exercises for ${day.name} — Forge cannot program a day with none`, done: false });
     });
     if (goals.some(goal => goal.type === 'Endurance')) {
-      items.push({ key: 'runs', label: recentRuns.length === 1 ? 'Log one more easy run (1 of 2) — or connect Strava' : 'Log 2 easy runs so Forge learns your real pace — or connect Strava', done: recentRuns.length >= 2 });
+      items.push({ key: 'runs', label: recentRuns.length === 1 ? 'Log one more easy run (1 of 2) — or connect your Garmin' : 'Log 2 easy runs so Forge learns your real pace — or connect your Garmin', done: recentRuns.length >= 2 });
     }
     return items;
   }, [splitDays, bests, goals, recentRuns]);
