@@ -172,3 +172,12 @@ textarea.ob-input{min-height:96px;resize:vertical}
 .ob-next:disabled{opacity:.42;cursor:default}
 .ob-action-hint{margin:0;text-align:center;font-size:14px;font-weight:700;color:var(--muted)}
 .ob-spinner{width:18px;height:18px;border-radius:999px;border:2.5px solid currentColor;border-right-color:transparent;animation:forge-spin .7s linear infinite}
+/* Starting numbers: one row per lift, weight × reps. */
+.ob-numbers{display:grid;gap:12px;margin-top:4px}
+.ob-number-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 12px 72px;align-items:center;gap:8px}
+.ob-number-row strong{font-size:16px;min-width:0}
+.ob-number-row label{position:relative;display:block}
+.ob-number-row .ob-input.small{width:100%;padding-right:30px;text-align:right;font-variant-numeric:tabular-nums}
+.ob-number-row label span{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;color:var(--muted);pointer-events:none}
+.ob-number-row label:last-child .ob-input.small{padding-right:38px}
+.ob-number-x{text-align:center;color:var(--muted);font-weight:700}

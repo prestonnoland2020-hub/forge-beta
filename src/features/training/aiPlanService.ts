@@ -1,4 +1,5 @@
 import { isDemoMode } from '../../lib/env';
+import { startingNumbers } from '../../lib/startingNumbers';
 import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
 import { calculateEstimatedOneRepMax, repMaxCoefficient, weightForReps, PRESCRIPTION_REP_CAP, REP_MAX_CAP } from '../../lib/strength';
 import { supabase } from '../../lib/supabase';
@@ -380,6 +381,19 @@ export function bestsFromHistory(
     if (set.weight > (byReps.get(reps) || 0)) byReps.set(reps, set.weight);
     anchors.set(key, byReps);
   }));
+  /* A LIFT WITH NO LOGGED SET TAKES THE ATHLETE'S STARTING NUMBER, if they
+     gave one in setup. It fills the best and the anchor at that rep count
+     only: no session is counted and no single is recorded, so the wave starts
+     from it as a first exposure and a Real 1RM goal still needs a real single.
+     Any logged set of the lift, completed or missed, means it is not used. */
+  for (const start of startingNumbers()) {
+    const key = canonicalLiftKey(start.lift);
+    if (bests.has(key) || misses.has(key)) continue;
+    const max = calculateEstimatedOneRepMax(start.weight, start.reps) || 0;
+    if (!max) continue;
+    bests.set(key, max);
+    anchors.set(key, new Map([[Math.min(Math.max(Math.round(start.reps), 1), 10), start.weight]]));
+  }
   const sessions = new Map([...sessionDays].map(([key, days]) => [key, days.size] as const));
   return { bests, singles, anchors, sessions, misses, lastAt };
 }

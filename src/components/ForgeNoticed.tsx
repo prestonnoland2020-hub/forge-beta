@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useCoachNotes } from '../features/training/useCoachNotes';
+import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useCoachActions } from '../features/training/useCoachActions';
 import { openCoachBubble } from '../features/training/coachService';
 import { Icon } from './Icon';
@@ -36,7 +37,13 @@ export function ForgeNoticed() {
   const coach = useCoachActions();
   const { pathname } = useLocation();
   const today = localDayIso();
-  const quiet = pathname === '/workout' || pathname === '/coach' || pathname.startsWith('/onboarding');
+  /* NOT BEFORE THERE IS SOMETHING TO NOTICE. With fewer than three training
+     days every note is about a handful of sets, and a pop-up about a goal
+     being "out of reach" on day one, from a number typed in setup, is noise
+     that teaches a new athlete to dismiss Forge. */
+  const { records } = useWorkoutHistory();
+  const settledIn = new Set(records.map(record => record.date)).size >= 3;
+  const quiet = !settledIn || pathname === '/workout' || pathname === '/coach' || pathname.startsWith('/onboarding');
   /* Latched when it opens: acknowledging moves the ranking on, and the pop-up
      should close on the note it showed, not swap to the next one. */
   const [note, setNote] = useState<typeof next>(null);
