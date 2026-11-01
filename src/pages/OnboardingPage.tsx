@@ -18,6 +18,7 @@ import { Icon } from '../components/Icon';
 import { ForgeLoader } from '../components/ForgeLoader';
 import { goalPath, OnboardingGoalPath } from '../components/OnboardingGoalPath';
 import { calculateEstimatedOneRepMax, weightForReps } from '../lib/strength';
+import { raceMiles } from '../lib/goalFeasibility';
 
 /* ONE QUESTION A SCREEN. Setup was three dense screens — a form of six
    controls, the full goal builder, and a lift picker per day — headed by
@@ -495,7 +496,7 @@ function OnboardingForm() {
            the first person through tapped Continue on an empty field. */
         const placeholder = `e.g. ${goalKind === 'race' ? race!.placeholder : goalUnit === 'reps' ? '12' : goalKind === 'weight' ? (massUnit === 'kg' ? '75' : '170') : (massUnit === 'kg' ? ({ 'Bench Press': '100', 'Deadlift': '180' } as Record<string, string>)[goalExercise] || '140' : ({ 'Bench Press': '225', 'Deadlift': '405' } as Record<string, string>)[goalExercise] || '315')}`;
         const customDate = pickDate || !goalWeeks.some(weeks => goalDate === weeksFromNow(weeks));
-        const targetPath = goalTarget.trim() ? goalPath({ kind: goalKind, unit: goalUnit, target: goalTarget, current: goalCurrent, date: goalDate }) : null;
+        const targetPath = goalTarget.trim() ? goalPath({ kind: goalKind, unit: goalUnit, target: goalTarget, current: goalCurrent, date: goalDate, miles: race ? raceMiles(goalExercise) : undefined }) : null;
         return {
           body: <>
             <h1>{question}</h1>
@@ -565,7 +566,7 @@ function OnboardingForm() {
       };
       case 'week': {
         /* The goal again, now from the best they gave or the top set they typed. */
-        const weekPath = pendingGoal ? goalPath({ kind: goalKind, unit: goalUnit, target: goalTarget, current: goalCurrent || (goalLiftMax ? String(goalLiftMax) : ''), date: pendingGoal.date }) : null;
+        const weekPath = pendingGoal ? goalPath({ kind: goalKind, unit: goalUnit, target: goalTarget, current: goalCurrent || (goalLiftMax ? String(goalLiftMax) : ''), date: pendingGoal.date, miles: race ? raceMiles(goalExercise) : undefined }) : null;
         return {
         body: <>
           <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>

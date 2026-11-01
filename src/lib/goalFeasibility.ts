@@ -75,6 +75,7 @@ const RACE_MILES: Record<string, number> = {
   '5k': 3.10686, '8k': 4.97097, '10k': 6.21371,
   'half marathon': 13.1094, marathon: 26.2188,
 };
+export const raceMiles = (name: string) => milesOf({ exercise: name } as CreatedGoal);
 const milesOf = (goal: CreatedGoal) => {
   const name = String(goal.exercise || goal.title || '').trim().toLowerCase();
   const direct = RACE_MILES[name];
@@ -104,8 +105,22 @@ import { equivalentSeconds, volumeForPace } from './riegel';
    12 weeks of it, because a 16-week horizon does not compound forever. */
 const WEEKLY_IMPROVEMENT = 0.01;
 const MAX_IMPROVEMENT_WEEKS = 12;
-export const reachableSeconds = (currentSeconds: number, weeks: number, weeklyRate = WEEKLY_IMPROVEMENT) =>
-  currentSeconds * Math.pow(1 - weeklyRate, Math.min(weeks, MAX_IMPROVEMENT_WEEKS));
+/* LONGER RACES HAVE MORE ROOM. A mile is mostly speed, which moves slowly; a
+   marathon is mostly aerobic base, which keeps answering to mileage for
+   months. The same 1% a week for twelve weeks told a recreational runner
+   their marathon could improve no more than their 5K. The rate and the weeks
+   it keeps paying are scaled by distance. A judgment from coaching practice,
+   not yet measured: the 2026-11-01 backtest had only training runs, whose
+   week-to-week swing (about ±10%) hid any effect of distance. */
+export const raceGainScale = (miles?: number): { rate: number; weeks: number } =>
+  !miles || (miles > 2 && miles <= 6.3) ? { rate: 1, weeks: MAX_IMPROVEMENT_WEEKS }
+    : miles <= 2 ? { rate: 0.8, weeks: MAX_IMPROVEMENT_WEEKS }
+    : miles <= 13.2 ? { rate: 1.1, weeks: 14 }
+    : { rate: 1.2, weeks: 16 };
+export const reachableSeconds = (currentSeconds: number, weeks: number, weeklyRate = WEEKLY_IMPROVEMENT, miles?: number) => {
+  const scale = raceGainScale(miles);
+  return currentSeconds * Math.pow(1 - weeklyRate * scale.rate, Math.min(weeks, scale.weeks));
+};
 
 /* THE ATHLETE'S OWN RATE, WHEN THE WATCH CAN SHOW IT. 1% a week is an
    assumption about a typical block. An athlete whose pace at the same heart
@@ -248,11 +263,11 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
      which turned an obviously bad log into a credible-sounding claim and hid
      the one detail that would have told the athlete not to believe it. */
   const from = fromHeart ? `your heart-rate data (threshold about ${clock(best.seconds / best.miles)}/mi)` : `your ${round1(best.miles)} mi in ${clock(best.seconds)}`;
-  const ceiling = reachableSeconds(nowAtDistance, weeks, pace.rate);
+  const ceiling = reachableSeconds(nowAtDistance, weeks, pace.rate, distance);
   const shortfall = (nowAtDistance - targetSeconds) / nowAtDistance;
   /* What the horizon actually buys, stated as the number it is — saying "it
      takes about 16 weeks" to someone who has 16 weeks is not an answer. */
-  const affordable = 1 - reachableSeconds(1, weeks, pace.rate);
+  const affordable = 1 - reachableSeconds(1, weeks, pace.rate, distance);
 
   if (targetSeconds >= nowAtDistance) {
     return { goal: goal.title, verdict: 'reachable',
@@ -284,47 +299,100 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
     change: `Keep the volume and put the quality work at ${clock(goalPace)}/mi.` };
 }
 
-/* A LIFT GOAL IS THE SAME QUESTION WITH DIFFERENT ARITHMETIC. Around 1% a week
-   on a calculated max is a strong block for an intermediate lifter; a beginner
-   can beat it and an advanced lifter will not come close. */
+/* A LIFT GOAL IS THE SAME QUESTION WITH DIFFERENT ARITHMETIC, and the rates
+   are now measured rather than assumed. Backtested on 2026-11-01 against every
+   logged top set (5 athletes, 18 lifts, up to five years): the typical lift
+   gained 0.2–0.4% a week, about 3% in 12 weeks and 6% in a year; the top
+   quarter about 9% in 12 weeks. The old rule — 1% a week, compounding — was a
+   fair ceiling for a block and wildly generous past it: it allowed a bench
+   that went 225 → 405 in five years to reach 976.
+
+   So there are two curves. The CEILING is the most a block can find: 1% a
+   week for twelve weeks, then a quarter of that, because strength comes
+   slower the stronger the lifter. The TYPICAL curve is what most lifters
+   actually get, and is the line between "realistic" and "ambitious". A lift
+   that is new to the athlete is still mostly technique, and the backtest's
+   biggest jumps were exactly those, so its first eight weeks run faster. */
 export const STRENGTH_WEEKLY_GAIN = 0.01;
-/* GAINS SLOW, THEY DO NOT STOP. The ceiling used to stop compounding at 24
-   weeks, so a 300 → 400 deadlift given 100 weeks read "out of reach — about 29
-   weeks is", a date it had already been given. Past six months the rate is
-   halved instead, and the weeks it suggests come from the same curve, so the
-   two can never disagree. */
-const STRENGTH_FULL_RATE_WEEKS = 24;
-export const liftCeiling = (best: number, weeks: number, rate = STRENGTH_WEEKLY_GAIN) =>
-  best * Math.pow(1 + rate, Math.min(weeks, STRENGTH_FULL_RATE_WEEKS)) * Math.pow(1 + rate / 2, Math.max(0, weeks - STRENGTH_FULL_RATE_WEEKS));
-export const weeksToLift = (best: number, target: number) => {
-  if (target <= best) return 0;
-  const early = Math.log(target / best) / Math.log(1 + STRENGTH_WEEKLY_GAIN);
-  if (early <= STRENGTH_FULL_RATE_WEEKS) return Math.ceil(early);
-  return STRENGTH_FULL_RATE_WEEKS + Math.ceil(Math.log(target / liftCeiling(best, STRENGTH_FULL_RATE_WEEKS)) / Math.log(1 + STRENGTH_WEEKLY_GAIN / 2));
+const STRENGTH_BLOCK_WEEKS = 12;
+const STRENGTH_LATER_GAIN = 0.0025;
+const STRENGTH_TYPICAL_GAIN = 0.0035;
+const STRENGTH_TYPICAL_LATER_GAIN = 0.0015;
+const NEW_LIFT_GAIN = 0.02;
+const NEW_LIFT_WEEKS = 8;
+/* Fewer sessions than this on a lift and it is still being learned. */
+export const NEW_LIFT_SESSIONS = 6;
+
+const liftCurve = (best: number, weeks: number, early: number, later: number, fastWeeks = 0, fast = early) => {
+  const quick = Math.min(weeks, fastWeeks);
+  const block = Math.max(0, Math.min(weeks, STRENGTH_BLOCK_WEEKS) - quick);
+  return best * Math.pow(1 + fast, quick) * Math.pow(1 + early, block) * Math.pow(1 + later, Math.max(0, weeks - STRENGTH_BLOCK_WEEKS));
 };
+export const liftCeiling = (best: number, weeks: number, newLift = false) =>
+  liftCurve(best, weeks, STRENGTH_WEEKLY_GAIN, STRENGTH_LATER_GAIN, newLift ? NEW_LIFT_WEEKS : 0, NEW_LIFT_GAIN);
+/* What most lifters reach. An athlete's own measured rate replaces it. */
+export const liftTypical = (best: number, weeks: number, measuredRate?: number) =>
+  measuredRate !== undefined ? liftCurve(best, weeks, measuredRate, measuredRate / 2) : liftCurve(best, weeks, STRENGTH_TYPICAL_GAIN, STRENGTH_TYPICAL_LATER_GAIN);
+/* The weeks the ceiling needs, from the same curve, so a suggestion can never
+   contradict the verdict beside it. Null past ten years. */
+export const weeksToLift = (best: number, target: number, newLift = false): number | null => {
+  if (target <= best) return 0;
+  for (let weeks = 1; weeks <= 520; weeks++) if (liftCeiling(best, weeks, newLift) >= target) return weeks;
+  return null;
+};
+
+/* THE ATHLETE'S OWN RATE, once a lift has enough history to show one: the
+   best of the last four weeks against the best of four weeks at least two
+   months earlier, within the last six months. Held between 0.1% and 1.5% a
+   week so one good month cannot promise a miracle. */
+function measuredLiftRate(sets: Array<{ date: string; max: number }>, todayIso = localDayIso()): number | undefined {
+  const today = new Date(`${todayIso}T12:00:00`).getTime();
+  const ago = (iso: string) => (today - new Date(`${iso}T12:00:00`).getTime()) / (7 * DAY);
+  const recent = sets.filter(set => ago(set.date) <= 26);
+  const latest = recent.filter(set => ago(set.date) <= 4);
+  const earliestWeeks = Math.max(...recent.map(set => ago(set.date)));
+  if (!latest.length || earliestWeeks < 12 || recent.length < NEW_LIFT_SESSIONS) return undefined;
+  const early = recent.filter(set => ago(set.date) >= earliestWeeks - 4);
+  const now = Math.max(...latest.map(set => set.max));
+  const then = Math.max(...early.map(set => set.max));
+  const span = earliestWeeks - 2;
+  if (!(then > 0) || span < 8) return undefined;
+  return Math.min(0.015, Math.max(0.001, Math.pow(now / then, 1 / span) - 1));
+}
+
 function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibility | null {
   const target = Number.parseFloat(String(goal.target).replace(/[^0-9.]/g, ''));
   if (!target || !goal.exercise) return null;
   const weeks = weeksUntil(goal.date);
-  let best = 0;
+  const sets: Array<{ date: string; max: number }> = [];
   records.forEach(record => (record.topSets || []).forEach(set => {
     if (set.completed === false || !set.lift || !sameLift(set.lift, String(goal.exercise))) return;
     const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
-    if (max > best) best = max;
+    if (max > 0) sets.push({ date: record.date, max });
   }));
+  const best = sets.reduce((top, set) => Math.max(top, set.max), 0);
   if (!best) {
     return { goal: goal.title, verdict: 'needs-more',
       say: `No ${goal.exercise} on file, so there is nothing to project from.`,
       change: `Log one heavy set of ${goal.exercise} and this becomes a real number.` };
   }
   if (best >= target) return { goal: goal.title, verdict: 'reachable', say: `Reached — your best ${goal.exercise} already estimates ${Math.round(best)}.` };
-  const ceiling = liftCeiling(best, weeks);
+  const newLift = new Set(sets.map(set => set.date)).size < NEW_LIFT_SESSIONS;
+  const ceiling = liftCeiling(best, weeks, newLift);
   const needed = (target - best) / best;
+  const by = new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   if (target > ceiling) {
-    const weeksNeeded = weeksToLift(best, target);
+    const weeksNeeded = weeksToLift(best, target, newLift);
     return { goal: goal.title, verdict: 'out-of-reach',
-      say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are at ${Math.round(best)} and ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks is not a normal block — about ${weeksNeeded} weeks is.`,
+      say: `Not by ${by}. You are at ${Math.round(best)} and ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks is more than training finds${weeksNeeded ? ` — about ${weeksNeeded} weeks is` : ''}.`,
       insteadOf: `${Math.round(ceiling / 5) * 5} is the reachable target for this date.` };
+  }
+  const measured = measuredLiftRate(sets);
+  const typical = liftTypical(best, weeks, measured);
+  if (target > typical) {
+    return { goal: goal.title, verdict: 'reachable',
+      say: `Ambitious but possible: ${Math.round(best)} today, ${Math.round(target)} by ${by} is ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks. ${measured !== undefined ? `You have been gaining about ${(measured * 100).toFixed(1)}% a week` : newLift ? 'A new lift climbs fast for a few weeks, then settles under ½% a week' : 'Most lifters gain under ½% a week'}, so it takes your best training.`,
+      change: `${Math.round(typical / 5) * 5} is where ${measured !== undefined ? 'your current rate' : 'a typical block'} lands by then.` };
   }
   return { goal: goal.title, verdict: 'reachable',
     say: `On the numbers this holds: ${Math.round(best)} today, ${Math.round(target)} needed, ${Math.round(weeks)} weeks to find ${Math.round(needed * 100)}%.` };
