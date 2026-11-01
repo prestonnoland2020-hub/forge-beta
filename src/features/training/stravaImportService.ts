@@ -38,7 +38,9 @@ const reviewKey = 'forge-strava-review-v1';
    survives a reload, and "was a lift part of this day" is exactly the thing
    the card needs and nothing else does. Entries were bare date strings; they
    are {d, s} now, and a stored array of strings still reads correctly. */
-type ReviewEntry = { d: string; s?: boolean };
+/* `w` names the watch the day came from, so the card can say Garmin or
+   Strava instead of calling every sync Strava. */
+type ReviewEntry = { d: string; s?: boolean; w?: 'Garmin' | 'Strava' };
 const readReviewQueue = (): ReviewEntry[] => {
   try {
     const list = JSON.parse(localStorage.getItem(reviewKey) || '[]');
@@ -53,11 +55,13 @@ const writeReviewQueue = (entries: ReviewEntry[]) => {
 export const pendingStravaReviews = (): string[] => readReviewQueue().map(entry => entry.d);
 /* Whether the sync for that date included a strength activity. */
 export const stravaReviewHasStrength = (date: string): boolean => Boolean(readReviewQueue().find(entry => entry.d === date)?.s);
+/* Which service the day's sync came from. */
+export const stravaReviewSource = (date: string): 'Garmin' | 'Strava' => readReviewQueue().find(entry => entry.d === date)?.w || 'Strava';
 export const markStravaReviewed = (date: string) => writeReviewQueue(readReviewQueue().filter(entry => entry.d !== date));
 const queueStravaReviews = (entries: ReviewEntry[]) => {
   if (!entries.length) return;
   const merged = new Map(readReviewQueue().map(entry => [entry.d, entry]));
-  entries.forEach(entry => merged.set(entry.d, { d: entry.d, s: Boolean(entry.s || merged.get(entry.d)?.s) }));
+  entries.forEach(entry => merged.set(entry.d, { d: entry.d, s: Boolean(entry.s || merged.get(entry.d)?.s), w: entry.w || merged.get(entry.d)?.w }));
   writeReviewQueue([...merged.values()]);
 };
 export const runShapedActivity = (activity: string) => !/bike|ride|swim|row|elliptical|stair|ski|weight|yoga|workout|crossfit/i.test(activity);
@@ -287,7 +291,7 @@ export async function importStravaActivities(
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
   const handLogged = handLoggedCoverage(records);
   const watchTotals = stravaTotalsByDay(rows);
-  const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[]; strength: boolean; strengthMinutes: number }>();
+  const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[]; strength: boolean; strengthMinutes: number; garmin: boolean }>();
   /* Days the athlete logged, as they will be after the watch fills in what
      they left out. Written back once each, after every row is placed. */
   const enrichedDays = new Map<string, WorkoutRecord>();
@@ -360,7 +364,8 @@ export async function importStravaActivities(
         skipped++; supersededRowIds.push(row.id); continue;
       }
     }
-    const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [], strength: false, strengthMinutes: 0 };
+    const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [], strength: false, strengthMinutes: 0, garmin: false };
+    if (isGarmin(row)) entry.garmin = true;
     /* A LIFT IS NOT CARDIO. Strava reports a gym session as WeightTraining,
        and importing every activity as a cardio session made "Weight Training"
        the athlete's most-logged cardio type — 139 barbell sessions filed under
@@ -389,7 +394,7 @@ export async function importStravaActivities(
     if (result.ok) {
       imported += entry.sessions.length; importedRowIds.push(...entry.rowIds);
       /* Ask only while the session is fresh enough to remember. */
-      if (date >= reviewCutoffIso) reviewIds.push({ d: date, s: entry.strength });
+      if (date >= reviewCutoffIso) reviewIds.push({ d: date, s: entry.strength, w: entry.garmin ? 'Garmin' : 'Strava' });
     }
   }
   queueStravaReviews(reviewIds);
