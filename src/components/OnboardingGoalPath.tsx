@@ -1,4 +1,4 @@
-import { liftCeiling, reachableSeconds, STRENGTH_WEEKLY_GAIN, weeksToLift, weeksUntil } from '../lib/goalFeasibility';
+import { liftCeiling, liftTypical, raceGainScale, reachableSeconds, weeksToLift, weeksUntil } from '../lib/goalFeasibility';
 import { secondsToClock } from '../lib/goalInput';
 
 /* WHY A GOAL, SHOWN RATHER THAN SAID. Setup asked for a target and a date and
@@ -16,6 +16,8 @@ export type GoalPathInput = {
   target: string;
   current: string;
   date: string;
+  /* A race's distance, which sets how much room it has to improve. */
+  miles?: number;
 };
 
 type Tone = 'good' | 'stretch' | 'hard';
@@ -37,7 +39,7 @@ const clockSeconds = (value: string) => {
 const round = (value: number, step: number) => Math.round(value / step) * step;
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-export function goalPath({ kind, unit, target, current, date }: GoalPathInput): GoalPath | null {
+export function goalPath({ kind, unit, target, current, date, miles }: GoalPathInput): GoalPath | null {
   const weeks = Math.max(1, Math.round(weeksUntil(date)));
   const by = shortDate(date);
   if (kind === 'race') {
@@ -50,9 +52,12 @@ export function goalPath({ kind, unit, target, current, date }: GoalPathInput): 
     const fromLabel = secondsToClock(from, hours && from >= 3600); const toLabel = secondsToClock(to, hours && to >= 3600);
     if (to >= from) return { from, to, weeks, fromLabel, toLabel, headline: 'You’re already there', verdict: 'Done', tone: 'good', note: 'Set a faster time and Forge has something to build toward.' };
     const perWeek = (from - to) / weeks;
-    const reachable = reachableSeconds(from, weeks);
+    const reachable = reachableSeconds(from, weeks, undefined, miles);
+    /* What most runners find: the same rate at every distance, though a
+       longer race keeps finding it for longer. */
+    const typical = reachableSeconds(from, weeks, 0.006 / raceGainScale(miles).rate, miles);
     const headline = `${Math.max(1, Math.round(perWeek))} seconds faster each week for ${weeks} weeks`;
-    if (to >= reachable) return { from, to, weeks, fromLabel, toLabel, headline, verdict: to >= reachableSeconds(from, weeks, 0.006) ? 'Realistic' : 'Ambitious', tone: to >= reachableSeconds(from, weeks, 0.006) ? 'good' : 'stretch' };
+    if (to >= reachable) return { from, to, weeks, fromLabel, toLabel, headline, verdict: to >= typical ? 'Realistic' : 'Ambitious', tone: to >= typical ? 'good' : 'stretch' };
     return { from, to, weeks, fromLabel, toLabel, headline, verdict: 'Too fast', tone: 'hard',
       note: `About ${secondsToClock(reachable, hours && reachable >= 3600)} is reachable by ${by}. Keep the goal and Forge will say so honestly as you train.` };
   }
@@ -81,13 +86,13 @@ export function goalPath({ kind, unit, target, current, date }: GoalPathInput): 
   const headline = `+${round(perWeek, 0.5)} ${unit} a week for ${weeks} weeks`;
   const reachable = liftCeiling(from, weeks);
   if (to <= reachable) {
-    const easy = to <= liftCeiling(from, weeks, STRENGTH_WEEKLY_GAIN * 0.6);
+    const easy = to <= liftTypical(from, weeks);
     return { from, to, weeks, fromLabel, toLabel, headline, verdict: easy ? 'Realistic' : 'Ambitious', tone: easy ? 'good' : 'stretch' };
   }
-  const suggestWeeks = weeksToLift(from, to);
+  const suggestWeeks = weeksToLift(from, to) ?? Infinity;
   return { from, to, weeks, fromLabel, toLabel, headline, verdict: 'Too steep', tone: 'hard',
     suggestWeeks: suggestWeeks <= 52 ? suggestWeeks : undefined,
-    note: suggestWeeks <= 52 ? `At a steady, strong rate that's about ${suggestWeeks} weeks.` : `${Math.round(reachable / 5) * 5} ${unit} is reachable by ${by}. A nearer milestone keeps the plan honest.` };
+    note: suggestWeeks <= 52 ? `Even a strong block finds about 1% a week, slowing after three months. That's about ${suggestWeeks} weeks.` : `${Math.round(reachable / 5) * 5} ${unit} is reachable by ${by}. A nearer milestone keeps the plan honest.` };
 }
 
 /* The line climbs left to right whatever the goal, because the card is about
