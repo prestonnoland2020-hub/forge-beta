@@ -77,7 +77,6 @@ import './billing.css';
 import './legal.css';
 import './login-strike.css';
 import './native.css';
-import './appearance.css';
 /* Shared primitives — cards, buttons, navigation. Colour comes from
    forge-theme.css above. */
 import './forge-system.css';
