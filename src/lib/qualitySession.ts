@@ -23,6 +23,7 @@
 
 import type { PaceModel } from './paceModel';
 import { normalizePhase, type TrainingPhase } from './trainingPhase';
+import { localDayIso } from './time';
 import { eventProfileFor, sessionKindFor, type SessionKind } from './eventProfile';
 import { thresholdWorkMinutes, intervalWorkMetres, repetitionWorkMetres, INTERVAL_REPS, REPETITION_REPS, type Levels } from './progressionLevels';
 
@@ -387,8 +388,52 @@ export const goalEventMiles = (goal?: EnduranceGoalRef): number => {
 export const notARunningRace = (goal: EnduranceGoalRef): boolean =>
   /hyrox|cycl|bike|row|swim|\bski/i.test(`${goal.exercise || ''} ${goal.title || ''}`);
 
+const DAY_MS = 86400000;
+const dayGap = (fromIso: string, toIso: string) =>
+  Math.round((new Date(`${toIso}T12:00:00`).getTime() - new Date(`${fromIso}T12:00:00`).getTime()) / DAY_MS);
+
+/* A RACE THAT HAS HAPPENED IS HISTORY. A goal stays on the list after its
+   date — nothing marks it done — and the plan kept treating last month's
+   marathon as zero weeks away: race week, every week, and no taper for the
+   race actually coming up. A race still counts for the week after it, which
+   is the recovery week; past that it no longer steers anything. */
+export const RACE_COUNTS_FOR_DAYS_AFTER = 7;
+export const raceIsHistory = (goal: EnduranceGoalRef, todayIso: string): boolean =>
+  !goal.date || dayGap(String(goal.date), todayIso) > RACE_COUNTS_FOR_DAYS_AFTER;
+
+/* A TUNE-UP IS A RACE ON THE WAY TO A BIGGER ONE. A 5K four weeks before a
+   marathon was the soonest race, so it got the whole treatment — two weeks of
+   taper, a recovery week after, and its pace set the training — and the
+   marathon block lost a month to a race the athlete entered as a workout. A
+   running race with a longer running race within ten weeks after it is a
+   tune-up: it is run, but the block is built for the longer one. */
+export const TUNE_UP_WINDOW_DAYS = 70;
+export const isTuneUp = (goal: EnduranceGoalRef, goals: EnduranceGoalRef[]): boolean => {
+  if (!goal.date || notARunningRace(goal)) return false;
+  const miles = goalEventMiles(goal);
+  return goals.some(other => other !== goal && other?.type === 'Endurance' && other.date && !notARunningRace(other)
+    && goalEventMiles(other) > miles
+    && dayGap(String(goal.date), String(other.date)) > 0
+    && dayGap(String(goal.date), String(other.date)) <= TUNE_UP_WINDOW_DAYS);
+};
+
+/* THE RACE THE BLOCK IS BUILT TOWARD: the earliest dated endurance goal that
+   is neither history nor a tune-up. Any endurance event counts — a HYROX or
+   a ride still needs its taper — which is why this is separate from
+   enduranceTarget, which only knows running paces. */
+export function nextRace<T extends EnduranceGoalRef>(goals: T[] | undefined | null, todayIso = localDayIso()): T | null {
+  const all = (goals || []).filter(goal => goal?.type === 'Endurance' && goal?.date);
+  return all
+    .filter(goal => !raceIsHistory(goal, todayIso) && !isTuneUp(goal, all))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || goalEventMiles(b) - goalEventMiles(a))[0] || null;
+}
+
+/* Which week of a calendar that starts on `fromIso` the race falls in. Week 0
+   is the seven days from `fromIso`; a race before it is negative. */
+export const raceWeekIndex = (raceIso: string, fromIso: string): number => Math.floor(dayGap(fromIso, raceIso) / 7);
+
 export type EnduranceTarget = { paceSecondsPerMile: number; miles: number; goal: EnduranceGoalRef; others: EnduranceGoalRef[] };
-export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null): EnduranceTarget | null {
+export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null, todayIso = localDayIso()): EnduranceTarget | null {
   const dated = (goals || [])
     .filter(entry => entry?.type === 'Endurance' && entry?.date && !notARunningRace(entry) && goalClockSeconds(entry.target) > 0)
     .sort((a, b) => {
@@ -396,12 +441,16 @@ export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null): E
       if (byDate) return byDate;
       return goalEventMiles(b) - goalEventMiles(a);
     });
-  const goal = dated[0];
+  /* The pace comes from the race being trained for: upcoming before past, and
+     the main race before its tune-ups. With nothing upcoming, the most recent
+     race still says how fast this athlete is trying to run. */
+  const upcoming = dated.filter(entry => !raceIsHistory(entry, todayIso));
+  const goal = upcoming.find(entry => !isTuneUp(entry, dated)) || upcoming[0] || dated[dated.length - 1];
   if (!goal) return null;
   const seconds = goalClockSeconds(goal.target);
   const miles = goalEventMiles(goal);
   if (!seconds || !miles) return null;
-  return { paceSecondsPerMile: seconds / miles, miles, goal, others: dated.slice(1) };
+  return { paceSecondsPerMile: seconds / miles, miles, goal, others: dated.filter(entry => entry !== goal) };
 }
 
 /* The AI block writes its phases in the strength block's old language. One

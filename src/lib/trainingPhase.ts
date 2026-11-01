@@ -32,8 +32,11 @@ export const normalizePhase = (value: string | undefined): TrainingPhase => LEGA
    race-specific. Short events sharpen sooner; long ones need the base for
    longer, because there is nothing to sharpen without it. Supplied by the
    event profile, defaulted here so a caller with no goal still gets a shape. */
-export type PhaseShape = { foundationShare: number; buildShare: number };
-export const DEFAULT_SHAPE: PhaseShape = { foundationShare: 0.3, buildShare: 0.4 };
+/* taperWeeks: how many weeks before race week the volume comes down. A 5K
+   needs one, a half two, a marathon three; one number for all of them
+   either left a marathoner short of fresh or had a 5K runner detraining. */
+export type PhaseShape = { foundationShare: number; buildShare: number; taperWeeks?: number };
+export const DEFAULT_SHAPE: PhaseShape = { foundationShare: 0.3, buildShare: 0.4, taperWeeks: 2 };
 
 export type PhaseContext = {
   /* Zero-based week within the block. */
@@ -46,15 +49,22 @@ export type PhaseContext = {
   shape?: PhaseShape;
 };
 
-/* A taper is the last two weeks before a race, and race week is race week.
+/* A taper is the weeks before a race (two unless the event says otherwise),
+   and race week is race week.
    Both are measured from the RACE, not from the end of the block: a block that
    ends in March cannot taper for an April race, and a block that runs past the
    race must taper inside itself. */
 export const TAPER_WEEKS = 2;
 
-export function phaseFor({ weekIndex, blockWeeks, weeksToRace, deloading, shape = DEFAULT_SHAPE }: PhaseContext): TrainingPhase {
+export function phaseFor({ weekIndex, blockWeeks, weeksToRace: rawWeeksToRace, deloading, shape = DEFAULT_SHAPE }: PhaseContext): TrainingPhase {
   const weeks = Math.max(1, blockWeeks);
   const index = Math.max(0, Math.min(weeks - 1, weekIndex));
+  const taperWeeks = shape.taperWeeks ?? TAPER_WEEKS;
+  /* THE RACE IS IN A WEEK, not at a fraction of one. Callers measured the gap
+     in fractional weeks — 5.3 — so `away` was never exactly zero: the plan
+     went from taper straight to an ordinary build, with no race week and no
+     recovery week after it. The race belongs to the week it falls in. */
+  const weeksToRace = typeof rawWeeksToRace === 'number' && Number.isFinite(rawWeeksToRace) ? Math.floor(rawWeeksToRace) : undefined;
 
   if (typeof weeksToRace === 'number' && weeksToRace >= 0) {
     const away = weeksToRace - index;
@@ -66,7 +76,7 @@ export function phaseFor({ weekIndex, blockWeeks, weeksToRace, deloading, shape 
        recovery; then the next build starts, because that is what actually
        happens next. */
     if (away < 0) return away === -1 ? 'Deload' : 'Foundation';
-    if (away <= TAPER_WEEKS) return 'Taper';
+    if (away <= taperWeeks) return 'Taper';
   } else if (index === weeks - 1) {
     /* No dated race: the block still ends by freshening rather than by
        stopping mid-climb. */
@@ -83,7 +93,7 @@ export function phaseFor({ weekIndex, blockWeeks, weeksToRace, deloading, shape 
      a deload, followed by the taper. The athlete never did a single week of
      race-specific work, in a plan whose entire purpose was that race. */
   const lastTraining = Math.max(0, (typeof weeksToRace === 'number' && weeksToRace >= 0
-    ? Math.min(weeks - 1, weeksToRace - TAPER_WEEKS - 1)
+    ? Math.min(weeks - 1, weeksToRace - taperWeeks - 1)
     : weeks - 2));
   const progress = lastTraining > 0 ? Math.min(1, index / lastTraining) : 1;
   if (progress < shape.foundationShare) return 'Foundation';

@@ -3,8 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { HYROX_NO_GOAL, hyroxGoalOf, hyroxPlanDetail, withHyroxPaces } from '../lib/hyroxSession';
 import { bestRunDay, type PlannedDay } from '../lib/interference';
 import { paceModel } from '../lib/paceModel';
-import { weeksUntil } from '../lib/goalFeasibility';
-import { enduranceTarget } from '../lib/qualitySession';
+import { enduranceTarget, nextRace, raceWeekIndex } from '../lib/qualitySession';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import type { PlannedCardio } from './CardioPlanBuilder';
@@ -272,14 +271,22 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const runGoal = useMemo(() => enduranceTarget(goals), [goals]);
   /* HOW LONG EACH GOAL HAS LEFT. When a max attempt and a race-effort week
      land in the same seven days, the nearer goal keeps the week — it is the
-     only one for which this week cannot be replaced. */
+     only one for which this week cannot be replaced.
+
+     Counted in weeks OF THE BLOCK, because that is what the week index the
+     plan compares them with is. Counted from today, a race five weeks out in
+     a block started three weeks ago sat three weeks late on the block's
+     calendar. The race is the next one that is neither past nor a tune-up. */
   const horizons = useMemo(() => {
-    const soonest = (type: string) => goals
-      .filter(goal => goal.type === type && goal.date)
-      .map(goal => weeksUntil(goal.date))
-      .filter(weeks => Number.isFinite(weeks))
-      .sort((a, b) => a - b)[0];
-    return { weeksToRace: soonest('Endurance') ?? Infinity, weeksToLiftGoal: soonest('Strength') ?? Infinity };
+    const race = nextRace(goals);
+    const lift = goals
+      .filter(goal => goal.type === 'Strength' && goal.date && goal.date >= localDayIso())
+      .map(goal => goal.date)
+      .sort()[0];
+    return (startDate: string) => ({
+      weeksToRace: race?.date ? raceWeekIndex(race.date, startDate) : Infinity,
+      weeksToLiftGoal: lift ? raceWeekIndex(lift, startDate) : Infinity,
+    });
   }, [goals]);
   /* EVERY TRAINING PACE, FROM ONE PIECE OF EVIDENCE. Built from the athlete's
      hardest recent continuous run, corrected for how far their weekly running
@@ -637,7 +644,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces, levels: levels.levels}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored), liftingMaxWeek: waveSlot(waveIndexOf(stored, index)).isMax, weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces, levels: levels.levels}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored), liftingMaxWeek: waveSlot(waveIndexOf(stored, index)).isMax, ...horizons(stored.startDate) }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),

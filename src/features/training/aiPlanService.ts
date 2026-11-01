@@ -652,8 +652,12 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const RACE_WEEK_EASY_MILES = 4;
   const TAPER_FIRST_SHARE = 0.68;
   const TAPER_LAST_SHARE = 0.5;
+  /* A marathon's third week out is the first step down, and a small one. */
+  const TAPER_EARLY_SHARE = 0.78;
   const TAPER_LONG_SHARE = 0.6;
-  const TAPER_WEEKS_BEFORE_RACE = 2;
+  /* As long as the event needs: a week for a 5K, three for a marathon. */
+  const TAPER_WEEKS_BEFORE_RACE = eventProfileFor(Number(athlete.goalMiles) || undefined).shape.taperWeeks ?? 2;
+  const taperShareAt = (gap: number) => gap <= 1 ? TAPER_LAST_SHARE : gap === 2 ? TAPER_FIRST_SHARE : TAPER_EARLY_SHARE;
   /* What a non-long run is worth, relative to the long one. */
   const OTHER_RUN_SHARE = 0.6;
   const WEEK_ON_WEEK_MAX = 1.2;
@@ -747,7 +751,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
        first week back is a recovery week off that peak; after that the normal
        climb applies, and the week-on-week limit carries them up to it. */
     if (gap < 0) return Math.min(line, peakBefore * (gap === -1 ? DELOAD_SHARE : 1));
-    if (gap > 0 && gap <= TAPER_WEEKS_BEFORE_RACE) return line * (gap <= 1 ? TAPER_LAST_SHARE : TAPER_FIRST_SHARE);
+    if (gap > 0 && gap <= TAPER_WEEKS_BEFORE_RACE) return line * taperShareAt(gap);
     return ((index + (deloadIndex - weekIndex)) % 5 + 5) % 5 === 3 ? line * DELOAD_SHARE : line;
   };
   /* AND THE CHAIN HAS TO BE CONSISTENT. Shaping one week back was not enough:
@@ -796,7 +800,9 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const lastTaperWeek = typeof block?.weeksToRace === 'number'
     ? block.weeksToRace - weekIndex <= 1
     : weekIndex >= blockWeeks - 2;
-  const taperShare = tapering ? (lastTaperWeek ? TAPER_LAST_SHARE : TAPER_FIRST_SHARE) : 1;
+  const taperShare = tapering
+    ? (typeof block?.weeksToRace === 'number' && Number.isFinite(block.weeksToRace) ? taperShareAt(block.weeksToRace - weekIndex) : lastTaperWeek ? TAPER_LAST_SHARE : TAPER_FIRST_SHARE)
+    : 1;
   /* AND IT STEPS DOWN FROM THE PEAK, not from wherever the climb had reached.
      Measured against the still-rising curve, the second taper week came out
      bigger than the first — a taper that went back up. The base is the last
@@ -805,11 +811,18 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const taperStart = typeof block?.weeksToRace === 'number'
     ? Math.max(0, block.weeksToRace - TAPER_WEEKS_BEFORE_RACE)
     : Math.max(0, blockWeeks - 1 - TAPER_WEEKS_BEFORE_RACE);
-  const taperBase = tapering ? climbAt(taperStart - 1) : 0;
+  /* The base is the week actually run before the taper — the climb's line
+     where it was reached, the rate-limited week where it was not — so every
+     taper week steps down from the same number. */
+  const taperBase = tapering ? Math.min(climbAt(taperStart - 1), taperStart > 0 ? shapedSeries(taperStart - 1) : climbAt(taperStart - 1)) : 0;
   const target = racing && raceMiles
     ? round1(raceMiles + RACE_WEEK_EASY_MILES)
     : tapering
-      ? round1(Math.min(chosen, climb, previousWeek, taperBase) * taperShare)
+      /* Measured against the base, not against last week. Inside a three-week
+         taper last week is already cut, and capping by it again compounded
+         the cuts — and where last week was rate-limited and this one was not,
+         the taper stepped back up. */
+      ? round1(Math.min(chosen, climb, taperBase) * taperShare)
       : clampMiles(round1(deloading ? Math.min(chosen, climb, previousWeek) * DELOAD_SHARE : chosen));
 
   /* THE WEEK'S REAL BUDGET, decided before anything is sized against it. The
@@ -829,8 +842,10 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   /* And durability stops growing in a taper: a long-run personal best nine
      days before a race is not a taper, it is a race nobody entered. */
   const taperingNow = phase === 'Taper';
+  /* Held where the taper began, so a three-week taper's long runs only come
+     down; measured from this week, the second taper week's ran longer. */
   const longCap = taperingNow
-    ? longRunCap(longestKnown, Math.max(0, weekIndex - 2)) * TAPER_LONG_SHARE
+    ? longRunCap(longestKnown, Math.max(0, Math.min(weekIndex, taperStart) - 2)) * TAPER_LONG_SHARE
     : longRunCap(longestKnown, weekIndex);
   /* A long run the athlete has already been doing is the floor for the long
      run, not a stretch goal — bounded by the week's volume, so it cannot eat

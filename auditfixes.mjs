@@ -42,9 +42,10 @@ const race = (() => { const d = new Date(); d.setDate(d.getDate() + 21); return 
 const roadmap = buildLongRangePlan(
   [{ type: 'Endurance', title: 'Half marathon', exercise: 'Half Marathon', target: '1:35:00', unit: 'hh:mm:ss', date: race, metric: 'Finish time', connection: '' }],
   { weeklyMileage: 30, runningDays: 5, readiness: 100, strengthFatigue: 'Low', experience: 'advanced', longestRunMiles: 10 }, 16, []);
-check('three weeks out is a three-week roadmap, not eight', roadmap.length <= 3, `${roadmap.length} weeks`);
+check('three weeks out is three weeks and race week, not eight', roadmap.length <= 4, `${roadmap.length} weeks`);
 const lastWeek = roadmap.at(-1);
-check('and the last week of it is the race week', lastWeek.phase === 'Taper' || lastWeek.phase === 'Test', lastWeek.phase);
+check('and the last week of it is the race week', lastWeek.phase === 'Race', lastWeek.phase);
+check('with the taper before it', roadmap.at(-2).phase === 'Taper', roadmap.map(week => week.phase).join(' → '));
 check('mileage never climbs past the start into race week',
   roadmap.every(week => week.mileage <= 30 * 1.2), roadmap.map(w => w.mileage).join(' → '));
 
