@@ -3,6 +3,7 @@ import { useToday } from '../lib/dayClock';
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
 import { CoachCheckIn } from './CoachCheckIn';
+import { GarminConnectPrompt } from './GarminConnectPrompt';
 import { ForgeNoticed } from './ForgeNoticed';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { syncKeyboardState } from '../features/shell/nativeChrome';
@@ -395,6 +396,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         both computed from the evidence it is asking about. */}
     <EffortCheck />
     <CoachCheckIn />
+    <GarminConnectPrompt />
     <MileageStartupCheck />
     {/* What Forge noticed comes last and only now and again: it waits for any
         of the dialogs above to be answered first. */}

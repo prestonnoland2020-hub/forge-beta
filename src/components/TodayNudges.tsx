@@ -1,29 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Icon } from './Icon';
 import { isDemoMode } from '../lib/env';
 import { loadNotificationPrefs, notificationPermission, notificationsSupported, requestNotificationPermission, saveNotificationPrefs } from '../lib/notifications';
 import { installedToHomeScreen, pushSupported, readPushHealth, syncPushSubscription } from '../lib/push';
-import { getActivityConnection } from '../features/training/activityConnectionService';
-import { getGarminConnection } from '../features/training/garminConnectionService';
 import { isNative } from '../features/billing/platform';
 
-/* THE TWO THINGS THAT MAKE FORGE WORK WITHOUT BEING OPENED.
+/* NOTIFICATIONS ARE WHAT MAKE FORGE WORK WITHOUT BEING OPENED.
 
-   Notifications carry the morning workout and the "a partner trained" nudge;
-   a connected watch carries sleep and recovery into the day's training. Both
-   are off for most athletes, and both lived only behind Profile, where nobody
-   goes to look. So Today asks — one card at a time, notifications first, and
-   "Not now" quiets a card for a few days rather than for good: an athlete who
-   said no on a busy morning has not said no forever.
+   They carry the morning workout and the "a partner trained" nudge, they are
+   off for most athletes, and the switch lived only behind Profile, where
+   nobody goes to look. So Today asks. "Not now" quiets the card for a few
+   days rather than for good: an athlete who said no on a busy morning has not
+   said no forever. It does not appear when there is nothing the athlete can
+   do, such as a browser with no notifications at all.
 
-   Neither card appears when there is nothing the athlete can do: no
-   notifications in this browser at all, or no watch connection switched on
-   yet for this build. */
+   Connecting a watch is asked separately, on open, by GarminConnectPrompt. */
 
-type Snoozes = { notifications?: string; watch?: string };
+type Snoozes = { notifications?: string };
 const snoozeKey = 'forge-today-nudges-v1';
-const SNOOZE_DAYS = { notifications: 3, watch: 7 } as const;
+const SNOOZE_DAYS = { notifications: 3 } as const;
 const readSnoozes = (): Snoozes => { try { return JSON.parse(localStorage.getItem(snoozeKey) || '{}'); } catch { return {}; } };
 const snoozed = (kind: keyof Snoozes) => { const until = readSnoozes()[kind]; return Boolean(until && new Date(until).getTime() > Date.now()); };
 const snooze = (kind: keyof Snoozes) => {
@@ -50,31 +45,17 @@ async function notifyState(): Promise<NotifyState> {
   return 'ask';
 }
 
-/* The connection status is two function calls; once a session is plenty. */
-const watchCacheKey = 'forge-today-watch-nudge';
-async function wantsWatch(): Promise<boolean> {
-  if (isDemoMode || snoozed('watch')) return false;
-  try { const cached = sessionStorage.getItem(watchCacheKey); if (cached) return cached === 'yes'; } catch { /* ask */ }
-  const [garmin, strava] = await Promise.all([getGarminConnection().catch(() => null), getActivityConnection().catch(() => null)]);
-  /* Only once a direct watch connection is switched on: until then the
-     only thing to offer is Strava, which brings no sleep or recovery. */
-  const answer = Boolean(garmin?.configured && !garmin.connected && !strava?.connected);
-  try { sessionStorage.setItem(watchCacheKey, answer ? 'yes' : 'no'); } catch { /* fine */ }
-  return answer;
-}
 
 export function TodayNudges() {
   const [notify, setNotify] = useState<NotifyState>(null);
-  const [watch, setWatch] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
 
   useEffect(() => {
     let live = true;
-    void notifyState().then(async state => {
+    void notifyState().then(state => {
       if (!live) return;
       setNotify(state);
-      if (!state) { const offer = await wantsWatch(); if (live) setWatch(offer); }
     });
     return () => { live = false; };
   }, []);
@@ -94,7 +75,7 @@ export function TodayNudges() {
       else setNote('Notifications are allowed, but Forge could not register this device. Try again from Profile → Coach settings.');
     } finally { setBusy(false); }
   };
-  const dismiss = (kind: keyof Snoozes) => { snooze(kind); if (kind === 'notifications') setNotify(null); else setWatch(false); };
+  const dismiss = (kind: keyof Snoozes) => { snooze(kind); setNotify(null); };
 
   if (notify) {
     const copy = {
@@ -111,13 +92,5 @@ export function TodayNudges() {
       </div>
     </section>;
   }
-  if (watch) return <section className="buffer-banner td-nudge" aria-label="Connect your watch">
-    <i className="buffer-banner-mark"><Icon name="watch" size={18} stroke={2.1} /></i>
-    <span><small>Connect your watch</small>Forge adjusts each day’s training from your sleep, HRV and recovery.</span>
-    <div className="td-nudge-actions">
-      <Link className="button" to="/profile?view=connections">Connect</Link>
-      <button type="button" className="td-nudge-later" onClick={() => dismiss('watch')}>Not now</button>
-    </div>
-  </section>;
   return null;
 }
