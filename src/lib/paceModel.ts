@@ -15,8 +15,14 @@
    THE HIERARCHY (PART 8 of the coaching brief, and ordinary coaching sense):
 
      1. a recent hard continuous run — the closest thing to a race
-     2. an older hard continuous run, when nothing recent exists
-     3. the goal, used ONLY as a last resort and labelled as unsupported
+     2. the threshold pace the athlete's heart rate implies, from the last six
+        weeks of watch-recorded running (see heartRate) — current, and it
+        needs no race, only runs with a heart rate on them
+     3. an older hard continuous run, when nothing recent exists
+     4. the goal, used ONLY as a last resort and labelled as unsupported
+
+   Heart rate ranks under a real recent effort on purpose: a raced 5K is a
+   measurement, the heart-rate line is an inference from easier running.
 
    A goal is not evidence of fitness. When the model is running off a goal it
    says so, and every consumer is free to refuse to prescribe from it. */
@@ -27,6 +33,7 @@ import { RIEGEL as RIEGEL_EXPONENT } from './riegel';
 import { cardioMiles, summarizeCardioDraft, continuousRunEfforts } from './cardioSession';
 import { effortKey, CONFIRMED_PREFIX } from './effortAudit';
 import { fitnessCurve, predictFromCurve, type Effort, type Effort as CurveEffort } from './fitnessCurve';
+import { heartRateEffort } from './heartRate';
 
 /* Canonical race durations the training paces are anchored to. These are the
    standard physiological anchors, not arbitrary distances: threshold is about
@@ -51,7 +58,7 @@ export const EASY_MULTIPLE_SLOW = 1.40;
    model says which it used. */
 export const RECENT_EVIDENCE_DAYS = 70;
 
-export type PaceSource = 'recent-run' | 'older-run' | 'goal' | 'none';
+export type PaceSource = 'recent-run' | 'heart-rate' | 'older-run' | 'goal' | 'none';
 
 export type PerformanceEvidence = { miles: number; seconds: number; date: string };
 
@@ -176,15 +183,24 @@ export function paceModel(
   cutoff.setDate(cutoff.getDate() - RECENT_EVIDENCE_DAYS);
   const sinceIso = cutoff.toISOString().slice(0, 10);
 
-  const recent = hardestEffort(records, sinceIso, excluded);
-  const older = recent ? null : hardestEffort(records, undefined, excluded);
-  const evidence = recent || older
+  const fastest = hardestEffort(records, sinceIso, excluded);
+  const heart = heartRateEffort(records, today);
+  /* THE FASTEST RUN IS NOT ALWAYS A HARD ONE. hardestEffort takes the quickest
+     recent run whatever it was, so an athlete who only jogs had their paces
+     built from a jog. When heart rate implies a faster threshold than that
+     run can, the run was not a real effort, and heart rate is the better
+     witness; when the run is faster, it was, and it stands. */
+  const heartWins = Boolean(heart && (!fastest || equivalentSeconds(heart.seconds, heart.miles, 1) < equivalentSeconds(fastest.seconds, fastest.miles, 1)));
+  const recent = heartWins ? null : fastest;
+  const fromHeart = heartWins ? heart : null;
+  const older = recent || fromHeart ? null : hardestEffort(records, undefined, excluded);
+  const evidence = recent || fromHeart || older
     || (goal && goal.paceSecondsPerMile > 0
       ? { miles: goal.miles, seconds: goal.paceSecondsPerMile * goal.miles, date: today }
       : null);
   if (!evidence) return emptyPaceModel;
 
-  const source: PaceSource = recent ? 'recent-run' : older ? 'older-run' : 'goal';
+  const source: PaceSource = recent ? 'recent-run' : fromHeart ? 'heart-rate' : older ? 'older-run' : 'goal';
 
   /* THE SAME CURVE THE GOAL CARD USES, so the plan and the verdict cannot
      disagree about the athlete. Paces used to be carried off the single
@@ -193,7 +209,10 @@ export function paceModel(
      their own fade rate. With no logged running at all there is nothing to fit
      and the goal is carried across as before — still labelled unsupported. */
   const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
-  const curve = source === 'goal' ? null : fitnessCurve([...continuousEfforts(records, undefined, excluded), ...workouts], today, confirmed);
+  /* When heart rate won, the logged runs it beat were submaximal by its own
+     measure; fitting a curve through them would treat the one honest number
+     as the outlier and drag it back to jogging pace. It is carried alone. */
+  const curve = source === 'goal' || source === 'heart-rate' ? null : fitnessCurve([...continuousEfforts(records, undefined, excluded), ...workouts, ...(heart ? [heart] : [])], today, confirmed);
 
   /* Measured against the effort's own pace, so the correction is about the gap
      between this athlete's speed and this athlete's base — not about the
@@ -210,7 +229,7 @@ export function paceModel(
   const atFit = (miles: number) => { const fromCurve = curve ? predictFromCurve(curve, miles, 0) : null; return fromCurve ? fromCurve.seconds / miles : paceAt(evidence, miles, 0); };
   const thresholdFit = Math.min(threshold, atFit(THRESHOLD_MILES));
   return {
-    source, supported: source !== 'goal', from: recent || older,
+    source, supported: source !== 'goal', from: recent || fromHeart || older,
     exponent: curve ? curve.exponent : RIEGEL_EXPONENT,
     fittedExponent: Boolean(curve?.fitted),
     easyFast: threshold * EASY_MULTIPLE_FAST,

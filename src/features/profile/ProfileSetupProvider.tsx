@@ -8,6 +8,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { loadAthleteSettings, saveAthleteSettings, reportSettingsSyncTo } from './settingsSync';
 import { freshestSetup } from './setupFreshness';
 import { useSyncStatus } from '../sync/SyncStatusProvider';
+import { rememberBirthDate } from '../../lib/heartRate';
 
 export type AthleteSetup = {
   displayName:string; username:string; birthDate:string; units:'Imperial'|'Metric'; height:string;
@@ -67,6 +68,9 @@ export function ProfileSetupProvider({children}:{children:ReactNode}){
     ?{label:'Profile and split',message:`Your latest change did not reach your account (${message}).`}
     :null)),[report]);
   const [setup,setSetup]=useState<AthleteSetup|null>(null);
+  /* Synchronously, so every pace and projection computed this render already
+     knows the athlete's age (heartRate's max-HR fallback). Idempotent. */
+  rememberBirthDate(setup?.birthDate);
   /* Kept in step during render, so the first calculation that reads it already sees it. */
   setStartingNumbers(setup?.startingNumbers);
   const [loadedUserId,setLoadedUserId]=useState<string|null>(null);

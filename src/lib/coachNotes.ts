@@ -110,6 +110,8 @@ export type CoachNoteInput = {
   goalChanges: GoalVerdictChange[];
   readiness: ReadinessToday | null;
   easyTooFast: { loggedPace: string; easyRange: string } | null;
+  /* The same error measured by heart rate, which sees through heat and hills. */
+  easyTooHard?: { runs: number; tooHard: number; ceiling: number; averageHr: number } | null;
   /* Several races on one date: the block can only peak for one. */
   raceClash?: { date: string; races: string[]; builtFor?: string } | null;
 };
@@ -253,7 +255,19 @@ export function coachNotes(input: CoachNoteInput): CoachNote[] {
 
   /* EASY RUNS RUN AT TEMPO — the commonest self-coaching error, said once a
      week rather than on every visit to the Plan tab. */
-  if (input.easyTooFast && input.week) {
+  /* By heart rate first: when the watch can say it, it is the better witness,
+     and the pace note below would only repeat it less precisely. */
+  if (input.easyTooHard && input.week) {
+    const hard = input.easyTooHard;
+    notes.push({
+      key: `easy-too-hard:${input.week.startIso}`,
+      kind: 'easy-too-fast',
+      priority: 52,
+      say: `${hard.tooHard} of your ${hard.runs} easy runs this week averaged ${hard.averageHr} bpm. Easy is under ${hard.ceiling}.`,
+      detail: 'At that heart rate they are threshold work, and they cost the hard days, which is where the progress is.',
+      ask: `${hard.tooHard} of my easy runs this week averaged ${hard.averageHr} bpm, and easy is under ${hard.ceiling}. How much does it matter?`,
+    });
+  } else if (input.easyTooFast && input.week) {
     notes.push({
       key: `easy-too-fast:${input.week.startIso}`,
       kind: 'easy-too-fast',
