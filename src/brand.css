@@ -377,3 +377,26 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
   transition: background var(--dur-standard) var(--ease-strike), color var(--dur-quick) var(--ease-respond); }
 .settings-switch button.active { background: var(--surface-1); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .14); }
 .simple-settings-list > button.settings-sign-out strong { color: var(--bad); }
+
+/* ---- Header ---------------------------------------------------------------
+   The full-colour mark on its own — no FORGE wordmark, no bar behind it. The
+   header was a translucent white band with a hairline under it; now the logo
+   and the actions sit straight on the page ground and scroll away with it.
+   Doubled class so it outranks every older .topbar rule without !important. */
+.forge-mark-full { display: block; width: 34px; height: 29px; flex: none; overflow: visible; }
+.forge-mark-arm1,
+.forge-mark-arm2 { fill: var(--accent); }
+.forge-mark-wedge { fill: var(--text); }
+.forge-mark-base { fill: var(--mark-shade); }
+.brand .forge-mark-full { width: 38px; height: 32px; }
+
+.topbar.topbar {
+  position: relative;
+  background: transparent;
+  border-bottom: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Wider than 900px the sidebar carries the mark; the header would repeat it. */
+@media (min-width: 901px) { .top-brand { display: none; } }
