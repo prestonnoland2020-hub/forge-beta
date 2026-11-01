@@ -162,17 +162,38 @@ async function nextUpFor(pairs: Array<[string, string]>): Promise<Map<string, Ne
   }
   const remaining = owners.filter(owner => !dates.some(date => out.has(pairKey(owner, date))));
   if (!remaining.length) return out;
+  /* THE LOG IS THE TRUTH, here as in the app (lib/cycleCursor): the day after
+     the last session logged against a split position, rest expiring after a
+     day. The cycle cursor is read only when no positioned session exists. */
   const { data: cycles } = await admin.from('training_cycle_state').select('owner_id,split_id,next_position').in('owner_id', remaining);
   const splitIds = [...new Set((cycles || []).map(row => String(row.split_id)))];
   const { data: days } = splitIds.length ? await admin.from('training_split_days').select('split_id,position,name,goal_lifts,cardio_types').in('split_id', splitIds) : { data: [] };
+  const { data: recent } = await admin.from('workout_days').select('owner_id,workout_date,split_position').in('owner_id', remaining).not('split_position', 'is', null).gte('workout_date', Array.from({ length: 14 }).reduce<string>(date => dayBefore(date), [...dates].sort()[0])).order('workout_date', { ascending: false });
+  const latestByOwner = new Map<string, { date: string; position: number }>();
+  for (const row of (recent || []) as Array<Record<string, unknown>>) {
+    const owner = String(row.owner_id);
+    if (!latestByOwner.has(owner)) latestByOwner.set(owner, { date: String(row.workout_date), position: Number(row.split_position) });
+  }
+  const isRest = (day: Record<string, unknown>) => /^rest|recovery|off$/i.test(String(day.name || '').trim()) || (!(Array.isArray(day.goal_lifts) && day.goal_lifts.length) && !(Array.isArray(day.cardio_types) && day.cardio_types.length) && /rest|recover|off/i.test(String(day.name || '')));
   for (const cycle of (cycles || []) as Array<Record<string, unknown>>) {
-    const day = ((days || []) as Array<Record<string, unknown>>).find(item => String(item.split_id) === String(cycle.split_id) && Number(item.position) === Number(cycle.next_position));
-    if (!day) continue;
-    const lifts = Array.isArray(day.goal_lifts) ? (day.goal_lifts as string[]).filter(Boolean) : [];
-    const cardio = Array.isArray(day.cardio_types) ? (day.cardio_types as string[]).filter(Boolean) : [];
-    const detail = [lifts[0], cardio[0]].filter(Boolean).join(' · ');
-    const line = `${String(day.name)}${detail ? ` — ${detail}` : ''}.`;
-    for (const date of dates) if (!out.has(pairKey(String(cycle.owner_id), date))) out.set(pairKey(String(cycle.owner_id), date), { line });
+    const owner = String(cycle.owner_id);
+    const splitDays = ((days || []) as Array<Record<string, unknown>>).filter(item => String(item.split_id) === String(cycle.split_id)).sort((a, b) => Number(a.position) - Number(b.position));
+    if (!splitDays.length) continue;
+    const after = (position: number) => splitDays.find(item => Number(item.position) > position) || splitDays[0];
+    const latest = latestByOwner.get(owner);
+    for (const date of dates) {
+      if (out.has(pairKey(owner, date))) continue;
+      let day = latest ? after(latest.position) : (splitDays.find(item => Number(item.position) === Number(cycle.next_position)) || after(Number(cycle.next_position) - 1));
+      if (latest && isRest(day)) {
+        const gap = Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${latest.date}T12:00:00Z`)) / 86400000);
+        if (gap >= 2) day = after(Number(day.position));
+      }
+      const lifts = Array.isArray(day.goal_lifts) ? (day.goal_lifts as string[]).filter(Boolean) : [];
+      /* cardio_types holds policies ("Forge", "Planned"), not sessions; only HYROX is worth a word. */
+      const hyrox = Array.isArray(day.cardio_types) && (day.cardio_types as string[]).some(item => /^hyrox$/i.test(String(item)));
+      const detail = [lifts[0], hyrox ? 'HYROX' : ''].filter(Boolean).join(' · ');
+      out.set(pairKey(owner, date), { line: isRest(day) ? `${String(day.name)}. Nothing owed today.` : `${String(day.name)}${detail ? ` — ${detail}` : ''}.` });
+    }
   }
   return out;
 }
