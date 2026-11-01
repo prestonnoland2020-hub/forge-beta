@@ -1,8 +1,9 @@
 /* THE TAP YOU CAN FEEL. A selection that answers with a click under the thumb
    reads as a real app; one that only changes colour reads as a web page.
 
-   Three kinds, matching what iOS itself uses them for:
+   Four kinds, matching what iOS itself uses them for:
      tap()     — choosing something (a card, a chip, a toggle)
+     tick()    — passing over a choice while dragging (the tab bar under a sliding finger)
      success() — finishing something (setup done, a set saved)
      warning() — being stopped (a required field still empty)
 
@@ -14,6 +15,9 @@
 type Bridge = { Plugins?: { Haptics?: {
   impact?: (options: { style: 'LIGHT' | 'MEDIUM' | 'HEAVY' }) => Promise<void>;
   notification?: (options: { type: 'SUCCESS' | 'WARNING' | 'ERROR' }) => Promise<void>;
+  selectionStart?: () => Promise<void>;
+  selectionChanged?: () => Promise<void>;
+  selectionEnd?: () => Promise<void>;
 } } };
 
 const native = () => (globalThis as { Capacitor?: Bridge }).Capacitor?.Plugins?.Haptics;
@@ -23,6 +27,19 @@ export function tap() {
   const haptics = native();
   if (haptics?.impact) { haptics.impact({ style: 'LIGHT' }).catch(() => {}); return; }
   buzz(8);
+}
+
+/* The detent click of a picker wheel: lighter than tap(), made for firing
+   several times in one gesture. */
+export function tick() {
+  const haptics = native();
+  if (haptics?.selectionChanged) {
+    haptics.selectionStart?.().catch(() => {});
+    haptics.selectionChanged().catch(() => {});
+    return;
+  }
+  if (haptics?.impact) { haptics.impact({ style: 'LIGHT' }).catch(() => {}); return; }
+  buzz(5);
 }
 
 export function success() {
