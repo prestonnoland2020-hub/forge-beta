@@ -1,0 +1,179 @@
+/* FORGE STRIKE — the faceted F, assembling.
+
+   One stylesheet, no dependencies. Works with the React component
+   (ForgeStrike.tsx), the web component (forge-strike.js) or hand-written
+   markup (see README.md).
+
+   MODES — set on the root as data-mode:
+     once    the sign-in entrance: assembles in ~1.1s, then holds still.
+     loop    a loading screen: assembles once, then a glint crosses the tile
+             every 1.8s for as long as it is on screen.
+     cycle   a long wait: the facets assemble, hold, and come apart again,
+             every 2.6s.
+
+   Inside the Forge app every colour resolves from the theme tokens
+   (--mark-*, --accent). Anywhere else the fallbacks below are the logo's
+   own colours, so it looks right with no setup at all.
+
+   Size is one number: --fs-size (default 96px). Everything — tile, facets,
+   shadow, glint, wordmark — is drawn in em off it, so it scales cleanly
+   from a 32px spinner to a full splash. */
+
+.fs {
+  --fs-size: 96px;
+  --fs-accent: var(--accent, #259de2);
+  --fs-tile: var(--mark-tile, #3f4849);
+  --fs-face: var(--mark-face, #f3f5f5);
+  --fs-shade: var(--mark-shade, #7b807e);
+  --fs-shadow: var(--mark-shadow, rgba(0, 0, 0, .34));
+  --fs-ink: var(--ink, currentColor);
+  --fs-ease: var(--ease-strike, cubic-bezier(.16, 1, .3, 1));
+
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .2em;
+  font-size: var(--fs-size);
+  line-height: 1;
+}
+
+.fs[data-wordmark="right"] { flex-direction: row; gap: .24em; }
+
+.fs-tile {
+  position: relative;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: .25em;
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--fs-face) 16%, transparent), transparent 62%),
+    var(--fs-tile);
+  box-shadow: 0 .1em .3em rgba(0, 0, 0, .3);
+}
+
+.fs-tile svg {
+  position: absolute;
+  width: .7em;
+  height: .593em;
+  overflow: visible;
+}
+
+.fs-base { fill: var(--fs-shade); }
+.fs-wedge { fill: var(--fs-face); }
+.fs-arm1,
+.fs-arm2 { fill: var(--fs-accent); }
+
+/* The long shadow: a copy of the mark in the shadow colour, stepped out
+   along 45° by a chain of drop-shadows. It sits exactly under the mark, so
+   only the steps it casts are ever seen. */
+.fs-shadow path { fill: var(--fs-shadow); }
+.fs-shadow {
+  filter:
+    drop-shadow(.04em .04em 0 var(--fs-shadow)) drop-shadow(.04em .04em 0 var(--fs-shadow))
+    drop-shadow(.06em .06em 0 var(--fs-shadow)) drop-shadow(.08em .08em 0 var(--fs-shadow))
+    drop-shadow(.13em .13em 0 var(--fs-shadow));
+}
+
+.fs-glint {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 40%;
+  width: .33em;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fs-face) 30%, transparent), transparent);
+  transform: skewX(-24deg);
+  pointer-events: none;
+}
+
+.fs-word {
+  display: inline-flex;
+  font: 800 .24em/1 var(--display, 'Archivo', 'Helvetica Neue', Arial, sans-serif);
+  letter-spacing: .3em;
+  padding-left: .3em; /* balances the tracking after the last letter */
+  color: var(--fs-ink);
+}
+.fs[data-wordmark="right"] .fs-word { font-size: .36em; letter-spacing: .1em; padding-left: 0; }
+.fs-word span { display: inline-block; }
+.fs[data-wordmark="none"] .fs-word,
+.fs:not([data-wordmark]) .fs-word { display: none; }
+
+.fs-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- Motion. All of it lives here, so reduced motion is simply the
+   finished mark, still. ------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .fs g[class^="fs-"] { transform-box: view-box; }
+
+  /* once + loop: the entrance */
+  .fs:not([data-mode="cycle"]) .fs-tile { animation: fs-tile 420ms var(--fs-ease) both; }
+  .fs:not([data-mode="cycle"]) .fs-arm1 { animation: fs-arm 520ms var(--fs-ease) 120ms both; }
+  .fs:not([data-mode="cycle"]) .fs-arm2 { animation: fs-arm 520ms var(--fs-ease) 230ms both; }
+  .fs:not([data-mode="cycle"]) .fs-wedge { animation: fs-drop 460ms var(--fs-ease) 360ms both; }
+  .fs:not([data-mode="cycle"]) .fs-base { animation: fs-rise 460ms var(--fs-ease) 440ms both; }
+  .fs:not([data-mode="cycle"]) .fs-shadow { animation: fs-shadow 560ms var(--fs-ease) 640ms both; }
+  .fs[data-mode="once"] .fs-glint,
+  .fs:not([data-mode]) .fs-glint { animation: fs-glint 620ms ease-in-out 820ms both; }
+  .fs[data-mode="loop"] .fs-glint { animation: fs-glint-loop 1800ms ease-in-out 820ms infinite; }
+
+  .fs .fs-word span { animation: fs-up 420ms var(--fs-ease) both; }
+  .fs .fs-word span:nth-child(1) { animation-delay: 900ms; }
+  .fs .fs-word span:nth-child(2) { animation-delay: 950ms; }
+  .fs .fs-word span:nth-child(3) { animation-delay: 1000ms; }
+  .fs .fs-word span:nth-child(4) { animation-delay: 1050ms; }
+  .fs .fs-word span:nth-child(5) { animation-delay: 1100ms; }
+
+  /* cycle: in, hold, out — each facet keeps its stagger on every pass */
+  .fs[data-mode="cycle"] .fs-arm1 { animation: fs-cycle-arm 2600ms var(--fs-ease) 0ms infinite both; }
+  .fs[data-mode="cycle"] .fs-arm2 { animation: fs-cycle-arm 2600ms var(--fs-ease) 110ms infinite both; }
+  .fs[data-mode="cycle"] .fs-wedge { animation: fs-cycle-drop 2600ms var(--fs-ease) 240ms infinite both; }
+  .fs[data-mode="cycle"] .fs-base { animation: fs-cycle-rise 2600ms var(--fs-ease) 320ms infinite both; }
+  .fs[data-mode="cycle"] .fs-shadow { animation: fs-cycle-shadow 2600ms var(--fs-ease) 0ms infinite both; }
+}
+
+@keyframes fs-tile { from { opacity: 0; transform: scale(.86); } }
+@keyframes fs-arm { from { opacity: 0; transform: translate(200px, -200px); } }
+@keyframes fs-drop { from { opacity: 0; transform: translateY(-140px); } }
+@keyframes fs-rise { from { opacity: 0; transform: translate(-120px, 120px); } }
+@keyframes fs-shadow { from { opacity: 0; transform: translate(-.1em, -.1em); } }
+@keyframes fs-up { from { opacity: 0; transform: translateY(.3em); } }
+@keyframes fs-glint {
+  0% { opacity: 0; transform: translateX(-.8em) skewX(-24deg); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(.8em) skewX(-24deg); }
+}
+@keyframes fs-glint-loop {
+  0% { opacity: 0; transform: translateX(-.8em) skewX(-24deg); }
+  14% { opacity: 1; }
+  34%, 100% { opacity: 0; transform: translateX(.8em) skewX(-24deg); }
+}
+@keyframes fs-cycle-arm {
+  0% { opacity: 0; transform: translate(200px, -200px); }
+  22%, 76% { opacity: 1; transform: none; }
+  92%, 100% { opacity: 0; transform: translate(200px, -200px); }
+}
+@keyframes fs-cycle-drop {
+  0% { opacity: 0; transform: translateY(-140px); }
+  20%, 74% { opacity: 1; transform: none; }
+  90%, 100% { opacity: 0; transform: translateY(-140px); }
+}
+@keyframes fs-cycle-rise {
+  0% { opacity: 0; transform: translate(-120px, 120px); }
+  20%, 72% { opacity: 1; transform: none; }
+  88%, 100% { opacity: 0; transform: translate(-120px, 120px); }
+}
+@keyframes fs-cycle-shadow {
+  0%, 24% { opacity: 0; transform: translate(-.1em, -.1em); }
+  40%, 68% { opacity: 1; transform: none; }
+  80%, 100% { opacity: 0; transform: translate(-.1em, -.1em); }
+}
