@@ -25,7 +25,7 @@ check('a tick for every tab crossed', /if \(index < 0 \|\| index === state\.inde
 check('tick is the selection detent where the engine has one', /export function tick\(\)[\s\S]{0,300}selectionChanged/.test(haptics));
 
 console.log('\nThe browser does not steal the drag');
-check('the bar takes the gesture itself', /\.tab-bar \{ touch-action: none; \}/.test(css));
+check('the bar takes sideways drags and leaves up-and-down to the page', /\.tab-bar, \.tab-bar \.tab \{ touch-action: pan-y; \}/.test(css) && !/\.tab-bar \{ touch-action: none; \}/.test(css));
 
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);

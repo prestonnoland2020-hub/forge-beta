@@ -1,4 +1,5 @@
 import { createContext,useCallback,useContext,useEffect,useMemo,useRef,useState,type ReactNode } from 'react';
+import { useToday } from '../../lib/dayClock';
 import { isDemoMode } from '../../lib/env';
 import { buildDailyRecommendation,recommendationFingerprint,DAILY_RECOMMENDATION_VERSION,type DailyRecommendation,type RecommendationSplitDay } from '../../lib/dailyRecommendationEngine';
 import { useAuth } from '../auth/AuthProvider';
@@ -140,6 +141,8 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const splitDayRaw=days.find(day=>day.position===duePosition)||trainingDays[0]||days[0]||{position:1,name:'Start training',type:'strength' as const,muscles:[],exercises:[],cardioTypes:[]};
   const splitDay=coachRest?{...splitDayRaw,name:'Rest day',type:'rest' as const,muscles:[],exercises:[],cardioTypes:[]}:splitDayRaw;
   const coachStamp=coachOverride?`${coachOverride.rest?'R':''}:${coachOverride.position||''}:${coachOverride.minutes||''}`:'';
+  /* Re-read when the day turns, so a phone that slept overnight wakes to today's plan. */
+  useToday();
   const date=isoToday();
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   const aiPlanStamp=useMemo(()=>readLocalAiPlan()?.generatedAt||'',[refreshKey]);
