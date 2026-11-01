@@ -216,3 +216,15 @@ export function summarizeCardioDraft(draft:CardioLogDraft):CardioTotals{
 export function enduranceGroup(draft:CardioLogDraft):'Running'|'Other'{
   return isRunningCardio(draft)?'Running':'Other';
 }
+
+/* A WATCH SESSION IS NAMED BY ITS ID. An import writes its session with the
+   provider in front of the activity id ("strava-1234"), which is also what the
+   importer reads to never write it twice. The logger asks the same question to
+   show the session as the watch's, above anything typed by hand. */
+const SYNCED_PROVIDERS:Array<[string,string]>=[['strava-','Strava'],['garmin-','Garmin'],['apple-','Apple Health'],['healthkit-','Apple Health'],['health-connect-','Health Connect'],['fitbit-','Fitbit'],['coros-','COROS'],['polar-','Polar'],['suunto-','Suunto'],['wahoo-','Wahoo'],['whoop-','WHOOP']];
+export function syncedProvider(draft:Pick<CardioLogDraft,'id'|'prescription'>):string|null{
+  const id=String(draft.id||'').toLowerCase();
+  const match=SYNCED_PROVIDERS.find(([prefix])=>id.startsWith(prefix));
+  if(match)return match[1];
+  return draft.prescription?.source==='wearable'?String(draft.prescription.provider||'Your watch'):null;
+}
