@@ -8,7 +8,7 @@ import { localDayIso } from '../../lib/time';
    watch-recorded run counts everywhere a hand-logged one does. */
 
 type ExternalRow = {
-  id: string; external_id: string; activity_type: string; activity_name: string;
+  id: string; provider?: string; external_id: string; activity_type: string; activity_name: string;
   started_at: string; distance_meters: number | null; moving_seconds: number | null;
   elapsed_seconds: number | null; average_heartrate: number | null;
   /* The athlete's local clock, pulled out of the payload by the query instead
@@ -196,6 +196,7 @@ const paceText = (minutes: number, miles: number) => { const pace = minutes / mi
 const clock = (minutes: number) => { const whole = Math.round(minutes * 60); const m = Math.floor(whole / 60); const s = whole % 60; return `${m}:${String(s).padStart(2, '0')}`; };
 
 export function externalToSession(row: ExternalRow): { date: string; session: CardioLogDraft } {
+  const source = row.provider === 'garmin' ? 'Garmin' : 'Strava';
   const localStart = row.local_start || row.raw_summary?.start_date_local || row.started_at;
   const date = String(localStart).slice(0, 10);
   const activity = activityName(row.activity_type);
@@ -207,13 +208,36 @@ export function externalToSession(row: ExternalRow): { date: string; session: Ca
   return {
     date,
     session: {
-      id: `strava-${row.external_id}`,
+      id: `${row.provider === 'garmin' ? 'garmin' : 'strava'}-${row.external_id}`,
       structure: 'steady',
       activity,
       summary,
-      prescription: { legacyIntervals: [{ cardioType: activity, unit: 'miles', distance: miles, time: minutes }], distanceUnit: 'miles', note: row.activity_name && row.activity_name !== activity ? `Strava: ${row.activity_name}` : 'Imported from Strava' },
+      prescription: { legacyIntervals: [{ cardioType: activity, unit: 'miles', distance: miles, time: minutes }], distanceUnit: 'miles', note: row.activity_name && row.activity_name !== activity ? `${source}: ${row.activity_name}` : `Imported from ${source}` },
     } as CardioLogDraft,
   };
+}
+
+/* ONE RUN, TWO SOURCES. A Garmin watch that also syncs to Strava delivers
+   every activity twice — once direct, once through Strava — with different
+   ids and slightly different numbers. Same class of activity starting within
+   five minutes is the same activity. The copy already in the log wins;
+   otherwise Strava's, since it was there first. The dropped copy is marked
+   imported so it is settled once and never re-offered. */
+const SAME_START_MS = 5 * 60_000;
+export function dropCrossSourceDuplicates<T extends { id: string; provider?: string; activity_type: string; started_at: string; imported_to_workout: boolean | null }>(rows: T[]): { kept: T[]; duplicateIds: string[] } {
+  const rank = (row: T) => (row.imported_to_workout ? 0 : 2) + (row.provider === 'garmin' ? 1 : 0);
+  const ordered = [...rows].sort((a, b) => rank(a) - rank(b));
+  const kept: T[] = []; const duplicateIds: string[] = [];
+  for (const row of ordered) {
+    const start = new Date(row.started_at).getTime();
+    const group = cardioClass(activityName(row.activity_type));
+    const twin = kept.find(other => (other.provider || 'strava') !== (row.provider || 'strava')
+      && Math.abs(new Date(other.started_at).getTime() - start) <= SAME_START_MS
+      && cardioClass(activityName(other.activity_type)) === group);
+    if (twin) { if (!row.imported_to_workout) duplicateIds.push(row.id); } else kept.push(row);
+  }
+  kept.sort((a, b) => a.started_at.localeCompare(b.started_at));
+  return { kept, duplicateIds };
 }
 
 export async function importStravaActivities(
@@ -225,14 +249,14 @@ export async function importStravaActivities(
      a full Strava history could never reach anything older: every pass
      re-fetched rows already imported, skipped them, and finished. Page the
      whole table oldest-to-newest so a complete history lands in the log. */
-  const columns = 'id,external_id,activity_type,activity_name,started_at,distance_meters,moving_seconds,elapsed_seconds,average_heartrate,imported_to_workout,local_start:raw_summary->>start_date_local';
+  const columns = 'id,provider,external_id,activity_type,activity_name,started_at,distance_meters,moving_seconds,elapsed_seconds,average_heartrate,imported_to_workout,local_start:raw_summary->>start_date_local';
   const rows: ExternalRow[] = [];
   const pageSize = 500;
   for (let page = 0; page < 40; page++) {
     const { data, error } = await supabase
       .from('external_activities')
       .select(columns)
-      .eq('provider', 'strava')
+      .in('provider', ['strava', 'garmin'])
       .order('started_at', { ascending: true })
       .range(page * pageSize, page * pageSize + pageSize - 1);
     if (error) return { imported: 0, skipped: 0 };
@@ -241,6 +265,8 @@ export async function importStravaActivities(
     if (data.length < pageSize) break;
   }
   if (!rows.length) return { imported: 0, skipped: 0 };
+  const { kept, duplicateIds } = dropCrossSourceDuplicates(rows);
+  rows.length = 0; rows.push(...kept);
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
   const handLogged = handLoggedCoverage(records);
   const watchTotals = stravaTotalsByDay(rows);
@@ -248,7 +274,7 @@ export async function importStravaActivities(
   let skipped = 0;
   /* Superseded rows are marked imported like any other, so a day the athlete
      logged by hand is settled once and never re-offered on the next sync. */
-  const supersededRowIds: string[] = [];
+  const supersededRowIds: string[] = [...duplicateIds];
   for (const row of rows) {
     const mapped = externalToSession(row);
     if (existingIds.has(mapped.session.id as string) || row.imported_to_workout) { skipped++; continue; }
