@@ -64,7 +64,7 @@ const barBox = () => page.evaluate(() => new Promise(resolve => requestAnimation
     top: Math.round(box.top), bottom: Math.round(box.bottom), height: Math.round(box.height),
     viewport: window.innerHeight,
     docHeight: document.documentElement.scrollHeight,
-    scrollY: Math.round(window.scrollY),
+    scrollY: Math.round((document.querySelector('.app-main') || document.scrollingElement).scrollTop),
   });
 }))));
 
@@ -98,7 +98,7 @@ for (const [sizeName, width, height] of SIZES) {
     /* AND STILL THERE AFTER A SCROLL, which is the state he screenshotted.
        A page shorter than the screen cannot scroll and proves nothing, so it
        is reported rather than counted. */
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.evaluate(() => (s => s.scrollTo(0, s.scrollHeight))(document.querySelector('.app-main') || document.scrollingElement));
     await page.waitForTimeout(350);
     const bottom = await barBox();
     if (bottom.scrollY < 20) { console.log(`  note  ${name} is shorter than the screen at this size — nothing to scroll`); continue; }
@@ -124,13 +124,13 @@ console.log('\nAnd the header stays at the top of the screen');
 await page.setViewportSize({ width: 390, height: 844 });
 for (const [name, route] of [['FAQ', '/profile?view=faq'], ['Exercises', '/exercises'], ['Plan', '/plan']]) {
   await visit(route);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.evaluate(() => (s => s.scrollTo(0, s.scrollHeight))(document.querySelector('.app-main') || document.scrollingElement));
   await page.waitForTimeout(350);
   const bar = await page.evaluate(() => {
     const el = document.querySelector('.topbar');
     if (!el) return null;
     const box = el.getBoundingClientRect();
-    return { top: Math.round(box.top), scrollY: Math.round(window.scrollY) };
+    return { top: Math.round(box.top), scrollY: Math.round((document.querySelector('.app-main') || document.scrollingElement).scrollTop) };
   });
   if (!bar) { check(`${name}: the header exists`, false); continue; }
   if (bar.scrollY < 20) { console.log(`  note  ${name} does not scroll at this size`); continue; }

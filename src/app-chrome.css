@@ -14,6 +14,17 @@
 .tab-bar { display: none; }
 
 @media (max-width: 900px) {
+  /* THE PAGE DOES NOT SCROLL; THE SCREEN INSIDE IT DOES. With the document
+     scrolling, Safari's toolbar shrank and grew under the thumb and the
+     home-screen app rubber-banded at both ends, and a bar pinned to the
+     bottom of that moving viewport moved with it: up and down as you
+     scrolled, when it should stay put. Now the frame is fixed to the screen,
+     only .app-main scrolls, and nothing the bar is pinned to ever moves. The
+     header is sticky inside the same scroller, so it stays where it was.
+     Only the app shell: setup and sign-in scroll as ordinary pages. */
+  html:has(.app-frame), html:has(.app-frame) body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  .app-frame { position: fixed; inset: 0; min-height: 0; }
+  .app-frame > .app-main { height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
   :root {
     --tab-h: 64px;
     --tab-gap: 12px;
