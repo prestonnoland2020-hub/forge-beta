@@ -288,8 +288,8 @@ function OnboardingForm() {
   const setNumber = (lift: string, field: 'weight' | 'reps', value: string) => { setError(''); setStartNums(current => ({ ...current, [lift]: { ...numberFor(lift), [field]: value.replace(/[^\d.]/g, '') } })); };
   const startingList = numberLifts.map(lift => ({ lift, weight: Number(numberFor(lift).weight), reps: Number(numberFor(lift).reps) || 5 }))
     .filter(item => item.weight > 0 && item.weight <= 1500 && item.reps >= 1 && item.reps <= 20);
-  /* A runner with years on Strava should not start from zero either: the
-     connection lives in Profile, so the end of setup takes them straight to it. */
+  /* A runner with a watch full of history should not start from zero either:
+     the connection lives in Profile, so the end of setup takes them straight to it. */
   const [importStrava, setImportStrava] = useState(false);
 
   const submitName = () => {
@@ -497,7 +497,7 @@ function OnboardingForm() {
               <label><input className="ob-input small" inputMode="numeric" value={value.reps} onChange={event => setNumber(lift, 'reps', event.target.value)} placeholder="5" aria-label={`${lift} reps`} /><span>reps</span></label>
             </div>;
           })}</div>
-          {(runningPlanned || goalKind === 'race') && <label className="setup-check"><input type="checkbox" checked={importStrava} onChange={event => { tap(); setImportStrava(event.target.checked); }} /><span><strong>I log my runs on Strava</strong><small>After setup, connect it and Forge imports your running history, so paces start from real runs.</small></span></label>}
+          {(runningPlanned || goalKind === 'race') && <label className="setup-check"><input type="checkbox" checked={importStrava} onChange={event => { tap(); setImportStrava(event.target.checked); }} /><span><strong>I have a smartwatch I’ll connect</strong><small>After setup, Forge takes you straight to Connections so your runs come in and paces start from real training.</small></span></label>}
         </>,
         action: <button className="button ob-next" onClick={() => { tap(); go(1); }}>{startingList.length ? 'Continue' : 'Skip for now'}</button>,
       };

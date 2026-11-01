@@ -119,7 +119,7 @@ export function HomePage() {
     {!firstWeekHidden && trainedDays < 3 && (() => {
       const steps = [
         { label: 'Log your first workout', detail: 'One top set per lift is enough.', done: trainedDays > 0, to: startUrl },
-        ...(runner ? [{ label: 'Bring in your runs', detail: 'Connect Strava, or log a run.', done: ranLogged, to: '/profile?view=connections' }] : []),
+        ...(runner ? [{ label: 'Bring in your runs', detail: 'Connect your watch, or log a run.', done: ranLogged, to: '/profile?view=connections' }] : []),
         { label: 'Train three times', detail: 'Then Forge starts spotting patterns and projecting your goals.', done: trainedDays >= 3, to: '' },
       ];
       return <section className="fw-card" aria-label="Your first week">
