@@ -325,6 +325,10 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 :is(.simple-settings-list, .simple-connections) div { gap: 2px; }
 :is(.simple-settings-list, .simple-connections) strong { font-size: var(--fs-body); font-weight: 700; }
 :is(.simple-settings-list, .simple-connections) span { font-size: var(--fs-small); color: var(--ink-3); }
+/* A row's second line wraps rather than clipping — a lift's muscle list or a
+   long setting is read, not guessed at. */
+.simple-settings-list > button > div > span,
+.exercise-group .simple-settings-list > button > div > span { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 .simple-settings-list > :is(a, button) > b {
   width: 16px; height: 16px; flex: none; font-size: 0; color: var(--ink-3); background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/contain no-repeat;
