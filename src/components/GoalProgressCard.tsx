@@ -361,11 +361,18 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      Preston: simplify it to the max, keep the projection by the event date,
      that is what is important. So it is one number, the bar from it to the
      target, and one line saying by how much it clears or misses. */
-  const projectedNumber = goal.type==='Endurance'
+  /* ONE MODEL ON THE CARD. The prediction above this box (goalFeasibility)
+     and this number came from different models — a trend line here, the
+     typical and best-case curves there — and could disagree on the same
+     screen. Where the goal has a prediction, this IS it: typical by the date
+     as the number, typical to best case as the range. */
+  const predicted = !paceGoal && !goalReached ? verdict?.prediction : undefined;
+  const projectedNumber = predicted ? predicted.typical : goal.type==='Endurance'
     ? (paceGoal ? (calculated || enduranceProjection || 0) : (outlook ? outlook.likely : (calculated || enduranceProjection || 0)))
     : (predictedAtDeadline || calculated || 0);
-  const projectedText = goal.type==='Endurance'&&!paceGoal&&outlook?formatValue(outlook.likely):aiEstimateLoading&&!projectedNumber?'…':projectedNumber?formatValue(projectedNumber):'—';
-  const range = goal.type==='Endurance'&&!paceGoal&&outlook?`${formatValue(outlook.best)}–${formatValue(outlook.likely)} on race day`
+  const projectedText = predicted ? formatValue(predicted.typical) : goal.type==='Endurance'&&!paceGoal&&outlook?formatValue(outlook.likely):aiEstimateLoading&&!projectedNumber?'…':projectedNumber?formatValue(projectedNumber):'—';
+  const range = predicted ? `${formatValue(predicted.typical)} typical · ${formatValue(predicted.ceiling)} best case`
+    : goal.type==='Endurance'&&!paceGoal&&outlook?`${formatValue(outlook.best)}–${formatValue(outlook.likely)} on race day`
     : strengthForecast && Math.round(strengthForecast.high) > Math.round(strengthForecast.low) ? `${Math.round(strengthForecast.low)}–${Math.round(strengthForecast.high)} ${goal.unit || ''} likely`.replace(/\s+likely$/, ' likely') : '';
   const clears = Boolean(projectedNumber && target && (lowerIsBetter ? projectedNumber <= target : projectedNumber >= target));
   const gap = projectedNumber && target ? Math.abs(projectedNumber - target) : 0;

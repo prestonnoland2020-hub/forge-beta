@@ -10,6 +10,8 @@ import { syncKeyboardState } from '../features/shell/nativeChrome';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useAuth } from '../features/auth/AuthProvider';
+import { ForgeMark } from './ForgeStrikeMark';
+import { useGoalPredictionLog } from '../features/goals/goalPredictionLog';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { isDemoMode } from '../lib/env';
 import { useSyncStatus } from '../features/sync/SyncStatusProvider';
@@ -24,7 +26,6 @@ import { importStravaActivities } from '../features/training/stravaImportService
 import { getGarminConnection, syncGarmin } from '../features/training/garminConnectionService';
 import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
-import { ForgeMark } from './ForgeStrikeMark';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
    standalone exercise library that duplicated what the Log screen already does;
@@ -83,6 +84,8 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      can be live on the site while the icon on the phone still runs last
      night's engine. version.json is fetched uncached on open and whenever the
      app returns to the foreground; a mismatch surfaces one tap to reload. */
+  /* Each goal's prediction is written down, and scored after its date. */
+  useGoalPredictionLog();
   const [updateReady,setUpdateReady]=useState<string|false>(false);
   useEffect(()=>{
     let last=0;

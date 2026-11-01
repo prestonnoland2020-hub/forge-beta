@@ -42,14 +42,12 @@ export function ForgeStrikeMark() {
   );
 }
 
-/* THE MARK IN ITS OWN COLOURS, FOR THE HEADER. The one-colour mask read as a
-   flat lime stamp, not the logo. This is the same four facets, still and
-   coloured as the app icon is — blue arms, grey base, light wedge — with the
-   wedge taking the ink colour so it holds on a white header too. Fills live
-   in header.css (.forge-mark-*). */
-export function ForgeMark() {
+/* The same four facets, standing still, for the header: the full-colour mark
+   rather than the one-colour mask, now that the logo stands without the
+   FORGE wordmark beside it. Fills live in brand.css (.forge-mark-full). */
+export function ForgeMark({ className = '' }: { className?: string }) {
   return (
-    <svg className="forge-mark-svg" viewBox="0 0 732 620" aria-hidden="true">
+    <svg className={`forge-mark-full ${className}`.trim()} viewBox="0 0 732 620" aria-hidden="true">
       {FACETS.map(({ part, d }) => (
         <g key={part} className={`forge-mark-${part}`}>
           <g transform={TRACE}><path d={d} /></g>

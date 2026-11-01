@@ -31,7 +31,3 @@
 /* The logo, not the screen's name, sits top left on every screen. */
 .top-brand{display:inline-flex;align-items:center;gap:10px;min-width:0;color:var(--ink);text-decoration:none;font:800 22px var(--display);letter-spacing:.1em;line-height:1}
 .top-brand .brand-mark{width:30px;height:26px;flex:none}
-.top-brand .forge-mark-svg,.sidebar .brand .forge-mark-svg{width:32px;height:27px;flex:none;display:block;overflow:visible}
-.forge-mark-arm1,.forge-mark-arm2{fill:var(--accent)}
-.forge-mark-base{fill:var(--mark-shade)}
-.forge-mark-wedge{fill:var(--text)}
