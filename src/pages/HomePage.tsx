@@ -94,6 +94,9 @@ export function HomePage() {
         </label></li>}
       </ul>}
       {!recommendedSets.length && dayType !== 'rest' && dayType !== 'cardio' && dayType !== 'hyrox' && <Link className="td-fix" to="/exercises"><span><b>Choose exercises for this day</b>Forge needs a lift mapped to it.</span><Icon name="arrow" size={16} /></Link>}
+      {/* A HYROX day only gets HYROX work for a HYROX goal; without one it is
+          open, and says where to set the goal. */}
+      {dayType === 'hyrox' && !recommendation.cardio && <Link className="td-fix" to="/goals"><span><b>Add a HYROX goal</b>Forge writes HYROX sessions once you’re training for one. Today is open.</span><Icon name="arrow" size={16} /></Link>}
       {quiet && <p className="td-quiet"><b>{dayType === 'rest' ? 'Rest day' : 'No run needed today'}</b>{dayType === 'rest' ? 'Nothing required. Walk, stretch or log anything you do.' : 'Your running is covered this week.'}</p>}
       {/* A FIRST SESSION IS A TEST, AND IT SAYS SO. A lift with no logged
           set and no starting number has no load to give; instead of "Find

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { hyroxGoalOf, hyroxPlanDetail } from '../lib/hyroxSession';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
@@ -75,7 +76,7 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     if(role==='quality'){cardioKind='FORGE · Quality';cardioText=week.quality;cardioStress='High'}else if(role==='long'){cardioKind='FORGE · Long run';cardioText=week.longRun;cardioStress='Moderate'}else if(role==='easy'){cardioKind='FORGE · Easy';cardioText=week.easy;cardioStress='Low'}else if(scaled){cardioKind='PLAN · Cardio';cardioText=scaled.summary;cardioStress=attached!.structure==='Steady'?'Low':'High'}
     /* The same facts as data, for the shared plan rows. */
     const run:PlanRun|undefined=cardioText?{kind:role==='quality'?'Hard run':role==='long'?'Long run':cardioStress==='High'?'Hard run':'Easy run',text:cardioText}:undefined;
-    if(type==='hyrox')return{date,kind:'HYROX',title:day.name,detail:'Forge writes the session on the day — stations, compromised running or a simulation, paced off your threshold.',goal:goals.find(goal=>/hyrox/i.test(`${goal.exercise||''} ${goal.title}`))?.title||'HYROX',stress:'High'};
+    if(type==='hyrox'){const hyroxGoal=hyroxGoalOf(goals);return hyroxGoal?{date,kind:'HYROX',title:day.name,detail:hyroxPlanDetail(goals),goal:hyroxGoal.title||'HYROX',stress:'High'}:{date,kind:'Flexible',title:day.name,detail:hyroxPlanDetail(goals),goal:'Open',stress:'Low'}}
     if(type==='rest'&&!cardioText)return{date,kind:'Recovery',title:day.name,detail:'No strength or cardio scheduled. Optional mobility or easy walking only.',goal:'Fatigue management',stress:'Rest'};
     if(type==='rest'&&cardioText)return{date,kind:cardioKind,title:day.name,detail:`No strength · ${cardioText}${scaled?` · ${scaled.reason}`:' · Scheduled from this calendar week’s cardio requirements.'}`,goal:enduranceGoal?.title||'Endurance development',stress:cardioStress||'Low',scaled:true,run};
     if(type==='strength'||type==='mixed'){const isPrimary=goalOwnerIndex>=0?index===goalOwnerIndex:strengthIndex++===0;
