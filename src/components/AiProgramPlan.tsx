@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { bestRunDay, interferenceNotes, type PlannedDay } from '../lib/interference';
-import { paceModel, easyTooFast, loggedEasyPace } from '../lib/paceModel';
-import { normalizePhase } from '../lib/trainingPhase';
+import { bestRunDay, type PlannedDay } from '../lib/interference';
+import { paceModel } from '../lib/paceModel';
 import { weeksUntil } from '../lib/goalFeasibility';
-import { enduranceTarget, clockText } from '../lib/qualitySession';
+import { enduranceTarget } from '../lib/qualitySession';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import type { PlannedCardio } from './CardioPlanBuilder';
@@ -30,7 +29,7 @@ import {
 } from '../features/training/aiPlanService';
 import { liftPositions, rungFor } from '../lib/liftProgression';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
-import { progressionLevels, levelNote, zoneOfPrescription } from '../lib/progressionLevels';
+import { progressionLevels } from '../lib/progressionLevels';
 import { sessionVerdicts } from '../features/training/sessionVerdicts';
 import { workoutEfforts } from '../lib/workoutEvidence';
 import { QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../lib/qualitySession';
@@ -293,20 +292,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || [], workoutEfforts(judged)),
     [records, runGoal, setup?.excludedEfforts, judged],
   );
-  /* AND THE MOST COMMON ERROR IN SELF-COACHED TRAINING, NAMED ONCE.
-
-     Running easy days at tempo pace is the mistake almost everybody makes, and
-     it is the one a plan cannot fix by prescribing anything — the session is
-     already written "easy". Forge has been able to detect it for months
-     (easyTooFast, with its own tests) and said it nowhere. It is one line,
-     under the interference note, and only when it is true.
-
-     IT LIVES UP HERE WITH THE OTHER HOOKS. Its first home was beside the line
-     that renders it, four hundred lines down and past two early returns — so
-     on any screen that took one of those returns React counted fewer hooks
-     than the render before and threw, and the error boundary ate the whole
-     Plan tab. "Something went wrong. Forge hit a snag on this screen." */
-  const easyPace = useMemo(() => loggedEasyPace(records as never[], paces, localDayIso()), [records, paces]);
 
   /* WHERE THE ATHLETE IS ON EACH LADDER — the plan's memory of how the last
      hard sessions went. Derived, never stored: sessionVerdicts reads what was
@@ -331,9 +316,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       provenQuality: moves.length > 0,
     }, moves);
   }, [records, judged, paces]);
-  const easyWarning = easyTooFast(paces, easyPace)
-    ? `Your easy runs are averaging ${clockText(easyPace)}/mi. Easy is ${clockText(paces.easyFast)}–${clockText(paces.easySlow)}/mi — running them harder than that costs the hard days, which is where the progress is.`
-    : '';
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */
@@ -632,27 +614,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const week = plan.weeks[weekIndex];
   const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi');
   const sessions = weekPlan.sessions;
-  /* WHY THE WEEK LOOKS LIKE THIS. At most one line, and only when there is
-     something true to say — a peak that had to give way, a long run on legs
-     that lifted yesterday, or a split with no room in it at all. */
-  const collision = interferenceNotes({
-    days: weekPlan.days, longRunIndex: weekPlan.longIndex, hardRunIndex: weekPlan.hardIndex,
-    liftingMaxWeek: waveSlot(waveIndexOf(stored, weekIndex)).isMax,
-    runningPeakWeek: ['Race', 'Taper', 'Specific'].includes(normalizePhase(week.phase)),
-    weeksToRace: horizons.weeksToRace, weeksToLiftGoal: horizons.weeksToLiftGoal,
-  })[0];
-  /* Which ladder this week's hard run is on, so the card explains the dose it
-     is actually showing rather than all four. */
-  const hardZone = zoneOfPrescription(weekPlan.sessions.find(session => session.run?.kind && /hard|threshold|interval|rep|race/i.test(session.run.kind))?.run?.text
-    || week.quality);
-  /* Everything the plan has to SAY about this week, as against everything it
-     has to show. Collected in one place so the screen can fold them into a
-     single line rather than stacking a paragraph each. */
-  const notes = [
-    collision?.say,
-    easyWarning,
-    hardZone ? levelNote(hardZone, levels.levels, levels.moves) : '',
-  ].filter((note): note is string => Boolean(note));
 
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
      of them, not whichever goal happened to be created first — falling back to
@@ -725,22 +686,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     /> : null}
     {/* Today belongs to today. Looking at week six, there is no "today" in it,
         and a card headed TODAY over a week in October would be a lie. */}
-    {/* THREE PARAGRAPHS OF ADVICE, FOLDED INTO ONE LINE.
-
-        Each of these earns its place — why the long run follows a leg day, that
-        the easy runs are being run too hard, why the hard run is the size it
-        is (a dose that moved because a session went well is a dose the athlete
-        will trust; a number that changed silently is the one they screenshot
-        and ask about). Each is also a paragraph, and stacked between the
-        today card and the week they were most of the screen: advice nobody
-        reads because there is too much of it to start.
-
-        They are notes ABOUT the week, not the week. One line that says how
-        many there are, open on a tap. */}
-    {notes.length > 0 && <details className="pv-notes">
-      <summary>{notes.length === 1 ? 'One note on this week' : `${notes.length} notes on this week`}</summary>
-      {notes.map(note => <p key={note}>{note}</p>)}
-    </details>}
     <WeekList sessions={weekSessions} unit={unit} records={records} todayHref={weekIndex === currentIndex ? workoutHref : undefined}
       title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />

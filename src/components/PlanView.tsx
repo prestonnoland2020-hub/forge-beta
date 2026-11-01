@@ -186,7 +186,7 @@ export function TodayCard({ session, unit, logged, workoutHref }: {
     {done && logged
       ? <div className="pv-lines">
           {(logged.topSets || []).filter(set => set.completed !== false).map((set, index) => <div className="pv-line" key={set.id || `${set.lift}-${index}`}><span className="pv-line-name">{set.lift}</span><span className="pv-line-value">{set.weight} <small>{unit}</small> × {set.reps}</span></div>)}
-          {(logged.cardioSessions || []).map(cardio => <div className="pv-line" key={cardio.id}><span className="pv-line-name">{cardio.activity}</span><span className="pv-line-value">{cardio.summary?.replace(`${cardio.activity} · `, '')}</span></div>)}
+          {(logged.cardioSessions || []).map(cardio => <div className="pv-line pv-line-run" key={cardio.id}><span className="pv-line-name">{cardio.activity}</span><span className="pv-line-value">{cardio.summary?.replace(`${cardio.activity} · `, '')}</span></div>)}
         </div>
       : isRest
         ? <p className="pv-today-note">Nothing scheduled. A walk or some mobility is welcome; nothing is required.</p>
@@ -338,7 +338,7 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
             {logged
               ? <>
                   {loggedLifts.map((set, index) => <LiftLine key={set.id || `${set.lift}-${index}`} lift={{ exercise: set.lift, weight: set.weight, reps: set.reps }} unit={unit} />)}
-                  {(logged.cardioSessions || []).map(cardio => <div className="pv-line" key={cardio.id}><span className="pv-line-name">{cardio.activity}</span><span className="pv-line-value">{cardio.summary?.replace(`${cardio.activity} · `, '')}</span></div>)}
+                  {(logged.cardioSessions || []).map(cardio => <div className="pv-line pv-line-run" key={cardio.id}><span className="pv-line-name">{cardio.activity}</span><span className="pv-line-value">{cardio.summary?.replace(`${cardio.activity} · `, '')}</span></div>)}
                   {isToday && <Link className="pv-row-edit" to={`/workout?edit=${logged.id}`}>Edit today</Link>}
                 </>
               : <>
