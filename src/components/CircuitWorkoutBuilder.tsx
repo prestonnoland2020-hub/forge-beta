@@ -6,6 +6,7 @@ import { type LibraryExercise } from '../features/training/TrainingLibraryProvid
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { type CircuitStation, type PlannedCardio } from './CardioPlanBuilder';
 import { Icon } from './Icon';
+import { SearchField } from './SearchField';
 
 type BuilderMode = 'manual' | 'forge';
 
@@ -189,7 +190,7 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
       <details className="movement-multiselect">
         <summary><span>Movement options</span><small>{requiredNames.length ? `${requiredNames.length} required` : mode === 'forge' ? 'Optional · let Forge choose' : 'Search and select movements'}</small><b><Icon name="chevron"/></b></summary>
         <div className="movement-dropdown-panel">
-          <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search movements" autoFocus />
+          <SearchField value={search} onChange={setSearch} placeholder="Search movements" aria-label="Search movements" autoFocus />
           <div className="movement-dropdown-list">{visibleOptions.map(exercise => <label key={exercise.name}><input type="checkbox" checked={requiredNames.includes(exercise.name)} onChange={() => toggleRequired(exercise)} /><span><strong>{exercise.name}</strong><small>{exercise.detail}</small></span></label>)}</div>
         </div>
       </details>

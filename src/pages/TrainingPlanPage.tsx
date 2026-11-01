@@ -20,6 +20,7 @@ import { NumberInput } from '../components/NumberInput';
 import { coreFirst } from '../lib/coreLifts';
 import { tap } from '../lib/haptics';
 import { Icon } from '../components/Icon';
+import { SearchField } from '../components/SearchField';
 
 /* STARTING POINTS. Building a split from a blank day means naming days,
    picking a type, picking muscles and picking lifts, seven times over. Most
@@ -191,7 +192,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
                 line under the lifts, editable but rarely needed. */}
             <p className="ss-trains">Trains {active.muscles.length?active.muscles.join(' · '):'—'} <button type="button" className="text-button" onClick={()=>setEditMuscles(open=>!open)}>{editMuscles?'Done':'Edit'}</button></p>
             {editMuscles&&<div className="ss-chips">{muscles.map(muscle=><button type="button" key={muscle} className={active.muscles.includes(muscle)?'active':''} onClick={()=>{tap();toggleMuscle(muscle)}}>{muscle}</button>)}</div>}
-            <input className="ss-search" value={exerciseQuery} onChange={event=>setExerciseQuery(event.target.value)} placeholder="Search lifts"/>
+            <SearchField className="ss-search" value={exerciseQuery} onChange={setExerciseQuery} placeholder="Search lifts" aria-label="Search lifts"/>
             <div className="ss-lifts">{visibleExercises.length?visibleExercises.map(exercise=>{const selected=active.exercises.includes(exercise);return <button type="button" key={exercise} aria-pressed={selected} className={selected?'selected':''} onClick={()=>{tap();toggleExercise(exercise)}}><span className="ss-check" aria-hidden="true">{selected?<Icon name="check" size={14} stroke={3}/>:''}</span>{exercise}</button>}):<p className="ss-empty">{exerciseQuery.trim()?'No lifts match that search.':'No lifts in your library for these muscles yet.'}</p>}</div>
             <div className="ss-block-head"><strong>Time</strong></div>
             <div className="ss-chips">{['30','45','60','75','90'].map(value=><button type="button" key={value} className={(active.strengthDuration||'60')===value?'active':''} onClick={()=>{tap();updateDay({strengthDuration:value})}}>{value} min</button>)}</div>

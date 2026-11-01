@@ -35,10 +35,11 @@ body { background: transparent !important; }
    was undoing. --page-glow is transparent in light, so this line now costs
    nothing there. */
 .app-main { background: radial-gradient(circle at 92% 0, var(--page-glow), transparent 26rem); }
-/* Every card is the brand guide's card: surface-1, radius 20, a hairline
-   edge in light tone and none in dark (brand.css clears it there). */
+/* Every card is the brand guide's card: surface-1, radius 20, no edge. In
+   light tone it lifts on --shadow-card (brand.css); in dark the step in
+   surface does it. */
 .card, .feed-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections {
-  border-color: var(--hairline) !important;
+  border-color: transparent !important;
   border-radius: var(--r-lg) !important;
   background-color: var(--surface-1) !important;
 }
