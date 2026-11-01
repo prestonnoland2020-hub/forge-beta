@@ -2,5 +2,17 @@
 
 /* Back arrow above profile subviews, and the FAQ list. */
 .profile-back{justify-self:start;border:0;background:none;color:var(--accent-text);font-weight:800;font-size:14px;padding:2px 0;cursor:pointer}
-.profile-faq .faq-item summary{cursor:pointer;font-weight:800;color:var(--ink);font-size:14px}
-.profile-faq .faq-item p{margin:12px 0 0;color:var(--ink-2);font-size:14px;line-height:1.5}
+/* Help & FAQ: each question is a row of the grouped list that opens in
+   place. The divider between rows comes from the same inset hairline the
+   other lists use. */
+.help-faq .faq-row{position:relative}
+.help-faq .faq-row+.faq-row::before{content:'';position:absolute;top:0;left:var(--s5);right:0;height:1px;background:var(--hairline)}
+.help-faq .faq-row summary{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);min-height:56px;padding:var(--s3) var(--s4) var(--s3) var(--s5);cursor:pointer;list-style:none;transition:background var(--dur-quick) var(--ease-respond)}
+.help-faq .faq-row summary::-webkit-details-marker{display:none}
+.help-faq .faq-row summary:active{background:var(--surface-2)}
+.help-faq .faq-row summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:var(--r-sm)}
+.help-faq .faq-chevron{flex:none;color:var(--ink-3);transition:transform var(--dur-standard) var(--ease-strike)}
+.help-faq .faq-row[open] .faq-chevron{transform:rotate(180deg);color:var(--accent-text)}
+.help-faq .faq-row[open] summary strong{color:var(--accent-text)}
+.help-faq .faq-row p{margin:0;padding:0 var(--s5) var(--s4);color:var(--ink-2);font-size:var(--fs-small);line-height:1.55;max-width:62ch}
+@media (prefers-reduced-motion:reduce){.help-faq .faq-chevron{transition:none}}
