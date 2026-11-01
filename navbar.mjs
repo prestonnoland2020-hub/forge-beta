@@ -61,7 +61,7 @@ const measure = (page) => page.evaluate(() => {
     capsule: { content: capsule.content },
     scrim: getComputedStyle(nav, '::after').backgroundImage,
     navBackground: getComputedStyle(nav).backgroundColor,
-    links, clearance, blocked, scrollY: window.scrollY,
+    links, clearance, blocked, scrollY: (document.querySelector('.app-main') || document.scrollingElement).scrollTop,
     docHeight: document.documentElement.scrollHeight,
   };
 });
@@ -84,7 +84,7 @@ for (const theme of ['light', 'dark']) {
 
       for (const where of ['top', 'bottom']) {
         if (where === 'bottom') {
-          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+          await page.evaluate(() => (s => s.scrollTo(0, s.scrollHeight))(document.querySelector('.app-main') || document.scrollingElement));
           await page.waitForTimeout(350);
         }
         const at = `${theme} ${width}px ${route} (${where})`;

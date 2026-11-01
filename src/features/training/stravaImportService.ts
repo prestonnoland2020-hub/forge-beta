@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { cardioMiles, summarizeCardioDraft, type CardioLogDraft } from '../../lib/cardioSession';
+import { cardioMiles, summarizeCardioDraft, syncedProvider, type CardioLogDraft } from '../../lib/cardioSession';
 import type { WorkoutRecord } from './WorkoutHistoryProvider';
 import { localDayIso } from '../../lib/time';
 
@@ -132,8 +132,9 @@ const handLoggedCoverage = (records: WorkoutRecord[]): Map<string, DayCoverage> 
   const byDate = new Map<string, DayCoverage>();
   for (const record of records) {
     for (const session of record.cardioSessions || []) {
-      /* Imported sessions carry a strava- id; anything else the athlete typed. */
-      if (String(session.id || '').startsWith('strava-')) continue;
+      /* Imported sessions carry their watch's id (strava-, garmin-, …);
+         anything else the athlete typed. */
+      if (syncedProvider(session)) continue;
       const day = byDate.get(record.date) || { classes: new Set<string>(), miles: new Map<string, number>(), minutes: new Map<string, number>() };
       const classes = [...cardioClasses(session.activity || '')];
       const miles = cardioMiles(session);
@@ -243,7 +244,8 @@ export function dropCrossSourceDuplicates<T extends { id: string; provider?: str
 export async function importStravaActivities(
   records: WorkoutRecord[],
   addRecord: (record: Omit<WorkoutRecord, 'id'>) => { ok: boolean },
-): Promise<{ imported: number; skipped: number }> {
+  updateRecord?: (id: string, record: Omit<WorkoutRecord, 'id'>) => { ok: boolean },
+): Promise<{ imported: number; skipped: number; enriched: number }> {
   /* A CEILING IS NOT A SYNC EITHER. This read used to stop at the newest 400
      rows, and because it always asked for the SAME newest 400, an athlete with
      a full Strava history could never reach anything older: every pass
@@ -259,18 +261,23 @@ export async function importStravaActivities(
       .in('provider', ['strava', 'garmin'])
       .order('started_at', { ascending: true })
       .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (error) return { imported: 0, skipped: 0 };
+    if (error) return { imported: 0, skipped: 0, enriched: 0 };
     if (!data || !data.length) break;
     rows.push(...(data as unknown as ExternalRow[]));
     if (data.length < pageSize) break;
   }
-  if (!rows.length) return { imported: 0, skipped: 0 };
+  if (!rows.length) return { imported: 0, skipped: 0, enriched: 0 };
   const { kept, duplicateIds } = dropCrossSourceDuplicates(rows);
   rows.length = 0; rows.push(...kept);
   const existingIds = new Set(records.flatMap(record => (record.cardioSessions || []).map(session => String(session.id || ''))));
   const handLogged = handLoggedCoverage(records);
   const watchTotals = stravaTotalsByDay(rows);
-  const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[]; strength: boolean }>();
+  const byDate = new Map<string, { sessions: CardioLogDraft[]; rowIds: string[]; titles: string[]; strength: boolean; strengthMinutes: number }>();
+  /* Days the athlete logged, as they will be after the watch fills in what
+     they left out. Written back once each, after every row is placed. */
+  const enrichedDays = new Map<string, WorkoutRecord>();
+  const dayFor = (date: string) => enrichedDays.get(date) || records.find(record => record.date === date);
+  const claimed = new Set<string>();
   let skipped = 0;
   /* Superseded rows are marked imported like any other, so a day the athlete
      logged by hand is settled once and never re-offered on the next sync. */
@@ -285,20 +292,45 @@ export async function importStravaActivities(
     const day = handLogged.get(mapped.date);
     if (day?.classes.has(group)) {
       const watch = watchTotals.get(mapped.date);
-      const covered = coversWatch(
-        { miles: day.miles.get(group) || 0, minutes: day.minutes.get(group) || 0 },
+      const typed = { miles: day.miles.get(group) || 0, minutes: day.minutes.get(group) || 0 };
+      /* An entry with no numbers ("Easy run", nothing else) is the watch's
+         session with the measurements left out — the case filling exists
+         for — not a different run. */
+      const covered = (typed.miles === 0 && typed.minutes === 0) || coversWatch(
+        typed,
         { miles: watch?.miles.get(group) || 0, minutes: watch?.minutes.get(group) || 0 },
       );
-      if (covered) { skipped++; supersededRowIds.push(row.id); continue; }
+      /* THE ATHLETE'S ENTRY STAYS; THE WATCH FILLS ITS GAPS. When what they
+         typed accounts for this activity, the activity is not a second
+         session — it is the same one, measured. Whatever the entry left
+         blank (duration, distance) is filled from the watch, and the watch's
+         numbers ride along beside the athlete's. Nothing they wrote changes. */
+      if (covered) {
+        const record = dayFor(mapped.date);
+        const filled = record ? enrichFromWatch(record, row, mapped.session, group, claimed) : null;
+        if (filled) enrichedDays.set(mapped.date, filled);
+        skipped++; supersededRowIds.push(row.id); continue;
+      }
     }
-    const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [], strength: false };
+    /* A watch-recorded lift on a day already logged: the day's sets stay as
+       they are, and the session's length is the one thing the watch adds. */
+    if (group === 'strength') {
+      const record = dayFor(mapped.date);
+      const minutes = Math.round(((row.moving_seconds || row.elapsed_seconds || 0) / 60) * 10) / 10;
+      if (record && hasLifting(record)) {
+        if (!record.durationMinutes && minutes > 0) enrichedDays.set(mapped.date, { ...record, durationMinutes: minutes });
+        skipped++; supersededRowIds.push(row.id); continue;
+      }
+    }
+    const entry = byDate.get(mapped.date) || { sessions: [], rowIds: [], titles: [], strength: false, strengthMinutes: 0 };
     /* A LIFT IS NOT CARDIO. Strava reports a gym session as WeightTraining,
        and importing every activity as a cardio session made "Weight Training"
        the athlete's most-logged cardio type — 139 barbell sessions filed under
        running and rowing, skewing every cardio insight. A strength activity
        still marks the day as trained, but it is not a cardio session and the
        day does not become a cardio day because of it. */
-    if (group !== 'strength') entry.sessions.push(mapped.session); else entry.strength = true;
+    if (group !== 'strength') entry.sessions.push(mapped.session);
+    else { entry.strength = true; entry.strengthMinutes += Math.round(((row.moving_seconds || row.elapsed_seconds || 0) / 60) * 10) / 10; }
     entry.rowIds.push(row.id); entry.titles.push(row.activity_name || mapped.session.activity);
     byDate.set(mapped.date, entry);
   }
@@ -314,6 +346,7 @@ export async function importStravaActivities(
       muscles: hasCardio ? ['Cardio'] : [],
       hasCardio,
       cardioSessions: entry.sessions,
+      ...(entry.strengthMinutes > 0 ? { durationMinutes: entry.strengthMinutes } : {}),
     } as Omit<WorkoutRecord, 'id'>);
     if (result.ok) {
       imported += entry.sessions.length; importedRowIds.push(...entry.rowIds);
@@ -322,6 +355,11 @@ export async function importStravaActivities(
     }
   }
   queueStravaReviews(reviewIds);
+  let enriched = 0;
+  if (updateRecord) for (const record of enrichedDays.values()) {
+    const { id, ...rest } = record;
+    if (updateRecord(id, rest).ok) enriched++;
+  }
   /* .in() takes a URL-length-bounded list, so a full history's worth of ids
      has to be marked in batches — one oversized request would fail and leave
      every row looking un-imported. */
@@ -329,5 +367,36 @@ export async function importStravaActivities(
   for (let start = 0; start < settledRowIds.length; start += 200) {
     try { await supabase.from('external_activities').update({ imported_to_workout: true }).in('id', settledRowIds.slice(start, start + 200)); } catch { /* dedupe covers it */ }
   }
-  return { imported, skipped };
+  return { imported, skipped, enriched };
+}
+
+const hasLifting = (record: WorkoutRecord) => Boolean(record.topSets?.length) || (record.muscles || []).some(muscle => muscle !== 'Cardio');
+
+/* Fill one hand-logged session from the watch. The session is the first one
+   that day of the same kind the watch has not already filled this pass.
+   Only blanks are written: a single-line entry gains its missing time or
+   distance; anything more structured (intervals, a circuit) keeps every
+   number it has and only gains the watch's record beside them. Returns the
+   day as it should now be, or null when there was nothing to add. */
+export function enrichFromWatch(record: WorkoutRecord, row: ExternalRow, watch: CardioLogDraft, group: string, claimed: Set<string>): WorkoutRecord | null {
+  const sessions = record.cardioSessions || [];
+  const index = sessions.findIndex(session => !syncedProvider(session) && !claimed.has(String(session.id)) && !session.recorded && cardioClasses(session.activity || '').has(group));
+  if (index < 0) return null;
+  const session = sessions[index];
+  claimed.add(String(session.id));
+  const minutes = Math.round(((row.moving_seconds || row.elapsed_seconds || 0) / 60) * 10) / 10;
+  const miles = cardioMiles(watch);
+  const recorded = { source: row.provider === 'garmin' ? 'Garmin' : 'Strava', externalId: String(row.external_id), ...(minutes > 0 ? { minutes } : {}), ...(miles > 0 ? { miles } : {}), ...(row.average_heartrate ? { averageHr: Math.round(row.average_heartrate) } : {}) };
+  const prescription = { ...(session.prescription || {}) } as Record<string, unknown>;
+  const lines = Array.isArray(prescription.legacyIntervals) ? prescription.legacyIntervals as Array<Record<string, unknown>> : null;
+  if (lines && lines.length === 1) {
+    const line = { ...lines[0] };
+    if (!(Number(line.time) > 0) && minutes > 0) line.time = minutes;
+    if (!(Number(line.distance) > 0) && miles > 0) { line.distance = miles; line.unit = 'miles'; }
+    prescription.legacyIntervals = [line];
+  } else if (!lines && session.structure === 'steady' && !(Number(prescription.duration) > 0) && minutes > 0) {
+    prescription.duration = minutes;
+  }
+  const next = { ...session, prescription, recorded };
+  return { ...record, cardioSessions: sessions.map((item, position) => position === index ? next : item) };
 }

@@ -31,7 +31,7 @@ for (const [label, route] of [['Today', '/'], ['Profile', '/profile'], ['Activit
   await page.waitForTimeout(2400);
   const readings = [];
   for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
-    await page.evaluate(f => window.scrollTo(0, (document.body.scrollHeight - window.innerHeight) * f), fraction);
+    await page.evaluate(f => (s => s.scrollTo(0, (s.scrollHeight - s.clientHeight) * f))(document.querySelector('.app-main') || document.scrollingElement), fraction);
     await page.waitForTimeout(250);
     const r = await page.evaluate(() => {
       const nav = document.querySelector('.bottom-nav');
