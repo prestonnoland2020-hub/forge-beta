@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { BACKFILL_KINDS, BACKFILL_MAX_DAYS, GARMIN_API, HISTORY_YEARS, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
+import { backfillKinds, BACKFILL_MAX_DAYS, GARMIN_API, HISTORY_YEARS, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -16,7 +16,7 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 async function requestBackfill(accessToken: string, days: number) {
   const end = Math.floor(Date.now() / 1000);
   const start = end - Math.min(days, BACKFILL_MAX_DAYS) * 86400;
-  const results = await Promise.all(BACKFILL_KINDS.map(async kind => {
+  const results = await Promise.all(backfillKinds().map(async kind => {
     const response = await fetch(`${GARMIN_API}/backfill/${kind}?summaryStartTimeInSeconds=${start}&summaryEndTimeInSeconds=${end}`, { headers: { Authorization: `Bearer ${accessToken}` } });
     /* 409: that window was already requested. It is coming; not a failure. */
     const ok = response.ok || response.status === 409;
@@ -26,34 +26,48 @@ async function requestBackfill(accessToken: string, days: number) {
   return Object.fromEntries(results).activities === true;
 }
 
-/* EVERY ACTIVITY THE ATHLETE EVER RECORDED. Garmin backfills at most one
-   month per request, so a whole history is a walk backwards, a month at a
-   time, until Garmin says there is nothing older (any refusal other than
-   "already requested") or the ceiling is reached. Requests go one after
-   another: the client-wide limit is 10,000 days a minute, and one athlete's
-   decade is 3,650 of them. Activities only — sleep and HRV from years ago do
-   not change today's readiness, and the connect backfill already asked for
-   the last month of those.
+/* EVERY ACTIVITY THE ATHLETE EVER RECORDED, WITHOUT TRIPPING THE LIMIT.
 
-   Garmin answers each request at once and delivers the data to
-   garmin-webhook over the following minutes; the import's dedupe settles it
-   against everything already in the log. Returns whether the walk finished,
-   so an interrupted one (rate limit, network) is tried again on next sync. */
-async function requestHistory(accessToken: string): Promise<boolean> {
-  const day = 86400;
-  let end = Math.floor(Date.now() / 1000) - BACKFILL_MAX_DAYS * day;
-  const floor = Math.floor(Date.now() / 1000) - HISTORY_YEARS * 365 * day;
-  while (end > floor) {
-    const start = Math.max(floor, end - BACKFILL_MAX_DAYS * day);
+   Garmin backfills at most a month per request, so a whole history is a walk
+   backwards a month at a time. The first version fired the whole walk at once
+   — about 120 requests in a few seconds — into a limit of 100 a minute for the
+   whole app, and every request after the hundredth, including the athlete's
+   own last-30-days backfill, came back 429 with nothing delivered.
+
+   So the walk is paced (one request every 1.3 s, under half the limit, leaving
+   room for everyone else) and time-boxed: each run spends at most 45 seconds,
+   records how far back it reached, and the next sync — or the next time Forge
+   opens — carries on from there. A 429 stops the run where it is; nothing is
+   lost, it resumes later.
+
+   The progress lives in garmin_connections.history_requested_at, read as "the
+   furthest-back day already requested". Null is "not started"; at or before
+   the ten-year floor is "done". Activities only — sleep and HRV from years ago
+   do not change today's readiness. */
+const DAY = 86400;
+const PACE_MS = 1300;
+const RUN_BUDGET_MS = 45_000;
+const historyFloor = () => Math.floor(Date.now() / 1000) - HISTORY_YEARS * 365 * DAY;
+const historyDone = (requestedAt?: string | null) => Boolean(requestedAt) && new Date(requestedAt!).getTime() / 1000 <= historyFloor() + DAY;
+
+async function walkHistory(accessToken: string, from: string | null | undefined, save: (reachedIso: string) => Promise<unknown>): Promise<void> {
+  const floor = historyFloor();
+  let end = from ? Math.floor(new Date(from).getTime() / 1000) : Math.floor(Date.now() / 1000) - BACKFILL_MAX_DAYS * DAY;
+  const started = Date.now();
+  while (end > floor + DAY && Date.now() - started < RUN_BUDGET_MS) {
+    const start = Math.max(floor, end - BACKFILL_MAX_DAYS * DAY);
     const response = await fetch(`${GARMIN_API}/backfill/activities?summaryStartTimeInSeconds=${start}&summaryEndTimeInSeconds=${end}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (response.status === 429) return false;
+    if (response.status === 429) break;
     if (!response.ok && response.status !== 409) {
-      console.warn(`garmin history stopped at ${new Date(start * 1000).toISOString().slice(0, 10)}: ${response.status} ${(await response.text()).slice(0, 200)}`);
-      return true;
+      /* Garmin refuses a window older than it keeps: the history is complete. */
+      console.warn(`garmin history ends at ${new Date(end * 1000).toISOString().slice(0, 10)}: ${response.status} ${(await response.text()).slice(0, 200)}`);
+      end = floor;
+      break;
     }
     end = start;
+    await new Promise(resolve => setTimeout(resolve, PACE_MS));
   }
-  return true;
+  await save(new Date(end * 1000).toISOString());
 }
 
 Deno.serve(async request => {
@@ -77,7 +91,7 @@ Deno.serve(async request => {
         admin.from('external_activities').select('*', { count: 'exact', head: true }).eq('owner_id', auth.user.id).eq('provider', 'garmin'),
         admin.from('health_daily_snapshots').select('*', { count: 'exact', head: true }).eq('owner_id', auth.user.id).eq('provider', 'garmin'),
       ]);
-      return json({ configured, connected: row?.status === 'active', lastSyncedAt: row?.last_push_at || row?.last_synced_at, importedActivities: activities || 0, healthDays: days || 0 });
+      return json({ configured, connected: row?.status === 'active', lastSyncedAt: row?.last_push_at || row?.last_synced_at, importedActivities: activities || 0, healthDays: days || 0, historyComplete: historyDone(row?.history_requested_at) });
     }
     if (!configured) throw new Error('Garmin setup is not finished yet. Add GARMIN_CLIENT_ID and GARMIN_CLIENT_SECRET to the Supabase function secrets.');
 
@@ -109,7 +123,7 @@ Deno.serve(async request => {
       await call('garmin_connection_synced', { p_owner: auth.user.id, p_synced: new Date().toISOString() });
       /* The rest of the history, after the athlete is already back in Forge. */
       const owner = auth.user.id;
-      EdgeRuntime.waitUntil(requestHistory(token.access_token).then(done => done ? call('garmin_connection_history_requested', { p_owner: owner, p_at: new Date().toISOString() }) : undefined).catch(error => console.error('garmin history:', error)));
+      EdgeRuntime.waitUntil(walkHistory(token.access_token, null, reached => call('garmin_connection_history_requested', { p_owner: owner, p_at: reached })).catch(error => console.error('garmin history:', error)));
       return json({ connected: true });
     }
 
@@ -122,13 +136,13 @@ Deno.serve(async request => {
       const requested = await requestBackfill(accessToken, 7);
       const syncedAt = new Date().toISOString();
       await call('garmin_connection_synced', { p_owner: auth.user.id, p_synced: syncedAt });
-      /* Connected before full history existed, or the walk was cut short:
-         finish it now, once. */
-      if (!row.history_requested_at) {
+      /* History not finished (never started, or a run was cut short by its
+         time box or a 429): carry on from where it reached. */
+      if (!historyDone(row.history_requested_at)) {
         const owner = auth.user.id;
-        EdgeRuntime.waitUntil(requestHistory(accessToken).then(done => done ? call('garmin_connection_history_requested', { p_owner: owner, p_at: new Date().toISOString() }) : undefined).catch(error => console.error('garmin history:', error)));
+        EdgeRuntime.waitUntil(walkHistory(accessToken, row.history_requested_at, reached => call('garmin_connection_history_requested', { p_owner: owner, p_at: reached })).catch(error => console.error('garmin history:', error)));
       }
-      return json({ connected: true, requested, lastSyncedAt: syncedAt });
+      return json({ connected: true, requested, lastSyncedAt: syncedAt, historyComplete: historyDone(row.history_requested_at) });
     }
 
     if (action === 'disconnect') {

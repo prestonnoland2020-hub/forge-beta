@@ -8,6 +8,9 @@ export type GarminConnectionStatus = {
   lastSyncedAt?: string;
   importedActivities?: number;
   healthDays?: number;
+  /* Whether the walk back through the athlete's whole Garmin history has
+     reached the end. Until it has, opening Forge carries it on. */
+  historyComplete?: boolean;
 };
 
 async function callGarmin(action: string, extra: Record<string, unknown> = {}) {
