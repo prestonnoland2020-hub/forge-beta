@@ -16,6 +16,8 @@ import { success, tap, warning } from '../lib/haptics';
 import { createNote, extractArea, saveNote } from '../features/training/athleteNotesService';
 import { Icon } from '../components/Icon';
 import { ForgeLoader } from '../components/ForgeLoader';
+import { goalPath, OnboardingGoalPath } from '../components/OnboardingGoalPath';
+import { calculateEstimatedOneRepMax, weightForReps } from '../lib/strength';
 
 /* ONE QUESTION A SCREEN. Setup was three dense screens — a form of six
    controls, the full goal builder, and a lift picker per day — headed by
@@ -82,6 +84,13 @@ const mileageChoices = {
 
 const weeksFromNow =(weeks: number) => { const date = new Date(); date.setDate(date.getDate() + weeks * 7); return date.toISOString().slice(0, 10); };
 const goalWeeks = [8, 12, 16];
+
+type SavedPlanDay = { name?: string; dayType?: string; muscles?: string[]; exercises?: string[] } & Record<string, unknown>;
+const readSavedPlan = (): ({ name?: string; days?: SavedPlanDay[] } & Record<string, unknown>) | null => {
+  try { return JSON.parse(localStorage.getItem('forge-training-plan-v1') || 'null'); } catch { return null; }
+};
+const planDayType = (value?: string): AthleteSetup['splitDays'][number]['type'] =>
+  value === 'strength' ? 'Strength' : value === 'cardio' ? 'Cardio' : value === 'mixed' ? 'Mixed' : value === 'hyrox' ? 'Hyrox' : 'Rest';
 
 export function starterSplit(focus: AthleteSetup['primaryFocus'], count: number): AthleteSetup['splitDays'] {
   const strength = [
@@ -155,7 +164,17 @@ function OnboardingForm() {
      screens vanish from under the progress bar mid-save. */
   const [askGoal] = useState(() => !goals.length);
 
-  const [data, setData] = useState<AthleteSetup>(() => ({ ...blank, units: guessUnits(), ...(setup || {}), displayName: setup?.displayName || suggestedName }));
+  /* THE SPLIT THEY SAVED IS THE ONE SHOWN. The Plan tab's copy holds each
+     day's lifts; the profile's copy did not, so going through setup again
+     reseeded every day with Forge's defaults and saved them over the
+     athlete's own choices. */
+  const [data, setData] = useState<AthleteSetup>(() => {
+    const savedDays = readSavedPlan()?.days || [];
+    const splitDays = savedDays.length ? savedDays.map(day => ({
+      name: String(day.name || ''), type: planDayType(day.dayType), muscles: day.muscles || [], exercises: day.exercises || [],
+    })) : setup?.splitDays;
+    return { ...blank, units: guessUnits(), ...(setup || {}), ...(splitDays?.length ? { splitDays, trainingDays: splitDays.filter(day => day.type !== 'Rest').length || setup?.trainingDays || blank.trainingDays } : {}), ...(savedDays.length ? { splitSource: 'Custom' as const } : {}), displayName: setup?.displayName || suggestedName };
+  });
   const set = <K extends keyof AthleteSetup>(key: K, value: AthleteSetup[K]) => { setError(''); setData(current => ({ ...current, [key]: value })); };
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -293,6 +312,13 @@ function OnboardingForm() {
   };
   const startingList = shownLifts.map(lift => ({ lift, weight: Number(numberFor(lift).weight), reps: Number(numberFor(lift).reps) }))
     .filter(item => item.weight > 0 && item.weight <= 1500 && item.reps >= 1 && item.reps <= 20);
+  /* WHAT A TOP SET IS WORTH, AS THEY TYPE IT. One heavy set is enough to
+     estimate a max, and the max is what every later weight is written from;
+     showing the estimate and what it means at other reps is the explanation. */
+  const plate = data.units === 'Metric' ? 2.5 : 5;
+  const maxFor = (lift: string) => { const value = numberFor(lift); return calculateEstimatedOneRepMax(Number(value.weight), Number(value.reps)) || 0; };
+  const atReps = (max: number, reps: number) => Math.round(weightForReps(max, reps) / plate) * plate;
+  const goalLiftMax = goalKind === 'lift' && goalUnit !== 'reps' ? maxFor(goalExercise) : 0;
   const halfFilled = shownLifts.filter(lift => { const value = numberFor(lift); return Boolean(value.weight.trim()) !== Boolean(value.reps.trim()); });
   const submitNumbers = () => {
     if (halfFilled.length) return fail(`Add ${numberFor(halfFilled[0]).weight.trim() ? 'reps' : 'a weight'} for ${CORE_LIFT_LABELS[halfFilled[0]] || halfFilled[0]}, or tap ✕ to skip it.`);
@@ -340,7 +366,7 @@ function OnboardingForm() {
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
     if (!goals.length && !pendingGoal) return fail('Set a goal first. Forge builds the plan around it.');
-    if (unmappedDays.length) return fail(`Pick a movement for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
+    if (unmappedDays.length) return fail(`Select your top sets for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
     const weight = Number(data.currentWeight);
     const weightGiven = Boolean(String(data.currentWeight || '').trim()) && Number.isFinite(weight) && weight > 0;
     setSaving(true); setError('');
@@ -349,14 +375,17 @@ function OnboardingForm() {
     try {
       /* THE SPLIT IS WRITTEN FIRST; the irreversible onboarding flag goes last,
          so a failure here is only ever a retry. */
-      await saveTrainingSplit(setup?.splitSource === 'Custom' ? 'My training split' : 'Forge starter split', splitDays.map((day, index) => ({
+      const existing = readSavedPlan();
+      const splitName = existing?.name || (data.splitSource === 'Custom' ? 'My training split' : 'Forge starter split');
+      await saveTrainingSplit(splitName, splitDays.map((day, index) => ({
         position: index + 1, name: day.name, muscleGroups: day.muscles || [], goalLifts: day.exercises || [],
         cardioTypes: day.type === 'Hyrox' ? ['HYROX'] : day.type === 'Cardio' || day.type === 'Mixed' ? ['Forge'] : [],
       })));
       try {
-        const existing = JSON.parse(localStorage.getItem('forge-training-plan-v1') || 'null') as { days?: Array<Record<string, unknown>> } | null;
+        /* A day keeps its weekday, cardio and recovery by name, so a day
+           moved or dropped in setup does not take another day's settings. */
         const days = splitDays.map((day, index) => {
-          const previous = existing?.days?.[index] as Record<string, unknown> | undefined;
+          const previous = (existing?.days?.find(item => item.name === day.name) || (existing?.days?.length === splitDays.length ? existing.days[index] : undefined)) as Record<string, unknown> | undefined;
           const dayType = day.type.toLowerCase();
           return {
             name: day.name, weekday: (previous?.weekday as string) || ['MON','TUE','WED','THU','FRI','SAT','SUN'][index % 7],
@@ -366,7 +395,7 @@ function OnboardingForm() {
             strengthDuration: String(data.strengthSessionMinutes || 60), maxDuration: String(data.strengthSessionMinutes || 60),
           };
         });
-        localStorage.setItem('forge-training-plan-v1', JSON.stringify({ name: 'My training split', rhythm: data.scheduleStyle === 'Weekly schedule' ? 'weekly' : 'rolling', days }));
+        localStorage.setItem('forge-training-plan-v1', JSON.stringify({ ...(existing || {}), name: splitName, rhythm: data.scheduleStyle === 'Weekly schedule' ? 'weekly' : 'rolling', days }));
       } catch { /* the account copy is the one that matters */ }
       const username = await saveProfile({
         username: requested.length >= 3 ? requested : `athlete${(user?.id || '').replace(/[^a-z0-9]/g, '').slice(0, 6) || 'fit'}`,
@@ -379,7 +408,7 @@ function OnboardingForm() {
       /* A runner's days default to the cardio days in the split. Never more
          days than they train. */
       const runningDays = Math.min(data.trainingDays, data.runningDays || plannedCardioDays || 0);
-      const completed = { ...data, username, runningDays, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString(),
+      const completed = { ...data, username, runningDays, splitDays, splitSource: data.splitSource || 'Recommended', acceptedSafety: true, completedAt: new Date().toISOString(),
         ...(startingList.length ? { startingNumbers: startingList } : {}),
         ...(isEditing ? {} : { acceptedTermsAt: new Date().toISOString(), healthConsentAt: new Date().toISOString(), consentVersion: LEGAL.version }) };
       /* The goal lands after every await, so a failed save above can be
@@ -466,6 +495,7 @@ function OnboardingForm() {
            the first person through tapped Continue on an empty field. */
         const placeholder = `e.g. ${goalKind === 'race' ? race!.placeholder : goalUnit === 'reps' ? '12' : goalKind === 'weight' ? (massUnit === 'kg' ? '75' : '170') : (massUnit === 'kg' ? ({ 'Bench Press': '100', 'Deadlift': '180' } as Record<string, string>)[goalExercise] || '140' : ({ 'Bench Press': '225', 'Deadlift': '405' } as Record<string, string>)[goalExercise] || '315')}`;
         const customDate = pickDate || !goalWeeks.some(weeks => goalDate === weeksFromNow(weeks));
+        const targetPath = goalTarget.trim() ? goalPath({ kind: goalKind, unit: goalUnit, target: goalTarget, current: goalCurrent, date: goalDate }) : null;
         return {
           body: <>
             <h1>{question}</h1>
@@ -489,6 +519,10 @@ function OnboardingForm() {
               </div>
               {pickDate && <input className="ob-input small" type="date" min={weeksFromNow(2)} value={goalDate} onChange={event => event.target.value && setGoalDate(event.target.value)} aria-label="Goal date" />}
             </form>
+            {targetPath
+              ? <OnboardingGoalPath path={targetPath} date={goalDate} onUseWeeks={weeks => { tap(); setPickDate(!goalWeeks.includes(weeks)); setGoalDate(weeksFromNow(weeks)); }} />
+              : goalTarget.trim() && !goalCurrent.trim() && <p className="ob-path-hint">Add {goalKind === 'weight' ? 'your weight today' : goalKind === 'race' ? 'your best time now' : 'your best right now'} and Forge shows what each week has to find.</p>}
+            <p className="ob-why">Forge builds every week backwards from this goal — the weights, the runs and when to push.</p>
           </>,
           action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!targetReady} onClick={() => targetReady && tap()}>Continue</button>,
         };
@@ -507,17 +541,21 @@ function OnboardingForm() {
       case 'numbers': return {
         body: <>
           <h1>What can you lift right now?</h1>
-          <p className="ob-lead">A recent set you could repeat, roughly. Forge writes your first week from it, and your first logged set replaces it. Tap ✕ on any you don’t know.</p>
+          <p className="ob-lead">One top set per lift: a heavy set you could repeat today. It tells Forge your max, and the top set you log each workout keeps it current. Tap ✕ on any you don’t know.</p>
           <div className="ob-numbers">{shownLifts.map(lift => {
             const value = numberFor(lift);
             const name = CORE_LIFT_LABELS[lift] || lift;
-            return <div className={`ob-number-row${halfFilled.includes(lift) ? ' half' : ''}`} key={lift}>
+            const max = maxFor(lift);
+            const toGoal = goalKind === 'lift' && canonicalLiftKey(lift) === canonicalLiftKey(goalExercise) && Number(goalTarget) > max ? Math.round(Number(goalTarget) - max) : 0;
+            return <div className="ob-number" key={lift}><div className={`ob-number-row${halfFilled.includes(lift) ? ' half' : ''}`}>
               <strong>{name}</strong>
               <input className="ob-input small" inputMode="decimal" value={value.weight} onChange={event => setNumber(lift, 'weight', event.target.value)} placeholder={exampleFor(lift)} aria-label={`${name} weight in ${massUnit}`} />
               <small>{massUnit} ×</small>
               <input className="ob-input small" inputMode="numeric" value={value.reps} onChange={event => setNumber(lift, 'reps', event.target.value)} placeholder="5" aria-label={`${name} reps`} />
               <small>reps</small>
               <button type="button" className="ob-number-remove" aria-label={`Skip ${name}`} onClick={() => removeLift(lift)}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+            </div>
+            {max > 0 && <p className="ob-number-max"><strong>Max ≈ {Math.round(max / plate) * plate} {massUnit}</strong> · {atReps(max, 3)} × 3 or {atReps(max, 8)} × 8{toGoal ? ` · ${toGoal} ${massUnit} to your goal` : ''}</p>}
             </div>;
           })}</div>
           {removedLifts.length > 0 && <div className="ob-chips ob-number-restore">{removedLifts.map(lift => chip(lift, `+ ${CORE_LIFT_LABELS[lift] || lift}`, false, toggle(() => setRemovedLifts(current => current.filter(item => item !== lift)))))}</div>}
@@ -525,13 +563,17 @@ function OnboardingForm() {
         </>,
         action: <button className="button ob-next" onClick={submitNumbers}>{startingList.length || halfFilled.length ? 'Continue' : 'Skip for now'}</button>,
       };
-      case 'week': return {
+      case 'week': {
+        /* The goal again, now from the best they gave or the top set they typed. */
+        const weekPath = pendingGoal ? goalPath({ kind: goalKind, unit: goalUnit, target: goalTarget, current: goalCurrent || (goalLiftMax ? String(goalLiftMax) : ''), date: pendingGoal.date }) : null;
+        return {
         body: <>
           <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
-          <p className="ob-lead">Forge picked a lift for each day. Tap any day to change it — or just start.</p>
+          <p className="ob-lead">Each lifting day has goal lifts and supporting lifts. Forge asks for one top set per lift each workout and writes your next weights from it — the rest of your workout is yours. Tap any day to change it, or just start.</p>
           {/* The stored title is the builder's ("5K Run · 24:30 mm:ss") so Goals
               reads it the same; this card says it the way a person would. */}
-          {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small></div>}
+          {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small>
+            {weekPath && <OnboardingGoalPath path={weekPath} date={pendingGoal.date} compact />}</div>}
           <div className="ob-week">{plannedDays.map((day, index) => {
             const lifting = day.type === 'Strength' || day.type === 'Mixed';
             const chosen = dayExercises[index] || [];
@@ -539,7 +581,7 @@ function OnboardingForm() {
             return <section className={open ? 'setup-day open' : 'setup-day'} key={`${day.name}-${index}`}>
               <button type="button" className="setup-day-head" onClick={() => { if (!lifting) return; tap(); setOpenDay(open ? -1 : index); }} aria-expanded={lifting ? open : undefined} disabled={!lifting}>
                 <span className="ob-day-number">{index + 1}</span>
-                <span className="ob-day-text"><strong>{day.name}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick a movement') : 'Running — Forge plans it'}</small></span>
+                <span className="ob-day-text"><strong>{day.name}{chosen.some(name => goalLiftKeys.has(canonicalLiftKey(name))) && <em className="ob-day-goal">Goal lift</em>}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Select your top sets') : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
                 {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Change'}</span>}
               </button>
               {open && <div className="muscle-picker compact-muscle-picker setup-day-options">
@@ -566,7 +608,8 @@ function OnboardingForm() {
           {safetyNeeded && !error && <p className="ob-action-hint">Tick the three boxes above to continue</p>}
           <button className="button ob-next" disabled={saving || safetyNeeded} onClick={finish}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
         </>,
-      };
+        };
+      }
     }
   })();
 

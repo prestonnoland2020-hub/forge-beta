@@ -287,7 +287,21 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
 /* A LIFT GOAL IS THE SAME QUESTION WITH DIFFERENT ARITHMETIC. Around 1% a week
    on a calculated max is a strong block for an intermediate lifter; a beginner
    can beat it and an advanced lifter will not come close. */
-const STRENGTH_WEEKLY_GAIN = 0.01;
+export const STRENGTH_WEEKLY_GAIN = 0.01;
+/* GAINS SLOW, THEY DO NOT STOP. The ceiling used to stop compounding at 24
+   weeks, so a 300 → 400 deadlift given 100 weeks read "out of reach — about 29
+   weeks is", a date it had already been given. Past six months the rate is
+   halved instead, and the weeks it suggests come from the same curve, so the
+   two can never disagree. */
+const STRENGTH_FULL_RATE_WEEKS = 24;
+export const liftCeiling = (best: number, weeks: number, rate = STRENGTH_WEEKLY_GAIN) =>
+  best * Math.pow(1 + rate, Math.min(weeks, STRENGTH_FULL_RATE_WEEKS)) * Math.pow(1 + rate / 2, Math.max(0, weeks - STRENGTH_FULL_RATE_WEEKS));
+export const weeksToLift = (best: number, target: number) => {
+  if (target <= best) return 0;
+  const early = Math.log(target / best) / Math.log(1 + STRENGTH_WEEKLY_GAIN);
+  if (early <= STRENGTH_FULL_RATE_WEEKS) return Math.ceil(early);
+  return STRENGTH_FULL_RATE_WEEKS + Math.ceil(Math.log(target / liftCeiling(best, STRENGTH_FULL_RATE_WEEKS)) / Math.log(1 + STRENGTH_WEEKLY_GAIN / 2));
+};
 function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibility | null {
   const target = Number.parseFloat(String(goal.target).replace(/[^0-9.]/g, ''));
   if (!target || !goal.exercise) return null;
@@ -304,10 +318,10 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
       change: `Log one heavy set of ${goal.exercise} and this becomes a real number.` };
   }
   if (best >= target) return { goal: goal.title, verdict: 'reachable', say: `Reached — your best ${goal.exercise} already estimates ${Math.round(best)}.` };
-  const ceiling = best * Math.pow(1 + STRENGTH_WEEKLY_GAIN, Math.min(weeks, MAX_IMPROVEMENT_WEEKS * 2));
+  const ceiling = liftCeiling(best, weeks);
   const needed = (target - best) / best;
   if (target > ceiling) {
-    const weeksNeeded = Math.ceil(Math.log(target / best) / Math.log(1 + STRENGTH_WEEKLY_GAIN));
+    const weeksNeeded = weeksToLift(best, target);
     return { goal: goal.title, verdict: 'out-of-reach',
       say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are at ${Math.round(best)} and ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks is not a normal block — about ${weeksNeeded} weeks is.`,
       insteadOf: `${Math.round(ceiling / 5) * 5} is the reachable target for this date.` };
