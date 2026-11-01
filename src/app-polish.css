@@ -582,3 +582,12 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .ss-topset-why { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
 .ss-topset-why b { color: var(--ink, var(--text)); font-weight: 800; }
 .ss-goal-tag { margin-left: auto; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; color: var(--accent-text, var(--accent)); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* Running behind the plan: the range to change, in two fields. */
+.running-behind-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; }
+.running-behind-fields label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.running-behind-fields input { width: 88px; min-height: 48px; text-align: center; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.running-behind-fields small { padding-bottom: 14px; font-weight: 700; color: var(--muted); }
+.running-behind-error { margin: 0 0 8px; font-size: 14px; color: var(--danger, #c0392b); }
+.running-behind-nudge { display: grid; gap: 8px; }
+.running-behind-nudge p { margin: 0; line-height: 1.5; }
+.running-behind-nudge .button { justify-self: start; }

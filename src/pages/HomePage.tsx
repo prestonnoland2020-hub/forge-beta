@@ -13,6 +13,7 @@ import { isSickNote, limitationIn } from '../lib/bodyLog';
 import { Icon } from '../components/Icon';
 import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate';
 import { TodayNudges } from '../components/TodayNudges';
+import { RunningBehindNudge } from '../components/RunningBehindCard';
 
 const todayIso = () => {
   const now = new Date();
@@ -130,6 +131,7 @@ export function HomePage() {
     {/* Below the workout, never above it: the day's training is the card
         Today exists for. */}
     <TodayNudges />
+    <RunningBehindNudge />
 
     {/* Under the workout, because this is the screen where you decide whether
         to train and a partner who has already trained is the one thing that

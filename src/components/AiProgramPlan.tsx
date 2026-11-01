@@ -12,6 +12,7 @@ import { PlanRebuildModal } from './PlanRebuildModal';
 import { PlanProgress, PlanActions, WeekList, useWeekSwipe, waveSentence, reconcileToday, type PlanSession } from './PlanView';
 import { MileageGate } from './MileageGate';
 import { PlanPressureCard } from './PlanPressureCard';
+import { RunningBehindCard } from './RunningBehindCard';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -169,7 +170,7 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
   return { sessions: rendered, days: placedDays, longIndex, hardIndex: qualityIndex };
 }
 
-export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', minWeeklyMileage, maxWeeklyMileage }: { goals: CreatedGoal[]; profile: AdaptiveProfile; splitDays: SplitDay[]; rhythm?: 'rolling' | 'weekly'; minWeeklyMileage: number; maxWeeklyMileage: number }) {
+export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', minWeeklyMileage, maxWeeklyMileage, onMileageBounds }: { goals: CreatedGoal[]; profile: AdaptiveProfile; splitDays: SplitDay[]; rhythm?: 'rolling' | 'weekly'; minWeeklyMileage: number; maxWeeklyMileage: number; onMileageBounds?: (min: number, max: number) => void }) {
   const { records } = useWorkoutHistory();
   const { user } = useAuth();
   const { recommendation, anchorDate, anchorPosition } = useDailyRecommendation();
@@ -629,6 +630,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     }),
   };
   const currentIndex = currentWeekIndex(stored);
+  const plannedMiles = plan.weeks.map(item => Number(item.mileage) || 0);
   const weekIndex = Math.max(0, Math.min(viewWeek ?? currentIndex, plan.weeks.length - 1));
   const week = plan.weeks[weekIndex];
   const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi', { goal: Boolean(hyroxGoalOf(goals)), detail: hyroxPlanDetail(goals) }, hrTargets);
@@ -722,7 +724,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     </section>}
     {/* The gap between what a goal needs and what the plan is allowed to give
         belongs where the plan is, not buried in a goal's detail panel. */}
-    <MileageGate onChanged={() => setRefreshAsk(true)} />
+    <MileageGate onChanged={next => { if (next && onMileageBounds) onMileageBounds(Number(next.minWeeklyMileage) || 0, Number(next.maxWeeklyMileage) || 0); setRefreshAsk(true); }} />
+    {/* Running well under the plan for a fortnight: the coach offers a lower
+        weekly range, editable, and a rebuild that uses it. */}
+    {onMileageBounds && <RunningBehindCard startDate={stored.startDate} plannedMiles={plannedMiles} onBounds={onMileageBounds} onRebuild={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />}
     {/* And when the block itself is the problem, the coach says so here and
         hands the rebuild the instruction, rather than leaving the athlete to
         press Regenerate and think of something to type. */}

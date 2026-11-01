@@ -82,7 +82,7 @@ function GateCard({ gap, unit, show, onBuild, onMinimum, onDismiss, heading }: {
 }
 
 /* The standing alert on Plan and Goals. */
-export function MileageGate({ onChanged }: { onChanged?: () => void } = {}) {
+export function MileageGate({ onChanged }: { onChanged?: (next: { minWeeklyMileage?: number; maxWeeklyMileage?: number } | null) => void } = {}) {
   const { goals } = useGoals();
   const { records } = useWorkoutHistory();
   const { setup, saveSetup } = useProfileSetup();
@@ -93,7 +93,9 @@ export function MileageGate({ onChanged }: { onChanged?: () => void } = {}) {
   const gap = useMemo(() => mileageGap(goals, records, setup), [goals, records, setup]);
 
   if (!gap || done) return null;
-  const commit = (next: typeof setup) => { if (next) saveSetup(next); setDone(true); onChanged?.(); };
+  /* The new bounds go back to the caller too: the Plan tab keeps its own
+     copy of the range, and a setup-only change was overwritten by it. */
+  const commit = (next: typeof setup) => { if (next) saveSetup(next); setDone(true); onChanged?.(next || null); };
 
   return <GateCard
     gap={gap} unit={unit} show={show}
