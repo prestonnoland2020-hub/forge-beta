@@ -4,7 +4,8 @@ import { useTrainingLibrary, isProgrammableStrength } from '../features/training
 import { requestCardioParse } from '../features/training/coachService';
 import { parseCardioDescription } from '../lib/cardioParse';
 import { formatCardioSummary, type CardioLogDraft } from '../lib/cardioSession';
-import { markStravaReviewed, pendingStravaReviews, stravaReviewHasStrength, cardioClass } from '../features/training/stravaImportService';
+import { markStravaReviewed, pendingStravaReviews, stravaReviewHasStrength, stravaReviewSource, cardioClass } from '../features/training/stravaImportService';
+import { sessionLength } from '../lib/time';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { splitDayKey } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -22,9 +23,16 @@ import { Icon } from './Icon';
    because a synced day is a question the athlete should answer once and then
    be done with rather than something to dismiss on the way to somewhere else.
 
-   Three answers, all optional, one save: which day, the top set, and what it
-   actually was in their own words. "Looks right" is always there. */
+   A gym session is asked what the log page asks, in the same order: which
+   workout it was (a split day, or custom), the muscle groups, and the top
+   sets — so a watch that synced before anything was typed walks the athlete
+   through logging the day rather than a shorter form of it. A run is asked
+   only what it actually was. "Looks right" is always there. */
 type PlanDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[] };
+type DraftSet = { lift: string; weight: number; reps: number };
+/* The log page's muscle list, without Cardio — a cardio session marks itself. */
+const MUSCLES = ['Chest', 'Back', 'Shoulders', 'Quads', 'Hamstrings', 'Glutes', 'Biceps', 'Triceps', 'Forearms', 'Abs'];
+const CUSTOM = 'custom';
 
 export function StravaReviewModal() {
   const { records, updateRecord } = useWorkoutHistory();
@@ -35,6 +43,8 @@ export function StravaReviewModal() {
   const [lift, setLift] = useState('');
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
+  const [sets, setSets] = useState<DraftSet[]>([]);
+  const [muscles, setMuscles] = useState<string[]>([]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [reflection, setReflection] = useState('');
@@ -116,14 +126,25 @@ export function StravaReviewModal() {
     if (!pending || seededFor.current === pending.date) return;
     seededFor.current = pending.date;
     setDayIndex(suggestedDayIndex);
-    setLift(''); setWeight(''); setReps(''); setText(''); setReflection('');
-  }, [pending, suggestedDayIndex]);
+    const suggested = suggestedDayIndex === '' ? undefined : planDays[Number(suggestedDayIndex)];
+    setMuscles(suggested ? (suggested.muscles || []).filter(muscle => muscle !== 'Cardio') : trainedMuscles);
+    setLift(''); setWeight(''); setReps(''); setSets([]); setText(''); setReflection('');
+  }, [pending, suggestedDayIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const strengthLibrary = useMemo(
     () => exercises.filter(item => item.enabled && isProgrammableStrength(item)),
     [exercises],
   );
-  const chosenDay = dayIndex === '' ? undefined : planDays[Number(dayIndex)];
+  const chosenDay = dayIndex === '' || dayIndex === CUSTOM ? undefined : planDays[Number(dayIndex)];
+  const custom = dayIndex === CUSTOM;
+  /* Picking the workout fills in its muscles, as the log page does; custom
+     starts from what the day already trained. Either can be changed after. */
+  const pickDay = (value: string) => {
+    setDayIndex(value); setLift('');
+    const day = value === '' || value === CUSTOM ? undefined : planDays[Number(value)];
+    setMuscles(day ? (day.muscles || []).filter(muscle => muscle !== 'Cardio') : value === CUSTOM ? trainedMuscles : []);
+  };
+  const toggleMuscle = (muscle: string) => setMuscles(current => current.includes(muscle) ? current.filter(item => item !== muscle) : [...current, muscle]);
   /* The chosen day's own lifts first — that is what the athlete trains there —
      with the rest of the library behind, since a gym session is not always
      the plan. */
@@ -146,12 +167,17 @@ export function StravaReviewModal() {
   const cardio = (record.cardioSessions || [])[0];
   const max = calculateEstimatedOneRepMax(Number(weight), Number(reps));
   const hasTopSet = Boolean(lift && Number(weight) > 0 && Number(reps) > 0);
-  /* A run's only answer is what it actually was; a gym session's is the day
-     it belongs to. Neither is asked for something it does not have. */
-  const hasAnswer = cardioOnly ? Boolean(text.trim()) : (Boolean(chosenDay) || hasTopSet || Boolean(text.trim()));
-  const tiesExistingSets = !cardioOnly && loggedTopSets.length > 0;
+  /* The set being typed counts on Save without a separate Add tap. */
+  const allSets = hasTopSet ? [...sets, { lift, weight: Number(weight), reps: Number(reps) }] : sets;
+  const addSet = () => { if (!hasTopSet) return; setSets(allSets); setLift(''); setWeight(''); setReps(''); };
+  /* A run's only answer is what it actually was; a gym session's is the
+     workout it was. Neither is asked for something it does not have. */
+  const hasAnswer = cardioOnly ? Boolean(text.trim()) : (Boolean(chosenDay) || custom || allSets.length > 0 || Boolean(text.trim()));
+  const source = stravaReviewSource(date);
+  /* How long the watch says the lifting took — the one number it adds. */
+  const watchLength = record.durationMinutes ? `Strength · ${sessionLength(record.durationMinutes)}` : '';
 
-  const close = () => { markStravaReviewed(date); seededFor.current = ''; setDayIndex(''); setLift(''); setWeight(''); setReps(''); setText(''); setReflection(''); };
+  const close = () => { markStravaReviewed(date); seededFor.current = ''; setDayIndex(''); setLift(''); setWeight(''); setReps(''); setSets([]); setMuscles([]); setText(''); setReflection(''); };
 
   /* A distance never sits on a time unit — the rule this file must keep. */
   const distanceSafeUnit = (row: { cardioType?: string; unit?: string; distance?: number }) => {
@@ -201,34 +227,27 @@ export function StravaReviewModal() {
       next = { ...next, notes: [record.notes, description].filter(Boolean).join('\n') };
     }
 
-    /* 2. The split day the athlete assigns owns the day's identity. */
-    const libraryMuscles = exercises.find(item => item.name === lift)?.muscles || [];
-    const liftMuscles = hasTopSet ? primaryMusclesFor(lift, libraryMuscles) : [];
-    if (chosenDay) {
-      /* A DAY THAT WAS LIFTED ON IS NOT A CARDIO DAY. The sets already logged
-         count toward the day's muscles too — without them a session with a
-         real top set on it came back reading "Cardio" and nothing else. */
-      const loggedMuscles = loggedTopSets.flatMap(set => primaryMusclesFor(set.lift, exercises.find(item => item.name === set.lift)?.muscles || []));
-      next = {
-        ...next,
-        title: chosenDay.name || record.title,
-        splitPosition: Number(dayIndex) + 1,
-        muscles: Array.from(new Set([
-          ...(chosenDay.muscles || []).filter(muscle => muscle !== 'Cardio'),
-          ...loggedMuscles,
-          ...liftMuscles,
-          ...(next.hasCardio ? ['Cardio'] : []),
-        ])),
-      };
-    } else if (liftMuscles.length) {
-      next = { ...next, muscles: Array.from(new Set([...(record.muscles || []), ...liftMuscles])) };
+    /* 2. The workout and its muscles. A split day owns the day's identity
+       and its place in the cycle; custom is named as the log page names it.
+       The muscles are what the athlete left ticked, plus whatever the sets
+       train — a day that was lifted on is not a cardio day. */
+    const musclesOf = (list: DraftSet[]) => list.flatMap(set => primaryMusclesFor(set.lift, exercises.find(item => item.name === set.lift)?.muscles || []));
+    if (!cardioOnly) {
+      const trained = Array.from(new Set([...muscles, ...musclesOf(loggedTopSets), ...musclesOf(allSets)].filter(muscle => muscle && muscle !== 'Cardio')));
+      if (chosenDay) next = { ...next, title: chosenDay.name || record.title, splitPosition: Number(dayIndex) + 1 };
+      else if (custom) next = { ...next, title: 'Custom Workout', splitPosition: undefined };
+      if (chosenDay || custom || trained.length) next = { ...next, muscles: [...trained, ...(next.hasCardio ? ['Cardio'] : [])] };
     }
 
-    /* 3. The top set. */
-    if (hasTopSet) {
+    /* 3. The top sets. */
+    if (allSets.length) {
       next = {
         ...next,
-        topSets: [...(record.topSets || []), { muscle: liftMuscles[0] || 'Primary', lift, weight: Number(weight), reps: Number(reps), calculatedMax: max ?? undefined, completed: true }],
+        topSets: [...(record.topSets || []), ...allSets.map(set => ({
+          muscle: primaryMusclesFor(set.lift, exercises.find(item => item.name === set.lift)?.muscles || [])[0] || 'Primary',
+          lift: set.lift, weight: set.weight, reps: set.reps,
+          calculatedMax: calculateEstimatedOneRepMax(set.weight, set.reps) ?? undefined, completed: true,
+        }))],
       };
     }
 
@@ -242,50 +261,56 @@ export function StravaReviewModal() {
     <div className="strava-review-sheet">
       <header>
         <div>
-          <span className="eyebrow">SYNCED FROM STRAVA</span>
-          <strong>{record.title}</strong>
-          <small>{dateLabel}{cardio?.summary ? ` · ${cardio.summary}` : ''}</small>
+          <span className="eyebrow">SYNCED FROM {source.toUpperCase()}</span>
+          <strong>{cardioOnly ? record.title : 'Log this workout'}</strong>
+          <small>{[dateLabel, watchLength, cardio?.summary].filter(Boolean).join(' · ')}</small>
         </div>
         <button type="button" className="strava-review-close" onClick={close} aria-label="Close">×</button>
       </header>
       <p className="strava-review-lede">{cardioOnly
-        ? 'Strava recorded the totals. Tell Forge what the session actually was — intervals, rests, warmup — or leave it as recorded.'
-        : 'Strava knows you were in the gym. Tell Forge which day of your split that was.'}</p>
+        ? `${source} recorded the totals. Tell Forge what the session actually was — intervals, rests, warmup — or leave it as recorded.`
+        : `${source} knows you were in the gym. Tell Forge what you trained, the same way you log any day.`}</p>
 
       {/* A RUN IS NOT A SPLIT DAY. It has no position in the cycle and no top
           set, so it is not asked for either — only for what it actually was. */}
-      {!cardioOnly && <label>Split day
-        {planDays.length
-          ? <select value={dayIndex} onChange={event => { setDayIndex(event.target.value); setLift(''); }}>
-              <option value="">Not part of the split</option>
-              {planDays.map((day, index) => <option key={`${day.name}-${index}`} value={index}>{day.name}</option>)}
-            </select>
-          : <small className="strava-review-hint">Build a split in Plan and its days appear here.</small>}
+      {!cardioOnly && <section className="strava-review-step" aria-label="Workout">
+        <span className="field-caption">1 · WORKOUT</span>
+        <div className="strava-review-choices">
+          {planDays.map((day, index) => <button type="button" key={`${day.name}-${index}`} className={dayIndex === String(index) ? 'muscle-chip active' : 'muscle-chip'} aria-pressed={dayIndex === String(index)} onClick={() => pickDay(dayIndex === String(index) ? '' : String(index))}>{day.name}</button>)}
+          <button type="button" className={custom ? 'muscle-chip active' : 'muscle-chip'} aria-pressed={custom} onClick={() => pickDay(custom ? '' : CUSTOM)}>Custom workout</button>
+        </div>
         {dayIndex !== '' && dayIndex === suggestedDayIndex && <small className="strava-review-hint">Matched to the day Forge had up — change it if that is wrong.</small>}
-      </label>}
+        {!planDays.length && <small className="strava-review-hint">Build a split in Plan and its days appear here.</small>}
+      </section>}
 
-      {/* Sets already logged for this day need no re-entry; assigning the day
-          is what ties them to it. */}
-      {tiesExistingSets
-        ? <div className="strava-review-tied">
-            <span className="eyebrow">ALREADY LOGGED</span>
-            <strong>{loggedTopSets.length} top {loggedTopSets.length === 1 ? 'set' : 'sets'}</strong>
-            <small>{loggedTopSets.map(set => `${set.lift} ${set.weight}×${set.reps}`).join(' · ')}</small>
-            <small>{chosenDay ? `Saving ties them to ${chosenDay.name}.` : 'Choose the day to tie them to it.'}</small>
-          </div>
-        : !cardioOnly && <div className="strava-review-set">
-            <label>Top set
-              <select value={lift} onChange={event => setLift(event.target.value)}>
-                <option value="">No top set</option>
-                {liftOptions.map(name => <option key={name}>{name}</option>)}
-              </select>
-            </label>
-            {lift && <div className="strava-review-numbers">
-              <DialField label="Weight" kind="weight" unit="lb" value={weight} onChange={setWeight} />
-              <DialField label="Reps" kind="reps" value={reps} onChange={setReps} />
-            </div>}
-            {hasTopSet && max ? <small className="strava-review-max">{Number(reps) === 1 ? 'Real 1RM' : 'Calculated max'} {max}</small> : null}
-          </div>}
+      {!cardioOnly && <section className="strava-review-step" aria-label="Muscle groups">
+        <span className="field-caption">2 · MUSCLE GROUPS</span>
+        <div className="strava-review-choices">
+          {MUSCLES.map(muscle => <button type="button" key={muscle} className={muscles.includes(muscle) ? 'muscle-chip active' : 'muscle-chip'} aria-pressed={muscles.includes(muscle)} onClick={() => toggleMuscle(muscle)}>{muscle}</button>)}
+        </div>
+      </section>}
+
+      {!cardioOnly && <section className="strava-review-step strava-review-set" aria-label="Top sets">
+        <span className="field-caption">3 · TOP SETS</span>
+        {/* Sets already logged for this day need no re-entry; the workout
+            chosen above is what ties them to it. */}
+        {(loggedTopSets.length > 0 || sets.length > 0) && <ul className="strava-review-sets">
+          {loggedTopSets.map((set, index) => <li key={`logged-${index}`}><span>{set.lift}</span><b>{set.weight} × {set.reps}</b><small>Logged</small></li>)}
+          {sets.map((set, index) => <li key={`new-${index}`}><span>{set.lift}</span><b>{set.weight} × {set.reps}</b><button type="button" className="text-button" aria-label={`Remove ${set.lift}`} onClick={() => setSets(current => current.filter((_, position) => position !== index))}>Remove</button></li>)}
+        </ul>}
+        <label>{loggedTopSets.length || sets.length ? 'Another top set' : 'Lift'}
+          <select value={lift} onChange={event => setLift(event.target.value)}>
+            <option value="">{loggedTopSets.length || sets.length ? 'No more' : 'No top set'}</option>
+            {liftOptions.filter(name => !allSets.some(set => set.lift === name) || name === lift).map(name => <option key={name}>{name}</option>)}
+          </select>
+        </label>
+        {lift && <div className="strava-review-numbers">
+          <DialField label="Weight" kind="weight" unit="lb" value={weight} onChange={setWeight} />
+          <DialField label="Reps" kind="reps" value={reps} onChange={setReps} />
+        </div>}
+        {hasTopSet && max ? <small className="strava-review-max">{Number(reps) === 1 ? 'Real 1RM' : 'Calculated max'} {max}</small> : null}
+        {hasTopSet && <button type="button" className="button ghost" onClick={addSet}>＋ Add another lift</button>}
+      </section>}
 
       <label>Describe it
         <textarea value={text} onChange={event => setText(event.target.value)} rows={3} disabled={busy}
