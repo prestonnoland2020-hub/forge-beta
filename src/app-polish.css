@@ -474,3 +474,28 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .forge-noticed.coach-checkin { border-left: 3px solid var(--accent); }
 .forge-noticed-head { align-items: center; }
 .forge-noticed-close { display: grid; place-items: center; width: 32px; height: 32px; margin: -6px -8px -6px 0; border: 0; border-radius: 999px; background: none; color: var(--ink-3); }
+
+/* Today's nudges (notifications, connect a watch): the coach banner's shape,
+   with the action on the right and "Not now" beneath it. */
+.td-nudge { display: flex; align-items: center; }
+.td-nudge .td-nudge-actions { display: grid; gap: 4px; justify-items: center; flex: none; }
+.td-nudge .td-nudge-actions .button { min-height: 36px; padding: 6px 14px; font-size: 13px; }
+.td-nudge .td-nudge-later { background: none; border: 0; padding: 2px 4px; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+@media (max-width: 420px) { .td-nudge { flex-wrap: wrap; } .td-nudge .td-nudge-actions { grid-auto-flow: column; width: 100%; justify-content: end; align-items: center; } }
+
+/* Provider marks on Connections: the brand's own colour as the tile, its
+   mark knocked out in white. Brands without published artwork get a quiet
+   initials tile that does not pretend to be a logo. */
+.provider-mark { width: 56px; height: 36px; flex: none; border-radius: 10px; display: inline-grid; place-items: center; background: var(--brand, var(--ink-2)); color: #fff; box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent); }
+.provider-mark svg { width: 22px; height: 22px; }
+.provider-mark.wordmark svg { width: 46px; height: 16px; }
+.provider-mark-plain { background: var(--surface-2, var(--panel-2)); color: var(--muted); border: 1px solid var(--line); box-shadow: none; font-size: 12px; font-weight: 900; letter-spacing: .04em; }
+.simple-connections article:has(> .provider-mark) { display: flex; align-items: center; gap: 12px; }
+.simple-connections article:has(> .provider-mark) > div:first-of-type { flex: 1; min-width: 0; }
+.brand-heading { display: flex; align-items: center; gap: 10px; }
+.brand-heading .provider-mark { width: 30px; height: 30px; border-radius: 8px; }
+.brand-heading .provider-mark svg { width: 18px; height: 18px; }
+/* Row text styles colour every span in a connection row muted; the tile is
+   a span too, and its mark must stay white on the brand colour. */
+.simple-connections article .provider-mark:not(.provider-mark-plain), .brand-heading .provider-mark:not(.provider-mark-plain) { color: #fff; }
+.simple-connections article .provider-mark { display: inline-grid; margin: 0; padding: 0; }

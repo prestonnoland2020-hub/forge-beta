@@ -49,7 +49,13 @@
   }
   /* Out of the way while typing and during a workout — the way an iOS tab bar
      slides down under a keyboard or a full-screen task. */
-  html.keyboard-open .tab-bar, .tab-bar.away {
+  /* AND WHILE A SHEET IS UP. Whether the bar ended up over or under a sheet
+     was left to each sheet's own z-index, so it depended on the page: the new
+     goal sheet sits at the bar's own 30 and comes earlier in the page, so on
+     Goals the bar stayed live over its Cancel and Continue — tap Plan and the
+     half-made goal was gone. Every sheet in the app is an aria-modal dialog,
+     so the bar steps aside for all of them, whatever number they carry. */
+  html.keyboard-open .tab-bar, .tab-bar.away, body:has([role="dialog"][aria-modal="true"]) .tab-bar {
     transform: translateY(calc(100% + 40px)); opacity: 0; pointer-events: none;
   }
   .tab-indicator {

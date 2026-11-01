@@ -15,3 +15,28 @@ export function deriveRecoveryState(today:DailyHealthSnapshot,history:DailyHealt
   let readiness=missing===3?100:Math.round(sleepScore*.38+autonomicScore*.37+loadScore*.25);if(injuryConstraint)readiness=Math.min(readiness,35);const reasons=missing===3?['Smartwatch sync is missing today','Recovery is not being used to change coaching or training']:[`${Math.round(today.sleepMinutes/60*10)/10} hr sleep`,today.hrvRmssd?`HRV ${Math.round(today.hrvRmssd)} ms vs ${Math.round(hrvBase||today.hrvRmssd)} baseline`:'HRV unavailable',today.restingHr?`Resting HR ${Math.round(today.restingHr)} bpm`:'Resting HR unavailable',`${strengthLoad7d.toFixed(0)} strength-load points in 7 days`];if(injuryConstraint)reasons.unshift('Injury constraint active');
   return{date:today.date,readiness,confidence,sleepScore,autonomicScore,loadScore,strengthFatigue,reasons,hardTrainingAllowed:!injuryConstraint&&(missing===3||readiness>=60)};
 }
+
+/* WHAT THE PLAN BUILDER IS TOLD ABOUT RECOVERY. A block is ten weeks, so it
+   gets the trend, not today: two weeks of sleep, HRV against the athlete's own
+   30-day baseline, and resting heart rate against the same. Fewer than seven
+   days of real data is not a trend, and the builder is told nothing rather
+   than something half-true. */
+export type RecoveryTrend={days:number;avgSleepHours?:number;hrvVsBaselinePct?:number;restingHrVsBaselineBpm?:number;status:'strained'|'normal'|'fresh'};
+export function recoveryTrend(history:DailyHealthSnapshot[]):RecoveryTrend|null{
+  const real=history.filter(day=>day.provider!=='Unavailable').sort((a,b)=>a.date.localeCompare(b.date));
+  const recent=real.slice(-14);
+  if(recent.length<7)return null;
+  const baseline=real.slice(-30);
+  const avg=(days:DailyHealthSnapshot[],pick:(day:DailyHealthSnapshot)=>number|undefined)=>{const values=days.map(pick).filter((value):value is number=>typeof value==='number'&&value>0);return values.length?mean(values):undefined};
+  const sleep=avg(recent,day=>day.sleepMinutes);
+  const hrvRecent=avg(recent.slice(-7),day=>day.hrvRmssd),hrvBase=avg(baseline,day=>day.hrvRmssd);
+  const rhrRecent=avg(recent.slice(-7),day=>day.restingHr),rhrBase=avg(baseline,day=>day.restingHr);
+  const hrvPct=hrvRecent&&hrvBase?Math.round((hrvRecent/hrvBase-1)*100):undefined;
+  const rhrDelta=rhrRecent&&rhrBase?Math.round((rhrRecent-rhrBase)*10)/10:undefined;
+  const sleepHours=sleep?Math.round(sleep/6)/10:undefined;
+  if(sleepHours===undefined&&hrvPct===undefined&&rhrDelta===undefined)return null;
+  /* Strained on any one clear signal; fresh only when nothing argues against it. */
+  const strained=(sleepHours!==undefined&&sleepHours<6.5)||(hrvPct!==undefined&&hrvPct<=-10)||(rhrDelta!==undefined&&rhrDelta>=4);
+  const fresh=!strained&&(sleepHours===undefined||sleepHours>=7.5)&&(hrvPct===undefined||hrvPct>=5)&&(rhrDelta===undefined||rhrDelta<=0)&&(sleepHours!==undefined||hrvPct!==undefined);
+  return{days:recent.length,avgSleepHours:sleepHours,hrvVsBaselinePct:hrvPct,restingHrVsBaselineBpm:rhrDelta,status:strained?'strained':fresh?'fresh':'normal'};
+}

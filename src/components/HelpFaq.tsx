@@ -30,7 +30,7 @@ const GROUPS: Array<{ title: string; items: Array<[string, string]> }> = [
     title: 'Running and connections',
     items: [
       ['How is my weekly running planned?', 'It ramps from what you actually run toward the ceiling you set in your split, deloading on every 2-rep week. The long run is capped at a sane share of the week and near your longest logged run.'],
-      ['What does recovery data change?', 'Nothing yet: Forge cannot read smartwatch recovery data today, so it ignores recovery entirely rather than guess. When a device connection exists, sleep, HRV and resting heart rate will shape the readiness score and can soften hard days.'],
+      ['What does recovery data change?', 'With a Garmin connected, sleep, HRV and resting heart rate set the readiness score: a poor night softens a hard day, and two strained weeks slow the next block’s mileage ramp. Without a watch, Forge leaves recovery out entirely rather than guess.'],
       ['What does Strava add?', 'Recorded runs, rides and rows import automatically into your training log and count toward mileage and endurance goals. Strava does not supply sleep or HRV.'],
     ],
   },
