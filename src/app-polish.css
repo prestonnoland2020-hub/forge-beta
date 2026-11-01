@@ -186,6 +186,15 @@ details.session-details[open] > summary { margin-bottom: 16px; }
    what its type needs. The sheet's controls are segments and chips, all at
    least 44px, so the whole split is buildable with a thumb. */
 .split-simple { display: grid; gap: 16px; }
+.ss-library { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ss-library-row { display: flex; gap: 8px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.ss-library-row::-webkit-scrollbar { display: none; }
+.ss-library-row > button { flex: none; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--hairline-strong, var(--line)); background: var(--surface-1, var(--card)); color: var(--ink-2, var(--ink)); font-weight: 700; font-size: 14px; white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+.ss-library-row > button.active { background: var(--accent-strong, var(--accent)); border-color: transparent; color: var(--accent-ink, #fff); }
+.ss-library-row > .ss-library-new { border-style: dashed; color: var(--accent); background: transparent; }
+.ss-library-save { flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--surface-2); color: var(--ink); font-weight: 800; font-size: 14px; white-space: nowrap; }
+.ss-library-save:disabled { background: transparent; color: var(--ink-3, var(--muted)); }
+.ss-settings .ss-forget { justify-self: start; color: var(--bad, #c0392b); }
 .ss-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .ss-head h2 { margin: 0; font-size: 26px; line-height: 1.15; text-transform: none; letter-spacing: -.015em; }
 .ss-head small { color: var(--ink-3, var(--muted)); font-weight: 600; font-size: 14px; }
