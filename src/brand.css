@@ -1,9 +1,9 @@
 /* THE BRAND LAYER — titles, the wordmark and the loading screen.
 
    Loaded after everything else, because it is the one place that decides how
-   a title looks. Titles are Saira at its widest useful setting: black, italic,
+   a title looks. Titles are SF Pro at its widest useful setting: black, italic,
    caps, tightly tracked, leaning the same way as the F. Everything else in the
-   app stays at Saira's normal width, so a title is always the loudest thing
+   app stays at SF Pro's normal width, so a title is always the loudest thing
    on the screen and nothing else competes with it. */
 
 .topbar h1,
@@ -147,7 +147,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 h2 { font-family: var(--display); font-size: var(--fs-h2); font-weight: 700; line-height: 1.15; text-transform: none; letter-spacing: -.01em; }
 h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; line-height: 1.3; text-transform: none; letter-spacing: 0; }
 
-/* Numerals: Saira 800 italic, tabular — the Type page's Numeral role. */
+/* Numerals: SF Pro 800 italic, tabular — the Type page's Numeral role. */
 .kpi-tile b, .gx-now, .gx-ring strong, .week-score strong, .feed-metric-row strong {
   font-family: var(--display);
   font-style: italic;
