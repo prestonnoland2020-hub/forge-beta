@@ -151,7 +151,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      last page's scroll and opened Goals halfway down an empty page. */
   const firstScreen = useRef(true);
   useEffect(() => { if (firstScreen.current) { firstScreen.current = false; return; } window.scrollTo(0, 0); }, [screenKey]);
-  const activeTab = tabs.findIndex(tab => tab.owns(location.pathname));
+  /* A partner opened from Today is still inside Today, so Today stays lit. */
+  const cameFromToday = location.pathname.startsWith('/partners') && (location.state as { origin?: string } | null)?.origin === '/';
+  const activeTab = cameFromToday ? 0 : tabs.findIndex(tab => tab.owns(location.pathname));
   /* A workout in progress and the full coach are tasks, not places: the tab
      bar steps aside for them the way a native app's does. */
   const hideTabs = location.pathname === '/workout' || location.pathname === '/coach';
@@ -203,10 +205,20 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      under Profile has to draw its own breadcrumb and no screen is a dead end.
      Sub-screens inside Profile are named by the header too, which is what
      lets the page below stop repeating its own name in 26px type. */
-  const chrome = ((): { title: string; back?: string } => {
+  /* WHERE A STEP IN STARTED. Partners belong to Profile, but Today links
+     straight to them; a screen reached from Today carries { origin: '/' }, so
+     back returns to Today instead of stranding the athlete in Profile, and
+     the Today tab stays lit while they are in there. The list passes it on to
+     a partner it opens, with { viaList } so back from that partner returns
+     to the list first. */
+  const navState = (location.state || {}) as { origin?: string; viaList?: boolean };
+  const chrome = ((): { title: string; back?: string; backState?: { origin?: string } } => {
     const params = new URLSearchParams(location.search);
-    /* A partner's own screen is a step in from the list. */
-    if (/^\/partners\/.+/.test(location.pathname)) return { title: 'Partner', back: '/partners' };
+    /* A partner's own screen is a step in from the list, or from Today. */
+    if (/^\/partners\/.+/.test(location.pathname)) {
+      if (navState.origin && !navState.viaList) return { title: 'Partner', back: navState.origin };
+      return { title: 'Partner', back: '/partners', backState: navState.origin ? { origin: navState.origin } : undefined };
+    }
     switch (location.pathname) {
       case '/': return { title: 'Today' };
       case '/plan': return { title: 'Plan' };
@@ -217,7 +229,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       case '/coach': return { title: 'Ask Forge', back: '/' };
       case '/split': return { title: 'Your split', back: '/profile' };
       case '/exercises': return { title: 'Exercise library', back: '/profile' };
-      case '/partners': return { title: 'Partners', back: '/profile' };
+      case '/partners': return { title: 'Partners', back: navState.origin || '/profile' };
       case '/profile': {
         const view = params.get('view');
         const names: Record<string, string> = { settings: 'Settings', appearance: 'Appearance', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Recovery', faq: 'FAQ' };
@@ -297,7 +309,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     <div className="app-main">
       <header className="topbar">
         <div className="top-title">
-          {chrome.back && <Link className="top-back" to={chrome.back} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
+          {chrome.back && <Link className="top-back" to={chrome.back} state={chrome.backState} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
           <div><span className="eyebrow">FORGE</span><h1>{chrome.title}</h1></div>
         </div>
         <div className="top-actions">
