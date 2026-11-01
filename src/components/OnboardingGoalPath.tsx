@@ -1,4 +1,4 @@
-import { reachableSeconds, STRENGTH_WEEKLY_GAIN, weeksUntil } from '../lib/goalFeasibility';
+import { liftCeiling, reachableSeconds, STRENGTH_WEEKLY_GAIN, weeksToLift, weeksUntil } from '../lib/goalFeasibility';
 import { secondsToClock } from '../lib/goalInput';
 
 /* WHY A GOAL, SHOWN RATHER THAN SAID. Setup asked for a target and a date and
@@ -53,7 +53,7 @@ export function goalPath({ kind, unit, target, current, date }: GoalPathInput): 
     const reachable = reachableSeconds(from, weeks);
     const headline = `${Math.max(1, Math.round(perWeek))} seconds faster each week for ${weeks} weeks`;
     if (to >= reachable) return { from, to, weeks, fromLabel, toLabel, headline, verdict: to >= reachableSeconds(from, weeks, 0.006) ? 'Realistic' : 'Ambitious', tone: to >= reachableSeconds(from, weeks, 0.006) ? 'good' : 'stretch' };
-    return { from, to, weeks, fromLabel, toLabel, headline, verdict: 'Too fast for one block', tone: 'hard',
+    return { from, to, weeks, fromLabel, toLabel, headline, verdict: 'Too fast', tone: 'hard',
       note: `About ${secondsToClock(reachable, hours && reachable >= 3600)} is reachable by ${by}. Keep the goal and Forge will say so honestly as you train.` };
   }
   const to = Number.parseFloat(target); const from = Number.parseFloat(current);
@@ -79,15 +79,15 @@ export function goalPath({ kind, unit, target, current, date }: GoalPathInput): 
   if (from >= to) return { from, to, weeks, fromLabel, toLabel, headline: 'You’re already there', verdict: 'Done', tone: 'good', note: 'Set a heavier target and Forge has something to build toward.' };
   const perWeek = (to - from) / weeks;
   const headline = `+${round(perWeek, 0.5)} ${unit} a week for ${weeks} weeks`;
-  const reachable = from * Math.pow(1 + STRENGTH_WEEKLY_GAIN, Math.min(weeks, 24));
+  const reachable = liftCeiling(from, weeks);
   if (to <= reachable) {
-    const easy = to <= from * Math.pow(1 + STRENGTH_WEEKLY_GAIN * 0.6, Math.min(weeks, 24));
+    const easy = to <= liftCeiling(from, weeks, STRENGTH_WEEKLY_GAIN * 0.6);
     return { from, to, weeks, fromLabel, toLabel, headline, verdict: easy ? 'Realistic' : 'Ambitious', tone: easy ? 'good' : 'stretch' };
   }
-  const suggestWeeks = Math.ceil(Math.log(to / from) / Math.log(1 + STRENGTH_WEEKLY_GAIN));
-  return { from, to, weeks, fromLabel, toLabel, headline, verdict: 'Too much for one block', tone: 'hard',
+  const suggestWeeks = weeksToLift(from, to);
+  return { from, to, weeks, fromLabel, toLabel, headline, verdict: 'Too steep', tone: 'hard',
     suggestWeeks: suggestWeeks <= 52 ? suggestWeeks : undefined,
-    note: suggestWeeks <= 52 ? `About 1% a week is a strong block, which is ${suggestWeeks} weeks.` : `${Math.round(reachable / 5) * 5} ${unit} is reachable by ${by}. A nearer milestone keeps the plan honest.` };
+    note: suggestWeeks <= 52 ? `At a steady, strong rate that's about ${suggestWeeks} weeks.` : `${Math.round(reachable / 5) * 5} ${unit} is reachable by ${by}. A nearer milestone keeps the plan honest.` };
 }
 
 /* The line climbs left to right whatever the goal, because the card is about
@@ -96,7 +96,8 @@ export function goalPath({ kind, unit, target, current, date }: GoalPathInput): 
 export function OnboardingGoalPath({ path, date, onUseWeeks, compact = false }: { path: GoalPath; date: string; onUseWeeks?: (weeks: number) => void; compact?: boolean }) {
   /* The line stretches to any width; the dots are placed over it in
      percentages so they stay round. */
-  const marks = Array.from({ length: Math.floor((path.weeks - 1) / 4) }, (_, index) => (index + 1) * 4);
+  const every = path.weeks > 26 ? 12 : 4;
+  const marks = Array.from({ length: Math.floor((path.weeks - 1) / every) }, (_, index) => (index + 1) * every);
   const at = (week: number) => ({ left: `${(week / path.weeks) * 100}%`, top: `${100 - (week / path.weeks) * 100}%` });
   return <div className={`ob-path ${path.tone}${compact ? ' compact' : ''}`} aria-live="polite">
     <div className="ob-path-head"><strong>{path.headline}</strong><span className="ob-path-verdict">{path.verdict}</span></div>
