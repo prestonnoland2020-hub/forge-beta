@@ -373,7 +373,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       const exercises = day.exercises || [];
       items.push(exercises.length
         ? { key: day.name, label: `Log one honest top set from ${day.name} — ${exercises[0]} works`, done: exercises.some(name => bests.has(canonicalLiftKey(name))) }
-        : { key: `${day.name}-exercises`, label: `Choose the exercises for ${day.name} — Forge cannot program a day with none`, done: false });
+        : { key: `${day.name}-exercises`, label: `Select your top sets for ${day.name} — Forge cannot program a day with none`, done: false });
     });
     if (goals.some(goal => goal.type === 'Endurance')) {
       items.push({ key: 'runs', label: recentRuns.length === 1 ? 'Log one more easy run (1 of 2) — or connect your Garmin' : 'Log 2 easy runs so Forge learns your real pace — or connect your Garmin', done: recentRuns.length >= 2 });
