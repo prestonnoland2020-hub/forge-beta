@@ -21,7 +21,7 @@ import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
-import { getGarminConnection } from '../features/training/garminConnectionService';
+import { getGarminConnection, syncGarmin } from '../features/training/garminConnectionService';
 import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
 
@@ -197,6 +197,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       if (!strava?.connected && !garmin?.connected) return;
       localStorage.setItem(throttleKey, String(Date.now()));
       if (strava?.connected) await syncStravaActivities().catch(() => undefined);
+      /* Garmin's history arrives a few years per run (Garmin's rate limit);
+         each launch carries it on until it is all requested. */
+      if (garmin?.connected && !garmin.historyComplete && !garmin.historyBlocked) await syncGarmin().catch(() => undefined);
       await importStravaActivities(stravaRecords, stravaAddRecord, stravaUpdateRecord);
     } catch { /* silent — manual sync remains in Profile → Connections */ }
   }, [historyLoading, stravaRecords, stravaAddRecord, stravaUpdateRecord]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -327,7 +330,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       <header className="topbar">
         <div className="top-title">
           {chrome.back && <Link className="top-back" to={chrome.back} state={chrome.backState} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
-          <div><span className="eyebrow">FORGE</span><h1>{chrome.title}</h1></div>
+          {/* The logo heads every screen; the screen's name stays for screen readers. */}
+          <NavLink className="top-brand" to="/" aria-label="Forge home"><span className="brand-mark" aria-hidden="true"><i /></span><span>FORGE</span></NavLink>
+          <h1 className="sr-only">{chrome.title}</h1>
         </div>
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}

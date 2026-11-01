@@ -1,3 +1,4 @@
+import { EFFORT_LABEL, effortOf, estimateMaxHr } from '../lib/heartRate';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageIntro } from '../components/AppShell';
@@ -16,7 +17,7 @@ const strengthMuscles=(record:WorkoutRecord)=>record.muscles.filter(muscle=>{con
 const sessionLength=(minutes:number)=>{const total=Math.round(minutes);return total>=60?`${Math.floor(total/60)} h ${total%60} min`:`${total} min`};
 
 export function HistoryPage({embedded=false}:{embedded?:boolean}={}){
-  const {records}=useWorkoutHistory();const {setup}=useProfileSetup();const weightUnit=setup?.units==='Metric'?'kg':'lb';const now=new Date();
+  const {records}=useWorkoutHistory();const {setup}=useProfileSetup();const maxHr=estimateMaxHr(records,setup?.birthDate);const weightUnit=setup?.units==='Metric'?'kg':'lb';const now=new Date();
   const recordTopSets=(record:WorkoutRecord)=>record.topSets?.length?record.topSets.filter(set=>set.completed!==false):(record.lift&&record.weight&&record.reps?[{muscle:record.muscles[0]||'Primary',lift:record.lift,weight:record.weight,reps:record.reps,calculatedMax:record.calculatedMax}]:[]);
   const hasStrength=(record:WorkoutRecord)=>strengthMuscles(record).length>0||recordTopSets(record).length>0;
   const hasCardio=(record:WorkoutRecord)=>(record.cardioSessions||[]).length>0;
@@ -66,7 +67,7 @@ export function HistoryPage({embedded=false}:{embedded?:boolean}={}){
                 asked for this day and the athlete did it. The position is a
                 cursor into the split — useful in a bug report, meaningless on a
                 Tuesday. */}
-            {selected.recommendationId&&<small className="recommendation-lineage">Forge planned this day</small>}<div className="simple-preview-results">{recordTopSets(selected).map((set,index)=><div key={`${set.lift}-${index}`}><strong>{set.lift}</strong><span>{set.weight} {weightUnit} ×{set.reps}</span></div>)}{recordTopSets(selected).length===0&&strengthMuscles(selected).length>0&&<div><strong>Strength workout</strong><span>{strengthMuscles(selected).join(' · ')} · no historical top set recorded</span></div>}{(selected.cardioSessions||[]).map(session=><div key={session.id}><strong>{session.activity}</strong><span>{formatCardioSummary(session)}{session.recorded?.averageHr?` · ${session.recorded.averageHr} bpm avg`:''}</span></div>)}</div>{selected.notes&&<aside className="selected-day-notes"><span className="eyebrow">NOTES</span><p>{selected.notes}</p></aside>}</>:<p>No training is logged for this date.</p>}</section>
+            {selected.recommendationId&&<small className="recommendation-lineage">Forge planned this day</small>}<div className="simple-preview-results">{recordTopSets(selected).map((set,index)=><div key={`${set.lift}-${index}`}><strong>{set.lift}</strong><span>{set.weight} {weightUnit} ×{set.reps}</span></div>)}{recordTopSets(selected).length===0&&strengthMuscles(selected).length>0&&<div><strong>Strength workout</strong><span>{strengthMuscles(selected).join(' · ')} · no historical top set recorded</span></div>}{(selected.cardioSessions||[]).map(session=><div key={session.id}><strong>{session.activity}</strong><span>{formatCardioSummary(session)}{session.recorded?.averageHr?` · ${maxHr&&/run|jog|tempo|easy|long|base|speed|track/i.test(session.activity||'')?`${EFFORT_LABEL[effortOf(session.recorded.averageHr,maxHr.bpm)]} effort, `:''}${session.recorded.averageHr} bpm avg`:''}</span></div>)}</div>{selected.notes&&<aside className="selected-day-notes"><span className="eyebrow">NOTES</span><p>{selected.notes}</p></aside>}</>:<p>No training is logged for this date.</p>}</section>
     </>:<section className="card history-first-empty"><strong>No workouts yet</strong><span>Every workout you finish shows up here.</span><Link className="button" to="/workout?source=blank">Log a workout <Icon name="arrow"/></Link></section>}
   </div>;
 }

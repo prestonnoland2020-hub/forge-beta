@@ -27,3 +27,7 @@
 /* The greeting is the Today screen's big line; at phone width it has to hold
    "Good afternoon, <name>" on one line for most names. */
 @media(max-width:640px){.feed-welcome h2{font-size:20px}}
+
+/* The logo, not the screen's name, sits top left on every screen. */
+.top-brand{display:inline-flex;align-items:center;gap:10px;min-width:0;color:var(--ink);text-decoration:none;font:800 22px var(--display);letter-spacing:.1em;line-height:1}
+.top-brand .brand-mark{width:30px;height:26px;flex:none}
