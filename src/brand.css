@@ -224,6 +224,22 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 .gx-mode-hint { margin: 0; font-size: var(--fs-small); color: var(--ink-3); }
 @media (prefers-reduced-motion: reduce) { .gx-mode-thumb { transition: none; } }
 
+/* The top of Goals is one block, not two sections a full stack gap apart: the
+   switch sits close to the overview, and the overview's ring is smaller, so on
+   a phone the first goal starts well above the fold. On a wide screen the two
+   sit side by side; when only one of them shows, it takes the whole row. */
+.gx-head { display: grid; gap: var(--s3); }
+.gx-head:empty { display: none; }
+.gx-head .gx-mode { gap: var(--s1); }
+.gx-head .gx-mode-track { margin-top: var(--s1); }
+.gx-head .gx-hero { gap: var(--s4); padding: var(--s4); }
+.gx-head .gx-ring { width: 76px; height: 76px; }
+.gx-head .gx-ring circle { stroke-width: 9; }
+@media (min-width: 901px) {
+  .gx-head { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: center; gap: var(--s5); }
+  .gx-head .gx-mode { order: 2; }
+}
+
 /* ---- Line charts ----------------------------------------------------------
    Every line chart in the app, drawn the way the guide's Goals chart is: a
    3.5 px signal line that draws itself left to right on the Strike curve in
