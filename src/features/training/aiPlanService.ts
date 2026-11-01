@@ -305,7 +305,8 @@ export const isRestDay = (day: { name?: string; type?: string; dayType?: string 
    surface builds it here now. */
 export function bestsFromHistory(
   records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean; prescribedReps?: number }> }>,
-): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>>; lastAt: LiftAnchors } {
+  todayIso = localDayIso(),
+): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>>; lastAt: LiftAnchors; returning: Map<string, { factor: number; daysOff: number }> } {
   const bests = new Map<string, number>();
   const singles = new Map<string, number>();
   /* HOW MANY TIMES THIS LIFT HAS BEEN TRAINED, counted in days rather than in
@@ -325,6 +326,8 @@ export function bestsFromHistory(
      plan should restart them. */
   const lastAt: LiftAnchors = new Map();
   const lastOn = new Map<string, string>();
+  /* The last day each lift was actually completed, for the time-off check below. */
+  const lastTrained = new Map<string, string>();
   /* THE HEAVIEST SET AT EACH REP COUNT, kept as itself. A single number per
      lift means every week of the wave is an extrapolation from one set —
      usually the athlete's best high-rep set, because that is what estimates
@@ -372,6 +375,7 @@ export function bestsFromHistory(
       byRepsLast.set(repSlot, set.weight);
       lastAt.set(key, byRepsLast);
     }
+    if (record.date && record.date > (lastTrained.get(key) || '')) lastTrained.set(key, record.date);
     const days = sessionDays.get(key) || new Set<string>();
     days.add(dayKey);
     sessionDays.set(key, days);
@@ -384,6 +388,26 @@ export function bestsFromHistory(
     if (set.weight > (byReps.get(reps) || 0)) byReps.set(reps, set.weight);
     anchors.set(key, byReps);
   }));
+  /* TIME OFF IS NOT FREE. A lift last trained five weeks ago was prescribed
+     from the numbers of five weeks ago, as if nothing had happened in
+     between — and the first session back is exactly where a too-heavy bar
+     turns into three misses and a back-off, or an injury. Strength fades
+     slowly but it fades: from three weeks off the loads ease 5%, from five
+     weeks 10%, from eight weeks 15%. The ease is applied to what the
+     prescription is written from — the working max, the per-rep anchors and
+     the last completed loads — so every surface eases together, and the first
+     set logged back resets the clock. A Real 1RM single is left alone: it is
+     a fact about what was lifted, not a prescription. */
+  const returning = new Map<string, { factor: number; daysOff: number }>();
+  const todayMs = new Date(`${todayIso}T12:00:00`).getTime();
+  for (const [key, last] of lastTrained) {
+    const daysOff = Math.floor((todayMs - new Date(`${last}T12:00:00`).getTime()) / 86400000);
+    const factor = daysOff >= 56 ? 0.85 : daysOff >= 35 ? 0.9 : daysOff >= 21 ? 0.95 : 1;
+    if (factor === 1) continue;
+    returning.set(key, { factor, daysOff });
+    if (bests.has(key)) bests.set(key, bests.get(key)! * factor);
+    for (const map of [anchors.get(key), lastAt.get(key)]) map?.forEach((weight, reps) => map.set(reps, weight * factor));
+  }
   /* A LIFT WITH NO LOGGED SET TAKES THE ATHLETE'S STARTING NUMBER, if they
      gave one in setup. It fills the best and the anchor at that rep count
      only: no session is counted and no single is recorded, so the wave starts
@@ -398,7 +422,7 @@ export function bestsFromHistory(
     anchors.set(key, new Map([[Math.min(Math.max(Math.round(start.reps), 1), 10), start.weight]]));
   }
   const sessions = new Map([...sessionDays].map(([key, days]) => [key, days.size] as const));
-  return { bests, singles, anchors, sessions, misses, lastAt };
+  return { bests, singles, anchors, sessions, misses, lastAt, returning };
 }
 
 /* Every lift's heaviest set at each rep count, 1-10. */
