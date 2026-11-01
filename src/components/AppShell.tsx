@@ -317,7 +317,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   return <div className="app-frame">
     {updateReady&&<button type="button" className="update-ready-pill" onClick={()=>window.location.reload()}>Forge updated · tap to refresh</button>}
     <aside className="sidebar">
-      <NavLink className="brand" to="/" aria-label="Forge home"><span className="brand-mark"><i /></span><span>FORGE</span></NavLink>
+      <NavLink className="brand" to="/" aria-label="Forge home"><span className="brand-mark"><i /></span></NavLink>
       <nav className="side-nav" aria-label="Primary navigation">
         {primaryNav.map(([to, label, icon]) => <NavLink key={to} to={to} end={to === '/'}><NavGlyph name={icon}/>{label}</NavLink>)}
       </nav>
