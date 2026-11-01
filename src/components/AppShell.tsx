@@ -56,7 +56,7 @@ function NavGlyph({ name }: { name: NavGlyphName }) {
 /* THE TAB BAR. Five destinations, each owning the screens that are steps into
    it, so the tab you came from stays lit while you are inside it. */
 const tabs = [
-  { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' },
+  { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' || path === '/insights' },
   { to: '/plan', label: 'Plan', icon: 'calendar', owns: (path: string) => path === '/plan' },
   { to: '/goals', label: 'Goals', icon: 'target', owns: (path: string) => path === '/goals' },
   { to: '/history', label: 'Activities', icon: 'history', owns: (path: string) => path === '/history' },
