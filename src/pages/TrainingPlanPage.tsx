@@ -18,6 +18,7 @@ import { isDemoMode } from '../lib/env';
 import { useEditingSplit } from '../features/profile/splitEditing';
 import { NumberInput } from '../components/NumberInput';
 import { coreFirst } from '../lib/coreLifts';
+import { canonicalLiftKey } from '../lib/liftAliases';
 import { tap } from '../lib/haptics';
 import { Icon } from '../components/Icon';
 import { SearchField } from '../components/SearchField';
@@ -57,7 +58,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
      than relying on the gate recognising its URL. */
   useEditingSplit();
   const {user}=useAuth();
-  const {goals}=useGoals();const {records}=useWorkoutHistory();const {profile}=useAdaptiveTraining();
+  const {goals}=useGoals();const goalLiftKeys=useMemo(()=>new Set(goals.filter(goal=>goal.type==='Strength'&&goal.exercise).map(goal=>canonicalLiftKey(String(goal.exercise)))),[goals]);const {records}=useWorkoutHistory();const {profile}=useAdaptiveTraining();
   const {strategy}=useCoachingStrategy();
   const {exercises:libraryExercises,workouts:libraryWorkouts}=useTrainingLibrary();const strengthExercises=libraryExercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));const exercises=strengthExercises.map(exercise=>exercise.name);const cardioWorkouts=libraryWorkouts.filter(workout=>Boolean(workout.plan));
   const {setup,saveSetup}=useProfileSetup();
@@ -82,6 +83,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const dayTouchStart=useRef<number|null>(null);
   const [days,setDays]=useState<TrainingDay[]>(()=>savedPlan?.days?.length?savedPlan.days.map(day=>({...day,strengthDuration:day.strengthDuration||day.maxDuration||'60'})):setup?.splitDays?.length?setup.splitDays.map((day,index)=>({name:day.name,weekday:['MON','TUE','WED','THU','FRI','SAT','SUN'][index%7],dayType:day.type.toLowerCase() as DayType,muscles:day.muscles||[],exercises:[],cardioPolicy:day.type==='Rest'?'none':'forge',cardio:[],recoveryStyle:'Full rest',strengthDuration:String(setup.strengthSessionMinutes),maxDuration:String(day.type==='Cardio'?setup.cardioSessionMinutes:day.type==='Mixed'?setup.combinedSessionMinutes:setup.strengthSessionMinutes)})):[{name:'Training Day 1',weekday:'MON',dayType:'strength',muscles:[],exercises:[],cardioPolicy:'none',cardio:[],recoveryStyle:'Full rest',strengthDuration:'60',maxDuration:'60'}]);
   const active=days[selectedDay];
+  const goalCount=(active?.exercises||[]).filter(name=>goalLiftKeys.has(canonicalLiftKey(name))).length;
   /* LOOKING IS NOT EDITING. Both effects below run on mount, not only on
      change — so merely opening the Plan tab out of curiosity rewrote the
      athlete's split: splitSource flipped from 'Recommended' to 'Custom',
@@ -215,13 +217,18 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
           <div className="ss-segment" role="radiogroup" aria-label="Day type">{DAY_TYPES.map(([type,label])=><button type="button" role="radio" aria-checked={active.dayType===type} key={type} className={active.dayType===type?'active':''} onClick={()=>{tap();setDayType(type)}}>{label}</button>)}</div>
           {rhythm==='weekly'&&<div className="ss-chips" aria-label="Weekday">{['MON','TUE','WED','THU','FRI','SAT','SUN'].map(weekday=><button type="button" key={weekday} className={active.weekday===weekday?'active':''} onClick={()=>{tap();updateDay({weekday})}}>{weekday[0]+weekday.slice(1).toLowerCase()}</button>)}</div>}
           {(active.dayType==='strength'||active.dayType==='mixed')&&<section className="ss-block">
-            <div className="ss-block-head"><strong>Select your top sets</strong><small>{active.exercises.length?`${active.exercises.length} chosen`:'Pick at least one'}</small></div>
+            <div className="ss-block-head"><strong>Select your top sets</strong><small>{active.exercises.length?[goalCount?`${goalCount} goal`:'',active.exercises.length-goalCount?`${active.exercises.length-goalCount} supporting`:''].filter(Boolean).join(' · '):'Pick at least one'}</small></div>
+            {/* GOAL LIFTS AND SUPPORTING LIFTS. Forge asks for one top set per
+                lift per workout and writes its weight; everything else the
+                athlete does that day is theirs. Said once, here, where the
+                lifts are chosen. */}
+            <p className="ss-topset-why">One top set per lift, each workout — Forge tracks it and sets the weight. <b>Goal lifts</b> move your goals; <b>supporting lifts</b> build them. The rest of your workout is yours.</p>
             {/* Lifts first; the muscles follow from them. The muscle list is one
                 line under the lifts, editable but rarely needed. */}
             <p className="ss-trains">Trains {active.muscles.length?active.muscles.join(' · '):'—'} <button type="button" className="text-button" onClick={()=>setEditMuscles(open=>!open)}>{editMuscles?'Done':'Edit'}</button></p>
             {editMuscles&&<div className="ss-chips">{muscles.map(muscle=><button type="button" key={muscle} className={active.muscles.includes(muscle)?'active':''} onClick={()=>{tap();toggleMuscle(muscle)}}>{muscle}</button>)}</div>}
             <SearchField className="ss-search" value={exerciseQuery} onChange={setExerciseQuery} placeholder="Search lifts" aria-label="Search lifts"/>
-            <div className="ss-lifts">{visibleExercises.length?visibleExercises.map(exercise=>{const selected=active.exercises.includes(exercise);return <button type="button" key={exercise} aria-pressed={selected} className={selected?'selected':''} onClick={()=>{tap();toggleExercise(exercise)}}><span className="ss-check" aria-hidden="true">{selected?<Icon name="check" size={14} stroke={3}/>:''}</span>{exercise}</button>}):<p className="ss-empty">{exerciseQuery.trim()?'No lifts match that search.':'No lifts in your library for these muscles yet.'}</p>}</div>
+            <div className="ss-lifts">{visibleExercises.length?visibleExercises.map(exercise=>{const selected=active.exercises.includes(exercise);return <button type="button" key={exercise} aria-pressed={selected} className={selected?'selected':''} onClick={()=>{tap();toggleExercise(exercise)}}><span className="ss-check" aria-hidden="true">{selected?<Icon name="check" size={14} stroke={3}/>:''}</span>{exercise}{goalLiftKeys.has(canonicalLiftKey(exercise))&&<em className="ss-goal-tag">Goal lift</em>}</button>}):<p className="ss-empty">{exerciseQuery.trim()?'No lifts match that search.':'No lifts in your library for these muscles yet.'}</p>}</div>
             <div className="ss-block-head"><strong>Time</strong></div>
             <div className="ss-chips">{['30','45','60','75','90'].map(value=><button type="button" key={value} className={(active.strengthDuration||'60')===value?'active':''} onClick={()=>{tap();updateDay({strengthDuration:value})}}>{value} min</button>)}</div>
           </section>}
