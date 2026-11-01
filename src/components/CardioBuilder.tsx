@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DialField } from './NumberDial';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import type { CardioLogDraft } from '../lib/cardioSession';
-import { parseCardioDescription, statedTotals, fillToTotals } from '../lib/cardioParse';
+import { parseCardioDescription, parseCircuitDescription, circuitSummary, statedTotals, fillToTotals } from '../lib/cardioParse';
 import { requestCardioParse } from '../features/training/coachService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioPlanSummary, type PlannedCardio } from './CardioPlanBuilder';
@@ -21,6 +21,10 @@ const ALL_UNITS = [...DISTANCE_UNITS, ...OTHER_UNITS];
 const STAPLE_TYPES = ['Run', 'Walk', 'Bike', 'Rowing', 'Swimming', 'Elliptical', 'Stair Climber', 'Jump Rope'];
 
 const isDistanceUnit = (unit: string) => DISTANCE_UNITS.includes(String(unit || '').trim().toLowerCase());
+/* A COUNT IS NOT A MISPLACED DISTANCE. "15 calories" and "20 reps" are a
+   number on a count unit; repairing them like "2 minutes" turned a 15-calorie
+   bike into 15 miles. Only a time unit is impossible for a distance. */
+const isCountUnit = (unit: string) => ['calories', 'reps', 'floors'].includes(String(unit || '').trim().toLowerCase());
 /* A distance measured in "minutes" converts to ZERO miles — it counts for
    nothing in weekly mileage, pace, or an endurance goal, while still looking
    logged. The pairing is impossible, so it is never stored: entering a
@@ -97,7 +101,7 @@ const linesFromDraft = (draft: CardioLogDraft): CardioLine[] => {
   return rows.map((row, index) => ({
     id: index + 1,
     cardioType: String(row.cardioType || row.activity || draft.activity || 'Run'),
-    unit: (() => { const stored = String(row.unit || row.distanceUnit || 'miles'); return Number(row.distance) > 0 && !isDistanceUnit(stored) ? distanceUnitFor(String(row.cardioType || row.activity || draft.activity || 'Run')) : stored; })(),
+    unit: (() => { const stored = String(row.unit || row.distanceUnit || 'miles'); return Number(row.distance) > 0 && !isCountUnit(stored) && !isDistanceUnit(stored) ? distanceUnitFor(String(row.cardioType || row.activity || draft.activity || 'Run')) : stored; })(),
     distance: row.distance ? String(row.distance) : '',
     time: minutesToClock(Number(row.time) || 0),
   }));
@@ -222,6 +226,28 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
     const description = aiText.trim();
     if (!description || aiBusy) return;
     setAiBusy(true); setAiReflection('');
+    /* ROUNDS ARE A CIRCUIT. "3 rounds of 500m row, 20 WB, 15 cal bike in 11
+       mins" is logged the way a planned circuit is: its stations, its rounds,
+       and one clock for the whole thing. Read deterministically, so it never
+       depends on the model squeezing calories and reps into distance rows. */
+    const circuit = parseCircuitDescription(description);
+    if (circuit) {
+      const runMiles = Number((circuit.stations.filter(station => station.name === 'Run').reduce((total, station) => total + toMiles(station.value, station.unit), 0) * circuit.rounds).toFixed(2));
+      const summary = `${circuitSummary(circuit)}${circuit.minutes ? ` · ${minutesToClock(circuit.minutes)}` : ''}`;
+      setSavedEntries(items => [...items, {
+        id: crypto.randomUUID(),
+        structure: 'circuit',
+        activity: 'Circuit',
+        summary,
+        prescription: { rounds: circuit.rounds, format: 'For time', ...(circuit.minutes || runMiles ? { legacyIntervals: [{ cardioType: 'Circuit', distance: runMiles, unit: 'miles', time: circuit.minutes }] } : {}), note: note.trim() || undefined },
+        circuitStations: circuit.stations.map(station => ({ name: station.name, value: String(station.value), unit: station.unit })),
+      }]);
+      reset();
+      setAiReflection(`Logged as ${summary}.${circuit.minutes ? '' : ' Add the time with Edit if you have it.'}`);
+      setAiSource('local');
+      setAiBusy(false);
+      return;
+    }
     const local = parseCardioDescription(description);
     const parsed = await requestCardioParse(description, { savedCardioTypes: typeOptions, plannedToday: plannedSummary || null }, local);
     if (!parsed.rows.length) { setAiReflection(parsed.reflection || 'Could not read a workout from that.'); setAiSource(parsed.source); setAiBusy(false); return; }
@@ -241,7 +267,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
        a distance unit so the miles are real. */
     /* A stated total ('1.65 miles 11:00 total') fills in what the rows left out. */
     const completeRows = fillToTotals(sourceRows, statedTotals(description));
-    const rows = completeRows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: Number(row.distance) > 0 && !isDistanceUnit(row.unit) ? distanceUnitFor(row.cardioType) : row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
+    const rows = completeRows.map((row, index) => ({ id: Date.now() + index, cardioType: row.cardioType, unit: Number(row.distance) > 0 && !isCountUnit(row.unit) && !isDistanceUnit(row.unit) ? distanceUnitFor(row.cardioType) : row.unit, distance: row.distance ? String(row.distance) : '', time: minutesToClock(row.timeMinutes) }));
     const noteText = parsed.note && !note ? parsed.note : note;
     /* "Log it" logs it. The rows used to land in the composer for a second
        confirming tap, and a session that never got that tap was thrown away
@@ -336,7 +362,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
           </label>
           <div className="cardio-log-distance">
             <DialField label="Distance" kind="distance" unit={line.unit} value={line.distance}
-              onChange={next => updateLine(line.id, Number(next) > 0 && !isDistanceUnit(line.unit) ? { distance: next, unit: distanceUnitFor(line.cardioType) } : { distance: next })} />
+              onChange={next => updateLine(line.id, Number(next) > 0 && !isCountUnit(line.unit) && !isDistanceUnit(line.unit) ? { distance: next, unit: distanceUnitFor(line.cardioType) } : { distance: next })} />
           </div>
           <label className="cardio-log-unit"><span className="cardio-log-label">Unit</span>
             <select value={line.unit} onChange={event => updateLine(line.id, { unit: event.target.value })}>

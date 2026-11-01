@@ -218,3 +218,82 @@ export function fillToTotals(rows: ParsedCardioRow[], totals: StatedTotals): Par
   const type = rows[0].cardioType;
   return [...rows, { cardioType: type, distance: Number(shortMiles.toFixed(2)), unit: 'miles', timeMinutes: Number(shortMinutes.toFixed(2)) }];
 }
+
+/* "3 ROUNDS OF 500m ROW, 20 WB AND 15 CAL ASSAULT BIKE IN 11 MINS TOTAL".
+   A circuit is rounds of stations and one clock, not a run of distances. Read
+   as distances it came back as a single 500 m bike for 11:00: the rounds, the
+   row, the wall balls and the calories were all lost. This reads the shape
+   the athlete actually wrote: how many rounds, each station with its number
+   and unit, and the total time, which belongs to the whole circuit and is
+   never split into made-up per-station times. */
+export type ParsedCircuit = { rounds: number; stations: Array<{ name: string; value: number; unit: string }>; minutes: number };
+
+const STATION_ALIASES: Array<[RegExp, string]> = [
+  [/^(wb|wbs|wall ?balls?)$/i, 'Wall Balls'],
+  [/^(bbj|bbjs|burpee broad ?jumps?)$/i, 'Burpee Broad Jumps'],
+  [/^(burpees?)$/i, 'Burpees'],
+  [/^(kbs|kb swings?|kettlebell swings?)$/i, 'Kettlebell Swings'],
+  [/^(du|dus|double ?unders?)$/i, 'Double Unders'],
+  [/^(t2b|ttb|toes ?to ?bar)$/i, 'Toes to Bar'],
+  [/^(box ?jumps?|bj)$/i, 'Box Jumps'],
+  [/^(thrusters?)$/i, 'Thrusters'],
+  [/^(pull ?ups?)$/i, 'Pull Ups'],
+  [/^(push ?ups?)$/i, 'Push Ups'],
+  [/^(air ?squats?|squats?)$/i, 'Air Squats'],
+  [/^(lunges?|sandbag lunges?)$/i, 'Sandbag Lunges'],
+  [/^(assault ?bike|air ?bike|echo ?bike|bike ?erg)$/i, 'Assault Bike'],
+  [/^(ski|ski ?erg)$/i, 'SkiErg'],
+  [/^(row|rower|rowing|erg)$/i, 'Rowing'],
+  [/^(run|running)$/i, 'Run'],
+  [/^(sled ?push)$/i, 'Sled Push'],
+  [/^(sled ?pull)$/i, 'Sled Pull'],
+  [/^(farmers? ?carry|farmer'?s ?carry)$/i, 'Farmers Carry'],
+];
+const stationName = (raw: string) => {
+  const name = raw.trim().replace(/\s+/g, ' ').replace(/^(of|x)\s+/i, '');
+  for (const [pattern, label] of STATION_ALIASES) if (pattern.test(name)) return label;
+  return name.replace(/\b\w/g, letter => letter.toUpperCase());
+};
+
+export function parseCircuitDescription(text: string): ParsedCircuit | null {
+  const lower = text.trim();
+  const head = lower.match(/^(\d{1,2})\s*(?:rounds?|rds?|rft)\b\s*(?:of|:|-)?\s*/i) || lower.match(/^(\d{1,2})\s*x\s+(?=\D)/i);
+  if (!head) return null;
+  const rounds = Number(head[1]);
+  if (!(rounds >= 2 && rounds <= 20)) return null;
+  let body = lower.slice(head[0].length);
+  /* The clock comes off the end: "in 11 mins total", "for 11:00", "— 11:32". */
+  let minutes = 0;
+  const clock = body.match(/\s*(?:,|-|—)?\s*(?:in|for|time|took|total(?: time)?(?: of)?)?\s*(\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?\s*(?:min|mins|minutes|m(?=\s|$)))\s*(?:total|overall|all in)?\.?\s*$/i);
+  if (clock) {
+    const value = clock[1];
+    minutes = value.includes(':') ? clockToMinutes(value) : Number(value.replace(/[^\d.]/g, ''));
+    body = body.slice(0, clock.index);
+  }
+  /* Written without commas ("500m row 20 WB and 15 cal bike"), a new station
+     starts wherever a number follows a word. */
+  body = body.replace(/([a-z])\s+(?=\d)/gi, '$1, ');
+  const parts = body.split(/\s*(?:,|\+|\/|;|\band\b|\bthen\b)\s*/i).map(part => part.trim()).filter(Boolean);
+  const stations: ParsedCircuit['stations'] = [];
+  for (const part of parts) {
+    const distance = part.match(/^(\d+(?:\.\d+)?)\s*(m|meters?|metres?|km|k|mi|miles?|yds?|yards?)\b\s*(.*)$/i);
+    if (distance) {
+      const unit = normalizeUnit(distance[2]);
+      stations.push({ name: stationName(distance[3] || 'Run'), value: Number(distance[1]), unit });
+      continue;
+    }
+    const calories = part.match(/^(\d+)\s*(?:cal|cals|calories)\b\s*(.*)$/i) || part.match(/^(.*?)\s*(\d+)\s*(?:cal|cals|calories)$/i);
+    if (calories) {
+      const [value, name] = /^\d/.test(calories[1]) ? [calories[1], calories[2]] : [calories[2], calories[1]];
+      stations.push({ name: stationName(name || 'Assault Bike'), value: Number(value), unit: 'calories' });
+      continue;
+    }
+    const reps = part.match(/^(\d+)\s*(?:x\s*)?(?:reps?\s*(?:of\s*)?)?([a-z].*)$/i);
+    if (reps) { stations.push({ name: stationName(reps[2]), value: Number(reps[1]), unit: 'reps' }); continue; }
+    return null; /* a piece we cannot read: let the regular reader try instead */
+  }
+  if (stations.length < 1) return null;
+  return { rounds, stations, minutes: Number(minutes.toFixed(2)) };
+}
+
+export const circuitSummary = (circuit: ParsedCircuit) => `${circuit.rounds} rounds · ${circuit.stations.map(station => station.unit === 'reps' ? `${station.value} ${station.name}` : station.unit === 'calories' ? `${station.value} cal ${station.name}` : `${station.value}${station.unit === 'meters' ? ' m' : station.unit === 'km' ? ' km' : station.unit === 'yards' ? ' yd' : ' mi'} ${station.name}`).join(' · ')}`;
