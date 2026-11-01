@@ -215,3 +215,11 @@ textarea.ob-input{min-height:96px;resize:vertical}
 @keyframes ob-path-draw{from{clip-path:inset(-8px 100% -8px -8px)}to{clip-path:inset(-8px -8px -8px -8px)}}
 @media (prefers-reduced-motion:reduce){.ob-path-chart svg,.ob-path-end{animation:none}.ob-number-max{animation:none}}
 .ob-week .ob-day-text strong{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px}
+
+/* Goals: the same prediction card setup draws, from today's numbers. */
+.goal-prediction{display:grid;gap:8px;margin:4px 16px 12px}
+.goal-prediction-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.goal-prediction-head span{font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.goal-prediction .ob-path-head strong{font-size:14px}
+.goal-prediction-rules{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px;line-height:1.45;color:var(--muted)}
+.goal-prediction-rules b{color:var(--text)}
