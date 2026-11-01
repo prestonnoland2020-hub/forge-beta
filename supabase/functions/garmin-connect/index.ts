@@ -63,7 +63,9 @@ const historyDone = (requestedAt?: string | null) => Boolean(requestedAt) && new
    column as a date no walk can reach, so it needs no schema of its own. Each
    sync tries once more (one request) in case the permission has arrived. */
 const HISTORY_BLOCKED = '2100-01-01T00:00:00.000Z';
-const historyBlocked = (requestedAt?: string | null) => requestedAt === HISTORY_BLOCKED;
+/* Compared as a date: Postgres hands the timestamp back as
+   "2100-01-01T00:00:00+00:00", which never equals the string written. */
+const historyBlocked = (requestedAt?: string | null) => Boolean(requestedAt) && new Date(requestedAt!).getUTCFullYear() >= 2100;
 
 async function walkHistory(accessToken: string, from: string | null | undefined, save: (reachedIso: string) => Promise<unknown>): Promise<void> {
   const floor = historyFloor();
