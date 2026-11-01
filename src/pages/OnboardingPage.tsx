@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
@@ -283,11 +283,37 @@ function OnboardingForm() {
       .filter(lift => !isWeightedBodyweight(lift))
       .filter(lift => { const key = canonicalLiftKey(lift); if (seen.has(key)) return false; seen.add(key); return true; });
   }, [pendingGoalLift.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* NOTHING IS FILLED IN FOR THEM. Reps used to show a 5 that read as an
+     answer, and saved as one. The examples are pale placeholders, matched to
+     the athlete where setup knows enough; a row is used only when both its
+     numbers are typed, and a lift can be taken off the screen with its ✕. */
   const [startNums, setStartNums] = useState<Record<string, { weight: string; reps: string }>>({});
+  const [removedLifts, setRemovedLifts] = useState<string[]>([]);
   const numberFor = (lift: string) => startNums[lift] || (goalKind === 'lift' && lift === goalExercise && goalCurrent ? { weight: goalCurrent, reps: '1' } : { weight: '', reps: '' });
-  const setNumber = (lift: string, field: 'weight' | 'reps', value: string) => { setError(''); setStartNums(current => ({ ...current, [lift]: { ...numberFor(lift), [field]: value.replace(/[^\d.]/g, '') } })); };
-  const startingList = numberLifts.map(lift => ({ lift, weight: Number(numberFor(lift).weight), reps: Number(numberFor(lift).reps) || 5 }))
+  const setNumber = (lift: string, field: 'weight' | 'reps', value: string) => { setError(''); setStartNums(current => ({ ...current, [lift]: { ...numberFor(lift), [field]: value.replace(field === 'reps' ? /\D/g : /[^\d.]/g, '') } })); };
+  const removeLift = (lift: string) => { tap(); setError(''); setRemovedLifts(current => [...current, lift]); setStartNums(current => ({ ...current, [lift]: { weight: '', reps: '' } })); };
+  const shownLifts = numberLifts.filter(lift => !removedLifts.includes(lift));
+  const EXAMPLES: Record<string, Record<string, number>> = {
+    Female: { 'Bench Press': 95, 'Back Squat': 135, Deadlift: 155 },
+    Male: { 'Bench Press': 185, 'Back Squat': 225, Deadlift: 275 },
+    Unspecified: { 'Bench Press': 135, 'Back Squat': 185, Deadlift: 225 },
+  };
+  const exampleFor = (lift: string) => {
+    const pounds = EXAMPLES[data.sex || 'Unspecified'][lift] || EXAMPLES[data.sex || 'Unspecified']['Back Squat'];
+    return String(data.units === 'Metric' ? Math.round(pounds / 2.2046 / 2.5) * 2.5 : pounds);
+  };
+  const startingList = shownLifts.map(lift => ({ lift, weight: Number(numberFor(lift).weight), reps: Number(numberFor(lift).reps) }))
     .filter(item => item.weight > 0 && item.weight <= 1500 && item.reps >= 1 && item.reps <= 20);
+  const halfFilled = shownLifts.filter(lift => { const value = numberFor(lift); return Boolean(value.weight.trim()) !== Boolean(value.reps.trim()); });
+  const submitNumbers = () => {
+    if (halfFilled.length) return fail(`Add ${numberFor(halfFilled[0]).weight.trim() ? 'reps' : 'a weight'} for ${CORE_LIFT_LABELS[halfFilled[0]] || halfFilled[0]}, or tap ✕ to skip it.`);
+    tap(); go(1);
+  };
+  /* A HYROX athlete who said Female or Male gets that Open division
+     suggested; they can still pick Pro. */
+  useEffect(() => {
+    if (goalExercise === 'HYROX' && !division && (data.sex === 'Female' || data.sex === 'Male')) setDivision(data.sex === 'Female' ? "Women's Open" : "Men's Open");
+  }, [goalExercise, data.sex, division]);
   /* A runner with a watch full of history should not start from zero either:
      the connection lives in Profile, so the end of setup takes them straight to it. */
   const [importStrava, setImportStrava] = useState(false);
@@ -406,6 +432,11 @@ function OnboardingForm() {
           <form id={STEP_FORM} className="ob-form" onSubmit={event => { event.preventDefault(); submitName(); }}>
             <input className="ob-input" autoFocus autoComplete="given-name" autoCapitalize="words" enterKeyHint="next" value={data.displayName} onChange={event => set('displayName', event.target.value)} placeholder="First name" aria-label="Your name" />
           </form>
+          {/* Optional. It tailors example numbers, the HYROX division and how the coach talks about women's health. */}
+          <h2 className="ob-group">You are</h2>
+          <div className="ob-chips" role="radiogroup" aria-label="Sex">
+            {([['Female', 'Female'], ['Male', 'Male'], ['Unspecified', 'Prefer not to say']] as const).map(([value, label]) => chip(value, label, data.sex === value, toggle(() => set('sex', value))))}
+          </div>
         </>,
         action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!nameReady} onClick={() => nameReady && tap()}>Continue</button>,
       };
@@ -487,19 +518,23 @@ function OnboardingForm() {
       case 'numbers': return {
         body: <>
           <h1>What can you lift right now?</h1>
-          <p className="ob-lead">A rough number is fine, like 185 for 5. Forge writes your first week from it, and your first logged set replaces it. Skip any you don’t know.</p>
-          <div className="ob-numbers">{numberLifts.map(lift => {
+          <p className="ob-lead">A recent set you could repeat, roughly. Forge writes your first week from it, and your first logged set replaces it. Tap ✕ on any you don’t know.</p>
+          <div className="ob-numbers">{shownLifts.map(lift => {
             const value = numberFor(lift);
-            return <div className="ob-number-row" key={lift}>
-              <strong>{CORE_LIFT_LABELS[lift] || lift}</strong>
-              <label><input className="ob-input small" inputMode="decimal" value={value.weight} onChange={event => setNumber(lift, 'weight', event.target.value)} placeholder="—" aria-label={`${lift} weight in ${massUnit}`} /><span>{massUnit}</span></label>
-              <span className="ob-number-x">×</span>
-              <label><input className="ob-input small" inputMode="numeric" value={value.reps} onChange={event => setNumber(lift, 'reps', event.target.value)} placeholder="5" aria-label={`${lift} reps`} /><span>reps</span></label>
+            const name = CORE_LIFT_LABELS[lift] || lift;
+            return <div className={`ob-number-row${halfFilled.includes(lift) ? ' half' : ''}`} key={lift}>
+              <strong>{name}</strong>
+              <input className="ob-input small" inputMode="decimal" value={value.weight} onChange={event => setNumber(lift, 'weight', event.target.value)} placeholder={exampleFor(lift)} aria-label={`${name} weight in ${massUnit}`} />
+              <small>{massUnit} ×</small>
+              <input className="ob-input small" inputMode="numeric" value={value.reps} onChange={event => setNumber(lift, 'reps', event.target.value)} placeholder="5" aria-label={`${name} reps`} />
+              <small>reps</small>
+              <button type="button" className="ob-number-remove" aria-label={`Skip ${name}`} onClick={() => removeLift(lift)}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
             </div>;
           })}</div>
+          {removedLifts.length > 0 && <div className="ob-chips ob-number-restore">{removedLifts.map(lift => chip(lift, `+ ${CORE_LIFT_LABELS[lift] || lift}`, false, toggle(() => setRemovedLifts(current => current.filter(item => item !== lift)))))}</div>}
           {(runningPlanned || goalKind === 'race') && <label className="setup-check"><input type="checkbox" checked={importStrava} onChange={event => { tap(); setImportStrava(event.target.checked); }} /><span><strong>I have a smartwatch I’ll connect</strong><small>After setup, Forge takes you straight to Connections so your runs come in and paces start from real training.</small></span></label>}
         </>,
-        action: <button className="button ob-next" onClick={() => { tap(); go(1); }}>{startingList.length ? 'Continue' : 'Skip for now'}</button>,
+        action: <button className="button ob-next" onClick={submitNumbers}>{startingList.length || halfFilled.length ? 'Continue' : 'Skip for now'}</button>,
       };
       case 'week': return {
         body: <>
