@@ -38,7 +38,12 @@ const muscles=['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps'
 type CardioPolicy='none'|'forge'|'planned';
 type DayType='strength'|'cardio'|'mixed'|'rest'|'hyrox';
 type TrainingDay={name:string;weekday:string;dayType:DayType;muscles:string[];exercises:string[];cardioPolicy:CardioPolicy;cardio:PlannedCardio[];recoveryStyle:'Full rest'|'Mobility'|'Active recovery';maxDuration:string;strengthDuration:string};
-type SavedPlan={name:string;rhythm:'rolling'|'weekly';days:TrainingDay[];minWeeklyMileage?:number;maxWeeklyMileage?:number};
+/* SAVED SPLITS ride inside the plan record, so they reach the account through
+   the same athlete_settings write as the split itself and need no table of
+   their own. The live split is the one the plan trains from; the library is
+   what the athlete can switch it to. */
+type SavedSplit={id:string;name:string;rhythm:'rolling'|'weekly';days:TrainingDay[];savedAt:string};
+type SavedPlan={name:string;rhythm:'rolling'|'weekly';days:TrainingDay[];minWeeklyMileage?:number;maxWeeklyMileage?:number;activeId?:string|null;library?:SavedSplit[]};
 const planStorageKey='forge-training-plan-v1';
 const loadSavedPlan=():SavedPlan|null=>{try{return JSON.parse(localStorage.getItem(planStorageKey)||'null')}catch{return null}};
 const plannedCardioMinutes=(plan:PlannedCardio)=>{if(plan.structure==='Steady'||plan.structure==='Custom')return Math.max(0,Number(plan.duration)||0);if(plan.structure==='Intervals'){const work=/seconds?/i.test(plan.workUnit||'')?Number(plan.workDistance||0)/60:/minutes?/i.test(plan.workUnit||'')?Number(plan.workDistance||0):0;return Math.ceil(Math.max(0,Number(plan.repeats)||0)*work+Math.max(0,(Number(plan.repeats)||0)-1)*(Number(plan.rest)||0)/60)}if(plan.structure==='Circuit'){if(plan.circuitFormat==='For time'&&Number(plan.duration)>0)return Number(plan.duration);if(plan.circuitFormat==='AMRAP'||plan.circuitFormat==='EMOM')return Math.max(0,Number(plan.rounds)||0);const rounds=Math.max(0,Number(plan.rounds)||0);return Math.ceil(rounds*8+Math.max(0,rounds-1)*(Number(plan.roundRest)||0)/60)}return 0};
@@ -63,6 +68,8 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const [minWeeklyMileage,setMinWeeklyMileage]=useState(savedPlan?.minWeeklyMileage??setup?.minWeeklyMileage??Math.max(0,Math.round(profile.weeklyMileage*.8)));
   const [maxWeeklyMileage,setMaxWeeklyMileage]=useState(savedPlan?.maxWeeklyMileage??setup?.maxWeeklyMileage??Math.max(0,Math.round(profile.weeklyMileage*1.2)));
   const [selectedDay,setSelectedDay]=useState(0);
+  const [library,setLibrary]=useState<SavedSplit[]>(savedPlan?.library||[]);
+  const [activeId,setActiveId]=useState<string|null>(savedPlan?.activeId??null);
   const [exerciseQuery,setExerciseQuery]=useState('');
   const [syncState,setSyncState]=useState<'saving'|'saved'|'local'|'error'>(isDemoMode?'local':'saving');
   const [reviewOpen,setReviewOpen]=useState(false);
@@ -84,10 +91,10 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
 
      The signature is the state these effects persist. Until it differs from
      what the page opened with, there is nothing to save. */
-  const persistSignature=JSON.stringify({splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage});
+  const persistSignature=JSON.stringify({splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage,activeId,library});
   const openedWith=useRef(persistSignature);
   const edited=persistSignature!==openedWith.current;
-  useEffect(()=>{if(!edited)return;const min=Math.max(0,minWeeklyMileage);const max=Math.max(min,maxWeeklyMileage);const savedPlanState={name:splitName,rhythm,days,minWeeklyMileage:min,maxWeeklyMileage:max} satisfies SavedPlan;localStorage.setItem(planStorageKey,JSON.stringify(savedPlanState));if(setup)saveSetup({...setup,minWeeklyMileage:min,maxWeeklyMileage:max,scheduleStyle:rhythm==='weekly'?'Weekly schedule':'Rolling cycle',splitSource:'Custom',trainingDays:days.filter(day=>day.dayType!=='rest').length,splitDays:days.map(day=>({name:day.name,type:(day.dayType[0].toUpperCase()+day.dayType.slice(1)) as 'Strength'|'Cardio'|'Mixed'|'Rest',muscles:day.muscles}))});const settingsTimer=window.setTimeout(()=>saveAthleteSettings({plan:savedPlanState}),1500);return()=>window.clearTimeout(settingsTimer)},[edited,splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage]);
+  useEffect(()=>{if(!edited)return;const min=Math.max(0,minWeeklyMileage);const max=Math.max(min,maxWeeklyMileage);const savedPlanState={name:splitName,rhythm,days,minWeeklyMileage:min,maxWeeklyMileage:max,activeId,library} satisfies SavedPlan;localStorage.setItem(planStorageKey,JSON.stringify(savedPlanState));if(setup)saveSetup({...setup,minWeeklyMileage:min,maxWeeklyMileage:max,scheduleStyle:rhythm==='weekly'?'Weekly schedule':'Rolling cycle',splitSource:'Custom',trainingDays:days.filter(day=>day.dayType!=='rest').length,splitDays:days.map(day=>({name:day.name,type:(day.dayType[0].toUpperCase()+day.dayType.slice(1)) as 'Strength'|'Cardio'|'Mixed'|'Rest',muscles:day.muscles}))});const settingsTimer=window.setTimeout(()=>saveAthleteSettings({plan:savedPlanState}),1500);return()=>window.clearTimeout(settingsTimer)},[edited,splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage,activeId,library]);
   useEffect(()=>{if(isDemoMode||!user){setSyncState('local');return}if(!edited){setSyncState('saved');return}setSyncState('saving');const timer=window.setTimeout(()=>{void saveTrainingSplit(splitName,days.map((day,index)=>({position:index+1,name:day.name,muscleGroups:day.dayType==='strength'||day.dayType==='mixed'?day.muscles:[],goalLifts:day.dayType==='strength'||day.dayType==='mixed'?day.exercises:[],cardioTypes:day.dayType==='hyrox'?['HYROX']:day.dayType==='cardio'||day.dayType==='mixed'?(day.cardioPolicy==='planned'?(day.cardio.length?day.cardio.map(cardioPlanSummary):['Planned']):['Forge']):[]}))).then(()=>{setSyncState('saved');window.dispatchEvent(new Event('forge-training-cycle-changed'))}).catch(()=>setSyncState('error'))},1200);return()=>window.clearTimeout(timer)},[edited,user,splitName,days]);
   const updateDay=(change:Partial<TrainingDay>)=>setDays(items=>items.map((day,index)=>{if(index!==selectedDay)return day;const next={...day,...change};next.maxDuration=durationForDay(next);return next}));
   /* Functional update — two fast taps must both land, never overwrite each
@@ -129,6 +136,16 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const openSplitReview=()=>{setReviewOpen(true);setTimeout(()=>document.getElementById('splitReviewPanel')?.scrollIntoView({behavior:'smooth',block:'start'}),0)};
   const askSplitCoach=async()=>{const question=reviewQuestion.trim();if(!question)return;setReviewLoading(true);const fallback=reviewFindings.length?`The clearest issues are: ${reviewFindings.join(' ')} Keep the rolling strength order separate from calendar-week mileage and attach multiple cardio workouts as alternatives, not stacked sessions.`:`This split is structurally complete. Forge would preserve the rolling strength order, reconcile cardio by calendar week, and recommend only one attached cardio option per day.`;const response=await requestForgeCoach({question,scope:'plan',context:{rhythm,weeklyMileageBoundary:{minimum:minWeeklyMileage,maximum:maxWeeklyMileage},coachStrategy:strategy,days:days.map(day=>({name:day.name,type:day.dayType,muscles:day.muscles,exercises:day.exercises,cardioPolicy:day.cardioPolicy,cardioOptions:day.cardio.map(cardioPlanSummary),recoveryStyle:day.recoveryStyle,maxDuration:day.maxDuration})),findings:reviewFindings,goals:goals.map(goal=>({title:goal.title,type:goal.type,target:goal.target,date:goal.date}))}},fallback);setReviewAnswer(response.answer);setReviewLoading(false)};
   const addDay=()=>{const next:TrainingDay={name:`Training Day ${days.length+1}`,weekday:'MON',dayType:'strength',muscles:[],exercises:[],cardioPolicy:'none',cardio:[],recoveryStyle:'Full rest',strengthDuration:'60',maxDuration:'60'};setDays(items=>[...items,next]);setSelectedDay(days.length)};
+  /* SWITCHING NEVER LOSES A SPLIT. Leaving the live split for another one, or
+     for a new one, keeps it in the library first — saved or not — so the
+     athlete can always switch back to what they had. */
+  const savedEntry=library.find(item=>item.id===activeId);
+  const unsaved=!savedEntry||savedEntry.name!==splitName||savedEntry.rhythm!==rhythm||JSON.stringify(savedEntry.days)!==JSON.stringify(days);
+  const keepCurrent=()=>{const id=savedEntry?savedEntry.id:`split-${Date.now().toString(36)}`;const entry:SavedSplit={id,name:splitName.trim()||'My training split',rhythm,days,savedAt:new Date().toISOString()};return{id,items:savedEntry?library.map(item=>item.id===id?entry:item):[...library,entry]}};
+  const saveSplit=()=>{tap();const kept=keepCurrent();setLibrary(kept.items);setActiveId(kept.id)};
+  const switchSplit=(id:string)=>{const target=library.find(item=>item.id===id);if(!target||id===activeId)return;tap();setLibrary(keepCurrent().items);setActiveId(id);setSplitName(target.name);setRhythm(target.rhythm);setDays(target.days);setSelectedDay(0);setSheetDay(null);setShowTemplates(false)};
+  const newSplit=()=>{tap();setLibrary(keepCurrent().items);setActiveId(null);setSplitName('New split');setDays([{name:'Training Day 1',weekday:'MON',dayType:'strength',muscles:[],exercises:[],cardioPolicy:'none',cardio:[],recoveryStyle:'Full rest',strengthDuration:'60',maxDuration:'60'}]);setSelectedDay(0);setSheetDay(null);setShowTemplates(true)};
+  const forgetSplit=()=>{if(!savedEntry)return;tap();setLibrary(items=>items.filter(item=>item.id!==savedEntry.id));setActiveId(null)};
   const removeDay=()=>{if(days.length===1)return;setDays(items=>items.filter((_,index)=>index!==selectedDay));setSelectedDay(Math.max(0,selectedDay-1))};
   const moveDay=(direction:-1|1)=>{const destination=selectedDay+direction;if(destination<0||destination>=days.length)return;setDays(items=>{const next=[...items];[next[selectedDay],next[destination]]=[next[destination],next[selectedDay]];return next});setSelectedDay(destination)};
   const reorderDay=(from:number,to:number)=>{if(from===to||from<0||to<0||from>=days.length||to>=days.length)return;setDays(items=>{const next=[...items];const [moved]=next.splice(from,1);next.splice(to,0,moved);return next});setSelectedDay(current=>{if(current===from)return to;if(from<current&&to>=current)return current-1;if(from>current&&to<=current)return current+1;return current})};
@@ -147,7 +164,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
      Upper day was handed a Deadlift. */
   const mainMuscle=(exercise:{name:string;muscles:string[]})=>/deadlift/i.test(exercise.name)?'Hamstrings':exercise.muscles[0];
   const liftsFor=(dayMuscles:string[],taken:Set<string>)=>{const fits=strengthExercises.filter(exercise=>dayMuscles.includes(mainMuscle(exercise))).map(exercise=>exercise.name);const picked=coreFirst(fits).filter(name=>!taken.has(name)).slice(0,2);picked.forEach(name=>taken.add(name));return picked};
-  const applyTemplate=(id:string)=>{const template=TEMPLATES.find(item=>item.id===id);if(!template)return;if(days.some(day=>day.exercises.length)&&!window.confirm('Replace your current split with this template?'))return;tap();const taken=new Set<string>();setDays(template.days.map(([name,dayType,dayMuscles],index)=>({name,weekday:['MON','TUE','WED','THU','FRI','SAT','SUN'][index%7],dayType,muscles:dayMuscles,exercises:dayType==='strength'?liftsFor(dayMuscles,taken):[],cardioPolicy:dayType==='strength'?'none':'forge',cardio:[],recoveryStyle:'Full rest',strengthDuration:'60',maxDuration:'60'})));setSelectedDay(0);setShowTemplates(false)};
+  const applyTemplate=(id:string)=>{const template=TEMPLATES.find(item=>item.id===id);if(!template)return;if(days.some(day=>day.exercises.length)&&!window.confirm('Replace your current split with this template?'))return;tap();const taken=new Set<string>();setDays(template.days.map(([name,dayType,dayMuscles],index)=>({name,weekday:['MON','TUE','WED','THU','FRI','SAT','SUN'][index%7],dayType,muscles:dayMuscles,exercises:dayType==='strength'?liftsFor(dayMuscles,taken):[],cardioPolicy:dayType==='strength'?'none':'forge',cardio:[],recoveryStyle:'Full rest',strengthDuration:'60',maxDuration:'60'})));setSelectedDay(0);setShowTemplates(false);if(splitName==='New split')setSplitName(template.label)};
   const daySummary=(day:TrainingDay)=>day.dayType==='rest'?(day.recoveryStyle==='Full rest'?'Rest':day.recoveryStyle):day.dayType==='hyrox'?'HYROX · Forge writes it':day.dayType==='cardio'?(day.cardioPolicy==='planned'&&day.cardio.length?cardioPlanSummary(day.cardio[0]):'Run · Forge plans it'):[day.exercises.slice(0,3).join(' · ')||'No lifts yet',day.dayType==='mixed'?'+ run':''].filter(Boolean).join(' ');
   const hasRunning=days.some(day=>day.dayType==='cardio'||day.dayType==='mixed'||day.dayType==='hyrox')||goals.some(goal=>goal.type==='Endurance');
   return <div className="stack-xl training-plan-page plan-studio">
@@ -162,7 +179,20 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
           recovery styles, all at once for whichever day was selected. Now the
           days are a list that reads like the week, and a day opens into a
           sheet that shows only what its type needs. */}
+      {/* YOUR SPLITS, AT THE TOP. Tap one to train from it, ＋ New to start
+          another from a template; the live split is always the highlighted one. */}
+      <section className="ss-library" aria-label="Your splits">
+        <div className="ss-library-row">
+          {library.map(item=><button type="button" key={item.id} className={item.id===activeId?'active':''} aria-pressed={item.id===activeId} onClick={()=>switchSplit(item.id)}>{item.id===activeId?(splitName.trim()||item.name):item.name}</button>)}
+          {!savedEntry&&<button type="button" className="active" aria-pressed="true">{splitName.trim()||'My training split'}</button>}
+          <button type="button" className="ss-library-new" onClick={newSplit}>＋ New</button>
+        </div>
+        <button type="button" className="ss-library-save" disabled={!unsaved} onClick={saveSplit}>{!savedEntry?'Add to my splits':unsaved?'Update':'In my splits'}</button>
+      </section>
       <header className="ss-head"><div><h2>{splitName}</h2><small>{days.length} {days.length===1?'day':'days'} · {rhythm==='weekly'?'by weekday':'repeats in order'}</small></div><small className={`split-autosave ${syncState}`}>{syncState==='saving'?'Saving…':syncState==='error'?'Saved here · will retry':'Saved'}</small></header>
+      {/* Only for someone who runs: a lifter's split opened on two empty mileage boxes.
+          It leads the split: the week's running is the frame the days sit in. */}
+      {hasRunning&&<section className="card ss-mileage"><div><strong>Weekly running</strong><small>Forge keeps your running between these, in miles a week.</small></div><div className="ss-mileage-fields"><label>From<NumberInput min="0" allowDecimal={false} value={minWeeklyMileage} onChange={next=>setMinWeeklyMileage(next ?? 0)}/></label><label>To<NumberInput min={minWeeklyMileage} allowDecimal={false} value={maxWeeklyMileage} onChange={next=>setMaxWeeklyMileage(next ?? 0)}/></label></div></section>}
       {showTemplates?<section className="ss-templates"><div className="ss-templates-head"><strong>Start from a template</strong>{days.some(day=>day.exercises.length)&&<button type="button" className="text-button" onClick={()=>setShowTemplates(false)}>Cancel</button>}</div>
         {TEMPLATES.map(template=><button type="button" key={template.id} onClick={()=>applyTemplate(template.id)}><strong>{template.label}</strong><small>{template.copy}</small></button>)}
       </section>:null}
@@ -174,9 +204,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
         </button>
       </li>)}</ol>
       <div className="ss-actions"><button type="button" className="ss-add" onClick={()=>{tap();addDay();setSheetDay(days.length)}}>＋ Add a day</button>{!showTemplates&&<button type="button" className="text-button" onClick={()=>setShowTemplates(true)}>Use a template</button>}</div>
-      {/* Only for someone who runs: a lifter's split opened on two empty mileage boxes. */}
-      {hasRunning&&<section className="card ss-mileage"><div><strong>Weekly running</strong><small>Forge keeps your running between these, in miles a week.</small></div><div className="ss-mileage-fields"><label>From<NumberInput min="0" allowDecimal={false} value={minWeeklyMileage} onChange={next=>setMinWeeklyMileage(next ?? 0)}/></label><label>To<NumberInput min={minWeeklyMileage} allowDecimal={false} value={maxWeeklyMileage} onChange={next=>setMaxWeeklyMileage(next ?? 0)}/></label></div></section>}
-      <details className="card ss-settings"><summary><span><strong>Name &amp; schedule</strong><small>{splitName} · {rhythm==='weekly'?'Weekly':'Rolling'}</small></span></summary><div><label>Split name<input value={splitName} onChange={event=>setSplitName(event.target.value)}/></label><label>Schedule<select value={rhythm} onChange={event=>setRhythm(event.target.value as 'rolling'|'weekly')}><option value="rolling">Repeat in order (rolling)</option><option value="weekly">Fixed weekdays</option></select></label><small>Rolling means the next day is whatever comes after the last one you trained. Fixed weekdays ties each day to a day of the week.</small></div></details>
+      <details className="card ss-settings"><summary><span><strong>Name &amp; schedule</strong><small>{splitName} · {rhythm==='weekly'?'Weekly':'Rolling'}</small></span></summary><div><label>Split name<input value={splitName} onChange={event=>setSplitName(event.target.value)}/></label><label>Schedule<select value={rhythm} onChange={event=>setRhythm(event.target.value as 'rolling'|'weekly')}><option value="rolling">Repeat in order (rolling)</option><option value="weekly">Fixed weekdays</option></select></label><small>Rolling means the next day is whatever comes after the last one you trained. Fixed weekdays ties each day to a day of the week.</small>{savedEntry&&<button type="button" className="text-button ss-forget" onClick={forgetSplit}>Remove from saved splits</button>}</div></details>
     </div>}
     {tab==='split'&&sheetDay!==null&&active&&<div className="ss-backdrop" onClick={event=>{if(event.target===event.currentTarget)closeSheet()}}>
       <section className="ss-sheet" role="dialog" aria-modal="true" aria-label={`Edit ${active.name}`}>
