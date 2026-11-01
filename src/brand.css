@@ -258,3 +258,11 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 @keyframes chart-fade { from { opacity: 0; } }
 @keyframes chart-pop { from { transform: scale(0); } }
 @keyframes chart-halo { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(2.6); } }
+
+/* Month arrows on History: a true circle with a stroke chevron. They were the
+   ‹ › characters at 26px in a condensed face, in a 34px button the tap-target
+   rule stretched to 48px tall, so they read as tall thin glyphs in an oval. */
+.classic-calendar .history-toolbar .month-step { display: grid; place-items: center; width: 44px; height: 44px; min-height: 0; padding: 0; border: 1px solid var(--hairline); border-radius: 50%; font-size: 0; background: var(--surface-1); color: var(--ink); box-shadow: var(--shadow-1); transition: transform var(--dur-tap) var(--ease-respond), background var(--dur-quick) var(--ease-respond); }
+.classic-calendar .history-toolbar .month-step:active { transform: scale(.94); background: var(--surface-sunken); }
+.classic-calendar .history-toolbar .month-step svg { display: block; }
+.classic-calendar .history-toolbar { grid-template-columns: 44px 1fr 44px; align-items: center; }
