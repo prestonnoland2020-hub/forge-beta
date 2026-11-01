@@ -80,9 +80,18 @@ Garmin is approved. The connector is built as two edge functions:
 - `garmin-connect`: the athlete's side. It handles authorize (OAuth 2.0 with
   PKCE), callback, sync, disconnect, and status. Deploy it with JWT
   verification on.
-- `garmin-webhook`: where Garmin pushes data. It handles activities, dailies,
-  sleeps, HRV, respiration, and deregistrations, in both push and ping mode.
-  Deploy it with JWT verification **off**. It checks a `?key=` secret instead.
+- `garmin-webhook`: where Garmin pushes data. It handles activities, manually
+  updated activities, dailies, sleeps, HRV, respiration, and deregistrations,
+  in both push and ping mode. Deploy it with JWT verification **off**. It
+  checks a `?key=` secret, and the `garmin-client-id` header when Garmin sends
+  it. It answers 200 before processing, because Garmin times out after 30
+  seconds and resends anything else hourly for 7 days.
+
+Which data arrives depends on which Garmin APIs the program is approved for.
+The **Activity API** brings activities. Sleep, HRV, resting heart rate and
+daily stats come from the **Health API**, which is a separate approval. If the
+program has only the Activity API, those requests are refused and Forge keeps
+working with activities alone.
 
 Setup:
 
@@ -92,17 +101,27 @@ Setup:
 3. In the Garmin portal:
    - **Redirect URL:** `https://prestonnoland2020-hub.github.io/forge-beta/?garmin=callback`
      (add `http://localhost:5173/?garmin=callback` for local testing).
-   - **Push endpoints** for Activities, Dailies, Sleeps, HRV, Respiration, and
-     Deregistration, all set to
+   - **Push endpoints**, set in Garmin's endpoint tool at
+     https://apis.garmin.com/tools/endpoints (sign in with the client ID and
+     secret). Enable Activities and Manually Updated Activities, plus Dailies,
+     Sleeps, HRV, Respiration and Deregistration if the Health API is
+     approved. Point every enabled type to
      `https://czefovdclflufixdpbnp.supabase.co/functions/v1/garmin-webhook?key=<GARMIN_WEBHOOK_KEY>`.
 
 The Garmin row on the Connections screen turns into a Connect button only after
 the secrets are set. Before that it keeps showing "Via Strava today". On
-connect, Forge asks Garmin to backfill 90 days. "Sync now" asks for the last 7
-days. Garmin delivers both by push, so data shows up a few minutes later, not
+connect, Forge asks Garmin to backfill 30 days, the most one request allows
+(Activity API §7). "Sync now" asks for the last 7 days. Garmin delivers both by push, so data shows up a few minutes later, not
 right away. Activities merge into the log through the same import Strava uses.
 A run that comes in from both Garmin and Strava (same kind of activity,
-starting within 5 minutes) is kept only once.
+starting within 5 minutes) is kept only once. For multisport
+activities, Forge stores each leg and skips the parent, so a triathlon isn't
+counted twice.
+
+The **Training API** (also approved) can send workouts and schedules *to* the
+watch: `POST /workoutportal/workout/v2` and `POST /training-api/schedule/`.
+Forge doesn't use it yet. It's the path for putting Forge's planned sessions
+on the athlete's Garmin.
 
 ## Going live with one
 

@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { BACKFILL_KINDS, GARMIN_API, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
+import { BACKFILL_KINDS, BACKFILL_MAX_DAYS, GARMIN_API, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: cors });
@@ -7,18 +7,21 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 /* Garmin delivers data by push, not by reply. "Sync" here asks Garmin to
    re-send a window of history (a backfill), which arrives at garmin-webhook
    over the next minutes; what the athlete sees is what has already landed.
-   Garmin caps one backfill request at 90 days. */
-const BACKFILL_DAYS = 90;
 
+   Returns whether the activities request was taken. Health kinds are asked
+   for alongside and may be refused (403/412) when the program or the athlete
+   has not granted them; that must not read as a failed sync. */
 async function requestBackfill(accessToken: string, days: number) {
   const end = Math.floor(Date.now() / 1000);
-  const start = end - days * 86400;
+  const start = end - Math.min(days, BACKFILL_MAX_DAYS) * 86400;
   const results = await Promise.all(BACKFILL_KINDS.map(async kind => {
     const response = await fetch(`${GARMIN_API}/backfill/${kind}?summaryStartTimeInSeconds=${start}&summaryEndTimeInSeconds=${end}`, { headers: { Authorization: `Bearer ${accessToken}` } });
     /* 409: that window was already requested. It is coming; not a failure. */
-    return response.ok || response.status === 409;
+    const ok = response.ok || response.status === 409;
+    if (!ok) console.warn(`garmin backfill ${kind}: ${response.status} ${(await response.text()).slice(0, 200)}`);
+    return [kind, ok] as const;
   }));
-  return results.every(Boolean);
+  return Object.fromEntries(results).activities === true;
 }
 
 Deno.serve(async request => {
@@ -70,7 +73,7 @@ Deno.serve(async request => {
       await call('garmin_connection_complete', { p_owner: auth.user.id, p_garmin_user: String(userId), p_access: token.access_token, p_refresh: token.refresh_token, p_expires: token.expiresAt, p_refresh_expires: token.refreshExpiresAt });
       /* History is what makes the first day useful: readiness needs a
          baseline and paces need past runs. Ask for it now. */
-      await requestBackfill(token.access_token, BACKFILL_DAYS).catch(() => false);
+      await requestBackfill(token.access_token, BACKFILL_MAX_DAYS).catch(() => false);
       await call('garmin_connection_synced', { p_owner: auth.user.id, p_synced: new Date().toISOString() });
       return json({ connected: true });
     }

@@ -65,19 +65,26 @@ export async function freshAccessToken(call: ReturnType<typeof rpc>, row: NonNul
    so a Garmin run and a Strava run land in the log as the same thing and the
    cross-source dedupe can compare them. Unknown types become PascalCase
    ("PADDLE_BOARDING" → "PaddleBoarding") so nothing is dropped. */
+/* Keys follow Appendix A of the Activity API (v2.1). Water sports come as
+   both NAME and NAME_V2; the suffix is stripped before lookup. */
 const activityTypes: Record<string, string> = {
-  RUNNING: 'Run', STREET_RUNNING: 'Run', TRACK_RUNNING: 'Run', TREADMILL_RUNNING: 'Run', INDOOR_RUNNING: 'Run', VIRTUAL_RUN: 'VirtualRun',
+  RUNNING: 'Run', STREET_RUNNING: 'Run', TRACK_RUNNING: 'Run', TREADMILL_RUNNING: 'Run', INDOOR_RUNNING: 'Run', OBSTACLE_RUN: 'Run', VIRTUAL_RUN: 'VirtualRun',
   TRAIL_RUNNING: 'TrailRun', ULTRA_RUN: 'TrailRun',
-  CYCLING: 'Ride', ROAD_BIKING: 'Ride', INDOOR_CYCLING: 'VirtualRide', VIRTUAL_RIDE: 'VirtualRide', GRAVEL_CYCLING: 'GravelRide', MOUNTAIN_BIKING: 'MountainBikeRide', E_BIKE_FITNESS: 'EBikeRide',
+  CYCLING: 'Ride', ROAD_BIKING: 'Ride', TRACK_CYCLING: 'Ride', RECUMBENT_CYCLING: 'Ride', CYCLOCROSS: 'Ride', BMX: 'Ride', HANDCYCLING: 'Ride',
+  INDOOR_CYCLING: 'VirtualRide', INDOOR_HANDCYCLING: 'VirtualRide', VIRTUAL_RIDE: 'VirtualRide', GRAVEL_CYCLING: 'GravelRide',
+  MOUNTAIN_BIKING: 'MountainBikeRide', DOWNHILL_BIKING: 'MountainBikeRide', ENDURO_MTB: 'MountainBikeRide',
+  E_BIKE_FITNESS: 'EBikeRide', E_BIKE_MOUNTAIN: 'EBikeRide', E_ENDURO_MTB: 'EBikeRide',
   LAP_SWIMMING: 'Swim', OPEN_WATER_SWIMMING: 'Swim', SWIMMING: 'Swim',
-  WALKING: 'Walk', CASUAL_WALKING: 'Walk', SPEED_WALKING: 'Walk', HIKING: 'Hike',
+  WALKING: 'Walk', CASUAL_WALKING: 'Walk', SPEED_WALKING: 'Walk', HIKING: 'Hike', RUCKING: 'Hike',
   INDOOR_ROWING: 'Rowing', ROWING: 'Rowing',
-  ELLIPTICAL: 'Elliptical', STAIR_CLIMBING: 'StairStepper', INDOOR_CARDIO: 'Workout', HIIT: 'Workout', FITNESS_EQUIPMENT: 'Workout',
-  STRENGTH_TRAINING: 'WeightTraining', YOGA: 'Yoga', PILATES: 'Pilates',
-  CROSS_COUNTRY_SKIING_WS: 'NordicSki', RESORT_SKIING_SNOWBOARDING_WS: 'AlpineSki',
+  ELLIPTICAL: 'Elliptical', STAIR_CLIMBING: 'StairStepper', FLOOR_CLIMBING: 'StairStepper', INDOOR_CARDIO: 'Workout', HIIT: 'Workout', FITNESS_EQUIPMENT: 'Workout',
+  STRENGTH_TRAINING: 'WeightTraining', YOGA: 'Yoga', PILATES: 'Pilates', MOBILITY: 'Yoga',
+  CROSS_COUNTRY_SKIING_WS: 'NordicSki', CROSS_COUNTRY_INDOOR_SKIING: 'NordicSki', SKATE_SKIING_WS: 'NordicSki', BACKCOUNTRY_SKIING: 'BackcountrySki',
+  RESORT_SKIING: 'AlpineSki', RESORT_SKIING_SNOWBOARDING_WS: 'AlpineSki', SNOWBOARDING_WS: 'Snowboard', BACKCOUNTRY_SNOWBOARDING: 'Snowboard',
+  SNOW_SHOE_WS: 'Snowshoe', KAYAKING: 'Kayaking', STAND_UP_PADDLEBOARDING: 'StandUpPaddling', SURFING: 'Surfing',
 };
 const pascal = (value: string) => value.toLowerCase().split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
-export const garminActivityType = (type: unknown) => { const key = String(type || '').toUpperCase(); return activityTypes[key] || (key ? pascal(key) : 'Workout'); };
+export const garminActivityType = (type: unknown) => { const key = String(type || '').toUpperCase().replace(/_V2$/, ''); return activityTypes[key] || (key ? pascal(key) : 'Workout'); };
 
 type Summary = Record<string, unknown>;
 const num = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -133,4 +140,15 @@ export function healthRows(kind: string, ownerId: string, items: Summary[]) {
 }
 
 export const HEALTH_KINDS = ['dailies', 'sleeps', 'hrv', 'respiration'];
+/* Both carry the activity summary model; a manual edit on Garmin Connect
+   arrives as the second and replaces the first by activity id. */
+export const ACTIVITY_KINDS = ['activities', 'manuallyUpdatedActivities'];
+/* Activities come from the Activity API; the rest need the Health API. A
+   program approved for one but not the other gets 403/412 on the rest, so
+   each kind is requested and judged on its own. */
 export const BACKFILL_KINDS = ['activities', 'dailies', 'sleeps', 'hrv'];
+/* Activity API §7: one historical request may span at most one month. */
+export const BACKFILL_MAX_DAYS = 30;
+/* A multisport parent (isParent) sums its legs, which also arrive as their
+   own activities; storing both would count the triathlon twice. */
+export const isMultisportParent = (item: Summary) => item.isParent === true;
