@@ -83,6 +83,13 @@ const mileageChoices = {
 const weeksFromNow =(weeks: number) => { const date = new Date(); date.setDate(date.getDate() + weeks * 7); return date.toISOString().slice(0, 10); };
 const goalWeeks = [8, 12, 16];
 
+type SavedPlanDay = { name?: string; dayType?: string; muscles?: string[]; exercises?: string[] } & Record<string, unknown>;
+const readSavedPlan = (): ({ name?: string; days?: SavedPlanDay[] } & Record<string, unknown>) | null => {
+  try { return JSON.parse(localStorage.getItem('forge-training-plan-v1') || 'null'); } catch { return null; }
+};
+const planDayType = (value?: string): AthleteSetup['splitDays'][number]['type'] =>
+  value === 'strength' ? 'Strength' : value === 'cardio' ? 'Cardio' : value === 'mixed' ? 'Mixed' : value === 'hyrox' ? 'Hyrox' : 'Rest';
+
 export function starterSplit(focus: AthleteSetup['primaryFocus'], count: number): AthleteSetup['splitDays'] {
   const strength = [
     { name: 'Chest & Back', type: 'Strength' as const, muscles: ['Chest', 'Back'] },
@@ -155,7 +162,17 @@ function OnboardingForm() {
      screens vanish from under the progress bar mid-save. */
   const [askGoal] = useState(() => !goals.length);
 
-  const [data, setData] = useState<AthleteSetup>(() => ({ ...blank, units: guessUnits(), ...(setup || {}), displayName: setup?.displayName || suggestedName }));
+  /* THE SPLIT THEY SAVED IS THE ONE SHOWN. The Plan tab's copy holds each
+     day's lifts; the profile's copy did not, so going through setup again
+     reseeded every day with Forge's defaults and saved them over the
+     athlete's own choices. */
+  const [data, setData] = useState<AthleteSetup>(() => {
+    const savedDays = readSavedPlan()?.days || [];
+    const splitDays = savedDays.length ? savedDays.map(day => ({
+      name: String(day.name || ''), type: planDayType(day.dayType), muscles: day.muscles || [], exercises: day.exercises || [],
+    })) : setup?.splitDays;
+    return { ...blank, units: guessUnits(), ...(setup || {}), ...(splitDays?.length ? { splitDays, trainingDays: splitDays.filter(day => day.type !== 'Rest').length || setup?.trainingDays || blank.trainingDays } : {}), ...(savedDays.length ? { splitSource: 'Custom' as const } : {}), displayName: setup?.displayName || suggestedName };
+  });
   const set = <K extends keyof AthleteSetup>(key: K, value: AthleteSetup[K]) => { setError(''); setData(current => ({ ...current, [key]: value })); };
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -349,14 +366,17 @@ function OnboardingForm() {
     try {
       /* THE SPLIT IS WRITTEN FIRST; the irreversible onboarding flag goes last,
          so a failure here is only ever a retry. */
-      await saveTrainingSplit(setup?.splitSource === 'Custom' ? 'My training split' : 'Forge starter split', splitDays.map((day, index) => ({
+      const existing = readSavedPlan();
+      const splitName = existing?.name || (data.splitSource === 'Custom' ? 'My training split' : 'Forge starter split');
+      await saveTrainingSplit(splitName, splitDays.map((day, index) => ({
         position: index + 1, name: day.name, muscleGroups: day.muscles || [], goalLifts: day.exercises || [],
         cardioTypes: day.type === 'Hyrox' ? ['HYROX'] : day.type === 'Cardio' || day.type === 'Mixed' ? ['Forge'] : [],
       })));
       try {
-        const existing = JSON.parse(localStorage.getItem('forge-training-plan-v1') || 'null') as { days?: Array<Record<string, unknown>> } | null;
+        /* A day keeps its weekday, cardio and recovery by name, so a day
+           moved or dropped in setup does not take another day's settings. */
         const days = splitDays.map((day, index) => {
-          const previous = existing?.days?.[index] as Record<string, unknown> | undefined;
+          const previous = (existing?.days?.find(item => item.name === day.name) || (existing?.days?.length === splitDays.length ? existing.days[index] : undefined)) as Record<string, unknown> | undefined;
           const dayType = day.type.toLowerCase();
           return {
             name: day.name, weekday: (previous?.weekday as string) || ['MON','TUE','WED','THU','FRI','SAT','SUN'][index % 7],
@@ -366,7 +386,7 @@ function OnboardingForm() {
             strengthDuration: String(data.strengthSessionMinutes || 60), maxDuration: String(data.strengthSessionMinutes || 60),
           };
         });
-        localStorage.setItem('forge-training-plan-v1', JSON.stringify({ name: 'My training split', rhythm: data.scheduleStyle === 'Weekly schedule' ? 'weekly' : 'rolling', days }));
+        localStorage.setItem('forge-training-plan-v1', JSON.stringify({ ...(existing || {}), name: splitName, rhythm: data.scheduleStyle === 'Weekly schedule' ? 'weekly' : 'rolling', days }));
       } catch { /* the account copy is the one that matters */ }
       const username = await saveProfile({
         username: requested.length >= 3 ? requested : `athlete${(user?.id || '').replace(/[^a-z0-9]/g, '').slice(0, 6) || 'fit'}`,
@@ -379,7 +399,7 @@ function OnboardingForm() {
       /* A runner's days default to the cardio days in the split. Never more
          days than they train. */
       const runningDays = Math.min(data.trainingDays, data.runningDays || plannedCardioDays || 0);
-      const completed = { ...data, username, runningDays, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString(),
+      const completed = { ...data, username, runningDays, splitDays, splitSource: data.splitSource || 'Recommended', acceptedSafety: true, completedAt: new Date().toISOString(),
         ...(startingList.length ? { startingNumbers: startingList } : {}),
         ...(isEditing ? {} : { acceptedTermsAt: new Date().toISOString(), healthConsentAt: new Date().toISOString(), consentVersion: LEGAL.version }) };
       /* The goal lands after every await, so a failed save above can be
@@ -539,7 +559,7 @@ function OnboardingForm() {
             return <section className={open ? 'setup-day open' : 'setup-day'} key={`${day.name}-${index}`}>
               <button type="button" className="setup-day-head" onClick={() => { if (!lifting) return; tap(); setOpenDay(open ? -1 : index); }} aria-expanded={lifting ? open : undefined} disabled={!lifting}>
                 <span className="ob-day-number">{index + 1}</span>
-                <span className="ob-day-text"><strong>{day.name}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick a movement') : 'Running — Forge plans it'}</small></span>
+                <span className="ob-day-text"><strong>{day.name}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick a movement') : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
                 {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Change'}</span>}
               </button>
               {open && <div className="muscle-picker compact-muscle-picker setup-day-options">
