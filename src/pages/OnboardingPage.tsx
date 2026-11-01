@@ -541,7 +541,7 @@ function OnboardingForm() {
       case 'numbers': return {
         body: <>
           <h1>What can you lift right now?</h1>
-          <p className="ob-lead">Your top set: one heavy set you could repeat today. It tells Forge your max, and every top set you log after this keeps it current. Tap ✕ on any you don’t know.</p>
+          <p className="ob-lead">One top set per lift: a heavy set you could repeat today. It tells Forge your max, and the top set you log each workout keeps it current. Tap ✕ on any you don’t know.</p>
           <div className="ob-numbers">{shownLifts.map(lift => {
             const value = numberFor(lift);
             const name = CORE_LIFT_LABELS[lift] || lift;
@@ -569,7 +569,7 @@ function OnboardingForm() {
         return {
         body: <>
           <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
-          <p className="ob-lead">Each lifting day has top sets: the heaviest set of a lift, the one Forge tracks. Log it, and Forge writes your next weights from it. Tap any day to select your own — or just start.</p>
+          <p className="ob-lead">Each lifting day has goal lifts and supporting lifts. Forge asks for one top set per lift each workout and writes your next weights from it — the rest of your workout is yours. Tap any day to change it, or just start.</p>
           {/* The stored title is the builder's ("5K Run · 24:30 mm:ss") so Goals
               reads it the same; this card says it the way a person would. */}
           {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small>
