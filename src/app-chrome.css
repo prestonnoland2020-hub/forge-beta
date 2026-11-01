@@ -49,7 +49,13 @@
   }
   /* Out of the way while typing and during a workout — the way an iOS tab bar
      slides down under a keyboard or a full-screen task. */
-  html.keyboard-open .tab-bar, .tab-bar.away {
+  /* AND WHILE A SHEET IS UP. Whether the bar ended up over or under a sheet
+     was left to each sheet's own z-index, so it depended on the page: the new
+     goal sheet sits at the bar's own 30 and comes earlier in the page, so on
+     Goals the bar stayed live over its Cancel and Continue — tap Plan and the
+     half-made goal was gone. Every sheet in the app is an aria-modal dialog,
+     so the bar steps aside for all of them, whatever number they carry. */
+  html.keyboard-open .tab-bar, .tab-bar.away, body:has([role="dialog"][aria-modal="true"]) .tab-bar {
     transform: translateY(calc(100% + 40px)); opacity: 0; pointer-events: none;
   }
   .tab-indicator {
@@ -63,7 +69,15 @@
   /* Sliding a finger along the bar: the browser must not take the sideways
      drag as a scroll or a back-swipe, and while the finger is down the bar
      lifts a little and the pill follows quickly, so it reads as held. */
-  .tab-bar { touch-action: none; }
+  /* SIDEWAYS ONLY. This was `none`, which also took the UPWARD drag: the bar
+     covers the bottom inch of the screen, which is exactly where a thumb
+     starts a scroll, and a swipe that began on it moved nothing — measured in
+     the simulator, a 345pt swipe up from the bar left Today where it was while
+     the same swipe from the card above it scrolled. On a short page there is
+     nothing to scroll, so it only showed on the long ones: Preston's "the
+     navigation bar sticks on certain pages". pan-y hands the vertical drag
+     back to the page and keeps the sideways one for the scrub. */
+  .tab-bar { touch-action: pan-y; }
   .tab-bar.scrubbing { transform: scale(1.03); }
   .tab-bar.scrubbing .tab-indicator { transition-duration: .2s; background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .tab-bar .tab {

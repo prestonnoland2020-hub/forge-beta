@@ -56,7 +56,7 @@ function NavGlyph({ name }: { name: NavGlyphName }) {
 /* THE TAB BAR. Five destinations, each owning the screens that are steps into
    it, so the tab you came from stays lit while you are inside it. */
 const tabs = [
-  { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' },
+  { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' || path === '/insights' },
   { to: '/plan', label: 'Plan', icon: 'calendar', owns: (path: string) => path === '/plan' },
   { to: '/goals', label: 'Goals', icon: 'target', owns: (path: string) => path === '/goals' },
   { to: '/history', label: 'Activities', icon: 'history', owns: (path: string) => path === '/history' },
@@ -239,7 +239,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       case '/partners': return { title: 'Partners', back: navState.origin || '/profile' };
       case '/profile': {
         const view = params.get('view');
-        const names: Record<string, string> = { settings: 'Settings', appearance: 'Appearance', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Recovery', faq: 'FAQ' };
+        const names: Record<string, string> = { settings: 'Settings', appearance: 'Appearance', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Connections', faq: 'FAQ' };
         if (view && names[view]) return { title: names[view], back: view === 'settings' ? '/profile' : '/profile?view=settings' };
         return { title: 'Profile' };
       }
@@ -321,7 +321,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         </div>
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
-          {hasRecoveryData && <NavLink className="top-readiness" to="/profile?view=devices"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
+          {hasRecoveryData && <NavLink className="top-readiness" to="/profile?view=connections"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
           <NavLink className="top-insights" to="/insights" aria-label="Progress"><NavGlyph name="chart"/></NavLink>
           {location.pathname !== '/workout' && <NavLink className="top-log" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></NavLink>}
           {/* Settings has one door, the first row of Profile. A gear on every
