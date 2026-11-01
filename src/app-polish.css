@@ -460,3 +460,11 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .forge-noticed.coach-checkin { border-left: 3px solid var(--accent); }
 .forge-noticed-head { align-items: center; }
 .forge-noticed-close { display: grid; place-items: center; width: 32px; height: 32px; margin: -6px -8px -6px 0; border: 0; border-radius: 999px; background: none; color: var(--ink-3); }
+
+/* Today's nudges (notifications, connect a watch): the coach banner's shape,
+   with the action on the right and "Not now" beneath it. */
+.td-nudge { display: flex; align-items: center; }
+.td-nudge .td-nudge-actions { display: grid; gap: 4px; justify-items: center; flex: none; }
+.td-nudge .td-nudge-actions .button { min-height: 36px; padding: 6px 14px; font-size: 13px; }
+.td-nudge .td-nudge-later { background: none; border: 0; padding: 2px 4px; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+@media (max-width: 420px) { .td-nudge { flex-wrap: wrap; } .td-nudge .td-nudge-actions { grid-auto-flow: column; width: 100%; justify-content: end; align-items: center; } }

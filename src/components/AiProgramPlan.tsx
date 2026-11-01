@@ -21,6 +21,8 @@ import { cardioMiles, summarizeCardioDraft, formatCardioMinutes } from '../lib/c
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { runShapedActivity } from '../features/training/stravaImportService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
+import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
+import { recoveryTrend } from '../lib/recoveryEngine';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
@@ -163,6 +165,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const { user } = useAuth();
   const { recommendation, anchorDate, anchorPosition } = useDailyRecommendation();
   const { setup } = useProfileSetup();
+  const { health } = useAdaptiveTraining();
   const metric = setup?.units === 'Metric';
   /* A recommendation restored from an older cache can arrive without its split
      day. Reading through it blanked the entire Plan tab behind "Forge hit a
@@ -446,6 +449,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         loggedBests: Object.fromEntries(bests),
         loggedSingles: Object.fromEntries(bestSingles),
         recentRuns,
+        /* Two weeks of watch recovery, when a watch has sent at least a week
+           of it. Absent otherwise, so the builder never plans around a guess. */
+        ...(recoveryTrend(health) ? { recovery: recoveryTrend(health) } : {}),
         /* The athlete's own words for this rebuild. Absent when they asked for
            a plain regeneration, so the builder is not handed an empty string
            to interpret. */

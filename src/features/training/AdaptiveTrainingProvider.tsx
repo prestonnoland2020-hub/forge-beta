@@ -5,6 +5,9 @@ import { applyCheckIn } from '../../lib/readiness';
 import { useCheckIns } from './CheckInProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { useProfileSetup } from '../profile/ProfileSetupProvider';
+import { useAuth } from '../auth/AuthProvider';
+import { isDemoMode } from '../../lib/env';
+import { loadGarminHealth } from './garminConnectionService';
 import { cardioMiles,isRunningCardio,summarizeCardioDraft } from '../../lib/cardioSession';
 import { countsAsRunVolume } from '../../lib/runQuality';
 
@@ -91,6 +94,13 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
     return{...prefs,runningDays:stated.runningDays,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):stated.statedWeekly,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):stated.statedLongest,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected:latest.provider!=='Unavailable'}},[prefs,recovery,latest,loggedRunHistory,setup]);
   useEffect(()=>localStorage.setItem('forge-training-preferences',JSON.stringify(prefs)),[prefs]);
   useEffect(()=>localStorage.setItem('forge-run-history',JSON.stringify(history)),[history]);
+  /* RECOVERY ON LAUNCH, NOT ON A VISIT TO PROFILE. Garmin pushes sleep, HRV
+     and resting HR to the server whenever the watch syncs; today's
+     recommendation reads them from here, so they are read when the athlete
+     signs in. One owner-scoped query; an athlete with no watch gets nothing
+     back and keeps whatever this device already had. */
+  const {user}=useAuth();
+  useEffect(()=>{if(isDemoMode||!user)return;let live=true;void loadGarminHealth().then(days=>{if(live&&days.length)syncWearableHealth(days)}).catch(()=>undefined);return()=>{live=false}},[user?.id]);
   const syncWearableHealth=(snapshots:DailyHealthSnapshot[])=>{const verified=snapshots.filter(item=>item.provider!=='Unavailable');const next=verified.length?verified.sort((a,b)=>a.date.localeCompare(b.date)):[unavailableHealth()];setHealth(next);if(verified.length)localStorage.setItem('forge-health-snapshots',JSON.stringify(next));else localStorage.removeItem('forge-health-snapshots')};
   return <Context.Provider value={{profile,recovery,health,history:combinedHistory,updateProfile:change=>setPrefs(value=>({...value,...change})),syncWearableHealth,setHistory}}>{children}</Context.Provider>
 }
