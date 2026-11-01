@@ -10,10 +10,6 @@ import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
 import { isSickNote, limitationIn } from '../lib/bodyLog';
 import { Icon } from '../components/Icon';
-import { useGoals } from '../features/goals/GoalsProvider';
-import { goalProgress } from '../lib/goalProgress';
-import { goalFeasibility } from '../lib/goalFeasibility';
-import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 
 const todayIso = () => {
   const now = new Date();
@@ -26,16 +22,11 @@ export function HomePage() {
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
   const { notes } = useAthleteNotes();
-  const { goals } = useGoals();
-  const workouts = useWorkoutEvidence();
   const bufferedNotes = notes.filter(isBufferActive);
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
   const currentDate = todayIso();
   const completedToday = records.find(record => record.date === currentDate);
   const completedSets = (completedToday?.topSets || []).filter(set => set.completed !== false);
-  /* Shown as a name, whatever case it was typed in. */
-  const firstName = (name => name.charAt(0).toUpperCase() + name.slice(1))((setup?.displayName || 'Athlete').trim().split(/\s+/)[0]);
-  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
 
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">TODAY</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
   if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">ONE QUICK SETUP</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split">Set up my split <Icon name="arrow"/></Link></section></div>;
@@ -56,24 +47,10 @@ export function HomePage() {
   const loggedDays = new Set(records.map(record => record.date));
   const week = Array.from({ length: 7 }, (_, index) => { const date = new Date(monday); date.setDate(monday.getDate() + index); return { iso: iso(date), letter: date.toLocaleDateString('en-US', { weekday: 'narrow' }), day: date.getDate() }; });
 
-  /* What comes after today in the split, so the athlete can see the shape of
-     the week from one screen. The split rotates on completion, not on the
-     calendar, so it is "next", never "tomorrow". */
-  const splitDays = setup?.splitDays || [];
-  const nextDay = splitDays.length > 1 ? splitDays[recommendation.splitDay.position % splitDays.length] : null;
-
-  const goal = goals[0];
-  const progress = goal ? goalProgress(goal, records, goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts })[0], setup) : null;
-  const goalTone = progress?.tone === 'on-track' || progress?.tone === 'reached' ? 'good' : progress?.tone === 'needs-work' ? 'work' : progress?.tone === 'off-track' ? 'off' : 'none';
-
   const dayType = recommendation.splitDay.type;
   const quiet = !recommendedSets.length && !recommendation.cardio && (dayType === 'rest' || dayType === 'cardio');
 
   return <div className="forge-feed today">
-    <header className="td-head">
-      <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
-      <h2>{greeting}, {firstName}</h2>
-    </header>
 
     <ol className="td-week" aria-label="This week">
       {week.map(day => <li key={day.iso} className={`${day.iso === currentDate ? 'today' : ''}${loggedDays.has(day.iso) ? ' logged' : ''}`} aria-current={day.iso === currentDate ? 'date' : undefined}>
@@ -125,10 +102,6 @@ export function HomePage() {
       <Link className="button wide" to={startUrl}>{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
     </section>}
 
-    {(nextDay || goal) && <div className="td-tiles">
-      {nextDay && <Link className="td-tile" to="/plan"><small>Next</small><strong>{nextDay.name}</strong><span>{nextDay.type === 'Rest' ? 'Recovery' : (nextDay.exercises || [])[0] || nextDay.type}</span></Link>}
-      {goal && progress && <Link className={`td-tile goal tone-${goalTone}`} to="/goals"><small>Goal</small><strong>{goal.title}</strong><span className="td-bar"><i style={{ width: `${Math.round((progress.share ?? 0) * 100)}%` }} /></span><span>{progress.share === null ? 'No data yet' : `${Math.round(progress.share * 100)}% to goal`}<span className="sr-only"> · {progress.label}</span></span></Link>}
-    </div>}
 
     {/* Under the workout, because this is the screen where you decide whether
         to train and a partner who has already trained is the one thing that

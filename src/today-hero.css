@@ -1,17 +1,12 @@
 /* TODAY — the brand guide's Today screen.
 
-   Top to bottom: the date and a greeting, the week as seven days, one card
-   for the session with one action, and two tiles for what is next and the
-   goal. Every size is a token from forge-theme.css; signal is the only
-   accent, and status uses only --good. Scoped to .today and loaded after
-   brand.css, so the older feed rules underneath it cannot leak in. */
+   Top to bottom: the week as seven days, one card for the session with one
+   action, and the training partners. Every size is a token from
+   forge-theme.css; signal is the only accent, and status uses only --good.
+   Scoped to .today and loaded after brand.css, so the older feed rules
+   underneath it cannot leak in. */
 
 .forge-feed.today { display: grid; gap: var(--s5); }
-
-/* ---- Greeting ---------------------------------------------------------- */
-.today .td-head { display: grid; gap: var(--s1); }
-.today .td-head span { font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
-.today .td-head h2 { margin: 0; font-size: var(--fs-h2); font-weight: 700; line-height: 1.15; color: var(--ink); }
 
 /* ---- The week ---------------------------------------------------------- */
 .today .td-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); margin: 0; padding: 0; list-style: none; }
@@ -56,30 +51,16 @@
 .today .td-note { margin: 0; font-size: var(--fs-small); line-height: 1.5; color: var(--ink-2); }
 .today .td-card .button { width: 100%; }
 
-/* ---- Next and goal tiles ----------------------------------------------- */
-.today .td-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--s3); }
-.today .td-tile { display: grid; align-content: start; gap: var(--s2); min-width: 0; padding: var(--s4); border-radius: var(--r-lg); background: var(--surface-1); border: 1px solid var(--hairline); color: inherit; text-decoration: none;
-  transition: transform var(--dur-tap) var(--ease-strike), background var(--dur-quick) var(--ease-respond); }
-.today .td-tile:active { transform: scale(.98); }
-.today .td-tile small { font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
-.today .td-tile strong { font-size: var(--fs-body); font-weight: 700; line-height: 1.25; color: var(--ink); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.today .td-tile > span:last-child { font-size: var(--fs-small); color: var(--ink-3); }
-.today .td-bar { display: block; height: 6px; border-radius: var(--r-pill); background: var(--surface-sunken); overflow: hidden; }
-.today .td-bar i { display: block; height: 100%; border-radius: inherit; background: var(--ink-3); transition: width var(--dur-signature) var(--ease-strike); }
-.today .td-tile.tone-good .td-bar i { background: var(--good); }
-.today .td-tile.tone-work .td-bar i { background: var(--warn); }
-.today .td-tile.tone-off .td-bar i { background: var(--bad); }
-
 /* Dark tone drops the hairline, as every card in Forge does. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .today :is(.td-card, .td-tile) { border-color: transparent; }
+  :root:not([data-theme="light"]) .today :is(.td-card) { border-color: transparent; }
 }
-:root[data-theme="dark"] .today :is(.td-card, .td-tile) { border-color: transparent; }
+:root[data-theme="dark"] .today :is(.td-card) { border-color: transparent; }
 
 /* Arrivals come in on the mark's 45° line, one after another. */
 @media (prefers-reduced-motion: no-preference) {
-  .today > :is(.td-week, .td-card, .td-tiles) { animation: td-rise var(--dur-emphasis) var(--ease-strike) both; }
+  .today > :is(.td-week, .td-card, .partners-card) { animation: td-rise var(--dur-emphasis) var(--ease-strike) both; }
   .today > .td-card { animation-delay: 60ms; }
-  .today > .td-tiles { animation-delay: 120ms; }
+  .today > .partners-card { animation-delay: 120ms; }
 }
 @keyframes td-rise { from { opacity: 0; transform: translate(-12px, 12px); } }

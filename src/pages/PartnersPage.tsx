@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { waveLabel } from '../components/PlanView';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -25,6 +25,9 @@ const MESSAGES: Record<AddResult, string> = {
 
 export function PartnersPage() {
   const { user } = useAuth();
+  /* Opened from Today: a partner opened from here should still find its way
+     back to Today, through this list. */
+  const origin = (useLocation().state as { origin?: string } | null)?.origin;
   const { setup } = useProfileSetup();
   const [params, setParams] = useSearchParams();
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -162,7 +165,7 @@ export function PartnersPage() {
                 ? `Week ${partner.blockWeek} of ${partner.blockWeeks} · ${waveLabel(partner.waveSlot ?? 0)}`
                 : 'No block yet';
               return <div className={`pv-row partner-full${partner.trainedToday ? ' done' : ''}`} key={partner.friendId}>
-                <Link className="partner-full-main" to={`/partners/${partner.friendId}`}>
+                <Link className="partner-full-main" to={`/partners/${partner.friendId}`} state={origin ? { origin, viaList: true } : undefined}>
                   <span className="partner-mark" aria-hidden="true">{(partner.displayName || partner.username).slice(0, 2).toUpperCase()}</span>
                   <div>
                     <strong>{partner.displayName}</strong>
