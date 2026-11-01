@@ -499,3 +499,13 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
    a span too, and its mark must stay white on the brand colour. */
 .simple-connections article .provider-mark:not(.provider-mark-plain), .brand-heading .provider-mark:not(.provider-mark-plain) { color: #fff; }
 .simple-connections article .provider-mark { display: inline-grid; margin: 0; padding: 0; }
+
+/* The Garmin prompt on open: the review sheet's frame, Garmin's tile above
+   the title, one primary action and two quiet ways out. */
+.garmin-prompt { gap: 16px; }
+.garmin-prompt header > div { gap: 8px; }
+.garmin-prompt .provider-mark { color: #fff; margin-bottom: 4px; }
+.strava-review-sheet.garmin-prompt .garmin-prompt-actions { display: grid; grid-template-columns: 1fr; gap: 4px; justify-items: stretch; }
+.strava-review-sheet.garmin-prompt .garmin-prompt-actions .button { width: 100%; min-height: 48px; margin-bottom: 4px; }
+.garmin-prompt-later, .garmin-prompt-never { background: none; border: 0; min-height: 40px; color: var(--muted); font-weight: 800; font-size: 14px; cursor: pointer; }
+.garmin-prompt-never { font-weight: 600; font-size: 13px; min-height: 32px; }
