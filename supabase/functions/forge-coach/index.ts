@@ -25,7 +25,6 @@ const cardioLogSchema = {
         required: ['cardioType', 'distance', 'unit', 'timeMinutes'],
       },
     },
-  },
     /* ROUNDS, EMOM AND AMRAP COME BACK AS A CIRCUIT, not as rows that try to
        fit reps and calories into distances. null for anything else. */
     circuit: {
