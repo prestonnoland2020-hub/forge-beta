@@ -3,6 +3,7 @@ import { useAuth } from '../features/auth/AuthProvider';
 import { Link, useSearchParams } from 'react-router-dom';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { BillingSettings } from '../components/BillingSettings';
+import { HelpFaq } from '../components/HelpFaq';
 import { useBilling } from '../features/billing/BillingProvider';
 import { CoachBodyLog } from '../components/CoachBodyLog';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
@@ -12,20 +13,20 @@ import { BrandMark } from '../features/training/brandLogos';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { useAppearance, themeChoices, groundChoices, accentChoices } from '../features/preferences/AppearanceProvider';
+import { useAppearance } from '../features/preferences/AppearanceProvider';
 import { beginStravaConnection, disconnectStrava, finishStravaConnection, getActivityConnection, syncStravaActivities, type ActivityConnectionStatus } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
 import { beginGarminConnection, disconnectGarmin, finishGarminConnection, getGarminConnection, loadGarminHealth, syncGarmin, type GarminConnectionStatus } from '../features/training/garminConnectionService';
 
-type View='profile'|'settings'|'coach'|'connections'|'appearance'|'billing'|'faq';
-const VIEWS=['profile','settings','coach','connections','appearance','billing','faq'] as const;
+type View='profile'|'settings'|'coach'|'connections'|'billing'|'faq';
+const VIEWS=['profile','settings','coach','connections','billing','faq'] as const;
 const isView=(value:string|null):value is View=>(VIEWS as readonly string[]).includes(String(value));
 export function ProfilePage(){
-  const {user,signOut}=useAuth();const {setup}=useProfileSetup();const {profile,recovery,health,syncWearableHealth}=useAdaptiveTraining();const {goals}=useGoals();const {records,addRecord}=useWorkoutHistory();const {settings:appearance,setTheme,setGround,setAccent,setIcon,resolved:resolvedTheme,resolvedIcon}=useAppearance();/* THE VIEW LIVES IN THE URL. The app header names the sub-screen and draws
+  const {user,signOut}=useAuth();const {setup}=useProfileSetup();const {profile,recovery,health,syncWearableHealth}=useAdaptiveTraining();const {goals}=useGoals();const {records,addRecord}=useWorkoutHistory();const {setTheme,resolved:resolvedTheme}=useAppearance();/* THE VIEW LIVES IN THE URL. The app header names the sub-screen and draws
      its back arrow from `?view=`, so switching views here has to go through
      the address — a local state the header could not see left it saying
      "Profile" over the appearance settings. */
-  const [params,setParams]=useSearchParams();const requested=params.get('view');const view:View=requested==='devices'?'connections':isView(requested)?requested:'profile';const setView=(next:View)=>setParams(next==='profile'?{}:{view:next});const {notes,upsert}=useAthleteNotes();const {isPro}=useBilling();
+  const [params,setParams]=useSearchParams();const requested=params.get('view');const view:View=requested==='devices'?'connections':requested==='appearance'?'settings':isView(requested)?requested:'profile';const setView=(next:View)=>setParams(next==='profile'?{}:{view:next});const {notes,upsert}=useAthleteNotes();const {isPro}=useBilling();
   const [activity,setActivity]=useState<ActivityConnectionStatus|null>(null);const [connectionMessage,setConnectionMessage]=useState('');const [connectionBusy,setConnectionBusy]=useState(false);const latest=health[health.length-1];const name=setup?.displayName||'Athlete';const initials=name.split(' ').map(part=>part[0]).join('').slice(0,2).toUpperCase();const metric=setup?.units==='Metric';const distanceUnit=metric?'km':'mi';const distanceValue=(miles:number)=>Number((metric?miles*1.609344:miles).toFixed(1));const weeklyDistance=distanceValue(profile.weeklyMileage);const longestDistance=distanceValue(profile.longestRunMiles);const runsShown=setup?.primaryFocus!=='Strength'||Number(longestDistance)>0;
   const loadConnection=async()=>{/* A status check that cannot reach the server is not news: it printed "Failed to send a request to the Edge Function" under Sign out. Connections already reads as not connected, and acting on it reports a real error. */try{setActivity(await getActivityConnection())}catch{setActivity(null)}};
   /* GARMIN, DIRECT. Data arrives by push, so after connecting or syncing the
@@ -43,173 +44,49 @@ export function ProfilePage(){
         the athlete. The tab strip that used to sit under the profile head
         overflowed a phone and hid the billing tab off its right edge; a list
         cannot hide anything. */}
-    {view==='settings'&&<section className="simple-settings-list">
-      <button type="button" onClick={()=>setView('appearance')}><div><strong>Appearance</strong><span>Light or dark, ground, accent and app icon</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('coach')}><div><strong>Coach &amp; notifications</strong><span>Check-ins, reminders and what Forge trains around</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('connections')}><div><strong>Connections</strong><span>{activity?.connected||garmin?.connected?`${[garmin?.connected&&'Garmin',activity?.connected&&'Strava'].filter(Boolean).join(' & ')} connected · recovery and devices`:'Strava, smartwatches and health apps'}</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('billing')}><div><strong>Plan and billing</strong><span>{isPro?'Forge Pro':'Forge Free'} · usage, payment and account</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('faq')}><div><strong>FAQ</strong><span>How Forge measures, plans and protects your training</span></div><b>›</b></button>
-      {/* The legal pages were reachable only from the sign-in screen, which a
-          signed-in athlete never sees again. */}
-      <button type="button" onClick={()=>{window.location.hash='/legal/privacy'}}><div><strong>Privacy &amp; legal</strong><span>Privacy, health data, terms, cookies and refunds</span></div><b>›</b></button>
-    </section>}
-    {/* A way out. There was no sign-out anywhere — the only exit was deleting
-        the account — so a shared phone or a wrong Google account was stuck. */}
-    {view==='settings'&&<section className="simple-settings-list">
-      <button type="button" onClick={()=>{if(window.confirm('Sign out of Forge on this device? Everything that has reached your account stays there.'))void signOut().catch(reason=>setConnectionMessage(reason instanceof Error?reason.message:'Could not sign out.'))}}><div><strong>Sign out</strong><span>{user?.email||'Signed in'}</span></div><b>›</b></button>
-      {connectionMessage&&view==='settings'&&<p className="connection-message">{connectionMessage}</p>}
-    </section>}
+    {/* SETTINGS, IN THREE SHORT GROUPS. Display is one switch, right here —
+        light or dark is the only appearance choice there is, so it does not
+        need a page of its own. Then what Forge connects to and how it coaches,
+        then the account. Sign out stands alone at the bottom, where every
+        phone puts it. */}
+    {view==='settings'&&<div className="settings-groups">
+      <section aria-labelledby="settings-display"><h3 id="settings-display">Display</h3>
+        <div className="simple-settings-list">
+          <div className="settings-row"><div><strong>Appearance</strong><span>Light or dark</span></div>
+            <div className="settings-switch" role="radiogroup" aria-label="Appearance">
+              {(['light','dark'] as const).map(tone=><button type="button" role="radio" key={tone} aria-checked={resolvedTheme===tone} className={resolvedTheme===tone?'active':''} onClick={()=>setTheme(tone)}>{tone==='light'?'Light':'Dark'}</button>)}
+            </div>
+          </div>
+        </div>
+      </section>
+      <section aria-labelledby="settings-training"><h3 id="settings-training">Training</h3>
+        <div className="simple-settings-list">
+          <button type="button" onClick={()=>setView('coach')}><div><strong>Coach &amp; notifications</strong><span>Check-ins, reminders, limitations</span></div><b>›</b></button>
+          <button type="button" onClick={()=>setView('connections')}><div><strong>Connections</strong><span>{activity?.connected||garmin?.connected?`${[garmin?.connected&&'Garmin',activity?.connected&&'Strava'].filter(Boolean).join(' & ')} connected · recovery and devices`:'Strava, smartwatches and health apps'}</span></div><b>›</b></button>
+        </div>
+      </section>
+      <section aria-labelledby="settings-account"><h3 id="settings-account">Account</h3>
+        <div className="simple-settings-list">
+          <button type="button" onClick={()=>setView('billing')}><div><strong>Plan &amp; billing</strong><span>{isPro?'Forge Pro':'Forge Free'}</span></div><b>›</b></button>
+          <button type="button" onClick={()=>setView('faq')}><div><strong>Help &amp; FAQ</strong><span>How Forge plans and measures</span></div><b>›</b></button>
+          {/* The legal pages were reachable only from the sign-in screen, which
+              a signed-in athlete never sees again. */}
+          <button type="button" onClick={()=>{window.location.hash='/legal/privacy'}}><div><strong>Privacy &amp; legal</strong><span>Privacy, health data and terms</span></div><b>›</b></button>
+        </div>
+      </section>
+      {/* A way out. There was no sign-out anywhere — the only exit was deleting
+          the account — so a shared phone or a wrong Google account was stuck. */}
+      <section aria-label="Sign out">
+        <div className="simple-settings-list">
+          <button type="button" className="settings-sign-out" onClick={()=>{if(window.confirm('Sign out of Forge on this device? Everything that has reached your account stays there.'))void signOut().catch(reason=>setConnectionMessage(reason instanceof Error?reason.message:'Could not sign out.'))}}><div><strong>Sign out</strong><span>{user?.email||'Signed in'}</span></div></button>
+        </div>
+        {connectionMessage&&<p className="connection-message">{connectionMessage}</p>}
+      </section>
+    </div>}
     {view==='billing'&&<BillingSettings/>}
     {view==='coach'&&<div className="stack-l coach-settings"><NotificationSettings/><CoachBodyLog notes={notes} upsert={upsert}/></div>}
     {view==='profile'&&<>{/* Running numbers only for someone who runs: a lifter's profile was half zeros. */}<section className={runsShown?'simple-profile-stats':'simple-profile-stats two'}><div><span>WORKOUTS</span><strong>{records.length}</strong></div>{runsShown&&<div><span>RUN · LAST 7 DAYS</span><strong>{weeklyDistance} {distanceUnit}</strong></div>}{runsShown&&<div><span>LONGEST RUN</span><strong>{longestDistance} {distanceUnit}</strong></div>}<div><span>ACTIVE GOALS</span><strong>{goals.length}</strong></div></section><section className="simple-settings-list"><Link to="/split"><div><strong>Split</strong><span>Training and rest-day structure</span></div><b>›</b></Link><Link to="/exercises"><div><strong>Exercise library</strong><span>Browse every movement Forge knows</span></div><b>›</b></Link><Link to="/partners"><div><strong>Training partners</strong><span>Up to five people and what they trained</span></div><b>›</b></Link><button type="button" onClick={()=>setView('settings')}><div><strong>Settings</strong><span>Appearance, coach, connections, billing</span></div><b>›</b></button></section></>}
     {view==='connections'&&<div className="connection-stack"><section className="simple-recovery"><div><span className="eyebrow">SMARTWATCH RECOVERY</span><h3>{recovery.confidence==='Low'?'No watch data yet':recovery.hardTrainingAllowed?'Recovery supports the plan':'Recovery safeguard active'}</h3><p>{recovery.confidence==='Low'?'Connect a watch below and Forge adjusts each day’s training from your sleep, HRV and resting heart rate. Until then it leaves recovery out rather than guess.':recovery.reasons.join(' · ')}</p></div><strong>{recovery.confidence==='Low'?'—':recovery.readiness}</strong></section>{recovery.confidence!=='Low'&&<section className="simple-profile-stats"><div><span>SLEEP</span><strong>{Math.round(latest.sleepMinutes/6)/10} hr</strong></div><div><span>HRV</span><strong>{latest.hrvRmssd??'—'} ms</strong></div><div><span>RESTING HR</span><strong>{latest.restingHr??'—'}</strong></div><div><span>SOURCE</span><strong>{latest.provider}</strong></div></section>}<section className="simple-connections activity-connection"><header><div><span className="eyebrow">REAL ACTIVITY IMPORT</span><h3 className="brand-heading"><BrandMark id="strava" name="Strava" />Connect through Strava</h3><p>Import recorded runs, rides, rows, and other activities from watches that sync to Strava.</p></div><span className={activity?.connected?'connection-pill connected':'connection-pill'}>{activity?.connected?'Connected':activity?.configured===false?'Setup needed':'Not connected'}</span></header><article><div><strong>{activity?.athleteName||'Strava activity sync'}</strong><span>{activity?.connected?`${activity.importedActivities||0} activities stored${activity.lastSyncedAt?` · last sync ${new Date(activity.lastSyncedAt).toLocaleDateString()}`:''}`:'Workout data only — Strava does not supply complete sleep or HRV recovery data.'}</span></div><div className="connection-actions">{activity?.connected?<><button disabled={connectionBusy} onClick={()=>void connectionAction('sync')}>Sync now</button><button className="danger" disabled={connectionBusy} onClick={()=>void connectionAction('disconnect')}>Disconnect</button></>:<button className="button" disabled={connectionBusy||activity?.configured===false} onClick={()=>void connectionAction('connect')}>Connect Strava</button>}</div></article>{connectionMessage&&<p className="connection-message">{connectionMessage}</p>}{activity?.configured===false&&<p className="connection-message">Strava connections aren’t switched on for this build yet. Check back after the next update.</p>}</section>{([['watch','SMARTWATCHES','Watches and rings','Direct sync is on the way. Until then, a watch marked “via Strava” already reaches Forge through your Strava connection.'],['health','HEALTH APPS','Health platforms','Sleep, recovery and body weight, read-only. Forge never writes to your health data.']] as const).map(([kind,eyebrow,title,blurb])=><section key={kind} className="simple-connections"><header><div><span className="eyebrow">{eyebrow}</span><h3>{title}</h3><p>{blurb}</p></div></header>{connectionCatalog.filter(item=>item.kind===kind).map(item=>item.id==='garmin'&&garmin?.configured?<article key={item.id} className="garmin-connection"><BrandMark id={item.id} name={item.name} /><div><strong>{item.name}</strong><span>{garmin.connected?`${garmin.healthDays||0} days of sleep & recovery · ${garmin.importedActivities||0} activities${garmin.lastSyncedAt?` · updated ${new Date(garmin.lastSyncedAt).toLocaleDateString()}`:''}`:item.data.join(' · ')}</span>{garminMessage&&<span className="connection-message">{garminMessage}</span>}</div><div className="connection-actions">{garmin.connected?<><button disabled={garminBusy} onClick={()=>void garminAction('sync')}>Sync now</button><button className="danger" disabled={garminBusy} onClick={()=>void garminAction('disconnect')}>Disconnect</button></>:<button className="button" disabled={garminBusy} onClick={()=>void garminAction('connect')}>Connect Garmin</button>}</div></article>:<article key={item.id}><BrandMark id={item.id} name={item.name} /><div><strong>{item.name}</strong><span>{item.data.join(' · ')}</span></div><span className={item.viaStrava&&activity?.connected?'connection-pill connected':'connection-pill'}>{item.viaStrava?activity?.connected?'Via Strava':'Via Strava today':'Coming soon'}</span></article>)}</section>)}</div>}
-    {view==='faq'&&<div className="profile-faq stack-l">
-      <section className="card"><span className="eyebrow">FAQ</span><h3>How Forge works</h3><p>The explanations that used to sit on every screen, in one place.</p></section>
-      {[
-        ['What is a top set?','The one heaviest meaningful set per lift. Warmups, back-offs and accessories are yours to train — the top set is what Forge measures progress from, and every saved one gets a calculated max.'],
-        ['Why only one top set per lift, per day?','Because it is the cleanest measurement you can take. One hard set taken early, while you are fresh, holds almost everything else still: same lift, same position in the session, same state of fatigue. So when the number moves, the only thing that changed is you. Log every set instead and the total is polluted by how long you rested, how many sets you felt like doing, and how tired you already were — three runners in the same race, and no way to tell which one moved the time. Volume matters for building the muscle; it is a terrible ruler for measuring it. Do all the back-off and accessory work you want — Forge just will not try to read growth out of it.'],
-        ['What is a calculated max?','An estimate of what you could lift for one rep, from any completed set — heavier or more reps means a higher number. A single (1 rep) is a real 1RM, not an estimate, and it is the only set a Real 1RM goal counts. Forge writes each week of the wave from your closest real evidence: your heavy weeks come from your heavy sets, not from stretching an 8-rep set down to a double.'],
-        ['How does the plan pick my numbers?','A 10-week block of 8/6/4/2/1 waves built from your logged bests. Beat a set and the wave rises; miss one and it holds. Max week tests only lifts you hold a Real 1RM goal on — the attempt is your last real single plus 5–10 lb, and never below the heavy double you just did.'],
-        ['Why is the 8/6/4/2/1 wave used on my goal lifts?','Because a max is a skill as much as a capacity, and you cannot test it from nowhere. The wave walks you down the rep ladder over five weeks — eight, six, four, two, one — so each week the weight climbs and the reps fall, and by the time you are pulling a single your nervous system has already rehearsed the shape of a heavy one twice. It also gives Forge real evidence at every rung: a calculated max off an 8 is a guess, a double is nearly the real thing, and a single IS the real thing. Test straight off a set of eight and you get a number that is mostly arithmetic. Walk it down and you get a lift.'],
-        ['Why are my other lifts on 12/10/8/6 instead?','Because they have a different job. Lifts you hold no max goal on are there to build the muscle and support the ones you do test, and that is done with more reps at less weight — enough load to matter, not enough to need a deload or a spotter. Running everything at 8/6/4/2/1 would mean peaking five lifts at once, which is how you arrive at max week already cooked. Twelve down to six keeps the growth stimulus high and the fatigue cost low, so the heavy work has somewhere to go. It is also honest about what Forge will claim: these lifts get progress, not a tested one-rep max.'],
-        ['How is my weekly running planned?','It ramps from what you actually run toward the ceiling you set in your split, deloading on every 2-rep week. The long run is capped at a sane share of the week and near your longest logged run.'],
-        ['What does recovery data change?','With a Garmin connected, sleep, HRV and resting heart rate set the readiness score: a poor night softens a hard day, and two strained weeks slow the next block’s mileage ramp. Without a watch, Forge leaves recovery out entirely rather than guess.'],
-        ['What does Strava add?','Recorded runs, rides and rows import automatically into your training log and count toward mileage and endurance goals. Strava does not supply sleep or HRV.'],
-        ['What changes my split cursor?','Completing real training on a recommended day advances the cycle. A body-weight check-in or a note never consumes the workout you still owe.'],
-      ].map(([q,a])=><details className="card faq-item" key={q}><summary>{q}</summary><p>{a}</p></details>)}
-    </div>}
-    {view==='appearance'&&<div className="appearance">
-      {/* Three sections, in the order they matter: the ground you read on,
-          then the one colour that is not neutral, then what sits on the home
-          screen. Each previews itself from the real thing. */}
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · TONE</span>
-          <h2>Light or dark</h2>
-          <p>One choice, applied everywhere. It saves to your account, so a new phone opens looking the same.</p>
-        </header>
-        <div className="theme-grid" role="radiogroup" aria-label="Tone">
-          {themeChoices.map(choice=>{
-            const active=appearance.theme===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card active':'pick-card'} onClick={()=>setTheme(choice.id)}>
-              {/* data-force-tone puts the OTHER tone's ladder on the element
-                  itself — custom properties inherit, so the swatch renders in a
-                  tone the page is not in without a single hardcoded hex, and it
-                  follows the athlete's chosen ground for free. */}
-              <span className={`theme-swatch theme-swatch-${choice.id}`} aria-hidden="true"
-                data-ground={appearance.ground}
-                data-force-tone={choice.id==='system'?undefined:choice.id}>
-                {choice.id==='system'
-                  ? <>
-                      <span className="ts-half" data-ground={appearance.ground} data-force-tone="dark"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
-                      <span className="ts-half" data-ground={appearance.ground} data-force-tone="light"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
-                    </>
-                  : <><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></>}
-              </span>
-              <span className="pick-meta">
-                <strong>{choice.name}</strong>
-                <small>{choice.description}</small>
-                {active&&<em>{choice.id==='system'?`ON — currently ${resolvedTheme}`:'ON'}</em>}
-              </span>
-            </button>;
-          })}
-        </div>
-      </section>
-
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · GROUND</span>
-          <h2>What it&rsquo;s built from</h2>
-          <p>Tone is how bright the app is. Ground is what the greys are made of. Every ground uses the same steps of lightness, so this one is purely a matter of taste &mdash; nothing here can make anything harder to read.</p>
-        </header>
-        <div className="ground-grid" role="radiogroup" aria-label="Ground">
-          {groundChoices.map(choice=>{
-            const active=appearance.ground===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card ground-card active':'pick-card ground-card'}
-              onClick={()=>setGround(choice.id)}>
-              {/* Both tones at once. A ground's character is mostly in its
-                  dark ladder — the light ones are damped on purpose — so a
-                  swatch showing only the tone you are currently in would make
-                  Carbon and Ink look identical and the choice arbitrary.
-                  data-ground + data-force-tone put the real ladders on these
-                  elements, so this is the ground, not a picture of it. */}
-              <span className="ground-swatch" aria-hidden="true">
-                <span className="gs-half" data-ground={choice.id} data-force-tone="dark"><i/><i/></span>
-                <span className="gs-half" data-ground={choice.id} data-force-tone="light"><i/><i/></span>
-              </span>
-              <span className="pick-meta">
-                <strong>{choice.name}</strong>
-                <small>{choice.description}</small>
-                {active&&<em>ON</em>}
-              </span>
-            </button>;
-          })}
-        </div>
-      </section>
-
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · ACCENT</span>
-          <h2>Your colour</h2>
-          <p>The one colour in Forge that is not a shade of grey. It marks what is yours — today&rsquo;s lift, your line on a chart, the button that starts the set.</p>
-        </header>
-        <div className="accent-grid" role="radiogroup" aria-label="Accent">
-          {accentChoices.map(choice=>{
-            const active=appearance.accent===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card accent-card active':'pick-card accent-card'}
-              onClick={()=>setAccent(choice.id)}>
-              {/* data-accent scopes the real tokens to this element, so the chip
-                  is the accent rather than a hand-picked stand-in for it — and it
-                  is drawn in the tone the athlete is currently reading in. */}
-              <span className="accent-swatch" data-accent={choice.id} aria-hidden="true">
-                <i/><b>AA</b>
-              </span>
-              <span className="pick-meta">
-                <strong>{choice.name}</strong>
-                <small>{choice.description}</small>
-                {active&&<em>ON</em>}
-              </span>
-            </button>;
-          })}
-        </div>
-        <p className="appearance-note">Every accent is checked against both grounds before it ships: the text and the buttons clear WCAG AA at 4.5:1 whichever tone you pair it with. None of these is a worse app than another.</p>
-      </section>
-
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · APP ICON</span>
-          <h2>Home screen</h2>
-          <p>Which Forge sits on your phone. Matching your accent is the default, so this changes with your colour unless you pin one.</p>
-        </header>
-        <div className="icon-grid" role="radiogroup" aria-label="App icon">
-          <button type="button" role="radio" aria-checked={appearance.icon==='match'}
-            className={appearance.icon==='match'?'pick-card icon-card active':'pick-card icon-card'}
-            onClick={()=>setIcon('match')}>
-            <span className="icon-stack" aria-hidden="true">
-              {/* The resolved icon sits in front, flanked by two others, so the
-                  tile reads as "whichever one you pick" instead of a sixth icon. */}
-              <img src={`./icons/${resolvedIcon==='signal'?'flare':'signal'}/icon-192.png`} alt=""/>
-              <img src={`./icons/${resolvedIcon==='amber'?'tide':'amber'}/icon-192.png`} alt=""/>
-              <img src={`./icons/${resolvedIcon}/icon-192.png`} alt=""/>
-            </span>
-            <strong>Match accent</strong>
-            <small>{accentChoices.find(choice=>choice.id===resolvedIcon)?.name}</small>
-          </button>
-          {accentChoices.map(choice=>{
-            const active=appearance.icon===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card icon-card active':'pick-card icon-card'}
-              onClick={()=>setIcon(choice.id)}>
-              <img src={`./icons/${choice.id}/icon-192.png`} alt="" aria-hidden="true"/>
-              <strong>{choice.name}</strong>
-              <small>{active?'On your phone':'\u00a0'}</small>
-            </button>;
-          })}
-        </div>
-      </section>
-    </div>}
+    {view==='faq'&&<HelpFaq/>}
   </div>;
 }

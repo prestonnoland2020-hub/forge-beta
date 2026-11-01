@@ -45,6 +45,75 @@
   .cardio-log-saved>div>button:first-of-type{grid-column:1/2}
 }
 
+/* THE CARDIO CARD, READ TOP TO BOTTOM: what the watch synced, what was
+   logged by hand, then one box to describe anything else. Each entry shows
+   the fields Forge mapped it to, so a misread is visible and one Edit away. */
+.cardio-log .section-title{padding-bottom:12px}
+.cardio-log.form-card{gap:16px}
+.cardio-log-saved{margin-bottom:0}
+.cardio-entry,.cardio-synced{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface-sunken);min-width:0}
+.cardio-entry.just-logged,.cardio-synced.just-logged{border-color:var(--accent-dim);box-shadow:inset 3px 0 var(--accent)}
+.cardio-entry-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 12px}
+.cardio-log-saved .cardio-entry-head strong{grid-column:1;font:800 20px var(--display);letter-spacing:.02em;line-height:1.2;overflow-wrap:anywhere}
+.cardio-log-saved .cardio-entry-head small{grid-column:1}
+.cardio-entry-head .cardio-entry-actions{grid-column:2;grid-row:1/3;align-self:center}
+.cardio-entry-actions{display:flex;gap:8px}
+.cardio-log .cardio-entry-actions button{min-height:36px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--ink-2);font-size:12px;font-weight:700}
+.cardio-entry-breakdown{display:grid;gap:8px;min-width:0}
+.cardio-entry-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.cardio-entry-facts>div{display:grid;gap:2px;padding:8px 12px;border-radius:10px;background:var(--panel);min-width:0}
+.cardio-entry-facts dt{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cardio-entry-facts dd{margin:0;font:800 clamp(13px,3.8vw,16px) var(--display);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cardio-entry-lines{margin:0;padding:0;list-style:none;display:grid;gap:0;border-top:1px solid var(--line)}
+.cardio-entry-lines li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums}
+.cardio-entry-lines li span{color:var(--ink-2);min-width:0;overflow-wrap:anywhere}
+.cardio-entry-lines li b{font-weight:700;text-align:right;white-space:nowrap}
+.cardio-entry-note,.cardio-log-saved .cardio-entry-note{margin:0;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.cardio-entry-ask{font-size:12px;color:var(--warn)}
+
+/* A watch session: the provider says where it came from, and the state says
+   whether the athlete has spoken for it yet. */
+.cardio-synced{background:var(--panel);border-color:var(--hairline-strong)}
+.cardio-synced.describing{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--tint) 8%,transparent)}
+.cardio-synced header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cardio-synced-badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.1em;color:var(--info)}
+.cardio-synced-state{font-size:12px;font-weight:800;color:var(--good)}
+.cardio-synced-state.pending{color:var(--muted);font-weight:700}
+.cardio-synced-title{display:grid;gap:2px}
+.cardio-synced-title strong{font:800 20px var(--display);letter-spacing:.02em}
+.cardio-synced-title small{font-size:12px;color:var(--muted)}
+.cardio-synced .cardio-entry-facts>div{background:var(--surface-sunken)}
+.cardio-synced footer{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cardio-synced footer .cardio-entry-actions{margin-left:auto}
+
+/* The box. While it describes a synced session it says which one. */
+.cardio-ai-box label.cardio-ai-label{display:inline-flex}
+.cardio-ai-box.describing{border-color:var(--accent)}
+.cardio-ai-target{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0;font-size:12px;color:var(--muted)}
+.cardio-ai-target b{color:var(--ink);font-weight:700}
+.cardio-ai-target .text-button{margin-left:auto;min-height:32px}
+.cardio-log-links{display:flex;flex-wrap:wrap;gap:16px}
+.cardio-log-links .text-button{min-height:36px;padding:0;font-size:14px}
+
+/* A circuit's own editor: format, rounds and clock, then the stations. */
+.cardio-circuit-head{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) minmax(0,1fr);gap:8px}
+.cardio-circuit-head label{display:grid;gap:4px;min-width:0}
+.cardio-circuit-head input,.cardio-circuit-head select,.cardio-circuit-station input,.cardio-circuit-station select{min-height:44px;padding:8px 12px;font-size:14px;min-width:0}
+.cardio-circuit-stations{display:grid;gap:8px}
+.cardio-circuit-station{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,.7fr) minmax(0,1fr) auto;gap:8px;align-items:center}
+.cardio-circuit-station button{width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);color:var(--muted);font-size:16px}
+
+@media(max-width:640px){
+  .cardio-entry,.cardio-synced{padding:12px}
+  .cardio-entry-facts>div{padding:8px}
+  .cardio-synced footer .button{flex:1 1 auto}
+  .cardio-circuit-station{grid-template-columns:minmax(0,1fr) 72px auto;grid-template-areas:"name name remove" "amount unit unit"}
+  .cardio-circuit-station input:first-child{grid-area:name}
+  .cardio-circuit-station input:nth-child(2){grid-area:amount}
+  .cardio-circuit-station select{grid-area:unit}
+  .cardio-circuit-station button{grid-area:remove}
+}
+.cardio-synced .cardio-entry-actions button{border:0;background:transparent;padding:8px 4px;color:var(--ink-2)}
 /* THE LOGGER LINE: type chips across the top, distance and time side by side
    beneath, the unit a small switch under the distance. */
 .cardio-log-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}

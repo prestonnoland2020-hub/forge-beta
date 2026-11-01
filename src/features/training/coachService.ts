@@ -1,5 +1,6 @@
 import { isDemoMode } from '../../lib/env';
 import { supabase } from '../../lib/supabase';
+import type { ParsedCircuit } from '../../lib/cardioParse';
 
 export type ForgeCoachRequest = {
   question: string;
@@ -7,7 +8,7 @@ export type ForgeCoachRequest = {
   context: Record<string, unknown>;
 };
 
-export type ParsedCardioRows = { reflection: string; note: string; rows: Array<{ cardioType: string; distance: number; unit: string; timeMinutes: number }> };
+export type ParsedCardioRows = { reflection: string; note: string; rows: Array<{ cardioType: string; distance: number; unit: string; timeMinutes: number }>; circuit?: ParsedCircuit | null };
 
 export type ForgeCoachResponse = {
   answer: string;
@@ -77,7 +78,9 @@ export async function requestCardioParse(description: string, context: Record<st
       if (response) { try { const body = await response.clone().json(); if (typeof body?.error === 'string') detail = body.error; } catch { /* keep default */ } }
       return { ...localFallback, source: 'local', error: detail };
     }
-    return { reflection: String(data.cardio.reflection || ''), note: String(data.cardio.note || ''), rows: data.cardio.rows, source: 'ai' };
+    /* An older deploy of forge-coach returns rows only; a circuit is read when it is there. */
+    const circuit = data.cardio.circuit && Array.isArray(data.cardio.circuit.stations) && data.cardio.circuit.stations.length ? data.cardio.circuit as ParsedCircuit : null;
+    return { reflection: String(data.cardio.reflection || ''), note: String(data.cardio.note || ''), rows: data.cardio.rows, circuit, source: 'ai' };
   } catch {
     return { ...localFallback, source: 'local', error: 'The AI logger is unreachable right now.' };
   }

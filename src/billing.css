@@ -1,209 +1,210 @@
 /* BILLING AND ACCOUNT.
 
-   Reads from the system tokens in forge-system.css so it follows whichever UI
-   package the athlete picked, in either theme, without a single literal
-   colour of its own. */
+   Reads from the system tokens in forge-theme.css so it follows the athlete's
+   ground and accent, in either theme, without a literal colour of its own.
+   Layout comes from the grouped-list system in brand.css (.settings-groups,
+   .simple-settings-list, .settings-row); this file only adds what billing
+   has that Settings does not — the plan title, meters, the offer and the
+   delete confirmation. */
 
-.billing-settings { --billing-gap: var(--s4); }
+/* On a wide screen a full-width plan tile is 600px of mostly nothing and a
+   footnote runs past 150 characters; both screens stop at a readable width. */
+.billing-settings, .help-faq { max-width: 760px; }
 
-/* ---- Plan status ------------------------------------------------------- */
+/* ---- The plan ---------------------------------------------------------- */
 
-.billing-status header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--s4);
+/* The tier is set like a page title — Saira wide, black, italic, caps — with
+   the tier word in the accent, so "which plan am I on" is answered by the
+   loudest thing on the screen and needs no pill beside it. */
+.billing-tier {
+  margin: var(--s1) 0 var(--s2);
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: var(--title-weight);
+  font-stretch: var(--title-stretch);
+  letter-spacing: var(--title-tracking);
+  text-transform: uppercase;
+  font-size: var(--fs-h2);
+  line-height: 1;
 }
-.billing-status h3 { margin: var(--s1) 0 var(--s2); }
-.billing-status p { color: var(--ink-2); margin: 0; max-width: 46ch; }
+.billing-tier em { font-style: inherit; color: var(--accent-text); }
+.billing-hero { padding: var(--s5); }
+.billing-hero p { margin: 0; color: var(--ink-2); max-width: 46ch; }
+.billing-hero[data-tier="pro"], .billing-hero[data-tier="founder"] {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--surface-1)), var(--surface-1) 60%);
+}
 
-.billing-pill {
+/* A quiet line under a group, the way iOS footnotes a Settings section. */
+.billing-group-note { margin: 0; padding: 0 var(--s5); color: var(--ink-3); font-size: var(--fs-small); line-height: 1.45; }
+
+/* ---- Usage ------------------------------------------------------------- */
+
+.billing-usage-row > div:first-child { flex: 1; }
+.billing-left {
   flex: none;
-  padding: 4px 12px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--hairline-strong);
-  color: var(--ink-2);
-  font-size: .68rem;
-  font-weight: 700;
-  letter-spacing: .1em;
+  display: grid;
+  justify-items: end;
+  line-height: 1;
+  color: var(--accent-text);
 }
-.billing-pill[data-pro] {
-  background: var(--accent-strong);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
-
-/* ---- Usage meters ------------------------------------------------------ */
-
-.billing-usage-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s4);
-  padding: var(--s3) 0;
-  border-top: 1px solid var(--hairline);
-}
-.billing-usage-row > div { min-width: 0; flex: 1; }
-.billing-usage-row strong { display: block; }
-.billing-usage-row span {
-  display: block;
-  color: var(--ink-2);
-  font-size: .82rem;
-  margin-top: 2px;
-}
-.billing-usage-row > b {
-  flex: none;
-  font-size: 1.5rem;
+/* Doubled class: the grouped list sets every <strong> in it to body size. */
+.simple-settings-list .billing-left strong {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: var(--fs-h2);
   font-variant-numeric: tabular-nums;
-  color:var(--accent-text);
+  letter-spacing: -.02em;
+  color: inherit;
 }
-.billing-usage-row > b[data-empty] { color: var(--bad); }
+.simple-settings-list .billing-left small { margin-top: 2px; font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.billing-left[data-empty] { color: var(--bad); }
 
 .billing-meter {
   margin-top: var(--s2);
-  height: 4px;
+  height: 6px;
   border-radius: var(--r-pill);
-  background: var(--surface-sunken);
+  background: var(--surface-2);
   overflow: hidden;
 }
 .billing-meter i {
   display: block;
   height: 100%;
+  border-radius: inherit;
   background: var(--accent);
-  transition: width var(--dur) var(--ease);
+  transition: width var(--dur-standard) var(--ease-strike);
 }
 .billing-meter i[data-full] { background: var(--bad); }
 
 /* ---- The offer --------------------------------------------------------- */
 
-.billing-features {
-  list-style: none;
-  margin: 0 0 var(--s4);
-  padding: 0;
-  display: grid;
-  gap: var(--s2);
-}
-.billing-features li {
-  position: relative;
-  padding-left: var(--s5);
-  color: var(--ink-2);
-}
-.billing-features li::before {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: .5em;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-}
+.billing-offer { display: grid; gap: var(--s4); padding: var(--s5); }
+.billing-offer header p { margin: 0; color: var(--ink-2); }
+.billing-offer .billing-tier { margin-top: 0; }
 
-.billing-plans {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--s3);
+.billing-features { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s3); }
+.billing-features li { display: grid; grid-template-columns: 24px 1fr; align-items: start; gap: var(--s2); color: var(--ink); }
+.billing-features svg, .billing-free li svg {
+  box-sizing: content-box;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--accent-wash);
+  color: var(--accent-text);
 }
+.billing-features svg { width: 14px; height: 14px; margin-top: 1px; }
+
+.billing-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--s3); }
 .billing-plan {
-  display: grid;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 2px;
   padding: var(--s4);
   text-align: left;
-  border: 1px solid var(--hairline-strong);
+  border: 0;
   border-radius: var(--r-md);
   background: var(--surface-2);
+  box-shadow: inset 0 0 0 1.5px var(--hairline-strong);
   color: var(--ink);
   cursor: pointer;
-  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  transition: transform var(--dur-tap) var(--ease-strike), box-shadow var(--dur-quick) var(--ease-respond);
 }
-.billing-plan:hover:not(:disabled) { border-color: var(--accent); }
-.billing-plan:active:not(:disabled) { transform: translateY(1px); }
+.billing-plan:active:not(:disabled) { transform: scale(.97); }
 .billing-plan:disabled { opacity: .6; cursor: default; }
-.billing-plan.recommended { border-color: var(--accent); }
-.billing-plan small {
-  color: var(--ink-2);
-  font-size: .7rem;
+.billing-plan.recommended { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); }
+.billing-plan small { font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.billing-plan strong {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: var(--fs-h2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+}
+.billing-plan > span:not(.billing-plan-badge) { color: var(--ink-2); font-size: var(--fs-small); margin-bottom: var(--s3); }
+/* The call to action reads as a button inside the tile — filled on the plan
+   Forge recommends, quiet on the other — rather than a line of link text. */
+.billing-plan-cta {
+  display: grid;
+  place-items: center;
+  min-height: var(--control-s);
+  /* auto: both tiles' buttons line up at the bottom even when one note wraps. */
+  margin-top: auto;
+  padding: 0 var(--s3);
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  color: var(--ink);
+  font: 700 var(--fs-small) var(--body);
+  text-align: center;
+}
+.billing-plan.recommended .billing-plan-cta { background: var(--accent-strong); color: var(--accent-ink); }
+.billing-plan-badge {
+  position: absolute;
+  top: -10px;
+  right: var(--s3);
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--accent-strong);
+  color: var(--accent-ink);
+  font-size: var(--fs-label);
   font-weight: 700;
-  letter-spacing: .1em;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
-.billing-plan strong { font-size: 1.7rem; font-variant-numeric: tabular-nums; }
-.billing-plan span { color: var(--ink-2); font-size: .82rem; }
-.billing-plan b {
-  margin-top: var(--s2);
-  color:var(--accent-text);
-  font-size: .82rem;
-}
 
-.billing-fineprint {
-  margin: var(--s4) 0 0;
-  color: var(--ink-3);
-  font-size: .78rem;
-  line-height: 1.5;
-}
+.billing-fineprint { margin: 0; color: var(--ink-3); font-size: var(--fs-small); line-height: 1.5; }
 .billing-fineprint a { color: var(--ink-2); text-decoration: underline; }
 
-.billing-free-note { margin-top: var(--s3); }
-.billing-free-note summary {
+/* "What stays free" is a row that opens, styled as one of the list's rows. */
+.billing-free summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  min-height: 56px;
+  padding: var(--s3) var(--s4) var(--s3) var(--s5);
   cursor: pointer;
-  color: var(--ink-2);
-  font-size: .84rem;
+  list-style: none;
 }
-.billing-free-note ul {
-  margin: var(--s2) 0 0;
-  padding-left: var(--s5);
-  color: var(--ink-2);
-  font-size: .84rem;
-  display: grid;
-  gap: 4px;
-}
+.billing-free summary::-webkit-details-marker { display: none; }
+.billing-free summary > div { display: grid; gap: 2px; }
+.billing-free-chevron { flex: none; color: var(--ink-3); transition: transform var(--dur-standard) var(--ease-strike); }
+.billing-free[open] .billing-free-chevron { transform: rotate(180deg); }
+.billing-free ul { list-style: none; margin: 0; padding: 0 var(--s4) var(--s4) var(--s5); display: grid; gap: var(--s2); }
+.billing-free li { display: grid; grid-template-columns: 22px 1fr; align-items: start; gap: var(--s2); color: var(--ink-2); font-size: var(--fs-small); }
+.billing-free li svg { width: 12px; height: 12px; padding: 3px; margin-top: 1px; }
 
 /* ---- Manage ------------------------------------------------------------ */
 
-.billing-actions {
+.simple-settings-list > a {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s4);
+  color: inherit;
+  text-decoration: none;
 }
-.billing-actions .button { flex: 0 1 auto; }
+.simple-settings-list > a > div { display: grid; gap: 2px; }
+.simple-settings-list > button:disabled { opacity: .6; cursor: default; }
 
-.billing-message {
-  margin: var(--s3) 0 0;
-  color: var(--good);
-  font-size: .86rem;
-}
+.billing-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.billing-actions .button { flex: 1 1 auto; }
+
+.billing-message { margin: 0; padding: 0 var(--s5); color: var(--good); font-size: var(--fs-small); font-weight: 600; }
 .billing-message.error { color: var(--bad); }
-
-.billing-account-email {
-  margin: var(--s3) 0 0;
-  color: var(--ink-3);
-  font-size: .78rem;
-}
 
 /* ---- Deletion ---------------------------------------------------------- */
 
-.billing-danger { border-color: color-mix(in srgb, var(--bad) 40%, var(--hairline)); }
-.billing-danger p { color: var(--ink-2); max-width: 60ch; }
-
-.billing-confirm { display: grid; gap: var(--s3); }
-.billing-confirm label {
-  display: grid;
-  gap: var(--s2);
-  color: var(--ink-2);
-  font-size: .86rem;
-}
+.billing-confirm { display: grid; gap: var(--s3); padding: var(--s4) var(--s5); }
+.billing-confirm > strong { color: var(--bad); font-size: var(--fs-body); }
+.billing-confirm > p { margin: 0; color: var(--ink-2); font-size: var(--fs-small); line-height: 1.5; }
+.billing-confirm .billing-message { padding: 0; }
+.billing-confirm label { display: grid; gap: var(--s2); color: var(--ink-2); font-size: var(--fs-small); font-weight: 600; }
 .billing-confirm b { color: var(--ink); letter-spacing: .08em; }
 /* 16px minimum: anything smaller makes iOS Safari zoom the page on focus. */
-.billing-confirm input {
-  font-size: 16px;
-  padding: var(--s3);
-  border-radius: var(--r-sm);
-  border: 1px solid var(--hairline-strong);
-  background: var(--surface-sunken);
-  color: var(--ink);
-  letter-spacing: .12em;
-  max-width: 220px;
-}
+.billing-confirm input { font-size: 16px; letter-spacing: .12em; max-width: 240px; }
 
 .button.danger,
 .button.danger-outline {
@@ -213,11 +214,6 @@
 .button.danger { background: var(--bad); color: var(--bg); }
 .button.danger-outline { background: transparent; color: var(--bad); }
 .button.danger:disabled { opacity: .45; }
-
-@media (max-width: 560px) {
-  .billing-status header { flex-direction: column; }
-  .billing-actions .button { flex: 1 1 100%; text-align: center; }
-}
 
 /* The coach's quota refusal. Deliberately not styled as an error: nothing
    went wrong, the athlete used what they had. */
