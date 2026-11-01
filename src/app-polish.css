@@ -107,6 +107,11 @@ details.session-details[open] > summary { margin-bottom: 16px; }
   min-height: 56px; border-radius: 14px; display: flex; flex-direction: column; gap: 0; font-size: 18px;
 }
 .workout-finish-bar .save-workout small { font-size: 12px; font-weight: 700; opacity: .82; }
+/* THE BAR BLEEDS TO A GUTTER THE PAGE DOES NOT ALWAYS HAVE. Its margins
+   assume 16px, and on a phone the page pads 12px, so the logger scrolled 4px
+   sideways. The editor clips what spills; clip, unlike hidden, keeps the bar
+   sticky. */
+.workout-editor { overflow-x: clip; }
 
 /* Smaller things seen on the phone: the day card's old divider under its
    title, the gap under an open lift's name, and the saved flash as a quiet

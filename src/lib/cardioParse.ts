@@ -70,6 +70,18 @@ const parsePace = (text: string): { minutesPerUnit: number; unit: string } | nul
 const DISTANCE = /(\d+(?:\.\d+)?)\s*(miles?|mi\b|kms?\b|k\b|kilometers?|meters?|m\b|yards?|yds?\b)/i;
 const INTERVAL = /(\d{1,2})\s*[x×]\s*(\d+(?:\.\d+)?)\s*(miles?|mi|kms?|k|meters?|m|yards?|yds?)?\b/i;
 const FIVE_K = /\b(5|10)k\b/i;
+const TIMED_INTERVAL = /(\d{1,2})\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|mins|minutes|s|sec|secs|seconds)\b/i;
+/* A count is a number on a count unit: "60 floors", "300 cal". */
+const COUNT = /(\d+(?:\.\d+)?)\s*(floors?|flights?|cal|cals|calories|kcal)\b/i;
+/* The recovery between repeats, in the athlete's words: "with 2 min jog",
+   "w/ 400 jog rec", "/ 1 min easy", "90s rest". It is kept as a note — a
+   recovery with no distance would drag the session's pace if it were a row. */
+const recoveryOf = (text: string) => {
+  const rest = text.match(/(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds|min|mins|minutes|m|meters?)?\s*(?:of\s+)?(rest|recovery|rec|jog|walk|easy|float|off)\b/i);
+  if (!rest) return '';
+  const unit = rest[2] ? (/^m(?:eters?)?$/i.test(rest[2]) ? 'm' : /^s/i.test(rest[2]) ? 's' : ' min') : (Number(rest[1]) >= 100 ? 'm' : '');
+  return `${rest[1]}${unit} ${rest[3].toLowerCase() === 'rec' ? 'recovery' : rest[3].toLowerCase()} between repeats`;
+};
 
 const extractTime = (text: string) => {
   const match = text.match(TIME);
@@ -95,6 +107,19 @@ export function parseCardioDescription(text: string): ParsedCardio {
   const segments = trimmed.split(/,|\bthen\b|\bplus\b|\band then\b|\bfollowed by\b|;/i).map(part => part.trim()).filter(Boolean);
 
   for (const segment of segments) {
+    /* TIME REPEATS ARE NOT MILE REPEATS. "10 x 1 min hard / 1 min easy" read
+       the bare 1 as a distance and logged ten one-mile repeats. A repeat
+       measured in minutes or seconds is time on the clock and nothing more. */
+    const timed = segment.match(TIMED_INTERVAL);
+    if (timed) {
+      const repeats = Math.min(16, Number(timed[1]) || 0);
+      const each = Number(timed[2]) || 0;
+      const minutes = /^s/i.test(timed[3]) ? each / 60 : each;
+      for (let index = 0; index < repeats; index += 1) rows.push({ cardioType: detectActivity(segment, activity), distance: 0, unit: 'minutes', timeMinutes: Number(minutes.toFixed(2)) });
+      const rest = recoveryOf(segment.slice((timed.index || 0) + timed[0].length));
+      if (rest) note = rest;
+      continue;
+    }
     const interval = segment.match(INTERVAL);
     if (interval) {
       const repeats = Math.min(16, Number(interval[1]) || 0);
@@ -103,8 +128,8 @@ export function parseCardioDescription(text: string): ParsedCardio {
       const perRepTime = extractTime(stripMatched(segment, INTERVAL)) / (repeats || 1);
       const eachTime = /each|@|at\b/.test(segment) ? extractTime(segment.slice(segment.search(/each|@|at\b/))) : perRepTime;
       for (let index = 0; index < repeats; index += 1) rows.push({ cardioType: detectActivity(segment, activity), distance: each, unit, timeMinutes: Number((eachTime || 0).toFixed(2)) });
-      const rest = segment.match(/(\d+(?:\.\d+)?)\s*(s|sec|seconds|min|minutes)\s*(rest|recovery|jog)/i);
-      if (rest) note = `${rest[1]} ${rest[2]} ${rest[3]} between repeats`;
+      const rest = recoveryOf(segment);
+      if (rest) note = rest;
       continue;
     }
     /* The pace is read first and struck from the segment, so "25 minutes at
@@ -113,8 +138,10 @@ export function parseCardioDescription(text: string): ParsedCardio {
     const paceless = pace ? stripMatched(segment, PACE) : segment;
     const distanceMatch = paceless.match(DISTANCE) || paceless.match(FIVE_K);
     let minutes = extractTime(paceless);
-    if (!distanceMatch && !minutes && !pace) continue;
+    const count = distanceMatch ? null : paceless.match(COUNT);
+    if (!distanceMatch && !count && !minutes && !pace) continue;
     let distance = 0, unit = 'miles';
+    if (count) { distance = Number(count[1]); unit = /^(floor|flight)/i.test(count[2]) ? 'floors' : 'calories'; }
     if (distanceMatch) {
       if (distanceMatch[0].match(FIVE_K) && !paceless.match(DISTANCE)) { distance = Number(distanceMatch[1]); unit = 'km'; }
       else { distance = Number(distanceMatch[1]); unit = normalizeUnit(distanceMatch[2] || 'miles'); }
@@ -219,6 +246,22 @@ export function fillToTotals(rows: ParsedCardioRow[], totals: StatedTotals): Par
   return [...rows, { cardioType: type, distance: Number(shortMiles.toFixed(2)), unit: 'miles', timeMinutes: Number(shortMinutes.toFixed(2)) }];
 }
 
+/* The rows a description gave, topped up to what the watch recorded. A
+   described interval set is the hard part of a run the watch measured end to
+   end; the warmup, the recoveries and the cooldown are in the watch's totals
+   and nowhere in the words, so the difference is kept as one more line rather
+   than dropped. Unlike a stated total, the watch's distance counts even when
+   the words gave none ("10 × 1 min hard"). */
+export const fillToWatch = (rows: ParsedCardioRow[], watch: { miles: number; minutes: number }): { rows: ParsedCardioRow[]; added?: ParsedCardioRow } => {
+  const miles = rows.reduce((total, row) => total + milesOf(row), 0);
+  const minutes = rows.reduce((total, row) => total + (Number(row.timeMinutes) || 0), 0);
+  const shortMiles = watch.miles > 0 && watch.miles - miles > Math.max(0.05, watch.miles * 0.03) ? watch.miles - miles : 0;
+  const shortMinutes = watch.minutes > 0 && watch.minutes - minutes > Math.max(0.25, watch.minutes * 0.03) ? watch.minutes - minutes : 0;
+  if (!shortMiles && !shortMinutes) return { rows };
+  const added = { cardioType: rows[0]?.cardioType || 'Run', distance: Number(shortMiles.toFixed(2)), unit: 'miles', timeMinutes: Number(shortMinutes.toFixed(2)) };
+  return { rows: [...rows, added], added };
+};
+
 /* "3 ROUNDS OF 500m ROW, 20 WB AND 15 CAL ASSAULT BIKE IN 11 MINS TOTAL".
    A circuit is rounds of stations and one clock, not a run of distances. Read
    as distances it came back as a single 500 m bike for 11:00: the rounds, the
@@ -226,7 +269,7 @@ export function fillToTotals(rows: ParsedCardioRow[], totals: StatedTotals): Par
    the athlete actually wrote: how many rounds, each station with its number
    and unit, and the total time, which belongs to the whole circuit and is
    never split into made-up per-station times. */
-export type ParsedCircuit = { rounds: number; stations: Array<{ name: string; value: number; unit: string }>; minutes: number };
+export type ParsedCircuit = { rounds: number; stations: Array<{ name: string; value: number; unit: string }>; minutes: number; format?: 'For time' | 'EMOM' | 'AMRAP' };
 
 const STATION_ALIASES: Array<[RegExp, string]> = [
   [/^(wb|wbs|wall ?balls?)$/i, 'Wall Balls'],
@@ -255,21 +298,10 @@ const stationName = (raw: string) => {
   return name.replace(/\b\w/g, letter => letter.toUpperCase());
 };
 
-export function parseCircuitDescription(text: string): ParsedCircuit | null {
-  const lower = text.trim();
-  const head = lower.match(/^(\d{1,2})\s*(?:rounds?|rds?|rft)\b\s*(?:of|:|-)?\s*/i) || lower.match(/^(\d{1,2})\s*x\s+(?=\D)/i);
-  if (!head) return null;
-  const rounds = Number(head[1]);
-  if (!(rounds >= 2 && rounds <= 20)) return null;
-  let body = lower.slice(head[0].length);
-  /* The clock comes off the end: "in 11 mins total", "for 11:00", "— 11:32". */
-  let minutes = 0;
-  const clock = body.match(/\s*(?:,|-|—)?\s*(?:in|for|time|took|total(?: time)?(?: of)?)?\s*(\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?\s*(?:min|mins|minutes|m(?=\s|$)))\s*(?:total|overall|all in)?\.?\s*$/i);
-  if (clock) {
-    const value = clock[1];
-    minutes = value.includes(':') ? clockToMinutes(value) : Number(value.replace(/[^\d.]/g, ''));
-    body = body.slice(0, clock.index);
-  }
+/* Stations, in order, from the body of a circuit description. null when any
+   piece cannot be read, so the regular reader can try instead. */
+function readStations(text: string): ParsedCircuit['stations'] | null {
+  let body = text;
   /* Written without commas ("500m row 20 WB and 15 cal bike"), a new station
      starts wherever a number follows a word. */
   body = body.replace(/([a-z])\s+(?=\d)/gi, '$1, ');
@@ -292,8 +324,48 @@ export function parseCircuitDescription(text: string): ParsedCircuit | null {
     if (reps) { stations.push({ name: stationName(reps[2]), value: Number(reps[1]), unit: 'reps' }); continue; }
     return null; /* a piece we cannot read: let the regular reader try instead */
   }
-  if (stations.length < 1) return null;
-  return { rounds, stations, minutes: Number(minutes.toFixed(2)) };
+  return stations.length ? stations : null;
 }
 
-export const circuitSummary = (circuit: ParsedCircuit) => `${circuit.rounds} rounds · ${circuit.stations.map(station => station.unit === 'reps' ? `${station.value} ${station.name}` : station.unit === 'calories' ? `${station.value} cal ${station.name}` : `${station.value}${station.unit === 'meters' ? ' m' : station.unit === 'km' ? ' km' : station.unit === 'yards' ? ' yd' : ' mi'} ${station.name}`).join(' · ')}`;
+export function parseCircuitDescription(text: string): ParsedCircuit | null {
+  const lower = text.trim();
+  /* EMOM AND AMRAP ARE CIRCUITS ON A CLOCK. "EMOM 20 min: 12 cal row, 10
+     burpees" was read as twenty minutes of rowing — the burpees and the
+     calories gone. The clock is the session's time; rounds are what fits in
+     it (EMOM) or what the athlete says they got (AMRAP). */
+  const clocked = lower.match(/^(emom|amrap)\s*(\d{1,3})\s*(?:min|mins|minutes|m)?\b\s*(?:[:\-—,]|of)?\s*/i)
+    || lower.match(/^(\d{1,3})\s*(?:min|mins|minute|minutes|m)?\s*(emom|amrap)\b\s*(?:[:\-—,]|of)?\s*/i);
+  if (clocked) {
+    const format = (/^\d/.test(clocked[1]) ? clocked[2] : clocked[1]).toUpperCase() as 'EMOM' | 'AMRAP';
+    const minutes = Number(/^\d/.test(clocked[1]) ? clocked[1] : clocked[2]);
+    let body = lower.slice(clocked[0].length);
+    let rounds = 0;
+    const got = body.match(/\s*(?:,|-|—|;)?\s*(?:got|did|completed|finished)?\s*(\d{1,3})\s*(?:rounds?|rds?)\b(?:\s*\+\s*\d+(?:\s*reps?)?)?\.?\s*$/i);
+    if (got) { rounds = Number(got[1]); body = body.slice(0, got.index); }
+    const stations = readStations(body);
+    if (!stations || !minutes) return null;
+    if (!rounds && format === 'EMOM') rounds = minutes % stations.length === 0 ? minutes / stations.length : minutes;
+    return { rounds, stations, minutes, format };
+  }
+  const head = lower.match(/^(\d{1,2})\s*(?:rounds?|rds?|rft)\b\s*(?:of|:|-)?\s*/i) || lower.match(/^(\d{1,2})\s*x\s+(?=\D)/i);
+  if (!head) return null;
+  const rounds = Number(head[1]);
+  if (!(rounds >= 2 && rounds <= 20)) return null;
+  let body = lower.slice(head[0].length);
+  /* The clock comes off the end: "in 11 mins total", "for 11:00", "— 11:32". */
+  let minutes = 0;
+  const clock = body.match(/\s*(?:,|-|—)?\s*(?:in|for|time|took|total(?: time)?(?: of)?)?\s*(\d{1,2}:\d{2}(?::\d{2})?|\d+(?:\.\d+)?\s*(?:min|mins|minutes|m(?=\s|$)))\s*(?:total|overall|all in)?\.?\s*$/i);
+  if (clock) {
+    const value = clock[1];
+    minutes = value.includes(':') ? clockToMinutes(value) : Number(value.replace(/[^\d.]/g, ''));
+    body = body.slice(0, clock.index);
+  }
+  const stations = readStations(body);
+  if (!stations) return null;
+  return { rounds, stations, minutes: Number(minutes.toFixed(2)), format: 'For time' };
+}
+
+const circuitHead = (circuit: ParsedCircuit) => circuit.format === 'EMOM' || circuit.format === 'AMRAP'
+  ? `${circuit.format} ${Number(circuit.minutes.toFixed(1))} min${circuit.rounds && circuit.format === 'AMRAP' ? ` · ${circuit.rounds} rounds` : ''}`
+  : `${circuit.rounds} rounds`;
+export const circuitSummary = (circuit: ParsedCircuit) => `${circuitHead(circuit)} · ${circuit.stations.map(station => station.unit === 'reps' ? `${station.value} ${station.name}` : station.unit === 'calories' ? `${station.value} cal ${station.name}` : `${station.value}${station.unit === 'meters' ? ' m' : station.unit === 'km' ? ' km' : station.unit === 'yards' ? ' yd' : ' mi'} ${station.name}`).join(' · ')}`;

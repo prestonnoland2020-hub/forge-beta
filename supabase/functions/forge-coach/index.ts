@@ -26,7 +26,37 @@ const cardioLogSchema = {
       },
     },
   },
-  required: ['reflection', 'note', 'rows'],
+    /* ROUNDS, EMOM AND AMRAP COME BACK AS A CIRCUIT, not as rows that try to
+       fit reps and calories into distances. null for anything else. */
+    circuit: {
+      anyOf: [{ type: 'null' }, {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          format: { type: 'string', enum: ['For time', 'EMOM', 'AMRAP'] },
+          rounds: { type: 'integer', minimum: 0, maximum: 60 },
+          minutes: { type: 'number', minimum: 0 },
+          stations: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                name: { type: 'string' },
+                value: { type: 'number', minimum: 0 },
+                unit: { type: 'string', enum: ['meters', 'km', 'miles', 'yards', 'calories', 'reps', 'seconds', 'minutes'] },
+              },
+              required: ['name', 'value', 'unit'],
+            },
+          },
+        },
+        required: ['format', 'rounds', 'minutes', 'stations'],
+      }],
+    },
+  },
+  required: ['reflection', 'note', 'rows', 'circuit'],
 };
 
 const cardioLogInstructions = `You convert an athlete's plain-language description of a COMPLETED cardio workout into structured log rows for the Forge training log.
@@ -36,8 +66,9 @@ OUTPUT
 - Each row: cardioType (Run, Walk, Bike, Rowing, Swimming, Elliptical, Stair Climber, Jump Rope — reuse the athlete's own activity name when it is clearly an activity), distance (0 when only time is known), unit, timeMinutes (decimal minutes; 0 when only distance is known).
 - UNIT AND DISTANCE MUST AGREE. A real distance uses miles, km, meters or yards. 'minutes' is only for rows with NO distance — a distance measured in minutes is worth zero miles to the athlete's mileage, pace and race goals.
 - COUNTS GO IN distance WITH A COUNT UNIT. "15 cal assault bike" is distance 15, unit 'calories'; "20 wall balls" is distance 20, unit 'reps'; "40 floors" is distance 40, unit 'floors'. Never turn a count into miles.
-- ROUNDS REPEAT THE WHOLE LIST. "3 rounds of 500m row, 20 WB, 15 cal bike" is those three rows written out three times, in order. A stated total time for the circuit goes in the note, not split across rows.
+- ROUNDS ARE A CIRCUIT. "3 rounds of 500m row, 20 WB, 15 cal bike in 11:00", "EMOM 20: 12 cal row, 10 burpees" and "AMRAP 15 — 6 rounds" fill circuit: format (For time, EMOM or AMRAP), rounds (completed rounds; for EMOM the minutes divided by the number of stations when it divides evenly), minutes (the whole clock, 0 when not stated) and each station once, in order, with its own number and unit. rows still carries one summary row for the circuit: cardioType "Circuit", distance = the total running distance across all rounds in miles (0 if none), unit 'miles', timeMinutes = the clock. For anything that is not rounds of stations, circuit is null.
 - NEVER DROP A STATED DISTANCE. If the athlete says how far they went ("2.1 miles in 20 minutes", "ran 3 in 24"), that number belongs in distance with a distance unit, and the duration belongs in timeMinutes. Only leave distance at 0 when they genuinely gave no distance at all.
+- A SYNCED WATCH SESSION MAY BE IN THE CONTEXT (syncedActivity: activity, miles, minutes). The description then adds detail to that session — it is not a second workout. Keep the watch's totals unless the athlete corrects them: when the described segments come up short of the watch's distance or time, add one easy row for the remainder (warmup, recoveries, cooldown) so the rows sum to what the watch recorded. If the description holds no numbers at all ("felt flat, treadmill"), return the watch session as one row and put their words in the note.
 - Prefer the athlete's interval detail over a synced device summary when both are given, but keep totals consistent with what they stated. If their stated total conflicts with the sum of described segments, trust the segments and flag the difference in the note.
 - Rest between intervals is NOT a row; describe a notable rest scheme in the note.
 - note: one short line of useful context from their words (surface, feel, rest scheme, weather). Empty string when there is nothing beyond the numbers.
@@ -160,7 +191,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v7',
+        prompt_cache_key: cardioScope ? 'forge-cardio-log-v2' : 'forge-coach-v7',
         reasoning: { effort: cardioScope ? 'low' : 'medium' },
         text: cardioScope ? {
           verbosity: 'low',
@@ -301,7 +332,8 @@ Return one editable cardio/circuit using only exact movement names and units in 
         const type = String(row.cardioType || '');
         return { ...row, unit: /row|ski|erg/i.test(type) ? 'meters' : /swim/i.test(type) ? 'yards' : 'miles' };
       });
-      return Response.json({ answer: String(parsed.reflection), cardio: { reflection: String(parsed.reflection), note: String(parsed.note || ''), rows } }, { headers: corsHeaders });
+      const circuit = parsed.circuit && Array.isArray(parsed.circuit.stations) && parsed.circuit.stations.length ? parsed.circuit : null;
+      return Response.json({ answer: String(parsed.reflection), cardio: { reflection: String(parsed.reflection), note: String(parsed.note || ''), rows, circuit } }, { headers: corsHeaders });
     }
     if (workoutScope) {
       const workout = JSON.parse(answer);
