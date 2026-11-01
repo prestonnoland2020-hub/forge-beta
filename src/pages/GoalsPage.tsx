@@ -126,6 +126,9 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
 
     {syncError && <p className="data-sync-error">{syncError}</p>}
 
+    {/* The switch and the overview share one tight block, so the goals start
+       near the top of a phone; on a wide screen they sit side by side. */}
+    <div className="gx-head">
     {/* A switch should look like one: a label saying what it switches, a thumb that slides, and a line saying what the chosen side counts. */}
     {hasStrength && <div className="gx-mode" data-mode={maxMode}>
       <span className="gx-mode-label" id="gx-mode-label">Strength goals use</span>
@@ -160,6 +163,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
         </div>
       </section>;
     })()}
+    </div>
 
     {goals.length === 0 && <section className="gx-empty">
       <div className="gx-empty-art" aria-hidden="true">{CATEGORIES.map(category => <span key={category.type} className={category.className}><Glyph d={category.icon} /></span>)}</div>

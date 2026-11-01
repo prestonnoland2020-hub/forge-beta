@@ -235,6 +235,22 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 .gx-mode-hint { margin: 0; font-size: var(--fs-small); color: var(--ink-3); }
 @media (prefers-reduced-motion: reduce) { .gx-mode-thumb { transition: none; } }
 
+/* The top of Goals is one block, not two sections a full stack gap apart: the
+   switch sits close to the overview, and the overview's ring is smaller, so on
+   a phone the first goal starts well above the fold. On a wide screen the two
+   sit side by side; when only one of them shows, it takes the whole row. */
+.gx-head { display: grid; gap: var(--s3); }
+.gx-head:empty { display: none; }
+.gx-head .gx-mode { gap: var(--s1); }
+.gx-head .gx-mode-track { margin-top: var(--s1); }
+.gx-head .gx-hero { gap: var(--s4); padding: var(--s4); }
+.gx-head .gx-ring { width: 76px; height: 76px; }
+.gx-head .gx-ring circle { stroke-width: 9; }
+@media (min-width: 901px) {
+  .gx-head { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: center; gap: var(--s5); }
+  .gx-head .gx-mode { order: 2; }
+}
+
 /* ---- Line charts ----------------------------------------------------------
    Every line chart in the app, drawn the way the guide's Goals chart is: a
    3.5 px signal line that draws itself left to right on the Strike curve in
@@ -341,3 +357,11 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 :is(.exercise-mobile-row, .library-table) button.table-status.table-status.on::after { transform: translateX(20px); }
 /* The switch is drawn 28 tall; its hit area is the guide's 44. */
 :is(.exercise-mobile-row, .library-table) button.table-status.table-status::before { content: ''; position: absolute; inset: -8px; }
+
+/* Month arrows on History: a true circle with a stroke chevron. They were the
+   ‹ › characters at 26px in a condensed face, in a 34px button the tap-target
+   rule stretched to 48px tall, so they read as tall thin glyphs in an oval. */
+.classic-calendar .history-toolbar .month-step { display: grid; place-items: center; width: 44px; height: 44px; min-height: 0; padding: 0; border: 1px solid var(--hairline); border-radius: 50%; font-size: 0; background: var(--surface-1); color: var(--ink); box-shadow: var(--shadow-1); transition: transform var(--dur-tap) var(--ease-respond), background var(--dur-quick) var(--ease-respond); }
+.classic-calendar .history-toolbar .month-step:active { transform: scale(.94); background: var(--surface-sunken); }
+.classic-calendar .history-toolbar .month-step svg { display: block; }
+.classic-calendar .history-toolbar { grid-template-columns: 44px 1fr 44px; align-items: center; }
