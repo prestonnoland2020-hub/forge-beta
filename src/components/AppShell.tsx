@@ -330,7 +330,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       <header className="topbar">
         <div className="top-title">
           {chrome.back && <Link className="top-back" to={chrome.back} state={chrome.backState} aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></Link>}
-          <div><span className="eyebrow">FORGE</span><h1>{chrome.title}</h1></div>
+          {/* The logo heads every screen; the screen's name stays for screen readers. */}
+          <NavLink className="top-brand" to="/" aria-label="Forge home"><span className="brand-mark" aria-hidden="true"><i /></span><span>FORGE</span></NavLink>
+          <h1 className="sr-only">{chrome.title}</h1>
         </div>
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
