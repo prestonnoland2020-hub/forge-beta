@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { HYROX_NO_GOAL, hyroxGoalOf, hyroxPlanDetail, withHyroxPaces } from '../lib/hyroxSession';
 import { bestRunDay, type PlannedDay } from '../lib/interference';
 import { paceModel } from '../lib/paceModel';
@@ -204,6 +205,18 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      reshape. It prefills the request box so they can edit or add to it — the
      coach proposes, the athlete still signs. */
   const [coachInstruction, setCoachInstruction] = useState('');
+  /* ARRIVING TO REBUILD. Today's mileage popup saves the new range and comes
+     here with the reason; the rebuild opens straight away with it written in,
+     rather than leaving the athlete to find the button. */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const arrivedToRebuild = (location.state as { rebuildInstruction?: string } | null)?.rebuildInstruction;
+  useEffect(() => {
+    if (!arrivedToRebuild) return;
+    setCoachInstruction(arrivedToRebuild);
+    setRefreshAsk(true);
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [arrivedToRebuild]); // eslint-disable-line react-hooks/exhaustive-deps
   /* Which week the tab is SHOWING. Null means "the one I am in", which is what
      it opens on and what it falls back to when a new block is built — so this
      never strands the screen on week 9 of a block that no longer has one. */
@@ -693,6 +706,10 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       <p>The next block starts from what you lifted and ran in this one. Build it when you are ready to keep going.</p>
       {canGenerate && <button type="button" className="button" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Building…' : 'Build the next block'}</button>}
     </section>}
+    {/* Running well under the plan for a fortnight: the coach offers a lower
+        weekly range, editable, and a rebuild that uses it. First on the page,
+        above the week — below it, a new athlete never found it. */}
+    {onMileageBounds && <RunningBehindCard startDate={stored.startDate} plannedMiles={plannedMiles} onBounds={onMileageBounds} onRebuild={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />}
     <PlanProgress weekIndex={weekIndex} current={currentIndex} total={plan.weeks.length}
       waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence}
       onPick={index => setViewWeek(index === currentIndex ? null : index)} />
@@ -725,9 +742,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {/* The gap between what a goal needs and what the plan is allowed to give
         belongs where the plan is, not buried in a goal's detail panel. */}
     <MileageGate onChanged={next => { if (next && onMileageBounds) onMileageBounds(Number(next.minWeeklyMileage) || 0, Number(next.maxWeeklyMileage) || 0); setRefreshAsk(true); }} />
-    {/* Running well under the plan for a fortnight: the coach offers a lower
-        weekly range, editable, and a rebuild that uses it. */}
-    {onMileageBounds && <RunningBehindCard startDate={stored.startDate} plannedMiles={plannedMiles} onBounds={onMileageBounds} onRebuild={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />}
     {/* And when the block itself is the problem, the coach says so here and
         hands the rebuild the instruction, rather than leaving the athlete to
         press Regenerate and think of something to type. */}
