@@ -4,6 +4,7 @@ import { prescribeTopSet } from './strengthPrescription';
 import { calculateEstimatedOneRepMax } from './strength';
 import { canonicalLiftKey, sameLift } from './liftAliases';
 import { bestsFromHistory } from '../features/training/aiPlanService';
+import { startingNumbers } from './startingNumbers';
 /* One Epley, and it treats a logged single as itself rather than inflating
    405x1 into a 419 max. */
 const epleyMax=(weight:number,reps:number)=>calculateEstimatedOneRepMax(weight,reps)||0;
@@ -55,7 +56,16 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
   const {anchors:liftAnchors,singles:liftSingles,sessions:liftSessions,misses:liftMisses,lastAt:liftLastAt}=bestsFromHistory(records);
 
   const topSets=templates.map(template=>{
-    const history=strengthResults(records).filter(record=>sameLift(record.lift,template.exercise)&&record.weight&&record.reps).sort((a,b)=>b.date.localeCompare(a.date)||(b.calculatedMax??epleyMax(b.weight,b.reps))-(a.calculatedMax??epleyMax(a.weight,a.reps)));
+    const logged=strengthResults(records).filter(record=>sameLift(record.lift,template.exercise)&&record.weight&&record.reps).sort((a,b)=>b.date.localeCompare(a.date)||(b.calculatedMax??epleyMax(b.weight,b.reps))-(a.calculatedMax??epleyMax(a.weight,a.reps)));
+    /* A LIFT WITH NOTHING LOGGED STARTS FROM WHAT THE ATHLETE SAID IN SETUP,
+       dated today so it counts as recent. It stands in as a single session,
+       which keeps the load at that number rather than stepping past it, and
+       the first logged set of the lift replaces it (lib/startingNumbers.ts).
+       A logged miss means the lift has evidence, so the number is not used. */
+    const tried=records.some(record=>(record.topSets||[]).some(set=>sameLift(set.lift,template.exercise)));
+    const start=!logged.length&&!tried?startingNumbers().find(item=>sameLift(item.lift,template.exercise)):undefined;
+    const startDate=new Date(todayStart);const startIso=`${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`;
+    const history=start?[{date:startIso,lift:start.lift,weight:start.weight,reps:start.reps,calculatedMax:epleyMax(start.weight,start.reps)}]:logged;
     const latest=history[0];
     if(!latest)return{...template,weight:0,reps:0,backoffSets:0,backoffReps:0,backoffWeight:0,calculatedMax:0,stage:'BASELINE',rationale:`Log a recent ${template.exercise} set before Forge recommends a load. Its first completed set puts this movement into the 8/6/4/2/1 wave.`,source:'baseline' as const};
     const recentCutoff=todayStart-90*dayMs;

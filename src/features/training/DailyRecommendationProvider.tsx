@@ -162,7 +162,9 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   /* THE BODY LOG IS AN INPUT TO TODAY. A note is part of the fingerprint, so
      the saved row from before "my knee hurts" is not reused all day. */
   const bodyLogStamp=`${bodyLog.areas.join('+')}|${bodyLog.restrictions.join('+')}${bodyLog.sick?':sick':''}${bodyLog.easing?':easing':''}`;
-  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp]);
+  /* Starting numbers are an input too: giving them must replace the saved "Find your weight" row. */
+  const startStamp=(setup?.startingNumbers||[]).map(item=>`${item.lift}:${item.weight}x${item.reps}`).join('+');
+  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp,startStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp,startStamp]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   /* ONE PIPELINE, ANY DAY OF THE SPLIT.
 
@@ -358,6 +360,8 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       const recovering=recovery.confidence!=='Low'&&(recovery.readiness<65||recovery.strengthFatigue==='High');
       const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness,holding:recovering,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
       const accessorySessions=liveSessions.get(key)||0;
+      /* No session yet means the best is the starting number from setup, and the card says so. */
+      const fromWhat=accessorySessions?`your best calc max ${live.best}`:`the starting number you gave (calc max ${live.best}) — your first logged set replaces it`;
       const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
          weight when the set says so, and an unwaved 'baseline' flag was
@@ -367,8 +371,8 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
          over it was describing a program it is not running. */
       const readinessNote=lowReadiness&&tests&&todayHoldsTheAttempt?` Readiness ${recovery.readiness} — the attempt waits for a better day.`:recovering?` Readiness ${recovery.readiness} — holding the load today.`:'';
       return{...prescription,source:'history' as const,rationale:(tests
-        ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`
-        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from your best calc max ${live.best}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`)+readinessNote};
+        ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from ${fromWhat}.`
+        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from ${fromWhat}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`)+readinessNote};
     };
     /* The day's plan prescription leads with the goal lift; every other set
        keeps its own exercise and simply joins the wave. */

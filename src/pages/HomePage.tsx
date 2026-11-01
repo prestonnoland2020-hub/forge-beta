@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PartnersCard } from '../components/PartnersCard';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
@@ -27,6 +28,15 @@ export function HomePage() {
   const currentDate = todayIso();
   const completedToday = records.find(record => record.date === currentDate);
   const completedSets = (completedToday?.topSets || []).filter(set => set.completed !== false);
+  /* THE FIRST WEEK, AS THREE THINGS TO DO. A new athlete's Today is mostly
+     promises ("projections", "readiness", "Forge noticed") that need data
+     first. This says what unlocks them and ticks itself off as it happens;
+     it leaves on its own after three training days, or when hidden. */
+  const trainedDays = new Set(records.map(record => record.date)).size;
+  const runner = Boolean(setup && (Number(setup.runningDays) > 0 || setup.primaryFocus === 'Endurance' || setup.primaryFocus === 'Hybrid'));
+  const ranLogged = records.some(record => record.hasCardio || (record.cardioSessions || []).length > 0);
+  const [firstWeekHidden, setFirstWeekHidden] = useState(() => { try { return localStorage.getItem('forge-first-week-hidden') === '1'; } catch { return false; } });
+  const hideFirstWeek = () => { setFirstWeekHidden(true); try { localStorage.setItem('forge-first-week-hidden', '1'); } catch { /* per-device convenience */ } };
 
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">TODAY</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
   if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">ONE QUICK SETUP</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split">Set up my split <Icon name="arrow"/></Link></section></div>;
@@ -87,7 +97,7 @@ export function HomePage() {
           <input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
           <span>{set.exercise}{set.optional && <small>Optional</small>}</span>
-          <b>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : 'Find your weight'}</b>
+          <b>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : `Work up to ${set.reps || 5}`}</b>
         </label></li>)}
         {recommendation.cardio && <li><label className={recommendation.cardio.selected ? 'on' : ''}>
           <input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} />
@@ -98,9 +108,28 @@ export function HomePage() {
       </ul>}
       {!recommendedSets.length && dayType !== 'rest' && dayType !== 'cardio' && dayType !== 'hyrox' && <Link className="td-fix" to="/exercises"><span><b>Choose exercises for this day</b>Forge needs a lift mapped to it.</span><Icon name="arrow" size={16} /></Link>}
       {quiet && <p className="td-quiet"><b>{dayType === 'rest' ? 'Rest day' : 'No run needed today'}</b>{dayType === 'rest' ? 'Nothing required. Walk, stretch or log anything you do.' : 'Your running is covered this week.'}</p>}
+      {/* A FIRST SESSION IS A TEST, AND IT SAYS SO. A lift with no logged
+          set and no starting number has no load to give; instead of "Find
+          your weight" it tells the athlete how to find it, once. */}
+      {recommendedSets.some(set => set.source !== 'history') && <p className="td-note td-first">{(() => { const fresh = recommendedSets.filter(set => set.source !== 'history'); const reps = fresh[0].reps || 5; return <><b>First time on {fresh.length === 1 ? fresh[0].exercise : 'these lifts'}?</b> Work up to a weight you could do for {reps} with 2 reps left in the tank, and log that one set. Forge sets your numbers from it.</>; })()}</p>}
       {(recommendation.coachNote || recommendation.bodyLogNote) && <p className="td-note">{recommendation.coachNote || recommendation.bodyLogNote}</p>}
       <Link className="button wide" to={startUrl}>{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
     </section>}
+
+    {!firstWeekHidden && trainedDays < 3 && (() => {
+      const steps = [
+        { label: 'Log your first workout', detail: 'One top set per lift is enough.', done: trainedDays > 0, to: startUrl },
+        ...(runner ? [{ label: 'Bring in your runs', detail: 'Connect Strava, or log a run.', done: ranLogged, to: '/profile?view=connections' }] : []),
+        { label: 'Train three times', detail: 'Then Forge starts spotting patterns and projecting your goals.', done: trainedDays >= 3, to: '' },
+      ];
+      return <section className="fw-card" aria-label="Your first week">
+        <header><small>Your first week</small><span>{steps.filter(step => step.done).length} of {steps.length}</span><button type="button" aria-label="Hide your first week" onClick={hideFirstWeek}><Icon name="close" size={14} /></button></header>
+        <ol>{steps.map((step, index) => {
+          const body = <><i aria-hidden="true">{step.done ? <Icon name="check" size={12} stroke={3} /> : index + 1}</i><span><b>{step.label}</b><small>{step.detail}</small></span>{step.to && !step.done && <Icon name="right" size={14} className="fw-go" />}</>;
+          return <li key={step.label} className={step.done ? 'done' : ''}>{step.to && !step.done ? <Link to={step.to}>{body}</Link> : <div>{body}</div>}</li>;
+        })}</ol>
+      </section>;
+    })()}
 
 
     {/* Under the workout, because this is the screen where you decide whether

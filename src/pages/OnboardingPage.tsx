@@ -33,7 +33,7 @@ import { ForgeLoader } from '../components/ForgeLoader';
    lift/race pick when the goal is a body weight, and running when the split
    has no cardio. Everything the builder offers beyond the common case —
    custom events, pace metrics, other lifts — is one tap away on Goals. */
-type StepId = 'name' | 'focus' | 'days' | 'goal' | 'target' | 'running' | 'week';
+type StepId = 'name' | 'focus' | 'days' | 'goal' | 'target' | 'running' | 'numbers' | 'week';
 
 const blank: AthleteSetup = {
   displayName: '', username: '', birthDate: '', units: 'Imperial', height: '', startingWeight: '', currentWeight: '',
@@ -212,8 +212,9 @@ function OnboardingForm() {
     'name', 'focus', 'days',
     ...(askGoal ? (weightGoal ? ['target'] : ['goal', 'target']) as StepId[] : []),
     ...(runningPlanned ? ['running'] as StepId[] : []),
+    ...(isEditing ? [] : ['numbers'] as StepId[]),
     'week',
-  ], [askGoal, weightGoal, runningPlanned]);
+  ], [askGoal, weightGoal, runningPlanned, isEditing]);
   const [stepId, setStepId] = useState<StepId>(needsExercises ? 'week' : needsGoal && askGoal ? (weightGoal ? 'target' : 'goal') : 'name');
   const stepIndex = Math.max(0, steps.indexOf(stepId));
   /* Forward slides in from the right, Back from the left — the direction a
@@ -270,6 +271,26 @@ function OnboardingForm() {
     return { ...common, type: 'Strength', title: `${target} ${goalUnit} ${label}`, connection: 'No fixed day', exercise: goalExercise };
   };
   const [pendingGoal, setPendingGoal] = useState<CreatedGoal | null>(null);
+
+  /* DAY ONE GETS NUMBERS. Without any, every load on Today read "Find your
+     weight" and every goal "No data yet" until a week of logging. Most lifters
+     can say "about 185 for 5"; that is enough to write the first week, and the
+     first logged set of each lift replaces it (lib/startingNumbers.ts). Every
+     field is optional. */
+  const numberLifts = useMemo(() => {
+    const seen = new Set<string>();
+    return [...pendingGoalLift, 'Bench Press', 'Back Squat', 'Deadlift']
+      .filter(lift => !isWeightedBodyweight(lift))
+      .filter(lift => { const key = canonicalLiftKey(lift); if (seen.has(key)) return false; seen.add(key); return true; });
+  }, [pendingGoalLift.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [startNums, setStartNums] = useState<Record<string, { weight: string; reps: string }>>({});
+  const numberFor = (lift: string) => startNums[lift] || (goalKind === 'lift' && lift === goalExercise && goalCurrent ? { weight: goalCurrent, reps: '1' } : { weight: '', reps: '' });
+  const setNumber = (lift: string, field: 'weight' | 'reps', value: string) => { setError(''); setStartNums(current => ({ ...current, [lift]: { ...numberFor(lift), [field]: value.replace(/[^\d.]/g, '') } })); };
+  const startingList = numberLifts.map(lift => ({ lift, weight: Number(numberFor(lift).weight), reps: Number(numberFor(lift).reps) || 5 }))
+    .filter(item => item.weight > 0 && item.weight <= 1500 && item.reps >= 1 && item.reps <= 20);
+  /* A runner with years on Strava should not start from zero either: the
+     connection lives in Profile, so the end of setup takes them straight to it. */
+  const [importStrava, setImportStrava] = useState(false);
 
   const submitName = () => {
     if (!data.displayName.trim()) return fail('Enter your name.');
@@ -344,6 +365,7 @@ function OnboardingForm() {
          days than they train. */
       const runningDays = Math.min(data.trainingDays, data.runningDays || plannedCardioDays || 0);
       const completed = { ...data, username, runningDays, splitDays, splitSource: 'Recommended' as const, acceptedSafety: true, completedAt: new Date().toISOString(),
+        ...(startingList.length ? { startingNumbers: startingList } : {}),
         ...(isEditing ? {} : { acceptedTermsAt: new Date().toISOString(), healthConsentAt: new Date().toISOString(), consentVersion: LEGAL.version }) };
       /* The goal lands after every await, so a failed save above can be
          retried without writing it twice. */
@@ -355,7 +377,7 @@ function OnboardingForm() {
       if (data.injuryConstraint && data.limitationNotes.trim() && !isEditing) void saveNote(createNote('injury', data.limitationNotes.trim(), extractArea(data.limitationNotes)));
       const from = (location.state as { from?: string } | null)?.from;
       success();
-      navigate(from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
+      navigate(importStrava && !isEditing ? '/profile?view=connections' : from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
     } catch (reason) {
       fail(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
     }
@@ -462,6 +484,23 @@ function OnboardingForm() {
           </button>;
         })}</div>
       </> };
+      case 'numbers': return {
+        body: <>
+          <h1>What can you lift right now?</h1>
+          <p className="ob-lead">A rough number is fine, like 185 for 5. Forge writes your first week from it, and your first logged set replaces it. Skip any you don’t know.</p>
+          <div className="ob-numbers">{numberLifts.map(lift => {
+            const value = numberFor(lift);
+            return <div className="ob-number-row" key={lift}>
+              <strong>{CORE_LIFT_LABELS[lift] || lift}</strong>
+              <label><input className="ob-input small" inputMode="decimal" value={value.weight} onChange={event => setNumber(lift, 'weight', event.target.value)} placeholder="—" aria-label={`${lift} weight in ${massUnit}`} /><span>{massUnit}</span></label>
+              <span className="ob-number-x">×</span>
+              <label><input className="ob-input small" inputMode="numeric" value={value.reps} onChange={event => setNumber(lift, 'reps', event.target.value)} placeholder="5" aria-label={`${lift} reps`} /><span>reps</span></label>
+            </div>;
+          })}</div>
+          {(runningPlanned || goalKind === 'race') && <label className="setup-check"><input type="checkbox" checked={importStrava} onChange={event => { tap(); setImportStrava(event.target.checked); }} /><span><strong>I log my runs on Strava</strong><small>After setup, connect it and Forge imports your running history, so paces start from real runs.</small></span></label>}
+        </>,
+        action: <button className="button ob-next" onClick={() => { tap(); go(1); }}>{startingList.length ? 'Continue' : 'Skip for now'}</button>,
+      };
       case 'week': return {
         body: <>
           <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
