@@ -57,3 +57,7 @@ export function BrandMark({ id, name }: { id: string; name: string }) {
    which needs the name beside it to be read at all. */
 const WORDMARKS = new Set(['garmin', 'samsung', 'whoop', 'oura', 'polar', 'suunto', 'wahoo']);
 export const hasWordmark = (id: string) => WORDMARKS.has(id) && Boolean(logos[id]);
+/* Whether Forge has the brand's artwork at all. Without it, the name is set in
+   type rather than squeezed into an initials tile that looks like a missing
+   image. */
+export const hasLogo = (id: string) => Boolean(logos[id]);
