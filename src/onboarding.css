@@ -147,9 +147,9 @@ textarea.ob-input{min-height:96px;resize:vertical}
 .ob-units button.active{background:var(--surface,#fff);color:var(--text);box-shadow:0 1px 3px rgb(0 0 0 / .14),0 0 0 1px color-mix(in srgb,var(--text) 6%,transparent)}
 
 .ob-goal{display:grid;gap:3px;padding:16px 16px;border-left:4px solid var(--accent);border-radius:14px;background:var(--surface-sunken)}
-.ob-goal span{font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-text)}
-.ob-goal strong{font-size:18px;font-weight:800;color:var(--text)}
-.ob-goal small{color:var(--muted);font-weight:600}
+.ob-goal>span{font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-text)}
+.ob-goal>strong{font-size:18px;font-weight:800;color:var(--text)}
+.ob-goal>small{color:var(--muted);font-weight:600}
 .ob-week{display:grid;gap:8px}
 .ob-screen .setup-day{border-radius:14px}
 .ob-screen .setup-day-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px}
@@ -184,3 +184,34 @@ textarea.ob-input{min-height:96px;resize:vertical}
 .ob-number-row.half .ob-input.small{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--warning,#c77700) 70%,transparent)}
 .ob-number-remove{display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:none;color:var(--muted)}
 .ob-number-restore{margin-top:2px}
+
+/* Why a goal and why a top set, answered by what the athlete types: the goal
+   draws its path and verdict; a starting set shows the max it implies. */
+.ob-path{display:grid;gap:8px;padding:14px 16px;border-radius:14px;background:var(--surface-sunken);border:1.5px solid var(--hairline-strong);--path:var(--accent)}
+.ob-path.stretch{--path:var(--warning,#c77700)}
+.ob-path.hard{--path:var(--danger,#c0392b)}
+.ob-path-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ob-path-head strong{font-size:16px;font-weight:800;line-height:1.35;color:var(--text)}
+.ob-path-verdict{flex:none;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:var(--path);background:color-mix(in srgb,var(--path) 14%,transparent)}
+.ob-path-chart{position:relative;height:52px;margin:6px 10px}
+.ob-path.compact .ob-path-chart{height:34px}
+.ob-path-chart svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;animation:ob-path-draw .6s ease-out both}
+.ob-path-line{stroke:var(--path);stroke-width:3;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.ob-path-chart i{position:absolute;border-radius:50%;transform:translate(-50%,-50%)}
+.ob-path-mark{width:6px;height:6px;background:var(--path);opacity:.5}
+.ob-path-start{width:12px;height:12px;background:var(--surface,#fff);box-shadow:inset 0 0 0 2.5px var(--path)}
+.ob-path-end{width:14px;height:14px;background:var(--path);animation:ob-pop .3s .45s cubic-bezier(.2,.9,.3,1.4) both}
+.ob-path-ends{display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.ob-path-note{margin:0;font-size:14px;line-height:1.45;color:var(--muted)}
+.ob-path-use{justify-self:start;font-weight:800}
+.ob-path-hint,.ob-why{margin:0;font-size:14px;line-height:1.45;color:var(--muted)}
+.ob-why{font-weight:600}
+.ob-goal .ob-path{margin-top:10px;padding:10px 0 0;border:0;border-top:1px solid var(--hairline-strong);border-radius:0;background:none}
+.ob-goal .ob-path-head strong{font-size:14px}
+.ob-number{display:grid;gap:4px}
+.ob-number-max{margin:0;font-size:13px;line-height:1.4;color:var(--muted);font-variant-numeric:tabular-nums;animation:ob-pop .22s ease-out}
+.ob-number-max strong{color:var(--accent-text);font-weight:800}
+.ob-day-goal{padding:2px 8px;border-radius:999px;font-style:normal;font-size:11px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-text);background:color-mix(in srgb,var(--accent) 14%,transparent);white-space:nowrap}
+@keyframes ob-path-draw{from{clip-path:inset(-8px 100% -8px -8px)}to{clip-path:inset(-8px -8px -8px -8px)}}
+@media (prefers-reduced-motion:reduce){.ob-path-chart svg,.ob-path-end{animation:none}.ob-number-max{animation:none}}
+.ob-week .ob-day-text strong{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px}
