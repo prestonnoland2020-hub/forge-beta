@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { backfillKinds, BACKFILL_MAX_DAYS, GARMIN_API, HISTORY_YEARS, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminActivityType, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
+import { backfillKinds, historicalDataEnabled, BACKFILL_MAX_DAYS, GARMIN_API, HISTORY_YEARS, GARMIN_AUTHORIZE, exchangeToken, freshAccessToken, garminActivityType, garminCredentials, pkcePair, rpc, type GarminConnection } from '../_shared/garmin.ts';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -23,6 +23,7 @@ type Refusal = 'permission' | 'rate-limit' | 'other';
 const refusalOf = (status: number): Refusal => status === 412 || status === 403 ? 'permission' : status === 429 ? 'rate-limit' : 'other';
 
 async function requestBackfill(accessToken: string, days: number): Promise<{ requested: boolean; refused?: Refusal }> {
+  if (!historicalDataEnabled()) return { requested: false, refused: 'permission' };
   const end = Math.floor(Date.now() / 1000);
   const start = end - Math.min(days, BACKFILL_MAX_DAYS) * 86400;
   const results = await Promise.all(backfillKinds().map(async kind => {
@@ -68,6 +69,7 @@ const HISTORY_BLOCKED = '2100-01-01T00:00:00.000Z';
 const historyBlocked = (requestedAt?: string | null) => Boolean(requestedAt) && new Date(requestedAt!).getUTCFullYear() >= 2100;
 
 async function walkHistory(accessToken: string, from: string | null | undefined, save: (reachedIso: string) => Promise<unknown>): Promise<void> {
+  if (!historicalDataEnabled()) { await save(HISTORY_BLOCKED); return; }
   const floor = historyFloor();
   let end = from && !historyBlocked(from) ? Math.floor(new Date(from).getTime() / 1000) : Math.floor(Date.now() / 1000) - BACKFILL_MAX_DAYS * DAY;
   const started = Date.now();
@@ -116,7 +118,7 @@ Deno.serve(async request => {
         admin.from('external_activities').select('*', { count: 'exact', head: true }).eq('owner_id', auth.user.id).eq('provider', 'garmin'),
         admin.from('health_daily_snapshots').select('*', { count: 'exact', head: true }).eq('owner_id', auth.user.id).eq('provider', 'garmin'),
       ]);
-      return json({ configured, connected: row?.status === 'active', lastSyncedAt: row?.last_push_at || row?.last_synced_at, importedActivities: activities || 0, healthDays: days || 0, historyComplete: historyDone(row?.history_requested_at), historyBlocked: historyBlocked(row?.history_requested_at) });
+      return json({ configured, connected: row?.status === 'active', lastSyncedAt: row?.last_push_at || row?.last_synced_at, importedActivities: activities || 0, healthDays: days || 0, historyComplete: historyDone(row?.history_requested_at), historyBlocked: !historicalDataEnabled() || historyBlocked(row?.history_requested_at) });
     }
     /* A GARMIN HISTORY, FROM GARMIN'S OWN EXPORT. Garmin backfills past data
        only to Enterprise programs; any athlete can download their history

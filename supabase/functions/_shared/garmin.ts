@@ -152,6 +152,15 @@ export const BACKFILL_KINDS = ['activities', 'dailies', 'sleeps', 'hrv'];
    sleeps or HRV only earns a 403 ("User not registered with consumer") and
    spends the rate limit on nothing. */
 export const backfillKinds = () => Deno.env.get('GARMIN_HEALTH_API') === 'true' ? BACKFILL_KINDS : ['activities'];
+/* WHETHER THIS PROGRAM MAY ASK FOR PAST DATA AT ALL. Garmin answers every
+   backfill — activities and health alike — with 412 "required
+   HISTORICAL_DATA_EXPORT" on the Starter tier, and every refused request
+   still counts against the app-wide limit of 100 a minute; a reconnect and a
+   few syncs were enough to have Garmin refuse everything for a minute. Until
+   Garmin grants Enterprise historical data (then set GARMIN_HISTORICAL_DATA
+   to "true"), Forge makes no backfill requests: data arrives by push when
+   the watch syncs, and the past comes from the athlete's export upload. */
+export const historicalDataEnabled = () => Deno.env.get('GARMIN_HISTORICAL_DATA') === 'true';
 /* Activity API §7: one historical request may span at most one month. */
 export const BACKFILL_MAX_DAYS = 30;
 /* How far back a full history reaches. Garmin answers a window older than it

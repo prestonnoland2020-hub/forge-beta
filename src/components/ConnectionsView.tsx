@@ -66,7 +66,7 @@ export function ConnectionsView({ garmin, garminBusy, garminMessage, onGarmin, s
       <header><Name id="garmin" name="Garmin" /><span className="cx-status"><i aria-hidden="true" />Connected</span></header>
       <p className="cx-line">{status}{garmin.lastSyncedAt ? <span> · updated {ago(garmin.lastSyncedAt)}</span> : null}</p>
       {garmin.historyBlocked
-        ? <p className="cx-note">New workouts arrive each time your watch syncs. Garmin hasn’t opened your past activities to Forge yet.</p>
+        ? <p className="cx-note">New workouts, sleep and HRV arrive each time your watch syncs with Garmin Connect. Add earlier activities from a Garmin export below.</p>
         : garmin.historyComplete === false && <p className="cx-note">Importing your Garmin history. Older activities arrive over the next few app opens.</p>}
       {garminMessage && <p className="cx-note" role="status">{garminMessage}</p>}
       <footer>
