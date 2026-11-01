@@ -1,4 +1,5 @@
 import { createContext,useCallback,useContext,useEffect,useMemo,useRef,useState,type ReactNode } from 'react';
+import { useToday } from '../../lib/dayClock';
 import { isDemoMode } from '../../lib/env';
 import { buildDailyRecommendation,recommendationFingerprint,DAILY_RECOMMENDATION_VERSION,type DailyRecommendation,type RecommendationSplitDay } from '../../lib/dailyRecommendationEngine';
 import { useAuth } from '../auth/AuthProvider';
@@ -19,7 +20,7 @@ import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 import { useAthleteNotes } from './useAthleteNotes';
 import { bodyLogState,bodyLogReason,exerciseBlocked } from '../../lib/bodyLog';
 import { useTodayOverride } from './coachOverrides';
-import { shortenRecommendation,easeRecommendation,EASE_PERCENT } from '../../lib/coachActions';
+import { shortenRecommendation,easeRecommendation,moderateRecommendation,EASE_PERCENT } from '../../lib/coachActions';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void;
   /* The full prescription for ANY split position, built by the same pipeline
@@ -140,6 +141,8 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const splitDayRaw=days.find(day=>day.position===duePosition)||trainingDays[0]||days[0]||{position:1,name:'Start training',type:'strength' as const,muscles:[],exercises:[],cardioTypes:[]};
   const splitDay=coachRest?{...splitDayRaw,name:'Rest day',type:'rest' as const,muscles:[],exercises:[],cardioTypes:[]}:splitDayRaw;
   const coachStamp=coachOverride?`${coachOverride.rest?'R':''}:${coachOverride.position||''}:${coachOverride.minutes||''}`:'';
+  /* Re-read when the day turns, so a phone that slept overnight wakes to today's plan. */
+  useToday();
   const date=isoToday();
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   const aiPlanStamp=useMemo(()=>readLocalAiPlan()?.generatedAt||'',[refreshKey]);
@@ -162,7 +165,9 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   /* THE BODY LOG IS AN INPUT TO TODAY. A note is part of the fingerprint, so
      the saved row from before "my knee hurts" is not reused all day. */
   const bodyLogStamp=`${bodyLog.areas.join('+')}|${bodyLog.restrictions.join('+')}${bodyLog.sick?':sick':''}${bodyLog.easing?':easing':''}`;
-  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp]);
+  /* Starting numbers are an input too: giving them must replace the saved "Find your weight" row. */
+  const startStamp=(setup?.startingNumbers||[]).map(item=>`${item.lift}:${item.weight}x${item.reps}`).join('+');
+  const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp,startStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp,startStamp]);
   const inputFingerprint=useMemo(()=>recommendationFingerprint({date,splitDay,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp}),[planInputsStamp,date,splitDay,exercises,records,goals,strategy.loadBiasPercent,cycle.revision,aiPlanStamp]);
   /* ONE PIPELINE, ANY DAY OF THE SPLIT.
 
@@ -358,6 +363,8 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       const recovering=recovery.confidence!=='Low'&&(recovery.readiness<65||recovery.strengthFatigue==='High');
       const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness,holding:recovering,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
       const accessorySessions=liveSessions.get(key)||0;
+      /* No session yet means the best is the starting number from setup, and the card says so. */
+      const fromWhat=accessorySessions?`your best calc max ${live.best}`:`the starting number you gave (calc max ${live.best}) — your first logged set replaces it`;
       const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
          weight when the set says so, and an unwaved 'baseline' flag was
@@ -367,8 +374,8 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
          over it was describing a program it is not running. */
       const readinessNote=lowReadiness&&tests&&todayHoldsTheAttempt?` Readiness ${recovery.readiness} — the attempt waits for a better day.`:recovering?` Readiness ${recovery.readiness} — holding the load today.`:'';
       return{...prescription,source:'history' as const,rationale:(tests
-        ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from your best calc max ${live.best}.`
-        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from your best calc max ${live.best}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`)+readinessNote};
+        ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from ${fromWhat}.`
+        :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from ${fromWhat}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`)+readinessNote};
     };
     /* The day's plan prescription leads with the goal lift; every other set
        keeps its own exercise and simply joins the wave. */
@@ -393,13 +400,17 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     if(!built)return built;
     /* Sick: the day is rest (coachRest above), and the card says why and
        how it ends. Easing back: the same session, lighter. */
-    const eased=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric'):built;
+    const lighter=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric'):built;
+    const eased=bodyLog.pregnant&&lighter!==built?moderateRecommendation(lighter,setup?.units==='Metric'):lighter;
+    /* Pregnancy and postpartum say what changed and whose word comes first. */
     const bodyNote=bodyLog.sick&&!pinnedPosition?'You’re sick, so today is a rest day. Tell Forge when you feel better and it will ease you back in.'
+      :bodyLog.pregnant&&eased!==built?'Pregnancy · moderate loads, no max attempts, easy cardio. Your clinician’s advice comes first.'
+      :bodyLog.postpartum&&eased!==built?'Postpartum · lighter loads, no running or impact until you’re cleared. Tell Forge when you are.'
       :eased!==built?`Easing back in · ${EASE_PERCENT}% lighter today`:undefined;
     if(!coachOverride)return bodyNote?{...eased,coachNote:bodyNote}:eased;
     const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(eased,coachOverride.minutes):eased;
     return{...fitted,coachNote:bodyNote||coachOverride.note||undefined};
-  },[buildFor,splitDay,coachOverride,coachRest,bodyLog.sick,bodyLog.easing,pinnedPosition,setup?.units]);
+  },[buildFor,splitDay,coachOverride,coachRest,bodyLog.sick,bodyLog.easing,bodyLog.pregnant,bodyLog.postpartum,pinnedPosition,setup?.units]);
   /* NAME FIRST, POSITION SECOND. The logger numbers the days from the local
      copy of the split; this list comes from the server's. They normally agree,
      but they are two lists, and one omitted rest day shifts every index after

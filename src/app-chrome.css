@@ -66,18 +66,13 @@
     transform: translateX(calc(var(--tab-index, 0) * 100%));
     transition: transform .42s var(--spring);
   }
-  /* Sliding a finger along the bar: the browser must not take the sideways
-     drag as a scroll or a back-swipe, and while the finger is down the bar
-     lifts a little and the pill follows quickly, so it reads as held. */
-  /* SIDEWAYS ONLY. This was `none`, which also took the UPWARD drag: the bar
-     covers the bottom inch of the screen, which is exactly where a thumb
-     starts a scroll, and a swipe that began on it moved nothing — measured in
-     the simulator, a 345pt swipe up from the bar left Today where it was while
-     the same swipe from the card above it scrolled. On a short page there is
-     nothing to scroll, so it only showed on the long ones: Preston's "the
-     navigation bar sticks on certain pages". pan-y hands the vertical drag
-     back to the page and keeps the sideways one for the scrub. */
-  .tab-bar { touch-action: pan-y; }
+  /* Sliding a finger along the bar: the sideways drag is the bar's, an
+     up-or-down one is still the page's. This was touch-action: none, which
+     also swallowed vertical drags, so a thumb that started its scroll low on
+     the screen landed on the bar and the page did not move — the bar felt
+     stuck to the finger. While a slide is held the bar lifts a little and
+     the pill follows quickly, so it reads as held. */
+  .tab-bar, .tab-bar .tab { touch-action: pan-y; }
   .tab-bar.scrubbing { transform: scale(1.03); }
   .tab-bar.scrubbing .tab-indicator { transition-duration: .2s; background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .tab-bar .tab {
@@ -90,8 +85,10 @@
   }
   .tab-bar .tab .nav-icon { width: 26px; height: 26px; display: grid; place-items: center; border: 0; background: none; }
   .tab-bar .tab .nav-icon svg { width: 23px; height: 23px; transition: transform .28s var(--spring); }
+  /* 11px, a hair tight, as iOS's own tab labels are: "Activities" at 12px
+     bold filled its pill edge to edge, and on a 375pt phone ran past it. */
   .tab-bar .tab small {
-    font-size: 12px; font-weight: 700; letter-spacing: 0;
+    font-size: 11px; font-weight: 700; letter-spacing: -.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
   }
   .tab-bar .tab.active { color: var(--accent-text, var(--accent)); }

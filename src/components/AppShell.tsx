@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useToday } from '../lib/dayClock';
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
 import { CoachCheckIn } from './CoachCheckIn';
@@ -144,6 +145,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     return()=>document.removeEventListener('visibilitychange',onVisible);
   },[updateReady,location.pathname,location.search]);
   const screenKey = `${location.pathname}?${new URLSearchParams(location.search).get('view') || ''}`;
+  const today = useToday();
   const lastScreen = useRef({ key: screenKey, depth: screenDepth(location.pathname, location.search) });
   /* Decided while rendering, not in an effect: the new screen's first frame
      has to carry the right direction, or it starts sliding the wrong way and
@@ -239,7 +241,10 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       case '/partners': return { title: 'Partners', back: navState.origin || '/profile' };
       case '/profile': {
         const view = params.get('view');
-        const names: Record<string, string> = { settings: 'Settings', appearance: 'Appearance', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Connections', faq: 'FAQ' };
+        const names: Record<string, string> = { settings: 'Settings', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Connections', faq: 'FAQ' };
+        /* An old link to the appearance page lands on Settings, where the
+           light/dark switch lives now; the header says so. */
+        if (view === 'appearance') return { title: 'Settings', back: '/profile' };
         if (view && names[view]) return { title: names[view], back: view === 'settings' ? '/profile' : '/profile?view=settings' };
         return { title: 'Profile' };
       }
@@ -343,7 +348,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
           : `${syncFailures.map(failure => failure.label).join(', ')} haven’t reached your account. They’re safe on this phone and will retry.`}</span>
         <button onClick={() => { retrySync(); retryAll(); }}>Retry</button>
       </div>}
-      <main className={`page screen-${motion.current}`} key={screenKey}><Outlet /></main>
+      {/* A NEW DAY OPENS THE SCREEN FRESH, so nothing keeps yesterday's
+          date in its state. Not mid-workout: the logger holds unsaved sets. */}
+      <main className={`page screen-${motion.current}`} key={location.pathname === '/workout' ? screenKey : `${screenKey}#${today}`}><Outlet /></main>
     </div>
     <nav className={`tab-bar${hideTabs ? ' away' : ''}${scrubbing ? ' scrubbing' : ''}`} aria-label="Tabs" style={{ '--tab-index': Math.max(0, activeTab) } as CSSProperties}
       onTouchStart={event => { const point = event.touches[0]; scrub.current = point ? { x: point.clientX, y: point.clientY, index: activeTab, active: false, moved: false } : null; }}

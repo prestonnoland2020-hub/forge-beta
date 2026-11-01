@@ -25,8 +25,37 @@ const cardioLogSchema = {
         required: ['cardioType', 'distance', 'unit', 'timeMinutes'],
       },
     },
+    /* ROUNDS, EMOM AND AMRAP COME BACK AS A CIRCUIT, not as rows that try to
+       fit reps and calories into distances. null for anything else. */
+    circuit: {
+      anyOf: [{ type: 'null' }, {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          format: { type: 'string', enum: ['For time', 'EMOM', 'AMRAP'] },
+          rounds: { type: 'integer', minimum: 0, maximum: 60 },
+          minutes: { type: 'number', minimum: 0 },
+          stations: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                name: { type: 'string' },
+                value: { type: 'number', minimum: 0 },
+                unit: { type: 'string', enum: ['meters', 'km', 'miles', 'yards', 'calories', 'reps', 'seconds', 'minutes'] },
+              },
+              required: ['name', 'value', 'unit'],
+            },
+          },
+        },
+        required: ['format', 'rounds', 'minutes', 'stations'],
+      }],
+    },
   },
-  required: ['reflection', 'note', 'rows'],
+  required: ['reflection', 'note', 'rows', 'circuit'],
 };
 
 const cardioLogInstructions = `You convert an athlete's plain-language description of a COMPLETED cardio workout into structured log rows for the Forge training log.
@@ -36,8 +65,9 @@ OUTPUT
 - Each row: cardioType (Run, Walk, Bike, Rowing, Swimming, Elliptical, Stair Climber, Jump Rope — reuse the athlete's own activity name when it is clearly an activity), distance (0 when only time is known), unit, timeMinutes (decimal minutes; 0 when only distance is known).
 - UNIT AND DISTANCE MUST AGREE. A real distance uses miles, km, meters or yards. 'minutes' is only for rows with NO distance — a distance measured in minutes is worth zero miles to the athlete's mileage, pace and race goals.
 - COUNTS GO IN distance WITH A COUNT UNIT. "15 cal assault bike" is distance 15, unit 'calories'; "20 wall balls" is distance 20, unit 'reps'; "40 floors" is distance 40, unit 'floors'. Never turn a count into miles.
-- ROUNDS REPEAT THE WHOLE LIST. "3 rounds of 500m row, 20 WB, 15 cal bike" is those three rows written out three times, in order. A stated total time for the circuit goes in the note, not split across rows.
+- ROUNDS ARE A CIRCUIT. "3 rounds of 500m row, 20 WB, 15 cal bike in 11:00", "EMOM 20: 12 cal row, 10 burpees" and "AMRAP 15 — 6 rounds" fill circuit: format (For time, EMOM or AMRAP), rounds (completed rounds; for EMOM the minutes divided by the number of stations when it divides evenly), minutes (the whole clock, 0 when not stated) and each station once, in order, with its own number and unit. rows still carries one summary row for the circuit: cardioType "Circuit", distance = the total running distance across all rounds in miles (0 if none), unit 'miles', timeMinutes = the clock. For anything that is not rounds of stations, circuit is null.
 - NEVER DROP A STATED DISTANCE. If the athlete says how far they went ("2.1 miles in 20 minutes", "ran 3 in 24"), that number belongs in distance with a distance unit, and the duration belongs in timeMinutes. Only leave distance at 0 when they genuinely gave no distance at all.
+- A SYNCED WATCH SESSION MAY BE IN THE CONTEXT (syncedActivity: activity, miles, minutes). The description then adds detail to that session — it is not a second workout. Keep the watch's totals unless the athlete corrects them: when the described segments come up short of the watch's distance or time, add one easy row for the remainder (warmup, recoveries, cooldown) so the rows sum to what the watch recorded. If the description holds no numbers at all ("felt flat, treadmill"), return the watch session as one row and put their words in the note.
 - Prefer the athlete's interval detail over a synced device summary when both are given, but keep totals consistent with what they stated. If their stated total conflicts with the sum of described segments, trust the segments and flag the difference in the note.
 - Rest between intervals is NOT a row; describe a notable rest scheme in the note.
 - note: one short line of useful context from their words (surface, feel, rest scheme, weather). Empty string when there is nothing beyond the numbers.
@@ -71,7 +101,7 @@ const coachAnswerSchema = {
           type: { type: 'string', enum: ACTION_TYPES },
           dayName: nullable('string'),
           minutes: nullable('integer'),
-          noteKind: { type: ['string', 'null'], enum: ['injury', 'fatigue', 'illness', 'other', null] },
+          noteKind: { type: ['string', 'null'], enum: ['injury', 'fatigue', 'illness', 'pregnancy', 'postpartum', 'other', null] },
           text: nullable('string'),
           area: nullable('string'),
           miles: nullable('number'),
@@ -97,7 +127,7 @@ Your reply is JSON: { answer, actions }. \`answer\` is the coaching answer, writ
 - swap_today { dayName } — today becomes a different split day; dayName must be one of establishedSplit's names exactly.
 - shorten_today { minutes } — the athlete has less time today (10–180). Keep the day, trim it.
 - log_note { noteKind: injury|fatigue|illness|other, text, area, days } — the athlete reported pain, an injury, fatigue, or being sick. text is their words in one line; area is the body part ("knee", "lower back") when there is one; days is how long they said it will last ("a few days" = 3, "all week" = 7), else null. Forge acts on each kind automatically: an injury holds the lifts that load it and swaps running for the bike; fatigue keeps the next days lighter (loads 10% down, cardio easy); a limitation (noteKind other, the athlete's own words in text — "no overhead pressing", "no jumping", "avoid deadlifts", "can't run") takes those movements off the plan, so text must name the movement; illness turns every scheduled day into rest until the athlete says they are better, then eases the first three days back.
-- clear_note { area } — the athlete says a logged issue (athleteHealthNotes) is better or gone. Being sick is logged with area "Sick": "I'm feeling better" clears { area: "Sick" }.
+- clear_note { area } — the athlete says a logged issue (athleteHealthNotes) is better or gone. Being sick is logged with area "Sick": "I'm feeling better" clears { area: "Sick" }. Pregnancy is area "Pregnancy" and postpartum is area "Postpartum": "I've been cleared to run" clears { area: "Postpartum" }.
 - set_weekly_mileage { miles } — they asked to run more or less per week, with a number.
 - set_running_days { days } — they asked to change how many days a week they run.
 - set_load_bias { percent } — they asked for lighter or heavier strength loads across the board (−10 to +10; 2.5 steps).
@@ -106,6 +136,13 @@ Your reply is JSON: { answer, actions }. \`answer\` is the coaching answer, writ
 - create_workout { name, items: exercises } — they asked to save a reusable strength workout from named exercises.
 
 WHEN TO ACT. A message that reports a state (pain, fatigue, illness, no time, travel) or asks for a change gets the matching action. A question ("should I run today?", "what does the plan want this week?") gets an empty actions list — answer it. Never act on something the athlete did not say. Never combine rest_today with swap_today. If the athlete reports pain, log_note is the action — do not also rest_today unless they asked for rest or the pain makes today's session impossible. If the athlete says they are sick (a cold, the flu, a fever, a stomach bug, COVID, "unwell"), the actions are rest_today AND log_note { noteKind: "illness" } with the days they gave — and never prescribe training "if you feel up to it"; a fever is a rest day. Say in \`answer\` what you are changing and why, in one clause, and never claim the change is already made — it is applied when they confirm.
+
+WOMEN'S HEALTH. athleteSex may be supplied ("Female", "Male", "Unspecified" or null). Talk about these plainly and without awkwardness — they are training variables, and an athlete who mentions one should be answered like one who mentions a sore knee.
+- Period / cycle: only when she brings it up. Cramps, a heavy day, low energy → log_note { noteKind: "fatigue", text, days: 1–3 } and keep today lighter; a good day stays a normal day. Never plan around a cycle she did not mention or assume one from athleteSex. Periods that stop or turn irregular during hard training or under-eating are a reason to see a doctor (low energy availability) — say that once, kindly, not as a diagnosis. Severe pain or very heavy bleeding: see a doctor.
+- Pregnancy: when she says she is pregnant → log_note { noteKind: "pregnancy", text }. Forge then keeps loads moderate, takes out max attempts and keeps cardio easy. Coach within that: effort where she can still talk, no max or PR attempts, no new goals that need them, avoid fall and contact risk, overheating and long periods lying flat on her back after the first trimester. Her obstetric clinician's guidance always overrides Forge — say so the first time. Stop and contact her clinician for bleeding, fluid leaking, dizziness or fainting, chest pain, headache, calf pain or swelling, or regular painful contractions.
+- Postpartum: when she says she has had the baby → clear_note { area: "Pregnancy" } and log_note { noteKind: "postpartum", text }. No running or impact until she is cleared (often around six weeks, longer after a C-section); rebuild gradually from light loads; pelvic-floor symptoms (leaking, heaviness) or abdominal doming are reasons to see a pelvic-health physio, not to push through. When she says she is cleared → clear_note { area: "Postpartum" }.
+- Breastfeeding: fuel and hydration matter more; training can continue. Perimenopause and menopause: strength training is especially valuable; poor sleep or hot flashes affecting training → a fatigue note like any other.
+- Never give medical advice beyond this; when something sounds medical, say who to see.
 
 NUMBERS YOU MAY QUOTE. runningFacts carries the athlete's running as Forge counted it: last7Days.miles with the runs behind it, longestRun30d, longestRunEver. weeklyRunning is the week-by-week series. Every distance, pace, time or count you state must appear in the context; never add up the log yourself, and never call a run "your longest" unless runningFacts says it is.`;
 
@@ -160,7 +197,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: cardioScope ? 'forge-cardio-log-v1' : 'forge-coach-v7',
+        prompt_cache_key: cardioScope ? 'forge-cardio-log-v2' : 'forge-coach-v7',
         reasoning: { effort: cardioScope ? 'low' : 'medium' },
         text: cardioScope ? {
           verbosity: 'low',
@@ -301,7 +338,8 @@ Return one editable cardio/circuit using only exact movement names and units in 
         const type = String(row.cardioType || '');
         return { ...row, unit: /row|ski|erg/i.test(type) ? 'meters' : /swim/i.test(type) ? 'yards' : 'miles' };
       });
-      return Response.json({ answer: String(parsed.reflection), cardio: { reflection: String(parsed.reflection), note: String(parsed.note || ''), rows } }, { headers: corsHeaders });
+      const circuit = parsed.circuit && Array.isArray(parsed.circuit.stations) && parsed.circuit.stations.length ? parsed.circuit : null;
+      return Response.json({ answer: String(parsed.reflection), cardio: { reflection: String(parsed.reflection), note: String(parsed.note || ''), rows, circuit } }, { headers: corsHeaders });
     }
     if (workoutScope) {
       const workout = JSON.parse(answer);

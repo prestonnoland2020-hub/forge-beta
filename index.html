@@ -56,7 +56,7 @@
          deliberately fails silent: a browser with storage blocked falls
          through to the prefers-color-scheme block in the CSS, which is the
          correct answer anyway. Keep it in sync with AppearanceProvider's
-         storage key and its lists of ground and accent names. -->
+         storage key. -->
     <script>
       (function () {
         var root = document.documentElement;
@@ -71,22 +71,8 @@
             /* Carried over from the five-package era: those were dark. */
             root.dataset.theme = 'dark';
           }
-          /* The accent has to land before first paint too, or the athlete sees
-             one frame of the brand blue on top of their own colour — which is
-             worse than a plain flash, because it looks like the setting did not
-             save. Any unknown value is left off, and bare :root is signal. */
-          if (/^(signal|flare|coral|amber|tide|harbor)$/.test(saved.accent)) {
-            root.dataset.accent = saved.accent;
-          } else {
-            /* The first accent set retired when Preston's secondary palettes
-               landed. Mapping here as well as in the provider keeps the first
-               painted frame the same colour as the second. */
-            var moved = { ember: 'coral', volt: 'amber', sand: 'harbor', slate: 'harbor' }[saved.accent];
-            if (moved) root.dataset.accent = moved;
-          }
-          if (/^(carbon|midnight|ink|espresso)$/.test(saved.ground)) {
-            root.dataset.ground = saved.ground;
-          }
+          /* Ground, accent and icon are no longer choices: Forge is carbon
+             and signal. Bare :root already is, so nothing else is stamped. */
         } catch (error) { /* System and signal it is. */ }
       })();
     </script>

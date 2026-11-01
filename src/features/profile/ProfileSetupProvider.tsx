@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { setStartingNumbers, type StartingNumber } from '../../lib/startingNumbers';
 import { normalizeMuscleGroups } from '../../lib/muscleGroups';
 import { isRestDay } from '../training/aiPlanService';
 import { supabase } from '../../lib/supabase';
@@ -28,6 +29,13 @@ export type AthleteSetup = {
   /* When, and to which version of the legal documents (lib/legal.ts), the
      athlete agreed. Absent for accounts set up before consent was asked. */
   acceptedTermsAt?:string; healthConsentAt?:string; consentVersion?:string;
+  /* What the athlete said they can already lift, asked once in setup so day
+     one has numbers. A stand-in only: see lib/startingNumbers.ts. */
+  startingNumbers?:StartingNumber[];
+  /* Asked in setup, optional. It sets the example numbers setup shows, the
+     HYROX division it suggests, and tells the coach who it is talking to
+     (women's health — periods, pregnancy, postpartum). */
+  sex?:'Female'|'Male'|'Unspecified';
 };
 
 const legacyStorageKey='forge-athlete-setup-v1';
@@ -59,6 +67,8 @@ export function ProfileSetupProvider({children}:{children:ReactNode}){
     ?{label:'Profile and split',message:`Your latest change did not reach your account (${message}).`}
     :null)),[report]);
   const [setup,setSetup]=useState<AthleteSetup|null>(null);
+  /* Kept in step during render, so the first calculation that reads it already sees it. */
+  setStartingNumbers(setup?.startingNumbers);
   const [loadedUserId,setLoadedUserId]=useState<string|null>(null);
   const loading=Boolean(user)&&loadedUserId!==user?.id;
   const saveSetup=(next:AthleteSetup)=>{if(user){localStorage.setItem(storageKey(user.id),JSON.stringify(next));writeStamp(user.id)}saveAthleteSettings({setup:next});setSetup(next)};
