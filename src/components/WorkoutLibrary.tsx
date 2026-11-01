@@ -3,6 +3,7 @@ import { cardioPlanSummary } from './CardioPlanBuilder';
 import { CircuitWorkoutBuilder } from './CircuitWorkoutBuilder';
 import { useTrainingLibrary, type LibraryWorkout } from '../features/training/TrainingLibraryProvider';
 import { Icon } from './Icon';
+import { SearchField } from './SearchField';
 
 type SplitChoice = { name: string; dayType: string; cardioIds: number[] };
 type BuilderMode = 'manual' | 'forge';
@@ -67,7 +68,7 @@ export function WorkoutLibrary({ splitDays = [], onAttach }: {
     </section>
 
     <section className="card library-table-card">
-      <header><span>{shown.length} saved workout{shown.length === 1 ? '' : 's'}</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search cardio and circuits" aria-label="Search cardio and circuits" /></header>
+      <header><span>{shown.length} saved workout{shown.length === 1 ? '' : 's'}</span><SearchField value={query} onChange={setQuery} placeholder="Search cardio and circuits" aria-label="Search cardio and circuits" /></header>
       <div className="library-table-scroll"><table className="library-table workout-table"><thead><tr><th>Workout</th><th>Format</th><th>Prescription</th><th>Actions</th></tr></thead><tbody>{shown.map(workout => <tr key={workout.id}><td><strong>{workout.name}</strong><small>{workout.source === 'Forge' ? 'Built with Forge' : 'Built manually'}</small></td><td>{workout.plan?.circuitFormat || workout.kind}</td><td>{workout.summary}</td><td>{onAttach && <button onClick={() => openAttach(workout)}>Add to Split</button>}<button onClick={() => openBuilder(workout.source === 'Forge' ? 'forge' : 'manual', workout)}>Edit</button><button className="danger" onClick={() => remove(workout)}>Delete</button></td></tr>)}</tbody></table>{!shown.length && <div className="library-table-empty">No cardio or circuit workouts yet.</div>}</div>
     </section>
 

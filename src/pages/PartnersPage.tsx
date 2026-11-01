@@ -8,10 +8,11 @@ import { isDemoMode } from '../lib/env';
 import {
   loadPartners, loadPartnerRequests, addPartner, declinePartner, removePartner,
   inviteLink, lastTrainedLabel, pendingInvite, clearPendingInvite, didToday,
-  searchAthletes, addPartnerById, loadDiscoverable, setDiscoverable, type AthleteResult,
+  searchAthletes, suggestAthletes, addPartnerById, loadDiscoverable, setDiscoverable, type AthleteResult, type SuggestedAthlete,
   type Partner, type PartnerRequest, type AddResult,
 } from '../features/friends/partnerService';
 import { Icon } from '../components/Icon';
+import { SearchField } from '../components/SearchField';
 
 const MESSAGES: Record<AddResult, string> = {
   requested: 'Request sent. They will see it next time they open Forge.',
@@ -38,6 +39,7 @@ export function PartnersPage() {
   const [myUsername, setMyUsername] = useState('');
   const [results, setResults] = useState<AthleteResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [suggested, setSuggested] = useState<SuggestedAthlete[]>([]);
   const [discoverable, setDiscoverableState] = useState(true);
   const unit = setup?.units === 'Metric' ? 'kg' : 'lb';
 
@@ -54,6 +56,13 @@ export function PartnersPage() {
       .then(({ data }) => setMyUsername(String(data?.username || '')));
     void loadDiscoverable().then(setDiscoverableState).catch(() => undefined);
   }, [user]);
+
+  /* SUGGESTED BEFORE ANYTHING IS TYPED. An empty search used to be a blank
+     box asking for a name the athlete might not know; now it opens on
+     partners of partners and people with the same goal. Reloaded after an
+     add, so someone just asked does not stay on the list. */
+  const loadSuggested = useCallback(() => { void suggestAthletes().then(setSuggested).catch(() => setSuggested([])); }, []);
+  useEffect(() => { if (user) loadSuggested(); }, [user, loadSuggested]);
 
   /* Search as they type, a beat behind the keyboard so a name is not eight
      round trips. */
@@ -74,7 +83,7 @@ export function PartnersPage() {
     try {
       const outcome = await addPartnerById(result.id);
       setMessage(MESSAGES[outcome] || 'That did not work.');
-      if (outcome === 'accepted' || outcome === 'requested') { setUsername(''); setResults([]); clearPendingInvite(); }
+      if (outcome === 'accepted' || outcome === 'requested') { setUsername(''); setResults([]); clearPendingInvite(); setSuggested(current => current.filter(item => item.id !== result.id)); loadSuggested(); }
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : 'That did not work.');
@@ -119,13 +128,19 @@ export function PartnersPage() {
 
     <section className="card partner-add">
       <h3>Add a partner</h3>
-      <form onSubmit={event => { event.preventDefault(); if (results[0]?.relation === 'none') void pick(results[0]); }}>
-        <label htmlFor="partner-username">Search by name or username</label>
-        <div className="partner-add-row">
-          <input id="partner-username" value={username} autoCapitalize="none" autoCorrect="off" spellCheck={false}
-            placeholder="Adam, or adamgomez" onChange={event => setUsername(event.target.value)} />
-        </div>
+      <form role="search" onSubmit={event => { event.preventDefault(); if (results[0]?.relation === 'none') void pick(results[0]); }}>
+        <SearchField id="partner-username" value={username} onChange={setUsername} autoCapitalize="none"
+          placeholder="Search by name or username" aria-label="Search by name or username" />
       </form>
+      {/* Before typing: who Forge suggests, each a tap from added. */}
+      {username.trim().length < 2 && suggested.length > 0 && <div className="partner-results">
+        <small className="partner-results-label">Suggested</small>
+        {suggested.map(person => <button type="button" className="partner-result" key={person.id} disabled={busy} onClick={() => void pick(person)}>
+          <span className="partner-mark" aria-hidden="true">{person.displayName.slice(0, 2).toUpperCase()}</span>
+          <span><strong>{person.displayName}</strong><small>{person.mutuals ? `${person.mutuals} shared ${person.mutuals === 1 ? 'partner' : 'partners'}` : `@${person.username}`}</small></span>
+          <b>Add</b>
+        </button>)}
+      </div>}
       {/* Results, or the honest reason there are none. */}
       {username.trim().length >= 2 && <div className="partner-results">
         {results.map(result => <button type="button" className="partner-result" key={result.id}

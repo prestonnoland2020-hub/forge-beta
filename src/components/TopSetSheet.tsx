@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import { DialField } from './NumberDial';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { SearchField } from './SearchField';
 
 /* ADDING A TOP SET IS ONE ANSWER, NOT A SCAVENGER HUNT.
 
@@ -128,7 +129,7 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
           </div>
         : <label className="top-set-sheet-search">
             Exercise
-            <input ref={search} value={query} onChange={event => setQuery(event.target.value)} placeholder="Type an exercise — e.g. Smith incline bench" autoComplete="off" />
+            <SearchField ref={search} value={query} onChange={setQuery} placeholder="Search exercises, e.g. Smith incline bench" />
           </label>}
 
       {!lift && <div className="top-set-sheet-results">
