@@ -27,6 +27,13 @@ export type BodyLogState = {
      come down and the day is kept light, instead of the full week resuming
      the morning after a fever. */
   easing: boolean;
+  /* PREGNANT: training continues, moderately — loads come down, no set
+     under five reps (so no max attempts), cardio easy. Her clinician's
+     guidance outranks all of it, and the card says so. */
+  pregnant: boolean;
+  /* POSTPARTUM: lighter loads and no running or impact until she says she
+     has been cleared, which clears the note. */
+  postpartum: boolean;
 };
 
 /* SICKNESS IS A FATIGUE NOTE WITH "SICK" AS ITS AREA. The notes table allows
@@ -36,6 +43,19 @@ export type BodyLogState = {
 export const SICK_AREA = 'Sick';
 export const isSickNote = (note: { kind: string; area?: string }) =>
   note.kind === 'fatigue' && (note.area || '').toLowerCase() === SICK_AREA.toLowerCase();
+/* PREGNANCY AND POSTPARTUM ARE NOTES TOO, kind "other" with their own area,
+   for the same reason sickness is fatigue named "Sick": the live notes table
+   allows three kinds, and a named area needs no migration. They are states of
+   the whole body, not limitations, so their words are never read as
+   movements to avoid. Pregnancy holds for about forty weeks; postpartum for
+   six, the usual point of a clinician's clearance, unless cleared sooner. */
+export const PREGNANCY_AREA = 'Pregnancy';
+export const POSTPARTUM_AREA = 'Postpartum';
+export const PREGNANCY_DAYS = 280;
+export const POSTPARTUM_DAYS = 42;
+export const isPregnancyNote = (note: { kind: string; area?: string }) => (note.area || '').toLowerCase() === PREGNANCY_AREA.toLowerCase();
+export const isPostpartumNote = (note: { kind: string; area?: string }) => (note.area || '').toLowerCase() === POSTPARTUM_AREA.toLowerCase();
+const isLifeStageNote = (note: { kind: string; area?: string }) => isPregnancyNote(note) || isPostpartumNote(note);
 /* How long the plan stays light after the sickness ends. */
 export const EASE_BACK_DAYS = 3;
 const plusDays = (iso: string, days: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
@@ -93,12 +113,17 @@ export function bodyLogState(notes: BodyLogNote[], todayIso: string): BodyLogSta
      happened to name a body part; an injury or limitation note's own words
      now decide which movements come off. Sickness and tiredness are handled
      as whole days below, not as movements. */
-  const limiting = notes.filter(note => current(note) && (note.kind === 'injury' || note.kind === 'other') && !isSickNote(note));
+  const limiting = notes.filter(note => current(note) && (note.kind === 'injury' || note.kind === 'other') && !isSickNote(note) && !isLifeStageNote(note));
   const said = limiting.map(note => plainText(`${note.note || ''} ${note.area || ''}`));
   const rules = MOVEMENT_RULES.filter(rule => said.some(text => rule.said.test(text)));
   const blockedMovements = rules.map(rule => rule.lifts).filter((lifts): lifts is string => Boolean(lifts));
-  const restrictions = Array.from(new Set([...areas.map(area => `${area} protected`), ...rules.map(rule => rule.label)]));
-  const runningSaid = rules.some(rule => rule.running);
+  const pregnant = notes.some(note => current(note) && isPregnancyNote(note));
+  const postpartum = !pregnant && notes.some(note => current(note) && isPostpartumNote(note));
+  /* After birth, impact waits for clearance: jumping comes off with running. */
+  if (postpartum) blockedMovements.push('jump|burpee|plyo|bound|box');
+  const restrictions = Array.from(new Set([...areas.map(area => `${area} protected`), ...rules.map(rule => rule.label),
+    ...(pregnant ? ['pregnancy: moderate loads, no max attempts'] : []), ...(postpartum ? ['postpartum: no running or impact yet'] : [])]));
+  const runningSaid = rules.some(rule => rule.running) || postpartum;
   const sickNotes = notes.filter(isSickNote);
   const sick = sickNotes.some(note => note.status === 'active' && (!note.bufferUntil || note.bufferUntil >= todayIso));
   /* Easing covers the days after a sickness ended — by its buffer running
@@ -111,7 +136,7 @@ export function bodyLogState(notes: BodyLogNote[], todayIso: string): BodyLogSta
     return ended && plusDays(note.bufferUntil, EASE_BACK_DAYS) >= todayIso;
   });
   const tired = notes.some(note => note.kind === 'fatigue' && !isSickNote(note) && note.status === 'active' && Boolean(note.bufferUntil) && note.bufferUntil! >= todayIso);
-  return { areas, blockedMuscles, blocksRunning: runningSaid || areas.some(area => RUN_BLOCKING.test(area.toLowerCase())), blockedMovements, restrictions, sick, easing: recovering || tired };
+  return { areas, blockedMuscles, blocksRunning: runningSaid || areas.some(area => RUN_BLOCKING.test(area.toLowerCase())), blockedMovements, restrictions, sick, easing: recovering || tired || pregnant || postpartum, pregnant, postpartum };
 }
 
 /* An exercise is blocked when the muscle it is FOR is one the note protects.
@@ -127,7 +152,7 @@ export const bodyLogReason = (state: BodyLogState) => {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : 'Your body log';
 };
 
-export const EMPTY_BODY_LOG: BodyLogState = { areas: [], blockedMuscles: [], blocksRunning: false, blockedMovements: [], restrictions: [], sick: false, easing: false };
+export const EMPTY_BODY_LOG: BodyLogState = { areas: [], blockedMuscles: [], blocksRunning: false, blockedMovements: [], restrictions: [], sick: false, easing: false, pregnant: false, postpartum: false };
 
 /* WHAT BEING SICK MEANS FOR ONE DATE, for anything that draws days ahead —
    the Plan week. The same rule as bodyLogState, asked of a day instead of

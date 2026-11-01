@@ -32,6 +32,10 @@ export type AthleteSetup = {
   /* What the athlete said they can already lift, asked once in setup so day
      one has numbers. A stand-in only: see lib/startingNumbers.ts. */
   startingNumbers?:StartingNumber[];
+  /* Asked in setup, optional. It sets the example numbers setup shows, the
+     HYROX division it suggests, and tells the coach who it is talking to
+     (women's health — periods, pregnancy, postpartum). */
+  sex?:'Female'|'Male'|'Unspecified';
 };
 
 const legacyStorageKey='forge-athlete-setup-v1';

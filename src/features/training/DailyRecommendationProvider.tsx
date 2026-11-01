@@ -19,7 +19,7 @@ import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 import { useAthleteNotes } from './useAthleteNotes';
 import { bodyLogState,bodyLogReason,exerciseBlocked } from '../../lib/bodyLog';
 import { useTodayOverride } from './coachOverrides';
-import { shortenRecommendation,easeRecommendation,EASE_PERCENT } from '../../lib/coachActions';
+import { shortenRecommendation,easeRecommendation,moderateRecommendation,EASE_PERCENT } from '../../lib/coachActions';
 
 type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:string|null;toggleTopSet:(id:string)=>void;setCardioSelected:(selected:boolean)=>void;markCompleted:()=>void;refresh:()=>void;
   /* The full prescription for ANY split position, built by the same pipeline
@@ -397,13 +397,17 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     if(!built)return built;
     /* Sick: the day is rest (coachRest above), and the card says why and
        how it ends. Easing back: the same session, lighter. */
-    const eased=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric'):built;
+    const lighter=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric'):built;
+    const eased=bodyLog.pregnant&&lighter!==built?moderateRecommendation(lighter,setup?.units==='Metric'):lighter;
+    /* Pregnancy and postpartum say what changed and whose word comes first. */
     const bodyNote=bodyLog.sick&&!pinnedPosition?'You’re sick, so today is a rest day. Tell Forge when you feel better and it will ease you back in.'
+      :bodyLog.pregnant&&eased!==built?'Pregnancy · moderate loads, no max attempts, easy cardio. Your clinician’s advice comes first.'
+      :bodyLog.postpartum&&eased!==built?'Postpartum · lighter loads, no running or impact until you’re cleared. Tell Forge when you are.'
       :eased!==built?`Easing back in · ${EASE_PERCENT}% lighter today`:undefined;
     if(!coachOverride)return bodyNote?{...eased,coachNote:bodyNote}:eased;
     const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(eased,coachOverride.minutes):eased;
     return{...fitted,coachNote:bodyNote||coachOverride.note||undefined};
-  },[buildFor,splitDay,coachOverride,coachRest,bodyLog.sick,bodyLog.easing,pinnedPosition,setup?.units]);
+  },[buildFor,splitDay,coachOverride,coachRest,bodyLog.sick,bodyLog.easing,bodyLog.pregnant,bodyLog.postpartum,pinnedPosition,setup?.units]);
   /* NAME FIRST, POSITION SECOND. The logger numbers the days from the local
      copy of the split; this list comes from the server's. They normally agree,
      but they are two lists, and one omitted rest day shifts every index after

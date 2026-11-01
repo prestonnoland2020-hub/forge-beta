@@ -37,6 +37,9 @@ export const isNoteActive = (note: AthleteNote) => note.status === 'active';
 export const isBufferActive = (note: AthleteNote) => isNoteActive(note) && Boolean(note.bufferUntil && note.bufferUntil >= todayIso());
 export const needsFollowUp = (note: AthleteNote) => {
   if (!isNoteActive(note)) return false;
+  /* "How's the pregnancy today? Better / Same / Worse" is not a question to
+     ask anyone. Pregnancy and postpartum end when she says so, in her words. */
+  if (/^(pregnancy|postpartum)$/i.test(note.area || '')) return false;
   const last = note.followUps[note.followUps.length - 1]?.date || note.reportedAt;
   return last < todayIso();
 };

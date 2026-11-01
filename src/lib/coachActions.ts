@@ -1,5 +1,6 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
-import { SICK_AREA, EASE_BACK_DAYS, limitationIn, plainText } from './bodyLog';
+import { SICK_AREA, EASE_BACK_DAYS, PREGNANCY_AREA, POSTPARTUM_AREA, PREGNANCY_DAYS, POSTPARTUM_DAYS, limitationIn, plainText } from './bodyLog';
+import { weightForReps } from './strength';
 
 /* THE COACH CAN ACT.
 
@@ -130,11 +131,15 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
         const days = bufferDays ?? 3;
         return { type, noteKind: 'fatigue', text, area: SICK_AREA, bufferDays: days, label: `Sick — rest for ${days === 1 ? 'today' : `${days} days`}, then ${EASE_BACK_DAYS} easier days back` };
       }
+      /* PREGNANCY AND POSTPARTUM are whole-body states with long buffers
+         (lib/bodyLog), named by their area. */
+      if (kindText === 'pregnancy') return { type, noteKind: 'other', text, area: PREGNANCY_AREA, bufferDays: PREGNANCY_DAYS, label: 'Pregnancy — moderate loads, no max attempts, easy cardio' };
+      if (kindText === 'postpartum') return { type, noteKind: 'other', text, area: POSTPARTUM_AREA, bufferDays: POSTPARTUM_DAYS, label: 'Postpartum — lighter loads, no running or impact until you’re cleared' };
       const noteKind: 'injury' | 'fatigue' | 'other' = kindText === 'injury' || kindText === 'fatigue' ? kindText : 'other';
       const area = str(entry.area).slice(0, 40) || undefined;
       const what = area || (noteKind === 'fatigue' ? 'fatigue' : 'a note');
       const avoid = noteKind !== 'fatigue' ? limitationIn(text) : null;
-      return { type, noteKind, text, area, bufferDays, label: avoid ? `Plan change: ${avoid}${area ? `, ${area} protected` : ''}` : noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? `Lighter training for ${bufferDays ? `${bufferDays} days` : 'the next few days'}` : `Body log: ${what}` };
+      return { type, noteKind, text, area, bufferDays, label: avoid ? `Plan change: ${avoid}${area ? `, ${area} protected` : ''}` : noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? `Lighter training for ${bufferDays ? `${bufferDays} day${bufferDays === 1 ? '' : 's'}` : 'the next few days'}` : `Body log: ${what}` };
     }
     case 'clear_note': {
       const wanted = norm(str(entry.area));
@@ -258,6 +263,20 @@ export function easeRecommendation(rec: DailyRecommendation, metric = false): Da
   return { ...rec, topSets, cardio };
 }
 
+/* MODERATE, FOR PREGNANCY. On top of easing: no set under five reps, so the
+   wave's heavy doubles and max attempts become a moderate five, written from
+   the calculated max with room to spare. */
+export function moderateRecommendation(rec: DailyRecommendation, metric = false): DailyRecommendation {
+  const step = metric ? 2.5 : 5;
+  const topSets = rec.topSets.map(set => {
+    if (!(set.weight > 0) || set.reps >= 5) return set;
+    const fromMax = set.calculatedMax ? weightForReps(set.calculatedMax, 5) * 0.9 : set.weight * 0.85;
+    const weight = Math.max(step, Math.floor(fromMax / step) * step);
+    return { ...set, reps: 5, weight, rationale: 'Pregnancy — a moderate five instead of a heavy single or double.' };
+  });
+  return { ...rec, topSets };
+}
+
 const cardioMinutesOf = (cardio: NonNullable<DailyRecommendation['cardio']>) => {
   const plan = cardio.session.plan as { duration?: string; distance?: string };
   return Number(plan.duration) || Math.round((Number(plan.distance) || 0) * 9) || 30;
@@ -275,6 +294,12 @@ const cardioMinutesOf = (cardio: NonNullable<DailyRecommendation['cardio']>) => 
    entry goes through parseActions like the server's do. */
 const SICK = /\b(sick|ill|unwell|flu|fever|feverish|covid|virus|stomach bug|food poisoning|strep|sinus infection|chest infection|throwing up|vomiting|nauseous)\b|\b(a|the|my) cold\b|\bcaught a cold\b|\bcoming down with\b/;
 const BETTER = /\b(feel(?:ing)? (?:a lot |much |way )?better|i'?m better|recovered|back to normal|over it|no longer sick|not sick anymore|healthy again)\b/;
+/* Women's health, read the same plain way. A period is a few lighter days
+   when she says it is hitting her, not a rule on every cycle. */
+const PREGNANT = /\b(i'?m|i am|we'?re|we are)\s+(?:\d+\s+weeks\s+)?(pregnant|expecting)\b|\bfound out i'?m pregnant\b/;
+const POSTPARTUM = /\b(had (?:my|the|our|a) baby|gave birth|just delivered|postpartum|post-partum|after (?:my|the) birth)\b/;
+const CLEARED = /\b(cleared|clearance|doctor (?:said|says) (?:i can|it'?s ok)|ok(?:ay)?'?d to (?:run|train))\b/;
+const PERIOD = /\b(my period|on my period|period cramps|cramps|menstrual|time of the month|pms|heavy flow|on my cycle)\b/;
 /* "for 3 days", "a couple of days", "all week", "this week" → days. */
 export function statedDays(lower: string): number | undefined {
   const words: Record<string, number> = { a: 1, one: 1, two: 2, couple: 2, three: 3, few: 3, four: 4, five: 5, six: 6, seven: 7, several: 4 };
@@ -304,6 +329,15 @@ export function localActions(question: string, ctx: ActionContext): CoachAction[
   const sickNow = ctx.activeNoteAreas.some(area => area.toLowerCase() === SICK_AREA.toLowerCase());
   if (sickNow && BETTER.test(lower)) return parseActions([{ type: 'clear_note', area: SICK_AREA }], ctx);
   const area = extractAreaWord(lower);
+  const active = (wanted: string) => ctx.activeNoteAreas.some(item => item.toLowerCase() === wanted.toLowerCase());
+  if (active(POSTPARTUM_AREA) && CLEARED.test(lower)) return parseActions([{ type: 'clear_note', area: POSTPARTUM_AREA }], ctx);
+  if (POSTPARTUM.test(lower)) {
+    if (active(PREGNANCY_AREA)) raw.push({ type: 'clear_note', area: PREGNANCY_AREA });
+    raw.push({ type: 'log_note', noteKind: 'postpartum', text });
+    return parseActions(raw, ctx);
+  }
+  if (PREGNANT.test(lower) && !active(PREGNANCY_AREA)) return parseActions([{ type: 'log_note', noteKind: 'pregnancy', text }], ctx);
+  if (PERIOD.test(lower) && /\b(bad|rough|awful|heavy|wiped|tired|exhausted|cramp|cramps|pain|hurts|hurting|struggling|low energy)\b/.test(lower)) return parseActions([{ type: 'log_note', noteKind: 'fatigue', text, area: null, days: statedDays(lower) ?? 2 }], ctx);
   if (SICK.test(lower) && !/\bsick of\b/.test(lower)) {
     raw.push({ type: 'rest_today' }, { type: 'log_note', noteKind: 'illness', text, days: statedDays(lower) ?? null });
     return parseActions(raw, ctx);
