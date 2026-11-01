@@ -1,0 +1,45 @@
+/* TODAY, AS ONE CARD THAT READS TOP TO BOTTOM.
+   Eyebrow, the day's name as the headline, top sets as tiles led by their
+   load, cardio as its own strip, one Start. Scoped to .today-hero and loaded
+   last, so the older feed-card rules underneath it do not leak in. */
+.today-hero.feed-card { display: grid; gap: var(--s4); padding: var(--s5) var(--s4) var(--s4); border: 1px solid var(--hairline); border-radius: var(--r-xl); background: var(--surface-1); box-shadow: var(--shadow-2); }
+.today-hero.feed-card::before { display: none; }
+.today-hero .th-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: 0; border: 0; }
+.today-hero .th-eyebrow { font: 700 var(--fs-label) var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-text); }
+.today-hero .th-head a { font-size: var(--fs-small); font-weight: 700; color: var(--ink-3); }
+.today-hero .th-title { display: grid; gap: 4px; margin-top: calc(var(--s2) * -1); }
+.today-hero .th-title h3 { margin: 0; font: 800 clamp(30px, 8.5vw, 40px)/1.02 var(--display); letter-spacing: -.01em; color: var(--ink); text-wrap: balance; }
+.today-hero .th-title p { margin: 0; font-size: var(--fs-small); color: var(--ink-3); }
+
+.today-hero input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+.today-hero .th-lifts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.today-hero .th-lifts.single { grid-template-columns: 1fr; }
+.today-hero .th-lift, .today-hero .th-cardio { position: relative; display: grid; gap: 6px; align-content: start; min-height: 96px; padding: var(--s3) var(--s3) var(--s3); border-radius: var(--r-lg); background: var(--surface-sunken); cursor: pointer; transition: opacity var(--dur-quick) var(--ease-respond), transform var(--dur-tap) var(--ease-respond); -webkit-tap-highlight-color: transparent; }
+.today-hero .th-lift:active, .today-hero .th-cardio:active { transform: scale(.98); }
+.today-hero .th-load { display: flex; align-items: baseline; gap: 3px; font: 800 30px/1 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); }
+.today-hero .th-load small { font: 700 13px var(--body); color: var(--ink-3); }
+.today-hero .th-load em { margin-left: 6px; font: 700 16px var(--display); font-style: normal; color: var(--ink-2); }
+.today-hero .th-find { font: 700 15px/1.2 var(--body); color: var(--accent-text); }
+.today-hero .th-name { display: grid; gap: 2px; padding-right: 22px; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--ink-2); overflow-wrap: break-word; }
+.today-hero .th-name small { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.today-hero .th-tick { position: absolute; top: var(--s3); right: var(--s3); display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--hairline-strong); color: transparent; transition: background var(--dur-quick) var(--ease-respond); }
+.today-hero .selected .th-tick { border-color: var(--accent-strong); background: var(--accent-strong); color: var(--accent-ink); }
+.today-hero .th-lift:not(.selected), .today-hero .th-cardio:not(.selected) { opacity: .5; }
+
+.today-hero .th-cardio { min-height: 0; gap: 2px; padding-right: 44px; }
+.today-hero .th-cardio-kind { font: 700 11px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-text); }
+.today-hero .th-cardio strong { font: 800 20px/1.15 var(--display); color: var(--ink); }
+.today-hero .th-cardio-plan { font-size: 14px; line-height: 1.4; color: var(--ink-2); overflow-wrap: break-word; }
+
+.today-hero .th-quiet { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--s3); align-items: center; padding: var(--s3); border-radius: var(--r-lg); background: var(--surface-sunken); color: var(--ink); }
+.today-hero .th-quiet strong { font-size: 16px; }
+.today-hero .th-quiet span { grid-column: 1; font-size: 14px; color: var(--ink-3); }
+.today-hero .th-fix svg { grid-row: 1 / span 2; grid-column: 2; color: var(--accent-text); }
+
+.today-hero .th-note { margin: 0; padding-left: var(--s3); border-left: 2px solid var(--accent); font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.today-hero .th-foot { display: block; padding: 0; }
+.today-hero .th-foot .button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-width: 0; min-height: 54px; border-radius: var(--r-lg); font-size: 17px; }
+@media (prefers-reduced-motion: reduce) { .today-hero .th-lift, .today-hero .th-cardio { transition: none; } }
+/* An odd last tile takes the full row rather than leaving a hole beside it. */
+.today-hero .th-lifts .th-lift:last-child:nth-child(odd) { grid-column: 1 / -1; min-height: 0; }
+.today-hero .th-load { padding-right: 24px; }

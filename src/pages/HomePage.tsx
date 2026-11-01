@@ -74,28 +74,36 @@ export function HomePage() {
          and that has an answer now — the log's From Split mode, where the
          athlete picks the day. The completed card puts Edit in this same
          slot, so this is the same kind of link, doing the same kind of job. */
-      <section className="feed-card today-focus-card">
-      <header className="feed-card-header"><div className="feed-identity"><span className="feed-icon">{String(recommendation.splitDay.position).padStart(2, '0')}</span><div><small>UP NEXT</small><strong>{recommendation.splitDay.name}</strong>{/* "Chest & Back" over "Chest · Back" said it twice; the muscles show only when the day's name does not already. */}{(() => { const muscles = recommendation.splitDay.muscles; const named = muscles.length > 0 && muscles.every(muscle => recommendation.splitDay.name.toLowerCase().includes(muscle.toLowerCase())); return named ? null : <em>{muscles.join(' · ') || (recommendation.splitDay.type === 'hyrox' ? 'Race-specific session' : 'Cardio and recovery')}</em>; })()}</div></div><Link to="/workout?source=split">Change day</Link></header>
-      <div className="today-workout-items">
-        {/* ONE LINE PER LIFT: the lift, today's top set, and a tick to drop it.
-            The tick is the checkbox — tapping the row still toggles it. */}
-        {recommendedSets.map(set => <label className={`tw-row${set.selected ? ' selected' : ''}`} key={set.id}><input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} /><span className="tw-name">{set.optional && <small>OPTIONAL</small>}<strong>{set.exercise}</strong></span><b className="tw-load">{set.source === 'history' ? <>{set.weight}<small> {weightUnit}</small> × {set.reps}</> : <small>Find your weight</small>}</b><i className="tw-tick"><Icon name="check" size={14} stroke={3} /></i></label>)}
-        {/* A CARDIO DAY IS NOT MISSING ITS LIFT. The engine deliberately
-            prescribes no top sets on a cardio-only split day, but this row
-            excluded only rest days — so the Hybrid starter split's "Quality
-            Cardio" day showed a red "Fix →" demanding a strength exercise for
-            a day that is not meant to have one, and following it to the
-            library fixed nothing. */}
-        {recommendation.coachNote && <p className="today-bodylog-note today-coach-note">{recommendation.coachNote}</p>}
-        {recommendation.bodyLogNote && <p className="today-bodylog-note">{recommendation.bodyLogNote}</p>}
-        {!recommendedSets.length && recommendation.splitDay.type !== 'rest' && recommendation.splitDay.type !== 'cardio' && recommendation.splitDay.type !== 'hyrox' && <Link className="feed-empty-row" to="/exercises"><span><small>STRENGTH</small><strong>Choose exercises for this split day</strong><em>Forge needs a strength exercise mapped to this day.</em></span><b>Fix <Icon name="arrow" size={14}/></b></Link>}
-        {recommendation.cardio && <label className={`tw-row${recommendation.cardio.selected ? ' selected' : ''}`}><input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} /><span className="tw-name"><small>{recommendation.splitDay.type === 'hyrox' ? 'HYROX' : 'CARDIO'}</small><strong>{recommendation.cardio.title}</strong><em>{cardioPlanSummary(recommendation.cardio.session.plan)}</em></span><i className="tw-tick"><Icon name="check" size={14} stroke={3} /></i></label>}
-        {/* NOTHING PRESCRIBED IS STILL AN ANSWER. A cardio day whose run the
-            plan has already covered this week (or a rest day) left the card
-            with no rows at all, which read as the workout having vanished. */}
-        {!recommendedSets.length && !recommendation.cardio && (recommendation.splitDay.type === 'rest' || recommendation.splitDay.type === 'cardio') && <div className="tw-row tw-quiet"><span className="tw-name"><small>{recommendation.splitDay.type === 'rest' ? 'RECOVERY' : 'CARDIO'}</small><strong>{recommendation.splitDay.type === 'rest' ? 'Rest day' : 'No run needed today'}</strong><em>{recommendation.splitDay.type === 'rest' ? 'Nothing required — walk, stretch or log anything you do.' : 'Your running is covered this week.'}</em></span></div>}
-      </div>
-      {/* One action. The coach has its own button on every screen. */}<footer><Link className="button feed-start" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} <Icon name="arrow"/></Link></footer>
+      /* ONE DAY, SAID ONCE, LIKE A COACH WOULD. The card was a header, a boxed
+         list of checkbox rows and a button: a form to fill in. Now the day's
+         name is the headline, each top set is a tile whose load is the number
+         you read first, cardio is its own strip, and Start is the one action.
+         Tapping a tile still drops it from today, as the tick did. */
+      <section className="feed-card today-focus-card today-hero">
+      <header className="feed-card-header th-head">
+        <span className="th-eyebrow">Up next · Day {String(recommendation.splitDay.position).padStart(2, '0')}</span>
+        <Link to="/workout?source=split">Change day</Link>
+      </header>
+      {(() => { const muscles = recommendation.splitDay.muscles; const named = muscles.length > 0 && muscles.every(muscle => recommendation.splitDay.name.toLowerCase().includes(muscle.toLowerCase())); return <div className="th-title"><h3>{recommendation.splitDay.name}</h3>{!named && <p>{muscles.join(' · ') || (recommendation.splitDay.type === 'hyrox' ? 'Race-specific session' : 'Cardio and recovery')}</p>}</div>; })()}
+      {recommendedSets.length > 0 && <div className={`th-lifts${recommendedSets.length === 1 ? ' single' : ''}`}>
+        {recommendedSets.map(set => <label className={`th-lift${set.selected ? ' selected' : ''}`} key={set.id}>
+          <input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} />
+          <span className="th-load">{set.source === 'history' ? <>{set.weight}<small>{weightUnit}</small><em>× {set.reps}</em></> : <span className="th-find">Find your weight</span>}</span>
+          <span className="th-name">{set.exercise}{set.optional && <small>Optional</small>}</span>
+          <i className="th-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
+        </label>)}
+      </div>}
+      {!recommendedSets.length && recommendation.splitDay.type !== 'rest' && recommendation.splitDay.type !== 'cardio' && recommendation.splitDay.type !== 'hyrox' && <Link className="th-quiet th-fix" to="/exercises"><strong>Choose exercises for this day</strong><span>Forge needs a strength exercise mapped to it.</span><Icon name="arrow" size={16}/></Link>}
+      {recommendation.cardio && <label className={`th-cardio${recommendation.cardio.selected ? ' selected' : ''}`}>
+        <input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} />
+        <span className="th-cardio-kind">{recommendation.splitDay.type === 'hyrox' ? 'Hyrox' : 'Cardio'}</span>
+        <strong>{recommendation.cardio.title}</strong>
+        <span className="th-cardio-plan">{cardioPlanSummary(recommendation.cardio.session.plan)}</span>
+        <i className="th-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
+      </label>}
+      {!recommendedSets.length && !recommendation.cardio && (recommendation.splitDay.type === 'rest' || recommendation.splitDay.type === 'cardio') && <div className="th-quiet"><strong>{recommendation.splitDay.type === 'rest' ? 'Rest day' : 'No run needed today'}</strong><span>{recommendation.splitDay.type === 'rest' ? 'Nothing required. Walk, stretch or log anything you do.' : 'Your running is covered this week.'}</span></div>}
+      {(recommendation.coachNote || recommendation.bodyLogNote) && <p className="th-note">{recommendation.coachNote || recommendation.bodyLogNote}</p>}
+      <footer className="th-foot"><Link className="button feed-start" to={startUrl}>{selectedCount ? 'Start workout' : 'Open workout'} <Icon name="arrow"/></Link></footer>
     </section>}
 
 
