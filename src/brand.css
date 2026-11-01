@@ -365,3 +365,13 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 .classic-calendar .history-toolbar .month-step:active { transform: scale(.94); background: var(--surface-sunken); }
 .classic-calendar .history-toolbar .month-step svg { display: block; }
 .classic-calendar .history-toolbar { grid-template-columns: 44px 1fr 44px; align-items: center; }
+
+/* NOTHING YOU TAP SITS IN THE HOME-INDICATOR STRIP. iOS keeps about the
+   bottom 54pt for its own swipe and delivers no touch from it (measured for
+   the tab bar, see app-chrome.css). The check-in and Forge noticed pop-ups
+   sat 16px off the edge, so Got it, Ask Forge and the check-in answers were
+   in that strip; the finish-workout bar and the split-day sheet's footer
+   dipped into it. Each now clears it: the safe-area inset plus 28px. */
+.coach-checkin-backdrop { padding-bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 28px); }
+.workout-finish-bar { padding-bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 24px); }
+.ss-sheet-foot { padding-bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 24px); }
