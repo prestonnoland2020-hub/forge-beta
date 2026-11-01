@@ -24,12 +24,20 @@ type Summary = Record<string, unknown>;
 
 Deno.serve(async request => {
   if (request.method !== 'POST') return new Response('ok');
+  /* WHO MAY DELIVER. Garmin names the client it is delivering for in a
+     garmin-client-id header; a delivery for another app's client is never
+     ours. Otherwise either proof will do: the secret key in the URL, or that
+     header matching this app's client id. The key alone was the rule, and
+     Garmin's first real deliveries arrived without it — 403, and Garmin
+     queues a refused delivery for a week of hourly retries. Nothing is
+     stored for a Garmin user who has not connected to Forge either way. */
   const key = Deno.env.get('GARMIN_WEBHOOK_KEY');
-  if (!key || new URL(request.url).searchParams.get('key') !== key) return new Response('forbidden', { status: 403 });
-  /* Garmin names the client it is delivering for; a delivery for some other
-     app's client id is not ours, whatever key it carries. */
+  const clientId = Deno.env.get('GARMIN_CLIENT_ID');
   const clientHeader = request.headers.get('garmin-client-id');
-  if (clientHeader && clientHeader !== Deno.env.get('GARMIN_CLIENT_ID')) return new Response('forbidden', { status: 403 });
+  if (clientHeader && clientHeader !== clientId) return new Response('forbidden', { status: 403 });
+  const keyed = Boolean(key) && new URL(request.url).searchParams.get('key') === key;
+  const fromGarmin = Boolean(clientId) && clientHeader === clientId;
+  if (!keyed && !fromGarmin) return new Response('forbidden', { status: 403 });
 
   let payload: Record<string, unknown>;
   try { payload = await request.json(); } catch { return new Response('ok'); }
