@@ -21,7 +21,7 @@ import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
-import { getGarminConnection } from '../features/training/garminConnectionService';
+import { getGarminConnection, syncGarmin } from '../features/training/garminConnectionService';
 import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
 
@@ -197,6 +197,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       if (!strava?.connected && !garmin?.connected) return;
       localStorage.setItem(throttleKey, String(Date.now()));
       if (strava?.connected) await syncStravaActivities().catch(() => undefined);
+      /* Garmin's history arrives a few years per run (Garmin's rate limit);
+         each launch carries it on until it is all requested. */
+      if (garmin?.connected && !garmin.historyComplete) await syncGarmin().catch(() => undefined);
       await importStravaActivities(stravaRecords, stravaAddRecord, stravaUpdateRecord);
     } catch { /* silent — manual sync remains in Profile → Connections */ }
   }, [historyLoading, stravaRecords, stravaAddRecord, stravaUpdateRecord]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -147,6 +147,11 @@ export const ACTIVITY_KINDS = ['activities', 'manuallyUpdatedActivities'];
    program approved for one but not the other gets 403/412 on the rest, so
    each kind is requested and judged on its own. */
 export const BACKFILL_KINDS = ['activities', 'dailies', 'sleeps', 'hrv'];
+/* Only the kinds this program may ask for. The Health API is a separate
+   approval; until GARMIN_HEALTH_API is set to "true", asking for dailies,
+   sleeps or HRV only earns a 403 ("User not registered with consumer") and
+   spends the rate limit on nothing. */
+export const backfillKinds = () => Deno.env.get('GARMIN_HEALTH_API') === 'true' ? BACKFILL_KINDS : ['activities'];
 /* Activity API §7: one historical request may span at most one month. */
 export const BACKFILL_MAX_DAYS = 30;
 /* How far back a full history reaches. Garmin answers a window older than it

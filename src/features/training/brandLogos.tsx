@@ -50,3 +50,10 @@ export function BrandMark({ id, name }: { id: string; name: string }) {
   if (!logo) return <span className="provider-logo provider-logo-plain" aria-hidden="true">{initials(name)}</span>;
   return <span className="provider-logo" aria-hidden="true">{logo.dark ? <><img className="logo-on-light" src={logo.light} alt="" draggable={false} /><img className="logo-on-dark" src={logo.dark} alt="" draggable={false} /></> : <img src={logo.light} alt="" draggable={false} />}</span>;
 }
+
+/* Whether a brand's logo spells its name. Where it does, the Connections
+   list shows the logo alone rather than "GARMIN" beside "Garmin". Strava,
+   Fitbit and COROS publish a symbol (the chevrons, the dots, the hexagon),
+   which needs the name beside it to be read at all. */
+const WORDMARKS = new Set(['garmin', 'samsung', 'whoop', 'oura', 'polar', 'suunto', 'wahoo']);
+export const hasWordmark = (id: string) => WORDMARKS.has(id) && Boolean(logos[id]);
