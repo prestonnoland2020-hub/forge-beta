@@ -13,7 +13,16 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
    Returns whether the activities request was taken. Health kinds are asked
    for alongside and may be refused (403/412) when the program or the athlete
    has not granted them; that must not read as a failed sync. */
-async function requestBackfill(accessToken: string, days: number) {
+/* WHY A BACKFILL WAS REFUSED, IN THE ATHLETE'S TERMS. 412/403 is not Garmin
+   being busy: Garmin answered "Access denied … required
+   HISTORICAL_DATA_EXPORT" — past data needs a permission this program does
+   not hold yet. 429 is the rate limit. Telling those apart is the difference
+   between "try again in a minute" and "this cannot work until Garmin grants
+   it". */
+type Refusal = 'permission' | 'rate-limit' | 'other';
+const refusalOf = (status: number): Refusal => status === 412 || status === 403 ? 'permission' : status === 429 ? 'rate-limit' : 'other';
+
+async function requestBackfill(accessToken: string, days: number): Promise<{ requested: boolean; refused?: Refusal }> {
   const end = Math.floor(Date.now() / 1000);
   const start = end - Math.min(days, BACKFILL_MAX_DAYS) * 86400;
   const results = await Promise.all(backfillKinds().map(async kind => {
@@ -21,9 +30,10 @@ async function requestBackfill(accessToken: string, days: number) {
     /* 409: that window was already requested. It is coming; not a failure. */
     const ok = response.ok || response.status === 409;
     if (!ok) console.warn(`garmin backfill ${kind}: ${response.status} ${(await response.text()).slice(0, 200)}`);
-    return [kind, ok] as const;
+    return { kind, ok, status: response.status };
   }));
-  return Object.fromEntries(results).activities === true;
+  const activities = results.find(result => result.kind === 'activities');
+  return activities?.ok ? { requested: true } : { requested: false, refused: refusalOf(activities?.status || 0) };
 }
 
 /* EVERY ACTIVITY THE ATHLETE EVER RECORDED, WITHOUT TRIPPING THE LIMIT.
@@ -49,15 +59,30 @@ const PACE_MS = 1300;
 const RUN_BUDGET_MS = 45_000;
 const historyFloor = () => Math.floor(Date.now() / 1000) - HISTORY_YEARS * 365 * DAY;
 const historyDone = (requestedAt?: string | null) => Boolean(requestedAt) && new Date(requestedAt!).getTime() / 1000 <= historyFloor() + DAY;
+/* "Garmin will not send past data to this program yet" — stored in the same
+   column as a date no walk can reach, so it needs no schema of its own. Each
+   sync tries once more (one request) in case the permission has arrived. */
+const HISTORY_BLOCKED = '2100-01-01T00:00:00.000Z';
+/* Compared as a date: Postgres hands the timestamp back as
+   "2100-01-01T00:00:00+00:00", which never equals the string written. */
+const historyBlocked = (requestedAt?: string | null) => Boolean(requestedAt) && new Date(requestedAt!).getUTCFullYear() >= 2100;
 
 async function walkHistory(accessToken: string, from: string | null | undefined, save: (reachedIso: string) => Promise<unknown>): Promise<void> {
   const floor = historyFloor();
-  let end = from ? Math.floor(new Date(from).getTime() / 1000) : Math.floor(Date.now() / 1000) - BACKFILL_MAX_DAYS * DAY;
+  let end = from && !historyBlocked(from) ? Math.floor(new Date(from).getTime() / 1000) : Math.floor(Date.now() / 1000) - BACKFILL_MAX_DAYS * DAY;
   const started = Date.now();
   while (end > floor + DAY && Date.now() - started < RUN_BUDGET_MS) {
     const start = Math.max(floor, end - BACKFILL_MAX_DAYS * DAY);
     const response = await fetch(`${GARMIN_API}/backfill/activities?summaryStartTimeInSeconds=${start}&summaryEndTimeInSeconds=${end}`, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (response.status === 429) break;
+    /* No permission for past data: not the end of the history, and not
+       progress either. Marked as blocked, so the whole walk runs from the
+       start once the permission is granted. */
+    if (refusalOf(response.status) === 'permission') {
+      console.warn(`garmin history needs permission: ${response.status} ${(await response.text()).slice(0, 200)}`);
+      await save(HISTORY_BLOCKED);
+      return;
+    }
     if (!response.ok && response.status !== 409) {
       /* Garmin refuses a window older than it keeps: the history is complete. */
       console.warn(`garmin history ends at ${new Date(end * 1000).toISOString().slice(0, 10)}: ${response.status} ${(await response.text()).slice(0, 200)}`);
@@ -91,7 +116,7 @@ Deno.serve(async request => {
         admin.from('external_activities').select('*', { count: 'exact', head: true }).eq('owner_id', auth.user.id).eq('provider', 'garmin'),
         admin.from('health_daily_snapshots').select('*', { count: 'exact', head: true }).eq('owner_id', auth.user.id).eq('provider', 'garmin'),
       ]);
-      return json({ configured, connected: row?.status === 'active', lastSyncedAt: row?.last_push_at || row?.last_synced_at, importedActivities: activities || 0, healthDays: days || 0, historyComplete: historyDone(row?.history_requested_at) });
+      return json({ configured, connected: row?.status === 'active', lastSyncedAt: row?.last_push_at || row?.last_synced_at, importedActivities: activities || 0, healthDays: days || 0, historyComplete: historyDone(row?.history_requested_at), historyBlocked: historyBlocked(row?.history_requested_at) });
     }
     if (!configured) throw new Error('Garmin setup is not finished yet. Add GARMIN_CLIENT_ID and GARMIN_CLIENT_SECRET to the Supabase function secrets.');
 
@@ -133,7 +158,7 @@ Deno.serve(async request => {
       const accessToken = await freshAccessToken(call, row);
       /* A manual sync only needs the recent past; the connect backfill
          already asked for the long history. */
-      const requested = await requestBackfill(accessToken, 7);
+      const { requested, refused } = await requestBackfill(accessToken, 7);
       const syncedAt = new Date().toISOString();
       await call('garmin_connection_synced', { p_owner: auth.user.id, p_synced: syncedAt });
       /* History not finished (never started, or a run was cut short by its
@@ -142,7 +167,7 @@ Deno.serve(async request => {
         const owner = auth.user.id;
         EdgeRuntime.waitUntil(walkHistory(accessToken, row.history_requested_at, reached => call('garmin_connection_history_requested', { p_owner: owner, p_at: reached })).catch(error => console.error('garmin history:', error)));
       }
-      return json({ connected: true, requested, lastSyncedAt: syncedAt, historyComplete: historyDone(row.history_requested_at) });
+      return json({ connected: true, requested, refused, lastSyncedAt: syncedAt, historyComplete: historyDone(row.history_requested_at) });
     }
 
     if (action === 'disconnect') {
