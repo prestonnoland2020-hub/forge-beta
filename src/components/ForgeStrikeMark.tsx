@@ -41,3 +41,18 @@ export function ForgeStrikeMark() {
     </span>
   );
 }
+
+/* The same four facets, standing still, for the header: the full-colour mark
+   rather than the one-colour mask, now that the logo stands without the
+   FORGE wordmark beside it. Fills live in brand.css (.forge-mark-full). */
+export function ForgeMark({ className = '' }: { className?: string }) {
+  return (
+    <svg className={`forge-mark-full ${className}`.trim()} viewBox="0 0 732 620" aria-hidden="true">
+      {FACETS.map(({ part, d }) => (
+        <g key={part} className={`forge-mark-${part}`}>
+          <g transform={TRACE}><path d={d} /></g>
+        </g>
+      ))}
+    </svg>
+  );
+}
