@@ -43,6 +43,9 @@ export function goalPath({ kind, unit, target, current, date }: GoalPathInput): 
   if (kind === 'race') {
     const to = clockSeconds(target); const from = clockSeconds(current);
     if (!to || !from) return null;
+    /* Half a race time is a time still being typed ("1:4" on the way to
+       1:45:00), not a goal; nothing is judged until it could be one. */
+    if (to < from * 0.5) return null;
     const hours = unit !== 'mm:ss';
     const fromLabel = secondsToClock(from, hours && from >= 3600); const toLabel = secondsToClock(to, hours && to >= 3600);
     if (to >= from) return { from, to, weeks, fromLabel, toLabel, headline: 'You’re already there', verdict: 'Done', tone: 'good', note: 'Set a faster time and Forge has something to build toward.' };
@@ -55,6 +58,10 @@ export function goalPath({ kind, unit, target, current, date }: GoalPathInput): 
   }
   const to = Number.parseFloat(target); const from = Number.parseFloat(current);
   if (!(to > 0) || !(from > 0)) return null;
+  /* THE CARD UPDATES ON EVERY KEY, so a target is half typed most of the
+     time: "2" on the way to 225 read as "You're already there" against a 185
+     best. A target under half of today's number is still being typed. */
+  if (to < from * 0.5) return null;
   const step = unit === 'kg' ? 0.5 : 1;
   const fromLabel = `${round(from, step)} ${unit}`; const toLabel = `${round(to, step)} ${unit}`;
   if (kind === 'weight') {
