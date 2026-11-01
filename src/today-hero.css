@@ -1,7 +1,7 @@
 /* TODAY — the brand guide's Today screen.
 
-   Top to bottom: the week as seven days, one card for the session with one
-   action, and the training partners. Every size is a token from
+   Top to bottom: one card for the session with one action, and the
+   training partners. Every size is a token from
    forge-theme.css; signal is the only accent, and status uses only --good.
    Scoped to .today and loaded after brand.css, so the older feed rules
    underneath it cannot leak in. */

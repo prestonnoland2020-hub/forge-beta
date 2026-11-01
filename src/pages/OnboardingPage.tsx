@@ -11,7 +11,7 @@ import { isProgrammableStrength, useTrainingLibrary, type LibraryExercise } from
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { coreFirst, coreOnly, CORE_LIFTS, CORE_LIFT_LABELS, isWeightedBodyweight } from '../lib/coreLifts';
 import { LEGAL } from '../lib/legal';
-import { normalizeGoalValue } from '../lib/goalInput';
+import { formatClock, normalizeGoalValue } from '../lib/goalInput';
 import { success, tap, warning } from '../lib/haptics';
 import { createNote, extractArea, saveNote } from '../features/training/athleteNotesService';
 import { Icon } from '../components/Icon';
@@ -79,17 +79,6 @@ const mileageChoices = {
   Imperial: [['Not running yet', 0], ['Under 10 miles', 5], ['10–20 miles', 15], ['20–30 miles', 25], ['30+ miles', 35]],
   Metric: [['Not running yet', 0], ['Under 15 km', 8], ['15–30 km', 22], ['30–50 km', 40], ['50+ km', 55]],
 } as const;
-
-/* THE COLONS ARE TYPED FOR THEM. iOS's number pad has no colon key, so a
-   time field that wants "24:30" and opens the number pad cannot be filled on
-   a phone. Digits are grouped from the right as they arrive: 2430 → 24:30,
-   15500 → 1:55:00. A bare one or two digits stay minutes. */
-export const formatClock = (raw: string) => {
-  const digits = raw.replace(/\D/g, '').replace(/^0+(?=\d{3})/, '').slice(0, 6);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, -2)}:${digits.slice(-2)}`;
-  return `${digits.slice(0, -4)}:${digits.slice(-4, -2)}:${digits.slice(-2)}`;
-};
 
 const weeksFromNow =(weeks: number) => { const date = new Date(); date.setDate(date.getDate() + weeks * 7); return date.toISOString().slice(0, 10); };
 const goalWeeks = [8, 12, 16];

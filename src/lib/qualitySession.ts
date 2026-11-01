@@ -340,8 +340,13 @@ export function qualitySession(context: QualityContext): QualitySession {
    exported, so both paths read the same numbers. */
 export type EnduranceGoalRef = { type?: string; exercise?: string; title?: string; target?: string; date?: string };
 
+/* A goal made on this phone stores its target with the unit after it —
+   "22:30 mm:ss", "1:25:00 hh:mm:ss" — and only the copy synced back from the
+   server is the bare clock. Anchored on both ends, this read the local copy as
+   no time at all, so the race goal the athlete had just set never reached the
+   plan on the phone they set it on. The unit is allowed to follow. */
 export const goalClockSeconds = (value?: string): number => {
-  const match = String(value || '').match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);
+  const match = String(value || '').trim().match(/^(?:(\d+):)?(\d{1,2}):(\d{2})(?:\s+[a-z:]+)?$/i);
   if (!match) return 0;
   return Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 };
@@ -372,10 +377,20 @@ export const goalEventMiles = (goal?: EnduranceGoalRef): number => {
    build gives a 5K runner neither the volume nor the durability, and it
    prescribes the shorter athlete paces they cannot survive at volume. The
    safe, sane direction is down from the longest, not up from the shortest. */
+/* A FINISH TIME IS ONLY A RUNNING PACE WHEN THE EVENT IS A RUN. Any event
+   goalEventMiles did not recognise fell through to the 5K, so a 1:25:00 HYROX
+   became a 5K at 27:21/mi — and that "goal pace" set the plan's training paces,
+   the coach's notes and the hard run's targets. HYROX is eight stations with a
+   kilometre of running before each, and a ride, a row or a swim is not run at
+   all: none of them can tell the plan how fast to run. Their dates still count
+   toward the taper; they just never become the race the runs are paced for. */
+export const notARunningRace = (goal: EnduranceGoalRef): boolean =>
+  /hyrox|cycl|bike|row|swim|\bski/i.test(`${goal.exercise || ''} ${goal.title || ''}`);
+
 export type EnduranceTarget = { paceSecondsPerMile: number; miles: number; goal: EnduranceGoalRef; others: EnduranceGoalRef[] };
 export function enduranceTarget(goals: EnduranceGoalRef[] | undefined | null): EnduranceTarget | null {
   const dated = (goals || [])
-    .filter(entry => entry?.type === 'Endurance' && entry?.date && goalClockSeconds(entry.target) > 0)
+    .filter(entry => entry?.type === 'Endurance' && entry?.date && !notARunningRace(entry) && goalClockSeconds(entry.target) > 0)
     .sort((a, b) => {
       const byDate = String(a.date).localeCompare(String(b.date));
       if (byDate) return byDate;

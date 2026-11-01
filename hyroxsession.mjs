@@ -1,4 +1,4 @@
-import { hyroxSession, hyroxShape, hyroxSessionsDone, stationsHalf, simulationFull, formatRunPace, kmSplit, divisionKey, HYROX_STATIONS, RUN_OFFSET, EASED_OFFSET } from './src/lib/hyroxSession.ts';
+import { daysSinceHyrox, hyroxSession, hyroxTargets, hyroxPlanDetail, hyroxTrainingPaces, withHyroxPaces, GOAL_OFFSET, hyroxShape, hyroxSessionsDone, stationsHalf, simulationFull, formatRunPace, kmSplit, divisionKey, HYROX_STATIONS, RUN_OFFSET, EASED_OFFSET } from './src/lib/hyroxSession.ts';
 import { buildDailyRecommendation, recommendationFingerprint } from './src/lib/dailyRecommendationEngine.ts';
 
 let fails = 0;
@@ -86,11 +86,88 @@ const goals = [{ type: 'Endurance', title: 'HYROX under 75', target: '1:15:00', 
 const rec = buildDailyRecommendation({ date: '2026-09-21', splitDay, exercises: [], records, goals, recovery: { confidence: 'Low', readiness: 80 }, profile: { weeklyMileage: 20, runningDays: 3 }, runningHistory: [], loadBiasPercent: 0, thresholdSecondsPerMile: T, inputFingerprint: recommendationFingerprint({ date: '2026-09-21', splitDay, exercises: [], records, goals, loadBiasPercent: 0 }) });
 check('a hyrox day prescribes no top sets', rec.topSets.length === 0);
 check('cardio is the HYROX session, third in the rotation (stations, back half)', rec.cardio?.title === 'HYROX stations · back half', rec.cardio?.title);
-check('summary carries the pace', /7:27\/mi/.test(rec.cardio?.summary || ''), rec.cardio?.summary);
+check('summary carries the goal pace — a 1:15:00 asks for 4:20/km, eased 15 s/mi on a stations day', /7:13\/mi/.test(rec.cardio?.summary || ''), rec.cardio?.summary);
 check('headline is HYROX day', rec.headline === 'HYROX day');
 check('the plan stationEntries reach the card', rec.cardio?.session.plan.stationEntries?.length === 8);
 const raceRec = buildDailyRecommendation({ date: '2026-12-01', splitDay, exercises: [], records, goals, recovery: { confidence: 'Low', readiness: 80 }, profile: { weeklyMileage: 20, runningDays: 3 }, runningHistory: [], loadBiasPercent: 0, thresholdSecondsPerMile: T, inputFingerprint: 'x' });
 check('four days out it is the race-week sharpener', raceRec.cardio?.title === 'HYROX race-week sharpener', raceRec.cardio?.title);
+
+console.log('\nHYROX work only for a HYROX goal');
+const build = (day, date, withGoals, extra = {}) => buildDailyRecommendation({ date, splitDay: day, exercises: [], records, goals: withGoals, recovery: { confidence: 'Low', readiness: 80 }, profile: { weeklyMileage: 20, runningDays: 3 }, runningHistory: [], loadBiasPercent: 0, thresholdSecondsPerMile: T, inputFingerprint: 'x', ...extra });
+const runGoals = [{ type: 'Endurance', title: '5K', target: '22:30', date: '2026-12-05', connection: '', exercise: '5K Run' }];
+check('a HYROX day with no HYROX goal writes no HYROX session', !build(splitDay, '2026-09-21', runGoals).cardio && !build(splitDay, '2026-09-21', []).cardio);
+const cardioDay = { position: 2, name: 'Conditioning', type: 'cardio', muscles: ['Cardio'], exercises: [], cardioTypes: ['Forge'] };
+const stationsRec = build(cardioDay, '2026-09-21', goals);
+check('with a HYROX goal and a week without HYROX, a cardio day becomes stations', /HYROX stations/.test(stationsRec.cardio?.title || ''), stationsRec.cardio?.title);
+check('and says why', /No HYROX station work in the last week/.test(stationsRec.cardio?.session.rationale || ''));
+check('and its summary names the runs and stations', /× 1 km at .* at race distance/.test(stationsRec.cardio?.summary || ''), stationsRec.cardio?.summary);
+check('HYROX inside the last week leaves the cardio day alone', !/HYROX/.test(build(cardioDay, '2026-09-12', goals).cardio?.title || ''), build(cardioDay, '2026-09-12', goals).cardio?.title);
+check('never on a leg day', !/HYROX/.test(build({ ...cardioDay, muscles: ['Quads'] }, '2026-09-21', goals).cardio?.title || ''));
+check('never on a mixed day', !/HYROX/.test(build({ ...cardioDay, type: 'mixed' }, '2026-09-21', goals).cardio?.title || ''));
+check('no HYROX goal, no stations on a cardio day', !/HYROX/.test(build(cardioDay, '2026-09-21', runGoals).cardio?.title || ''));
+check('daysSinceHyrox counts back to the last HYROX day', daysSinceHyrox(records, '2026-09-21') === 13 && daysSinceHyrox([], '2026-09-21') === Infinity);
+
+
+console.log('\nGoal time → race pace (Hunger in the Wild chart)');
+const at = target => hyroxTargets(target);
+check('90 min → 5:00/km, 5:30 a station', at('1:30:00')?.runSecondsPerKm === 300 && at('1:30:00')?.stationSeconds === 330);
+check('75 min → 4:20/km, 4:20 a station', at('1:15:00')?.runSecondsPerKm === 260 && at('1:15:00')?.stationSeconds === 260);
+check('60 min → 3:45/km, 3:15 a station', at('1:00:00')?.runSecondsPerKm === 225 && at('1:00:00')?.stationSeconds === 195);
+check('85 min sits between the anchors', at('1:25:00')?.runSecondsPerKm === 287, String(at('1:25:00')?.runSecondsPerKm));
+check('the unit after the time still reads', at('1:25:00 hh:mm:ss')?.runSecondsPerKm === 287);
+check('the chart adds back up: 4–7 min left for the Roxzone (four at the elite end)',
+  ['1:00:00', '1:15:00', '1:30:00', '1:50:00'].every(t => { const r = at(t).roxzoneSeconds / 60; return r >= 4 && r <= 7; }),
+  ['1:00:00', '1:15:00', '1:30:00', '1:50:00'].map(t => (at(t).roxzoneSeconds / 60).toFixed(1)).join(', '));
+check('a slower finish never gets a faster pace', at('1:50:00').runSecondsPerKm > at('1:30:00').runSecondsPerKm);
+check('no time, or a nonsense one, gives nothing', at('') === null && at('0:20:00') === null && at('4:00:00') === null);
+
+console.log('\nThe goal paces the HYROX day');
+const G = '1:25:00 hh:mm:ss';
+check('compromised runs at goal pace: 4:47/km', hyroxSession({ sessionIndex: 1, thresholdSecondsPerMile: T, goalTarget: G, metric: true }).runPace === '4:47/km',
+  hyroxSession({ sessionIndex: 1, thresholdSecondsPerMile: T, goalTarget: G, metric: true }).runPace);
+check('a simulation banks nothing — also goal pace', hyroxSession({ sessionIndex: 5, thresholdSecondsPerMile: T, goalTarget: G, metric: true }).runPace === '4:47/km');
+check('a stations day eases off goal pace a little', hyroxSession({ sessionIndex: 0, thresholdSecondsPerMile: T, goalTarget: G }).runPace === formatRunPace(287 * 1.609344 + GOAL_OFFSET.stations));
+check('the rationale says what the finish asks for', /1:25:00 finish is 4:47\/km on all eight runs, about 5:07 per station/.test(hyroxSession({ sessionIndex: 1, thresholdSecondsPerMile: T, goalTarget: G }).rationale),
+  hyroxSession({ sessionIndex: 1, thresholdSecondsPerMile: T, goalTarget: G }).rationale);
+check('a goal faster than threshold holds at threshold, and says so', (() => {
+  const s = hyroxSession({ sessionIndex: 1, thresholdSecondsPerMile: 420, goalTarget: '1:00:00' });
+  return s.runPace === formatRunPace(420) && /quicker than your threshold/.test(s.rationale);
+})());
+check('a goal with no threshold still paces the runs', hyroxSession({ sessionIndex: 1, thresholdSecondsPerMile: 0, goalTarget: G, metric: true }).runPace === '4:47/km');
+check('low readiness still eases a goal pace', hyroxSession({ sessionIndex: 1, thresholdSecondsPerMile: T, goalTarget: G, readiness: 50 }).runPace === formatRunPace(287 * 1.609344 + EASED_OFFSET));
+check("Plan's HYROX row names the race pace", /Your 1:25:00 asks for 4:47\/km runs and about 5:07 per station/.test(hyroxPlanDetail([{ type: 'Endurance', exercise: 'HYROX', title: 'HYROX · 1:25:00 hh:mm:ss', target: G }])));
+check('without a HYROX goal the row is an open day', /Open day — add a HYROX goal/.test(hyroxPlanDetail([])));
+check('a HYROX goal with no time says it paces off threshold', /paced off your threshold/.test(hyroxPlanDetail([{ type: 'Endurance', exercise: 'HYROX', title: 'HYROX', target: '' }])));
+
+
+console.log('\nDoubles reads its own table');
+const dbl = t => hyroxTargets(t, 'Doubles Mixed');
+check('a 1:11 doubles is 5:00/km', dbl('1:11:00')?.runSecondsPerKm === 300);
+check('a 1:23 doubles is 6:00/km', dbl('1:23:00')?.runSecondsPerKm === 360);
+check('a 2:00 doubles is 9:20/km', dbl('2:00:00')?.runSecondsPerKm === 560);
+check('between rows it interpolates: 1:12:30 → 5:08/km', dbl('1:12:30')?.runSecondsPerKm === 308, String(dbl('1:12:30')?.runSecondsPerKm));
+check('the same time is a faster run in singles than doubles', hyroxTargets('1:25:00').runSecondsPerKm < dbl('1:25:00').runSecondsPerKm);
+check('a relay gets no table', hyroxTargets('1:25:00', 'Relay Mixed') === null);
+
+console.log('\nTraining paces from race pace (Repz)');
+const rp = hyroxTrainingPaces(300);
+check('5:00/km race → 6:07 recovery, 5:45 long, 4:41 threshold, 4:14 VO2', rp.recovery === 367 && rp.long === 345 && rp.threshold === 281 && rp.vo2 === 254, JSON.stringify(rp));
+const mid = hyroxTrainingPaces(315);
+check('between rows it interpolates', mid.threshold > 281 && mid.threshold < 309, JSON.stringify(mid));
+
+console.log('\nThe HYROX goal sets the plan paces');
+const empty = { source: 'none', supported: false, from: null, exponent: 1.06, fittedExponent: false, easyFast: 0, easySlow: 0, marathon: 0, threshold: 0, interval: 0, repetition: 0 };
+const hyroxGoal = [{ type: 'Endurance', exercise: 'HYROX', title: 'HYROX', target: '1:30:00 hh:mm:ss', date: '2027-01-24', eventDivision: "Men's Open" }];
+const fromGoal = withHyroxPaces(empty, hyroxGoal);
+check('no logged runs: the table sets threshold (4:41/km)', Math.round(fromGoal.threshold / 1.609344) === 281, String(fromGoal.threshold / 1.609344));
+check('and easy runs sit between long and recovery pace', Math.round(fromGoal.easyFast / 1.609344) === 345 && Math.round(fromGoal.easySlow / 1.609344) === 367);
+const slowLog = { ...empty, source: 'recent-run', supported: true, easyFast: 700, easySlow: 760, marathon: 600, threshold: 520, interval: 480, repetition: 460 };
+const held = withHyroxPaces(slowLog, hyroxGoal);
+check('a pace the log has not shown is not handed out', held.threshold === 520 && held.interval === 480);
+const fastLog = { ...slowLog, threshold: 380, interval: 350, repetition: 330, easyFast: 470, easySlow: 520, marathon: 420 };
+check('a fitter athlete trains at the goal\'s paces', Math.round(withHyroxPaces(fastLog, hyroxGoal).threshold / 1.609344) === 281);
+check('a running race goal still owns the paces', withHyroxPaces(slowLog, [...hyroxGoal, { type: 'Endurance', exercise: '5K Run', title: '5K', target: '22:30 mm:ss', date: '2027-03-01' }]) === slowLog);
+check('no HYROX goal, nothing changes', withHyroxPaces(slowLog, []) === slowLog);
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);

@@ -330,10 +330,15 @@ Deno.serve(async request => {
           if (next) { set.exercise = next; present.add(liftKey(next)); }
         }
         /* Still missing means the day had fewer sets than goal lifts — add one
-           per remaining lift so nothing the athlete is training for is absent. */
+           per remaining lift so nothing the athlete is training for is absent.
+           NEVER WITH A NEIGHBOUR'S LOAD. It used to copy the first set's
+           weight, so Pull Ups added beside Bench was prescribed at the bench
+           number. The wave pass below sets the weight when the lift has a
+           logged best; when it has none, zero is the honest answer and the
+           app asks the athlete to find it. */
         for (const name of missing) {
           const template = onDay[0];
-          sets.push({ splitDay: template.splitDay, exercise: name, weight: template.weight, reps: template.reps });
+          sets.push({ splitDay: template.splitDay, exercise: name, weight: 0, reps: template.reps });
         }
       }
       week.topSets = sets;

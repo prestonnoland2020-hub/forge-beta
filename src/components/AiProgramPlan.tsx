@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HYROX_NO_GOAL, hyroxGoalOf, hyroxPlanDetail, withHyroxPaces } from '../lib/hyroxSession';
 import { bestRunDay, type PlannedDay } from '../lib/interference';
 import { paceModel } from '../lib/paceModel';
 import { weeksUntil } from '../lib/goalFeasibility';
@@ -61,7 +62,7 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    is where it is, and that sentence is the difference between an instruction
    and coaching. */
 type WeekPlan = { sessions: Session[]; days: PlannedDay[]; longIndex: number; hardIndex: number };
-function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi'): WeekPlan {
+function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi', hyrox: { goal: boolean; detail: string } = { goal: false, detail: HYROX_NO_GOAL }): WeekPlan {
   /* The window comes from `weekCycleDays` — the same function the volume math
      uses. This was a byte-identical second copy of that rotation, which meant
      the schedule and the mileage that must agree were computed twice and free
@@ -144,13 +145,16 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
       runText = miles ? `${miles} ${distanceUnit} @ ${week.easyPace}` : `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`;
       runStress = 'Low';
     }
-    const setText = (item: AiPlanTopSet) => `${item.exercise}: ${item.weight} × ${item.reps}`;
+    const setText = (item: AiPlanTopSet) => item.unlogged ? `${item.exercise}: find your weight` : `${item.exercise}: ${item.weight} × ${item.reps}`;
     const strengthText = topSet
       ? `${topSet.reps === 1 ? '1RM attempt' : 'Top set'} · ${[setText(topSet), ...extraSets.map(setText)].join(' · ')}`
       : (type === 'strength' || type === 'mixed') ? `${(day.muscles || []).filter(muscle => muscle !== 'Cardio').join(' + ') || 'Strength'} · no exercise mapped yet` : '';
     const lifts = topSet ? [topSet, ...extraSets] : [];
     const run = runKind && runText ? { kind: runKind, text: runText } : undefined;
-    if (type === 'hyrox') return { date, kind: 'HYROX', title: day.name, detail: 'Forge writes the session on the day — stations, compromised running or a simulation, paced off your threshold.', stress: 'High' as const, lifts, run: undefined };
+    /* Without a HYROX goal the day is open, not a HYROX session. */
+    if (type === 'hyrox') return hyrox.goal
+      ? { date, kind: 'HYROX', title: day.name, detail: hyrox.detail, stress: 'High' as const, lifts, run: undefined }
+      : { date, kind: 'Flexible', title: day.name, detail: hyrox.detail, stress: 'Low' as const, lifts, run: undefined };
     if (type === 'rest' && !runText) return { date, kind: 'Recovery', title: day.name, detail: 'No strength or cardio scheduled. Optional mobility or easy walking only.', stress: 'Rest' as const, lifts, run };
     if (strengthText && runText) return { date, kind: `${type === 'mixed' ? 'Mixed' : 'Strength'} + ${runKind}`, title: day.name, detail: `${strengthText} · ${runText}`, stress: 'High' as const, lifts, run };
     if (strengthText) return { date, kind: type === 'mixed' ? 'Mixed' : 'Strength', title: day.name, detail: strengthText, stress: 'Moderate' as const, lifts, run };
@@ -292,8 +296,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      the workouts included. Feeding these back round would let a session help
      decide whether it was a session. */
   const paces = useMemo(
-    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || [], workoutEfforts(judged)),
-    [records, runGoal, setup?.excludedEfforts, judged],
+    /* A HYROX goal with no running race sets the paces from its own table. */
+    () => withHyroxPaces(paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || [], workoutEfforts(judged)), goals),
+    [records, runGoal, setup?.excludedEfforts, judged, goals],
   );
 
   /* WHERE THE ATHLETE IS ON EACH LADDER — the plan's memory of how the last
@@ -618,7 +623,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const currentIndex = currentWeekIndex(stored);
   const weekIndex = Math.max(0, Math.min(viewWeek ?? currentIndex, plan.weeks.length - 1));
   const week = plan.weeks[weekIndex];
-  const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi');
+  const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi', { goal: Boolean(hyroxGoalOf(goals)), detail: hyroxPlanDetail(goals) });
   const sessions = weekPlan.sessions;
 
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any

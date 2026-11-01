@@ -1,4 +1,3 @@
-.exercise-mobile-list { display: none; }
 .mobile-editor-backdrop { display: contents; }
 .connection-stack { display: grid; gap: 16px; }
 .activity-connection header p { margin: 4px 0 0; color: var(--muted); }
@@ -185,26 +184,9 @@ body { background: transparent !important; }
   .onboarding-simple .setup-actions { position: sticky; bottom: 0; margin: auto -17px -22px; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
   .onboarding-simple .setup-actions .button { min-height: 56px; }
   .exercise-library { gap: 16px; }
-  .simple-library-head h2 { font-size: 20px; }
-  .simple-library-head p { font-size: 14px; }
-  .simple-library-head .button-row { display: grid; grid-template-columns: 1fr 1fr; }
-  .simple-library-head .button { min-height: 48px; padding-inline: 12px; }
   .library-table-card { border-radius: var(--r-lg) !important; }
   .library-table-card > header { gap: 12px; padding: 12px; }
-  .library-filters { display: grid; grid-template-columns: repeat(4, max-content); margin-inline: -2px; padding: 2px; }
-  .library-filters button { min-height: 36px; padding: 8px 12px; }
   .library-table-scroll { display: none; }
-  .exercise-mobile-list { display: grid; }
-  .exercise-mobile-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 0 12px; border-top: 1px solid var(--line); }
-  .exercise-mobile-row:first-child { border-top: 0; }
-  .exercise-mobile-row.disabled { opacity: .55; }
-  .exercise-mobile-main { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 16px 2px; border: 0; background: transparent; color: var(--text); text-align: left; }
-  .exercise-mobile-main > span { min-width: 0; display: grid; gap: 4px; }
-  .exercise-mobile-main strong, .exercise-mobile-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .exercise-mobile-main strong { font-size: 16px; }
-  .exercise-mobile-main small { color: var(--muted); font-size: 12px; }
-  .exercise-mobile-main > b { color: var(--muted); font-size: 20px; }
-  .exercise-mobile-row > .table-status { min-width: 45px; min-height: 36px; }
   .mobile-editor-backdrop { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; padding-top: env(safe-area-inset-top); background: var(--scrim); backdrop-filter: blur(5px); }
   .mobile-editor-backdrop .custom-exercise { width: 100%; max-height: calc(100dvh - env(safe-area-inset-top)); overflow: auto; margin: 0; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); border-width: 1px 0 0; border-radius: 20px 20px 0 0 !important; }
   .custom-exercise .card-head { position: sticky; top: -20px; z-index: 2; margin: -20px -16px 16px; padding: 16px 16px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -236,9 +218,7 @@ body { background: transparent !important; }
     grid-template-columns: minmax(0, 1fr);
   }
   .app-main .page > *, .app-main .page > * > * { min-width: 0; }
-  .simple-library-head .button-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .simple-library-head .button { min-width: 0; }
-  .library-filters, .library-table-card { min-width: 0; }
+  .library-table-card { min-width: 0; }
 
   /* Legibility floor. 6–9px labels were unreadable on a phone. */
   .eyebrow, .field-caption { font-size: 12px; letter-spacing: .1em; }
@@ -246,7 +226,7 @@ body { background: transparent !important; }
   .today-workout-items small, .feed-empty-row small,
   .feed-metric-row span, .feed-status,
   .classic-streak article span, .classic-calendar .calendar-kpis span,
-  .calendar-legend, .exercise-mobile-main small,
+  .calendar-legend,
   .history-data-table th, .library-table-card th { font-size: 12px; }
   .classic-calendar .weekday-row span { font-size: 12px; }
   .today-workout-items em, .feed-empty-row em,
@@ -255,14 +235,12 @@ body { background: transparent !important; }
   /* Tap-target floor of 44px for anything that is actually a control.
      Deliberately scoped to controls — inline text links keep their own size. */
   .bottom-nav a { min-height: var(--tap); align-content: center; }
-  .range-options button, .progress-domain-filter button, .library-filters button,
+  .range-options button, .progress-domain-filter button,
   .plan-tabs button, .plan-tabs a, .profile-tabs button, .insight-tabs button,
   .question-chips button, .same-day-sessions button, .segmented button,
-  .table-status, .exercise-mobile-row > .table-status,
   .history-toolbar button, .icon-button, .text-button,
   .connection-actions button { min-height: var(--tap); }
   .question-chips button { padding: 12px 16px; font-size: 12px; }
-  .table-status, .exercise-mobile-row > .table-status { min-width: var(--tap); font-size: 12px; }
   /* Card-header and section-header links: keep the small type, grow the target. */
   .feed-card-header a, .compact-card > header a, .feed-text-link,
   .feed-welcome > a, .goal-card > .feed-text-link {
@@ -270,14 +248,14 @@ body { background: transparent !important; }
   }
 
   /* Rows of filters/tabs scroll horizontally instead of overflowing the page. */
-  .library-filters, .plan-tabs, .profile-tabs, .insight-tabs, .range-options {
+  .plan-tabs, .profile-tabs, .insight-tabs, .range-options {
     display: flex; flex-wrap: nowrap; overflow-x: auto;
     scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
-  .library-filters::-webkit-scrollbar, .plan-tabs::-webkit-scrollbar,
+  .plan-tabs::-webkit-scrollbar,
   .profile-tabs::-webkit-scrollbar, .insight-tabs::-webkit-scrollbar,
   .range-options::-webkit-scrollbar { display: none; }
-  .library-filters button, .plan-tabs button, .plan-tabs a,
+  .plan-tabs button, .plan-tabs a,
   .profile-tabs button, .insight-tabs button { flex: 0 0 auto; white-space: nowrap; }
 
   /* Three domains have to fit the width, not get clipped mid-word. */
@@ -301,13 +279,10 @@ body { background: transparent !important; }
 @media (max-width: 900px) {
   /* Scrollable strips get a soft right edge so it reads as "more this way"
      instead of a chip that looks arbitrarily chopped off. */
-  .library-filters, .plan-tabs, .profile-tabs, .insight-tabs, .range-options, .question-chips {
+  .plan-tabs, .profile-tabs, .insight-tabs, .range-options, .question-chips {
     -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
     mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 26px), transparent 100%);
   }
-  /* Exercises: the page header now lives in the page intro, so this row is
-     just its actions. */
-  .simple-library-head { display: grid; }
 }
 
 @media (min-width: 901px) {

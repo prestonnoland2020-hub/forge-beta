@@ -8,7 +8,7 @@ import { normalizeMuscleGroups } from './muscleGroups';
 import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
 import { liftPositions, rungFor } from './liftProgression';
-import { hyroxSession,hyroxSessionsDone,weeksUntil } from './hyroxSession';
+import { daysSinceHyrox,HYROX_STATIONS_EVERY_DAYS,hyroxGoalOf,hyroxSession,hyroxSessionsDone,weeksUntil } from './hyroxSession';
 import { exerciseBlocked,bodyLogReason,EMPTY_BODY_LOG,type BodyLogState } from './bodyLog';
 
 /* Bump this whenever the engine's OUTPUT changes shape or policy — the daily
@@ -30,8 +30,9 @@ import { exerciseBlocked,bodyLogReason,EMPTY_BODY_LOG,type BodyLogState } from '
    version is the whole point of having one: the stored row on his phone was
    written by v5 and would otherwise keep showing 265 all day beside a build
    that no longer produces it. */
-/* v7 adds the HYROX split day: Forge writes the session itself. */
-export const DAILY_RECOMMENDATION_VERSION='hyrox-v7';
+/* v7 adds the HYROX split day: Forge writes the session itself. v8 writes it
+   only for an athlete with a HYROX goal. */
+export const DAILY_RECOMMENDATION_VERSION='hyrox-v8';
 
 export type RecommendationSplitDay={
   id?:string;
@@ -113,7 +114,7 @@ const formatCardio=(session:GeneratedSession)=>session.plan.structure==='Interva
   ?`${session.plan.activity} · ${session.plan.repeats} × ${session.plan.workDistance} ${session.plan.workUnit} · ${session.plan.pace}`
   :session.plan.structure==='Steady'
     ?`${session.plan.activity} · ${session.plan.duration||session.plan.distance} ${session.plan.duration?'min':session.plan.distanceUnit||''} · ${session.plan.pace||'controlled effort'}`
-    :`${session.title} · ${session.plan.rounds||1} rounds`;
+    :session.plan.customTarget||`${session.title} · ${session.plan.rounds||1} rounds`;
 
 export function recommendationFingerprint(input:Omit<EngineInput,'recovery'|'profile'|'runningHistory'|'loadBiasPercent'> & {cycleRevision?:number;loadBiasPercent:number;aiPlanStamp?:string;planInputsStamp?:string}){
   const history=input.records.slice(0,120).map(record=>[record.id,record.date,(record.topSets||[]).map(set=>[set.lift,set.weight,set.reps,set.completed]),(record.cardioSessions||[]).map(session=>[session.id,session.summary])]);
@@ -228,15 +229,34 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   /* A HYROX day is written by Forge, not picked from the week's runs: the
      course is fixed, so the session is arithmetic on how many HYROX days are
      in the log, the athlete's threshold, and how close race day is. */
+  /* No HYROX goal, no HYROX session: the day stays open (see hyroxGoalOf). */
+  const hyroxGoal=hyroxGoalOf(input.goals);
   const hyrox=(()=>{
-    if(input.splitDay.type!=='hyrox')return undefined;
-    const goal=input.goals.find(goal=>/hyrox/i.test(`${goal.exercise||''} ${goal.title}`));
-    return hyroxSession({sessionIndex:hyroxSessionsDone(input.records,input.date),thresholdSecondsPerMile:input.thresholdSecondsPerMile||0,division:goal?.eventDivision,weeksToRace:weeksUntil(goal?.date,input.date),readiness:input.recovery?.readiness,metric:input.metric});
+    if(input.splitDay.type!=='hyrox'||!hyroxGoal)return undefined;
+    return hyroxSession({sessionIndex:hyroxSessionsDone(input.records,input.date),thresholdSecondsPerMile:input.thresholdSecondsPerMile||0,division:hyroxGoal.eventDivision,goalTarget:hyroxGoal.target,weeksToRace:weeksUntil(hyroxGoal.date,input.date),readiness:input.recovery?.readiness,metric:input.metric});
   })();
   const cardioCandidate=(()=>{
     if(hyrox)return{id:`hyrox-${hyrox.plan.id}`,goal:'HYROX',event:'HYROX',role:'Race specific',title:hyrox.title,phase:'Specific',week:0,plan:hyrox.plan,rationale:hyrox.rationale,placement:input.splitDay.name,stress:hyrox.shape==='race-week'?'Low':'High',progression:'Stations, compromised running and a simulation rotate; the simulation feeds the HYROX goal.',scaleNotes:[],status:'Scheduled'} as GeneratedSession;
     if(input.splitDay.type!=='cardio'&&input.splitDay.type!=='mixed')return undefined;
     const weekly=buildWeeklyCardio(input.goals,0,{profile:input.profile,history:input.runningHistory});
+    /* A HYROX GOAL BRINGS STATION WORK TO ORDINARY CARDIO DAYS. Without a HYROX
+       day in the split, an athlete training for one would only ever be handed
+       runs. So once a week — when nothing HYROX is in the log for seven days —
+       a pure cardio day that would have been an easy run — or the generic
+       compromised-running circuit the cardio engine writes for HYROX goals —
+       becomes a stations workout: four stations at race distance and division
+       load, a 1 km run at goal pace before each.
+       Never on a leg day (the sleds and lunges are legs), never on a mixed day
+       after lifting, and never in place of the long run or the quality
+       session, which the race needs more. */
+    const stationsDay=(session?:GeneratedSession)=>{
+      if(!hyroxGoal||lowerBodyDay||input.splitDay.type!=='cardio'||bodyLog.blocksRunning)return undefined;
+      if(session&&session.role!=='Easy'&&session.event!=='HYROX')return undefined;
+      if(daysSinceHyrox(input.records,input.date)<HYROX_STATIONS_EVERY_DAYS)return undefined;
+      const written=hyroxSession({sessionIndex:hyroxSessionsDone(input.records,input.date),shape:'stations',thresholdSecondsPerMile:input.thresholdSecondsPerMile||0,division:hyroxGoal.eventDivision,goalTarget:hyroxGoal.target,weeksToRace:weeksUntil(hyroxGoal.date,input.date),readiness:input.recovery?.readiness,metric:input.metric});
+      if(written.shape==='race-week')return undefined;
+      return{id:`hyrox-${written.plan.id}`,goal:'HYROX',event:'HYROX',role:'Race specific',title:written.title,phase:'Specific',week:0,plan:written.plan,rationale:`No HYROX station work in the last week, so today's cardio is a stations workout. ${written.rationale}`,placement:input.splitDay.name,stress:'High',progression:'Weekly station work for your HYROX goal, on a cardio day.',scaleNotes:[],status:'Scheduled'} as GeneratedSession;
+    };
     const wanted=roleForDayName(input.splitDay.name);
     const pick=(role:GeneratedSession['role'])=>weekly.scheduled.find(session=>session.role===role)||weekly.deferred.find(session=>session.role===role);
     if(lowerBodyDay){
@@ -248,9 +268,9 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
     }
     if(wanted){
       const found=pick(wanted)||(wanted==='Long'?pick('Easy'):undefined);
-      if(found)return{...found,status:'Scheduled' as const};
+      if(found)return stationsDay(found)||{...found,status:'Scheduled' as const};
     }
-    return weekly.scheduled[0];
+    return stationsDay(weekly.scheduled[0])||weekly.scheduled[0];
   })();
   const runBlocked=bodyLog.blocksRunning&&cardioCandidate&&!hyrox&&/run/i.test(`${cardioCandidate.plan.activity} ${cardioCandidate.title}`);
   const cardio=cardioCandidate?runBlocked

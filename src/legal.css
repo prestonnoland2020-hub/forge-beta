@@ -7,16 +7,9 @@
 }
 
 /* Sign in with Apple is not offered at the moment (see LoginPage), so Google
-   is the only route and has to read as the page's primary action. Google's
-   brand terms fix the surface — white or Google blue, with the G mark — so it
-   cannot simply be given the app's accent. What it CAN have is the stroke
-   Google specifies for its own light button (#747775): without it, a white
-   button on the white sign-in card had no edge at all and read as a caption.
-
-   The Apple rules are kept alongside so restoring the button is a matter of
-   rendering it again. */
-.apple-button,
-.google-button {
+   is the only route. The shared Apple rules are kept so restoring that button
+   is a matter of rendering it again. */
+.apple-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,20 +22,86 @@
   font-weight: 600;
   cursor: pointer;
   transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
-}
-.apple-button {
   background: var(--ink);
   color: var(--bg);
   border: 1px solid var(--ink);
 }
+.apple-button:active:not(:disabled) { transform: translateY(1px); }
+.apple-button:disabled { opacity: .6; cursor: default; }
+
+/* GOOGLE'S BUTTON, TO THE LETTER OF ITS BRANDING GUIDELINES.
+
+   Every value here is Google's, not Forge's: the 40px height, 12px side
+   padding and 10px between the G and the label, Roboto Medium 14/20, the 4px
+   corners of its rectangular shape. The theme picks between Google's two
+   variants — light (#FFFFFF fill, #747775 stroke, #1F1F1F label) and dark
+   (#131314 fill, #8E918F stroke, #E3E3E3 label) — and nothing else about the
+   app reaches it, so the accent, Saira and the card radius stop at its edge.
+
+   Hover and press are Google's state layers, a wash of the label colour at 8%
+   and 12%, laid on by ::after so the fill itself never shifts. Disabled is
+   Google's too: the fill and stroke fade, and label and mark drop to 38%.
+   A 40px button is short of the 44pt tap target iOS asks for, so ::before
+   reaches 2px past each edge to take the tap without changing the drawing. */
 .google-button {
-  border: 1px solid #747775;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  --g-fill: #ffffff;
+  --g-stroke: #747775;
+  --g-label: #1f1f1f;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 400px;
+  margin-inline: auto;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--g-stroke);
+  border-radius: 4px;
+  background: var(--g-fill);
+  color: var(--g-label);
+  font: 500 14px/20px Roboto, Arial, sans-serif;
+  letter-spacing: .25px;
+  text-transform: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.apple-button:active:not(:disabled),
-.google-button:active:not(:disabled) { transform: translateY(1px); }
-.apple-button:disabled,
-.google-button:disabled { opacity: .6; cursor: default; }
+:root[data-theme="dark"] .google-button {
+  --g-fill: #131314;
+  --g-stroke: #8e918f;
+  --g-label: #e3e3e3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .google-button {
+    --g-fill: #131314;
+    --g-stroke: #8e918f;
+    --g-label: #e3e3e3;
+  }
+}
+/* forge-system.css lifts every button to 48px on touch screens; this one keeps
+   Google's 40 and widens its tap area with ::before instead. */
+.login-page .login-providers .google-button { min-height: 40px; }
+.google-button::before { content: ""; position: absolute; inset: -3px; }
+.google-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--g-label);
+  opacity: 0;
+  transition: opacity 218ms;
+  pointer-events: none;
+}
+.google-button:hover:not(:disabled)::after { opacity: .08; }
+.google-button:focus-visible::after,
+.google-button:active:not(:disabled)::after { opacity: .12; }
+.google-button:focus-visible { outline: 2px solid var(--g-stroke); outline-offset: 2px; }
+.google-mark { width: 20px; height: 20px; flex: none; }
+.google-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.google-button:disabled { cursor: default; background: color-mix(in srgb, var(--g-fill) 38%, transparent); border-color: color-mix(in srgb, var(--g-label) 12%, transparent); }
+.google-button:disabled .google-mark,
+.google-button:disabled .google-label { opacity: .38; }
 
 .provider-mark {
   width: 20px;

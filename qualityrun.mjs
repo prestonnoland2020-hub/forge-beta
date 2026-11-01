@@ -255,6 +255,14 @@ check('and a sooner race wins even when it is the shortest',
   enduranceTarget([...sameDay, { type: 'Endurance', exercise: 'Mile', title: 'Spring mile', target: '4:55', date: '2026-10-01' }]).goal.title === 'Spring mile');
 check('a goal with no time set cannot steer the block',
   enduranceTarget([{ type: 'Endurance', exercise: '10K', title: '10K', target: '', date: '2026-10-01' }, ...sameDay]).goal.exercise === '5K');
+check('a target saved with its unit still steers the block',
+  enduranceTarget([{ type: 'Endurance', exercise: '5K Run', title: '5K Run · 22:30 mm:ss', target: '22:30 mm:ss', date: '2027-01-24' }])?.miles === 3.107);
+check('a HYROX finish time is never read as a 5K pace',
+  enduranceTarget([{ type: 'Endurance', exercise: 'HYROX', title: 'HYROX · 1:25:00 hh:mm:ss', target: '1:25:00 hh:mm:ss', date: '2027-01-24' }]) === null);
+check('nor is a ride, a row or a swim',
+  ['Cycling', 'Rowing', 'Swimming'].every(exercise => enduranceTarget([{ type: 'Endurance', exercise, title: exercise, target: '1:30:00', date: '2027-01-24' }]) === null));
+check('a HYROX on an earlier date does not hide the run goal behind it',
+  enduranceTarget([{ type: 'Endurance', exercise: 'HYROX', title: 'HYROX', target: '1:25:00', date: '2026-12-01' }, ...sameDay])?.goal.exercise === '5K');
 check('no endurance goals, nothing to build for', enduranceTarget([{ type: 'Strength', title: 'Squat' }]) === null);
 
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);

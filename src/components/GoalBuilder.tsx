@@ -3,7 +3,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { coreFirst, coreOnly, isCoreLift, isWeightedBodyweight, CORE_LIFT_LABELS } from '../lib/coreLifts';
 import { canonicalLiftKey } from '../lib/liftAliases';
-import { normalizeGoalValue, isTimeUnit, isPaceMetric } from '../lib/goalInput';
+import { formatClock, normalizeGoalValue, isTimeUnit, isPaceMetric } from '../lib/goalInput';
 import { Icon } from './Icon';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
@@ -118,6 +118,9 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
   const chooseType=(next:string)=>{setType(next);setCurrent('');setTarget('');if(next==='endurance'){setExercise('5K Run');setMetric('Finish time');setUnit('mm:ss')}else if(next==='body'){setExercise('');setMetric('Body weight');setUnit(setup?.units==='Metric'?'kg':'lb')}else{setExercise('Back Squat');setMetric('Real 1RM');setUnit(setup?.units==='Metric'?'kg':'lb')}};
   const chooseEnduranceEvent=(value:string)=>{if(value==='Custom event'||value==='Custom running event'){const running=value==='Custom running event';setIsCustomRun(running);setCustomEnduranceEvent(running?'My Running Event':'');setExercise(running?'My Running Event':'');if(running){setMetric('Finish time');setUnit('hh:mm:ss')}}else{setIsCustomRun(false);setCustomEnduranceEvent('');setExercise(value);if(['Half Marathon','Marathon'].includes(value)){setMetric('Finish time');setUnit('hh:mm:ss');setCurrent('');setTarget('')}if(value==='HYROX'){setMetric('Finish time');setUnit('hh:mm:ss');setCurrent('');setTarget('')}}};
   const chooseEnduranceMetric=(value:string)=>{setMetric(value);setUnit(enduranceUnits[value][0]);setCurrent('');setTarget('')};
+  /* A time field opens the number pad, which has no colon: the colons go in as
+     the digits arrive, the way onboarding has always done it. */
+  const asTyped=(value:string)=>isTimeUnit(unit)||isPaceMetric(String(metric))?formatClock(value):value;
   const goalFields=(<div className="goal-fields">
 <div className="goal-selection-banner">
 <span>{selectedType.label.toUpperCase()} GOAL</span>
@@ -198,10 +201,10 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 <label>Measurement<select value={metric} onChange={e=>setMetric(e.target.value)}><option>Resting heart rate</option><option>Repetition count</option><option>Daily steps</option><option>Sleep duration</option><option>Weekly completion</option><option>Session frequency</option><option>Distance</option><option>Duration</option><option>Body measurement</option><option>Yes/no milestone</option></select>
 </label>
 </div>}<div className="field-grid three">
-<label>Current<input value={current} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setCurrent(e.target.value);if(fieldErrors.current)setFieldErrors(errors=>({...errors,current:undefined}))}} placeholder="Optional" />
+<label>Current<input value={current} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setCurrent(asTyped(e.target.value));if(fieldErrors.current)setFieldErrors(errors=>({...errors,current:undefined}))}} placeholder="Optional" />
 {fieldErrors.current&&<small className="field-error">{fieldErrors.current}</small>}
 </label>
-<label>Target<input value={target} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setTarget(e.target.value);if(fieldErrors.target)setFieldErrors(errors=>({...errors,target:undefined}))}} placeholder={isPaceMetric(String(metric))?'8:30':isTimeUnit(unit)?(/hh/.test(unit)?'1:20:00':'22:30'):'315'} />
+<label>Target<input value={target} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setTarget(asTyped(e.target.value));if(fieldErrors.target)setFieldErrors(errors=>({...errors,target:undefined}))}} placeholder={isPaceMetric(String(metric))?'8:30':isTimeUnit(unit)?(/hh/.test(unit)?'1:20:00':'22:30'):'315'} />
 {fieldErrors.target?<small className="field-error">{fieldErrors.target}</small>:isPaceMetric(String(metric))?<small>Minutes and seconds — 8:30 (8.5 also reads as 8:30).</small>:isTimeUnit(unit)?<small>A clock — 22:30. A bare number is minutes.</small>:null}
 </label>
 <label>Unit<select value={unit} onChange={e=>setUnit(e.target.value)}>{unitOptions.map(option=><option key={option}>{option}</option>)}</select>

@@ -29,6 +29,7 @@ const DISTANCE_UNITS = ['miles', 'km', 'meters', 'yards'];
 const OTHER_UNITS = ['minutes', 'calories', 'reps', 'floors'];
 const ALL_UNITS = [...DISTANCE_UNITS, ...OTHER_UNITS];
 const STAPLE_TYPES = ['Run', 'Walk', 'Bike', 'Rowing', 'Swimming', 'Elliptical', 'Stair Climber', 'Jump Rope'];
+const QUICK_TYPES = ['Run', 'Walk', 'Bike', 'Rowing', 'Elliptical', 'Swimming'];
 
 const isDistanceUnit = (unit: string) => DISTANCE_UNITS.includes(String(unit || '').trim().toLowerCase());
 /* A COUNT IS NOT A MISPLACED DISTANCE. "15 calories" and "20 reps" are a
@@ -502,18 +503,27 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
     <datalist id="cardio-type-options">{typeOptions.map(option => <option value={option} key={option} />)}</datalist>
     <div className="cardio-log-lines">
       {lines.map((line, index) => <div className="cardio-log-line" key={line.id}>
-        <label className="cardio-log-type"><span className="cardio-log-label">Type</span>
-          <input list="cardio-type-options" value={line.cardioType} onChange={event => changeType(line.id, event.target.value)} placeholder="Run" />
-        </label>
+        {/* THE TYPE IS A TAP. A text box holding "Run" hid every other
+            choice behind its own word — on a phone the list only appeared
+            once "Run" was deleted. The everyday ones are chips; anything
+            else is "Other", which opens the box with the full list. */}
+        <div className="cardio-log-type"><span className="cardio-log-label">Type</span>
+          <div className="cardio-type-chips">
+            {QUICK_TYPES.map(type => <button type="button" key={type} className={line.cardioType === type ? 'active' : ''} onClick={() => changeType(line.id, type)}>{type}</button>)}
+            <button type="button" className={QUICK_TYPES.includes(line.cardioType) ? '' : 'active'} onClick={() => { if (QUICK_TYPES.includes(line.cardioType)) changeType(line.id, ''); }}>Other</button>
+          </div>
+          {!QUICK_TYPES.includes(line.cardioType) && <input list="cardio-type-options" aria-label="Cardio type" autoFocus={!line.cardioType} value={line.cardioType} onChange={event => changeType(line.id, event.target.value)} placeholder="Stair climber, SkiErg, hike…" />}
+        </div>
+        {/* ONE UNIT, WHERE THE NUMBER IS. The distance field already printed
+            "MILES" and a second Unit box beside it said it again; the unit
+            is now a quiet switch under the number it belongs to. */}
         <div className="cardio-log-distance">
           <DialField label="Distance" kind="distance" unit={line.unit} value={line.distance}
             onChange={next => updateLine(line.id, Number(next) > 0 && !isCountUnit(line.unit) && !isDistanceUnit(line.unit) ? { distance: next, unit: distanceUnitFor(line.cardioType) } : { distance: next })} />
-        </div>
-        <label className="cardio-log-unit"><span className="cardio-log-label">Unit</span>
-          <select value={line.unit} onChange={event => updateLine(line.id, { unit: event.target.value })}>
-            {(Number(line.distance) > 0 ? DISTANCE_UNITS : ALL_UNITS).map(unit => <option value={unit} key={unit}>{unit}</option>)}
+          <select className="cardio-log-unit-inline" aria-label="Distance unit" value={line.unit} onChange={event => updateLine(line.id, { unit: event.target.value })}>
+            {(Number(line.distance) > 0 ? DISTANCE_UNITS : ALL_UNITS).map(unit => <option value={unit} key={unit}>in {unit}</option>)}
           </select>
-        </label>
+        </div>
         <div className="cardio-log-time">
           <DialField label="Time" kind="clock" value={line.time} onChange={next => updateLine(line.id, { time: next })} placeholder="0:00" />
         </div>

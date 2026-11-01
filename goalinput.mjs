@@ -1,4 +1,4 @@
-import { normalizeGoalValue, normalizeTimeValue, normalizeNumberValue } from './src/lib/goalInput.ts';
+import { formatClock, normalizeGoalValue, normalizeTimeValue, normalizeNumberValue } from './src/lib/goalInput.ts';
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${ok ? '' : detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
 const v = r => r.ok ? r.value : `ERR:${r.message}`;
@@ -19,9 +19,17 @@ check('22:30 stays', v(normalizeTimeValue('22:30')) === '22:30');
 check('1:20:00 stays', v(normalizeTimeValue('1:20:00')) === '1:20:00');
 check('80 with hh:mm:ss → 1:20:00', v(normalizeTimeValue('80', true)) === '1:20:00');
 check('1:20 with hh:mm:ss is h:mm', v(normalizeTimeValue('1:20', true)) === '1:20:00');
+check('85:00 with hh:mm:ss is 85 minutes, not 85 hours', v(normalizeTimeValue('85:00', true)) === '1:25:00');
 check('22:75 is refused', !normalizeTimeValue('22:75').ok);
 check('"fast" is refused', !normalizeTimeValue('fast').ok);
 check('0 is refused', !normalizeTimeValue('0').ok);
+
+console.log('\nTyped on a number pad');
+check('12500 → 1:25:00', formatClock('12500') === '1:25:00');
+check('2430 → 24:30', formatClock('2430') === '24:30');
+check('22 stays minutes', formatClock('22') === '22');
+check('8.5 is left for the pace reader', formatClock('8.5') === '8.5');
+check('a HYROX current typed as 13000 saves as 1:30:00', v(normalizeGoalValue(formatClock('13000'), 'hh:mm:ss', 'Finish time')) === '1:30:00');
 
 console.log('\nBy unit');
 check('mm:ss unit routes to time', v(normalizeGoalValue('22', 'mm:ss')) === '22:00');
