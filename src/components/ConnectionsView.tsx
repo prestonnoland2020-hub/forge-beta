@@ -61,7 +61,9 @@ export function ConnectionsView({ garmin, garminBusy, garminMessage, onGarmin, s
     connected.push(<article key="garmin" className="cx-card">
       <header><Name id="garmin" name="Garmin" /><span className="cx-status"><i aria-hidden="true" />Connected</span></header>
       <p className="cx-line">{status}{garmin.lastSyncedAt ? <span> · updated {ago(garmin.lastSyncedAt)}</span> : null}</p>
-      {garmin.historyComplete === false && <p className="cx-note">Importing your Garmin history. Older activities arrive over the next few app opens.</p>}
+      {garmin.historyBlocked
+        ? <p className="cx-note">New workouts arrive each time your watch syncs. Garmin hasn’t opened your past activities to Forge yet.</p>
+        : garmin.historyComplete === false && <p className="cx-note">Importing your Garmin history. Older activities arrive over the next few app opens.</p>}
       {garminMessage && <p className="cx-note" role="status">{garminMessage}</p>}
       <footer>
         <button type="button" className="cx-secondary" disabled={garminBusy} onClick={() => onGarmin('sync')}>{garminBusy ? 'Syncing…' : 'Sync now'}</button>

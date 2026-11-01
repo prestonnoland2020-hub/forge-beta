@@ -11,6 +11,9 @@ export type GarminConnectionStatus = {
   /* Whether the walk back through the athlete's whole Garmin history has
      reached the end. Until it has, opening Forge carries it on. */
   historyComplete?: boolean;
+  /* Garmin refuses past data to this program (it needs Garmin's historical
+     data permission). New workouts still arrive by push. */
+  historyBlocked?: boolean;
 };
 
 async function callGarmin(action: string, extra: Record<string, unknown> = {}) {

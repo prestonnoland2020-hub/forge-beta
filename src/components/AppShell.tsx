@@ -199,7 +199,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       if (strava?.connected) await syncStravaActivities().catch(() => undefined);
       /* Garmin's history arrives a few years per run (Garmin's rate limit);
          each launch carries it on until it is all requested. */
-      if (garmin?.connected && !garmin.historyComplete) await syncGarmin().catch(() => undefined);
+      if (garmin?.connected && !garmin.historyComplete && !garmin.historyBlocked) await syncGarmin().catch(() => undefined);
       await importStravaActivities(stravaRecords, stravaAddRecord, stravaUpdateRecord);
     } catch { /* silent — manual sync remains in Profile → Connections */ }
   }, [historyLoading, stravaRecords, stravaAddRecord, stravaUpdateRecord]); // eslint-disable-line react-hooks/exhaustive-deps
