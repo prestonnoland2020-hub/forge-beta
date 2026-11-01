@@ -521,7 +521,7 @@ function OnboardingForm() {
             </form>
             {targetPath
               ? <OnboardingGoalPath path={targetPath} date={goalDate} onUseWeeks={weeks => { tap(); setPickDate(!goalWeeks.includes(weeks)); setGoalDate(weeksFromNow(weeks)); }} />
-              : goalTarget.trim() && <p className="ob-path-hint">Add {goalKind === 'weight' ? 'your weight today' : goalKind === 'race' ? 'your best time now' : 'your best right now'} and Forge shows what each week has to find.</p>}
+              : goalTarget.trim() && !goalCurrent.trim() && <p className="ob-path-hint">Add {goalKind === 'weight' ? 'your weight today' : goalKind === 'race' ? 'your best time now' : 'your best right now'} and Forge shows what each week has to find.</p>}
             <p className="ob-why">Forge builds every week backwards from this goal — the weights, the runs and when to push.</p>
           </>,
           action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!targetReady} onClick={() => targetReady && tap()}>Continue</button>,
