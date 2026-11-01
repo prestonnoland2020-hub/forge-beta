@@ -1,4 +1,5 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
+import { startingNumbers } from './startingNumbers';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import type { Feasibility } from './goalFeasibility';
 import { calculateEstimatedOneRepMax } from './strength';
@@ -63,7 +64,11 @@ function strengthCurrent(goal: CreatedGoal, records: WorkoutRecord[], mode: MaxM
     const value = reps ? Number(set.reps) || 0 : tested ? Number(set.weight) || 0 : calculateEstimatedOneRepMax(Number(set.weight) || 0, Number(set.reps) || 0) || 0;
     if (value > best) best = value;
   }
-  return best || (tested ? null : numeric(goal.current) || null);
+  /* Nothing logged and nothing typed on the goal: the starting number from
+     setup stands in as a calculated max, so a day-one goal has a "now". */
+  const start = !tested && !reps && lift ? startingNumbers().find(item => sameLift(item.lift, lift)) : undefined;
+  const fromStart = start ? calculateEstimatedOneRepMax(start.weight, start.reps) || 0 : 0;
+  return best || (tested ? null : numeric(goal.current) || fromStart || null);
 }
 
 /* The race distance a goal is for, in miles — from its event distance, or
