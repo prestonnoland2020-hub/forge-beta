@@ -11,7 +11,7 @@
 /* ---- The week ---------------------------------------------------------- */
 
 /* ---- The session card -------------------------------------------------- */
-.today .td-card { display: grid; gap: var(--s4); padding: var(--s5); border-radius: var(--r-lg); background: var(--surface-1); border: 1px solid var(--hairline); }
+.today .td-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); padding: var(--s5); border-radius: var(--r-lg); background: var(--surface-1); border: 1px solid var(--hairline); }
 .today .td-card-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .today .td-card-top a { font-size: var(--fs-small); font-weight: 700; color: var(--ink-3); text-decoration: none; }
 .today .td-chip { display: inline-flex; align-items: center; gap: var(--s1); padding: var(--s1) var(--s3); border-radius: var(--r-pill); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); color: var(--accent-text); font-size: var(--fs-label); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -26,7 +26,10 @@
 .today .td-lines li + li::before { content: ''; position: absolute; top: 0; left: 34px; right: 0; height: 1px; background: var(--hairline); }
 .today .td-lines li > span, .today .td-lines label { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s3); min-height: var(--control-m); }
 .today .td-lines label { grid-template-columns: 22px minmax(0, 1fr) auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.today .td-lines li > span, .today .td-lines label > span { font-size: var(--fs-body); font-weight: 600; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.today .td-lines li > span, .today .td-lines label > span { font-size: var(--fs-body); font-weight: 600; line-height: 1.3; color: var(--ink); min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; padding-block: var(--s2); }
+/* A run: its name, and the distance and pace under it in the quieter voice. */
+.today .td-lines .td-stack { display: grid; -webkit-line-clamp: unset; gap: 2px; }
+.today .td-lines .td-detail { font-style: normal; font-size: var(--fs-small); font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .today .td-lines span small { margin-left: var(--s2); font-size: var(--fs-label); font-weight: 600; color: var(--ink-3); }
 .today .td-lines b { font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
 .today .td-lines input { position: absolute; opacity: 0; pointer-events: none; }

@@ -21,6 +21,13 @@ const todayIso = () => {
 };
 
 
+/* The plan summary leads with the activity ("Easy Run · 2.5 miles · 9:20/mi");
+   under a title that already says it, the detail starts after it. */
+const runDetail = (title: string, summary: string) => {
+  const [first, ...rest] = summary.split(' · ');
+  return rest.length && title.toLowerCase().includes(first.toLowerCase()) ? rest.join(' · ') : summary;
+};
+
 export function HomePage() {
   const { recommendation, loading, syncError, toggleTopSet, setCardioSelected } = useDailyRecommendation();
   const { records } = useWorkoutHistory();
@@ -95,8 +102,11 @@ export function HomePage() {
         {recommendation.cardio && <li><label className={recommendation.cardio.selected ? 'on' : ''}>
           <input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
-          <span>{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}</span>
-          <b>{cardioPlanSummary(recommendation.cardio.session.plan)}</b>
+          {/* A run's detail is a sentence, not a number, so it goes under its
+              name rather than in the number column — where it could not wrap
+              and pushed the whole card wider than the screen. */}
+          <span className="td-stack">{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}
+            <em className="td-detail">{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</em></span>
         </label></li>}
       </ul>}
       {!recommendedSets.length && dayType !== 'rest' && dayType !== 'cardio' && dayType !== 'hyrox' && <Link className="td-fix" to="/exercises"><span><b>Choose exercises for this day</b>Forge needs a lift mapped to it.</span><Icon name="arrow" size={16} /></Link>}
