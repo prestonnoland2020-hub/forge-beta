@@ -24,6 +24,7 @@ import { runShapedActivity } from '../features/training/stravaImportService';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { recoveryTrend } from '../lib/recoveryEngine';
+import { estimateMaxHr, heartRateRuns, heartRateTargets, type HeartRateTargets } from '../lib/heartRate';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
@@ -62,7 +63,7 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    is where it is, and that sentence is the difference between an instruction
    and coaching. */
 type WeekPlan = { sessions: Session[]; days: PlannedDay[]; longIndex: number; hardIndex: number };
-function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi', hyrox: { goal: boolean; detail: string } = { goal: false, detail: HYROX_NO_GOAL }): WeekPlan {
+function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi', hyrox: { goal: boolean; detail: string } = { goal: false, detail: HYROX_NO_GOAL }, hr: HeartRateTargets | null = null): WeekPlan {
   /* The window comes from `weekCycleDays` — the same function the volume math
      uses. This was a byte-identical second copy of that rotation, which meant
      the schedule and the mileage that must agree were computed twice and free
@@ -134,15 +135,19 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     const extraSets = (rawTopSets || []).slice(1);
     const type = day.dayType.toLowerCase();
     let runText = ''; let runKind: '' | 'Long run' | 'Hard run' | 'Easy run' = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
-    if (index === longIndex) { runKind = 'Long run'; runText = `${week.longRunMiles} ${distanceUnit} @ ${week.longRunPace}`; runStress = 'Moderate'; }
-    else if (index === qualityIndex) { runKind = 'Hard run'; runText = `${week.quality}${week.qualityPace ? ` @ ${week.qualityPace}` : ''}`; runStress = 'High'; }
+    /* HEART RATE BESIDE PACE. Pace is the target; heart rate is the check that
+       holds on a hot day or a hilly route, when the pace is the wrong thing to
+       chase. Easy and long runs get a ceiling; a threshold session its band. */
+    const easyCap = hr ? ` · HR under ${hr.easyCeiling}` : '';
+    if (index === longIndex) { runKind = 'Long run'; runText = `${week.longRunMiles} ${distanceUnit} @ ${week.longRunPace}${easyCap}`; runStress = 'Moderate'; }
+    else if (index === qualityIndex) { runKind = 'Hard run'; runText = `${week.quality}${week.qualityPace ? ` @ ${week.qualityPace}` : ''}${hr && /threshold|tempo/i.test(week.quality) ? ` · HR ${hr.thresholdLow}–${hr.thresholdHigh}` : ''}`; runStress = 'High'; }
     else if (easySet.has(index)) {
       runKind = 'Easy run';
       /* Each easy day carries its own distance — the same number the week's
          mileage is built from — never one duration copied onto every day. */
       const easyIndex = (week.easyDays || []).indexOf(day.name);
       const miles = week.easyRuns?.[easyIndex >= 0 ? easyIndex : 0];
-      runText = miles ? `${miles} ${distanceUnit} @ ${week.easyPace}` : `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`;
+      runText = (miles ? `${miles} ${distanceUnit} @ ${week.easyPace}` : `${week.easyMinutes ? `${week.easyMinutes} min` : 'Easy'} @ ${week.easyPace}`) + easyCap;
       runStress = 'Low';
     }
     const setText = (item: AiPlanTopSet) => item.unlogged ? `${item.exercise}: find your weight` : `${item.exercise}: ${item.weight} × ${item.reps}`;
@@ -169,6 +174,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const { user } = useAuth();
   const { recommendation, anchorDate, anchorPosition } = useDailyRecommendation();
   const { setup } = useProfileSetup();
+  /* Only for an athlete whose watch records heart rate: a target nobody can
+     see on their wrist is just a number in the way. */
+  const hrTargets = useMemo(() => heartRateRuns(records).length ? heartRateTargets(estimateMaxHr(records, setup?.birthDate)) : null, [records, setup?.birthDate]);
   const { health } = useAdaptiveTraining();
   const metric = setup?.units === 'Metric';
   /* A recommendation restored from an older cache can arrive without its split
@@ -623,7 +631,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const currentIndex = currentWeekIndex(stored);
   const weekIndex = Math.max(0, Math.min(viewWeek ?? currentIndex, plan.weeks.length - 1));
   const week = plan.weeks[weekIndex];
-  const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi', { goal: Boolean(hyroxGoalOf(goals)), detail: hyroxPlanDetail(goals) });
+  const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi', { goal: Boolean(hyroxGoalOf(goals)), detail: hyroxPlanDetail(goals) }, hrTargets);
   const sessions = weekPlan.sessions;
 
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any
