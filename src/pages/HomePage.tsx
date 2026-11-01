@@ -11,6 +11,7 @@ import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
 import { isSickNote, limitationIn } from '../lib/bodyLog';
 import { Icon } from '../components/Icon';
+import { sessionLength } from '../lib/time';
 import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate';
 import { TodayNudges } from '../components/TodayNudges';
 import { RunningBehindNudge } from '../components/RunningBehindCard';
@@ -84,6 +85,9 @@ export function HomePage() {
     {completedToday ? <section className="td-card done">
       <div className="td-card-top"><span className="td-chip done"><Icon name="check" size={12} stroke={3} />Done</span><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></div>
       <h3 className="td-title">{completedToday.title}</h3>
+      {/* How long the lifting took, from the watch's strength session — matched
+          to the day by date, so it sits with the top set it belongs to. */}
+      {completedToday.durationMinutes ? <p className="td-session-length"><Icon name="watch" size={13} />{completedSets.length ? 'Lifting' : 'Session'} · {sessionLength(completedToday.durationMinutes)} · from your watch</p> : null}
       {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <ul className="td-lines">
         {completedSets.map((set, index) => <li key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><b>{set.weight} {weightUnit} × {set.reps}</b></li>)}
         {(completedToday.cardioSessions || []).map(session => <li key={session.id}><span>{session.activity}</span><b>{formatCardioSummary(session)}</b></li>)}

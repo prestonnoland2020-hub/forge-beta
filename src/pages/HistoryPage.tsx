@@ -6,6 +6,7 @@ import { useWorkoutHistory, type WorkoutRecord } from '../features/training/Work
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioMiles, formatCardioSummary } from '../lib/cardioSession';
 import { Icon } from '../components/Icon';
+import { sessionLength } from '../lib/time';
 
 const formatDate=(date:string)=>new Date(`${date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -14,7 +15,6 @@ const nonStrengthMuscles=new Set(['cardio','none','rest','n/a','na']);
 const strengthMuscles=(record:WorkoutRecord)=>record.muscles.filter(muscle=>{const normalized=muscle.trim().toLowerCase();return normalized&&!nonStrengthMuscles.has(normalized)});
 
 /* "1 h 12 min", "48 min": how long the session took, as the watch timed it. */
-const sessionLength=(minutes:number)=>{const total=Math.round(minutes);return total>=60?`${Math.floor(total/60)} h ${total%60} min`:`${total} min`};
 
 export function HistoryPage({embedded=false}:{embedded?:boolean}={}){
   const {records}=useWorkoutHistory();const {setup}=useProfileSetup();const maxHr=estimateMaxHr(records,setup?.birthDate);const weightUnit=setup?.units==='Metric'?'kg':'lb';const now=new Date();

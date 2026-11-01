@@ -58,3 +58,6 @@ export function formatGoalTarget(target:string,metric?:string,unit?:string){
   const seconds=clockToSeconds(target,/hh:mm:ss/i.test(unitText));
   return seconds?decimalMinutesToClock(seconds/60):target;
 }
+
+/* A session's length as people say it: "47 min", "1 h 12 min". */
+export const sessionLength=(minutes:number)=>{const total=Math.round(minutes);return total>=60?`${Math.floor(total/60)} h ${total%60} min`:`${total} min`};

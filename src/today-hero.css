@@ -79,3 +79,7 @@
 .fw-card li small { font-size: var(--fs-small); color: var(--ink-3); }
 .fw-card .fw-go { color: var(--accent-text); }
 .today .td-first b { color: var(--ink); }
+
+/* The watch's session length, under the day's name on the done card. */
+.today .td-session-length { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font-size: var(--fs-small, 13px); color: var(--muted); }
+.today .td-session-length svg { flex: none; }

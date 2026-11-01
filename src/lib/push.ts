@@ -78,7 +78,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
    as it is". Sending the local copy on every launch turned both notifications
    off for anyone whose device cache had been wiped, silently, while the app
    still drew the switches as on. */
-export async function syncPushSubscription(prefs?: { morningWorkout: boolean; partnerTrained: boolean }): Promise<boolean> {
+export async function syncPushSubscription(prefs?: { morningWorkout: boolean; partnerTrained: boolean; watchSynced?: boolean }): Promise<boolean> {
   if (isDemoMode || !pushSupported()) return false;
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
   const vapidPublic = await applicationServerKey();
@@ -116,6 +116,9 @@ export async function syncPushSubscription(prefs?: { morningWorkout: boolean; pa
       p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       p_wants_morning: prefs ? prefs.morningWorkout : null,
       p_wants_partner: prefs ? prefs.partnerTrained : null,
+      /* Named only when it is being changed, so a launch sync matches the
+         function's older signature too. */
+      ...(prefs?.watchSynced !== undefined ? { p_wants_sync: prefs.watchSynced } : {}),
     });
     return !error;
   } catch { return false; }

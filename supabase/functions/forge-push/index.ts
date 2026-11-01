@@ -6,6 +6,7 @@ import { sendPush, type PushTarget } from './webpush.ts';
 
      morning   the day's training, once, in their own morning
      partner   a training partner logged and you have not
+     sync      their Garmin watch just delivered a new activity
      test      one push to one athlete, on demand, to prove the path
      status    what this function can and cannot do right now
 
@@ -54,7 +55,7 @@ async function config(): Promise<Config> {
   return cached;
 }
 
-type Row = { endpoint: string; owner_id: string; p256dh: string; auth: string; timezone: string; wants_morning: boolean; wants_partner: boolean };
+type Row = { endpoint: string; owner_id: string; p256dh: string; auth: string; timezone: string; wants_morning: boolean; wants_partner: boolean; wants_sync: boolean };
 type LogRow = { kind: string; owner_id?: string; endpoint?: string; local_date?: string; status?: number; outcome: string; note?: string };
 const log = async (rows: LogRow[]) => {
   if (!rows.length) return;
@@ -161,17 +162,38 @@ async function nextUpFor(pairs: Array<[string, string]>): Promise<Map<string, Ne
   }
   const remaining = owners.filter(owner => !dates.some(date => out.has(pairKey(owner, date))));
   if (!remaining.length) return out;
+  /* THE LOG IS THE TRUTH, here as in the app (lib/cycleCursor): the day after
+     the last session logged against a split position, rest expiring after a
+     day. The cycle cursor is read only when no positioned session exists. */
   const { data: cycles } = await admin.from('training_cycle_state').select('owner_id,split_id,next_position').in('owner_id', remaining);
   const splitIds = [...new Set((cycles || []).map(row => String(row.split_id)))];
   const { data: days } = splitIds.length ? await admin.from('training_split_days').select('split_id,position,name,goal_lifts,cardio_types').in('split_id', splitIds) : { data: [] };
+  const { data: recent } = await admin.from('workout_days').select('owner_id,workout_date,split_position').in('owner_id', remaining).not('split_position', 'is', null).gte('workout_date', Array.from({ length: 14 }).reduce<string>(date => dayBefore(date), [...dates].sort()[0])).order('workout_date', { ascending: false });
+  const latestByOwner = new Map<string, { date: string; position: number }>();
+  for (const row of (recent || []) as Array<Record<string, unknown>>) {
+    const owner = String(row.owner_id);
+    if (!latestByOwner.has(owner)) latestByOwner.set(owner, { date: String(row.workout_date), position: Number(row.split_position) });
+  }
+  const isRest = (day: Record<string, unknown>) => /^rest|recovery|off$/i.test(String(day.name || '').trim()) || (!(Array.isArray(day.goal_lifts) && day.goal_lifts.length) && !(Array.isArray(day.cardio_types) && day.cardio_types.length) && /rest|recover|off/i.test(String(day.name || '')));
   for (const cycle of (cycles || []) as Array<Record<string, unknown>>) {
-    const day = ((days || []) as Array<Record<string, unknown>>).find(item => String(item.split_id) === String(cycle.split_id) && Number(item.position) === Number(cycle.next_position));
-    if (!day) continue;
-    const lifts = Array.isArray(day.goal_lifts) ? (day.goal_lifts as string[]).filter(Boolean) : [];
-    const cardio = Array.isArray(day.cardio_types) ? (day.cardio_types as string[]).filter(Boolean) : [];
-    const detail = [lifts[0], cardio[0]].filter(Boolean).join(' · ');
-    const line = `${String(day.name)}${detail ? ` — ${detail}` : ''}.`;
-    for (const date of dates) if (!out.has(pairKey(String(cycle.owner_id), date))) out.set(pairKey(String(cycle.owner_id), date), { line });
+    const owner = String(cycle.owner_id);
+    const splitDays = ((days || []) as Array<Record<string, unknown>>).filter(item => String(item.split_id) === String(cycle.split_id)).sort((a, b) => Number(a.position) - Number(b.position));
+    if (!splitDays.length) continue;
+    const after = (position: number) => splitDays.find(item => Number(item.position) > position) || splitDays[0];
+    const latest = latestByOwner.get(owner);
+    for (const date of dates) {
+      if (out.has(pairKey(owner, date))) continue;
+      let day = latest ? after(latest.position) : (splitDays.find(item => Number(item.position) === Number(cycle.next_position)) || after(Number(cycle.next_position) - 1));
+      if (latest && isRest(day)) {
+        const gap = Math.round((Date.parse(`${date}T12:00:00Z`) - Date.parse(`${latest.date}T12:00:00Z`)) / 86400000);
+        if (gap >= 2) day = after(Number(day.position));
+      }
+      const lifts = Array.isArray(day.goal_lifts) ? (day.goal_lifts as string[]).filter(Boolean) : [];
+      /* cardio_types holds policies ("Forge", "Planned"), not sessions; only HYROX is worth a word. */
+      const hyrox = Array.isArray(day.cardio_types) && (day.cardio_types as string[]).some(item => /^hyrox$/i.test(String(item)));
+      const detail = [lifts[0], hyrox ? 'HYROX' : ''].filter(Boolean).join(' · ');
+      out.set(pairKey(owner, date), { line: isRest(day) ? `${String(day.name)}. Nothing owed today.` : `${String(day.name)}${detail ? ` — ${detail}` : ''}.` });
+    }
   }
   return out;
 }
@@ -199,7 +221,7 @@ async function sentDays(kind: string, pairs: Array<[string, string]>): Promise<S
   return new Set((data || []).map(row => pairKey(row.owner_id, String(row.local_date))));
 }
 
-const COLUMNS = 'endpoint,owner_id,p256dh,auth,timezone,wants_morning,wants_partner';
+const COLUMNS = 'endpoint,owner_id,p256dh,auth,timezone,wants_morning,wants_partner,wants_sync';
 
 /* THE TWO HOURS THAT DECIDE WHEN A PHONE IS ALLOWED TO BUZZ, in the athlete's
    own timezone — never the server's.
@@ -365,6 +387,54 @@ Deno.serve(async request => {
         ? { title: `${name} trained`, body: did ? `${did}. Both of you are in today.` : 'Both of you are in today.', tag: `partner-${date}`, url: './#/' }
         : { title: 'Your turn', body: did ? `${name} did ${did}. You haven’t logged yet.` : `${name} trained today. You haven’t logged yet.`, tag: `partner-${date}`, url: './#/' };
       messages.push({ row, date, payload });
+    }
+  }
+
+  if (kind === 'sync') {
+    /* THE WATCH SYNCED. Sent by the insert trigger on external_activities with
+       the Garmin ids that just arrived — new rows only, so a resend is silent.
+       No quiet hours: the athlete has just synced their watch, so they are
+       awake and holding it. What it says is what arrived ("Strength 47 min ·
+       Run 2.3 mi") and, for a lift, the day's top set the session belongs to —
+       Forge files the lift's length on that day, so naming the set tells them
+       it went to the right place. */
+    const owner = String(body.owner_id || '');
+    const ids = Array.isArray(body.external_ids) ? (body.external_ids as unknown[]).map(String).slice(0, 20) : [];
+    if (!owner || !ids.length) return json({ sent: 0 });
+    const { data: subs } = await admin.from('push_subscriptions').select(COLUMNS).eq('owner_id', owner).eq('wants_sync', true);
+    if (!subs?.length) return json({ sent: 0 });
+    const { data: activities } = await admin.from('external_activities')
+      .select('activity_type,distance_meters,moving_seconds,elapsed_seconds,local_start:raw_summary->>start_date_local')
+      .eq('owner_id', owner).eq('provider', 'garmin').in('external_id', ids).order('started_at', { ascending: true });
+    const rows = (activities || []) as Array<{ activity_type: string; distance_meters: number | null; moving_seconds: number | null; elapsed_seconds: number | null; local_start: string | null }>;
+    if (!rows.length) return json({ sent: 0 });
+    const { data: profile } = await admin.from('profiles').select('unit_system').eq('id', owner).maybeSingle();
+    const metric = profile?.unit_system === 'metric';
+    const minutesOf = (row: typeof rows[number]) => Math.round((Number(row.moving_seconds || row.elapsed_seconds) || 0) / 60);
+    const lift = (row: typeof rows[number]) => row.activity_type === 'WeightTraining';
+    const name = (type: string) => ({ WeightTraining: 'Strength', Run: 'Run', TrailRun: 'Trail run', VirtualRun: 'Run', Ride: 'Ride', VirtualRide: 'Ride', Walk: 'Walk', Hike: 'Hike', Swim: 'Swim', Rowing: 'Row' } as Record<string, string>)[type] || type.replace(/([a-z])([A-Z])/g, '$1 $2');
+    const parts = rows.map(row => {
+      const distance = Number(row.distance_meters) || 0;
+      const shown = distance > 0 && !lift(row) ? `${Math.round((distance / (metric ? 1000 : 1609.344)) * 10) / 10} ${metric ? 'km' : 'mi'}` : '';
+      const minutes = minutesOf(row);
+      return [name(row.activity_type), shown || (minutes ? `${minutes} min` : '')].filter(Boolean).join(' ');
+    });
+    /* The lift's day, by the athlete's local date — the same day the import
+       files the minutes on. */
+    const liftRow = rows.find(lift);
+    let matched = '';
+    if (liftRow?.local_start) {
+      const { data: day } = await admin.from('workout_days').select('title,top_sets(lift_name,weight,reps,position)')
+        .eq('owner_id', owner).eq('workout_date', liftRow.local_start.slice(0, 10)).maybeSingle();
+      const sets = ((day?.top_sets || []) as Array<{ lift_name: string; weight: number; reps: number; position: number }>).sort((a, b) => a.position - b.position);
+      const unit = metric ? 'kg' : 'lb';
+      matched = sets.length
+        ? ` Matched to ${day?.title ? `${day.title} · ` : ''}${sets[0].lift_name} ${Number(sets[0].weight)} ${unit} × ${Number(sets[0].reps)}${sets.length > 1 ? ` +${sets.length - 1}` : ''}.`
+        : ' Log your top set and the time goes with it.';
+    }
+    for (const row of subs as Row[]) {
+      const date = localDate(row.timezone);
+      messages.push({ row, date, payload: { title: 'Garmin synced', body: `${parts.join(' · ')}.${matched}`, tag: `sync-${ids[ids.length - 1]}`, url: './#/' } });
     }
   }
 
