@@ -10,7 +10,7 @@ import { localDayIso } from '../../lib/time';
 type ExternalRow = {
   id: string; provider?: string; external_id: string; activity_type: string; activity_name: string;
   started_at: string; distance_meters: number | null; moving_seconds: number | null;
-  elapsed_seconds: number | null; average_heartrate: number | null;
+  elapsed_seconds: number | null; average_heartrate: number | null; max_heartrate?: number | null;
   /* The athlete's local clock, pulled out of the payload by the query instead
      of dragging every raw Strava blob across the wire — a full history is
      thousands of rows and the blobs alone would be tens of megabytes. */
@@ -196,6 +196,16 @@ const distanceSport = (activity: string) => !/weight training|workout|yoga|cross
 const paceText = (minutes: number, miles: number) => { const pace = minutes / miles; const whole = Math.floor(pace); const seconds = Math.round((pace - whole) * 60); return `${whole}:${String(seconds === 60 ? 0 : seconds).padStart(2, '0')} /mi`; };
 const clock = (minutes: number) => { const whole = Math.round(minutes * 60); const m = Math.floor(whole / 60); const s = whole % 60; return `${m}:${String(s).padStart(2, '0')}`; };
 
+/* What the watch measured, as the session keeps it: the heart-rate model reads
+   effort from here, so every imported run carries it, not only the ones that
+   filled a hand-logged entry. */
+const watchRecord = (row: ExternalRow, minutes: number, miles: number): NonNullable<CardioLogDraft['recorded']> => ({
+  source: row.provider === 'garmin' ? 'Garmin' : 'Strava', externalId: String(row.external_id),
+  ...(minutes > 0 ? { minutes } : {}), ...(miles > 0 ? { miles } : {}),
+  ...(row.average_heartrate ? { averageHr: Math.round(row.average_heartrate) } : {}),
+  ...(row.max_heartrate ? { maxHr: Math.round(row.max_heartrate) } : {}),
+});
+
 export function externalToSession(row: ExternalRow): { date: string; session: CardioLogDraft } {
   const source = row.provider === 'garmin' ? 'Garmin' : 'Strava';
   const localStart = row.local_start || row.raw_summary?.start_date_local || row.started_at;
@@ -214,6 +224,7 @@ export function externalToSession(row: ExternalRow): { date: string; session: Ca
       activity,
       summary,
       prescription: { legacyIntervals: [{ cardioType: activity, unit: 'miles', distance: miles, time: minutes }], distanceUnit: 'miles', note: row.activity_name && row.activity_name !== activity ? `${source}: ${row.activity_name}` : `Imported from ${source}` },
+      recorded: watchRecord(row, minutes, miles),
     } as CardioLogDraft,
   };
 }
@@ -251,7 +262,7 @@ export async function importStravaActivities(
      a full Strava history could never reach anything older: every pass
      re-fetched rows already imported, skipped them, and finished. Page the
      whole table oldest-to-newest so a complete history lands in the log. */
-  const columns = 'id,provider,external_id,activity_type,activity_name,started_at,distance_meters,moving_seconds,elapsed_seconds,average_heartrate,imported_to_workout,local_start:raw_summary->>start_date_local';
+  const columns = 'id,provider,external_id,activity_type,activity_name,started_at,distance_meters,moving_seconds,elapsed_seconds,average_heartrate,max_heartrate,imported_to_workout,local_start:raw_summary->>start_date_local';
   const rows: ExternalRow[] = [];
   const pageSize = 500;
   for (let page = 0; page < 40; page++) {
@@ -282,6 +293,29 @@ export async function importStravaActivities(
   /* Superseded rows are marked imported like any other, so a day the athlete
      logged by hand is settled once and never re-offered on the next sync. */
   const supersededRowIds: string[] = [...duplicateIds];
+  /* HEART RATE FOR WHAT WAS IMPORTED BEFORE IT WAS KEPT. Runs already in the
+     log from a watch carry no `recorded` — the import used to drop it — so
+     each one is matched back to its row by id and given the watch's numbers.
+     Once, quietly: a session that has them is left alone. */
+  const rowBySessionId = new Map(rows.map(row => [`${row.provider === 'garmin' ? 'garmin' : 'strava'}-${row.external_id}`, row]));
+  /* A year back is all the heart-rate model reads (max HR over a year, the
+     trend over twelve weeks); re-saving older days would only queue hundreds
+     of writes for nothing. */
+  const hydrateFrom = new Date(); hydrateFrom.setDate(hydrateFrom.getDate() - 365);
+  const hydrateFromIso = localDayIso(hydrateFrom);
+  for (const record of records) {
+    if (record.date < hydrateFromIso) continue;
+    const sessions = record.cardioSessions || [];
+    let changed = false;
+    const next = sessions.map(session => {
+      const row = session.recorded ? null : rowBySessionId.get(String(session.id));
+      if (!row || !(row.average_heartrate || row.max_heartrate)) return session;
+      changed = true;
+      const mapped = externalToSession(row).session;
+      return { ...session, recorded: mapped.recorded };
+    });
+    if (changed) enrichedDays.set(record.date, { ...(enrichedDays.get(record.date) || record), cardioSessions: next });
+  }
   for (const row of rows) {
     const mapped = externalToSession(row);
     if (existingIds.has(mapped.session.id as string) || row.imported_to_workout) { skipped++; continue; }
@@ -386,7 +420,7 @@ export function enrichFromWatch(record: WorkoutRecord, row: ExternalRow, watch: 
   claimed.add(String(session.id));
   const minutes = Math.round(((row.moving_seconds || row.elapsed_seconds || 0) / 60) * 10) / 10;
   const miles = cardioMiles(watch);
-  const recorded = { source: row.provider === 'garmin' ? 'Garmin' : 'Strava', externalId: String(row.external_id), ...(minutes > 0 ? { minutes } : {}), ...(miles > 0 ? { miles } : {}), ...(row.average_heartrate ? { averageHr: Math.round(row.average_heartrate) } : {}) };
+  const recorded = watchRecord(row, minutes, miles);
   const prescription = { ...(session.prescription || {}) } as Record<string, unknown>;
   const lines = Array.isArray(prescription.legacyIntervals) ? prescription.legacyIntervals as Array<Record<string, unknown>> : null;
   if (lines && lines.length === 1) {

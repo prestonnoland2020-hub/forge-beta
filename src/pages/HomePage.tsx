@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PartnersCard } from '../components/PartnersCard';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
@@ -11,6 +11,7 @@ import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
 import { isSickNote, limitationIn } from '../lib/bodyLog';
 import { Icon } from '../components/Icon';
+import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate';
 import { TodayNudges } from '../components/TodayNudges';
 
 const todayIso = () => {
@@ -23,6 +24,10 @@ export function HomePage() {
   const { recommendation, loading, syncError, toggleTopSet, setCardioSelected } = useDailyRecommendation();
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
+  /* The day's run with its heart-rate check: a ceiling on an easy or long run,
+     a band on threshold work. Only for an athlete whose watch records it. */
+  const hrTargets = useMemo(() => heartRateRuns(records).length ? heartRateTargets(estimateMaxHr(records, setup?.birthDate)) : null, [records, setup?.birthDate]);
+  const hrHint = (title: string) => !hrTargets ? '' : /threshold|tempo/i.test(title) ? `Heart rate ${hrTargets.thresholdLow}–${hrTargets.thresholdHigh}` : /easy|long|recovery|base/i.test(title) ? `Keep heart rate under ${hrTargets.easyCeiling}` : '';
   const { notes } = useAthleteNotes();
   const bufferedNotes = notes.filter(isBufferActive);
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
@@ -89,7 +94,7 @@ export function HomePage() {
         {recommendation.cardio && <li><label className={recommendation.cardio.selected ? 'on' : ''}>
           <input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
-          <span>{recommendation.cardio.title}</span>
+          <span>{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}</span>
           <b>{cardioPlanSummary(recommendation.cardio.session.plan)}</b>
         </label></li>}
       </ul>}

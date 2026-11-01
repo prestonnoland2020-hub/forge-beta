@@ -7,6 +7,7 @@ import { calculateEstimatedOneRepMax } from './strength';
 import { isRaceEvidence } from './runQuality';
 import { predictRaceFromLegacyMethod, raceEvidenceEfforts } from './cardioPrediction';
 import type { Effort as CurveEffort } from './fitnessCurve';
+import { aerobicTrend, estimateMaxHr, heartRateEffort, heartRateRuns } from './heartRate';
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 import { sameLift } from './liftAliases';
@@ -103,8 +104,23 @@ import { equivalentSeconds, volumeForPace } from './riegel';
    12 weeks of it, because a 16-week horizon does not compound forever. */
 const WEEKLY_IMPROVEMENT = 0.01;
 const MAX_IMPROVEMENT_WEEKS = 12;
-export const reachableSeconds = (currentSeconds: number, weeks: number) =>
-  currentSeconds * Math.pow(1 - WEEKLY_IMPROVEMENT, Math.min(weeks, MAX_IMPROVEMENT_WEEKS));
+export const reachableSeconds = (currentSeconds: number, weeks: number, weeklyRate = WEEKLY_IMPROVEMENT) =>
+  currentSeconds * Math.pow(1 - weeklyRate, Math.min(weeks, MAX_IMPROVEMENT_WEEKS));
+
+/* THE ATHLETE'S OWN RATE, WHEN THE WATCH CAN SHOW IT. 1% a week is an
+   assumption about a typical block. An athlete whose pace at the same heart
+   rate has been dropping for twelve weeks has shown their rate; one who has
+   plateaued has shown that too. The measured rate replaces the assumption,
+   held between 0.2% (training still buys something) and 1.5% (nothing
+   sustains more), so one remarkable month cannot promise a miracle. */
+const MIN_MEASURED_RATE = 0.002;
+const MAX_MEASURED_RATE = 0.015;
+export function improvementRate(records: WorkoutRecord[], todayIso = localDayIso()): { rate: number; measured: boolean; secondsPerMilePerWeek?: number } {
+  const max = estimateMaxHr(records, undefined, todayIso);
+  const trend = max ? aerobicTrend(heartRateRuns(records), max.bpm, todayIso) : null;
+  if (!trend) return { rate: WEEKLY_IMPROVEMENT, measured: false };
+  return { rate: Math.min(MAX_MEASURED_RATE, Math.max(MIN_MEASURED_RATE, trend.weeklyRate)), measured: true, secondsPerMilePerWeek: trend.secondsPerMilePerWeek };
+}
 
 /* AND IT HAS TO BE RECENT ENOUGH TO BE ABOUT THE ATHLETE WHO EXISTS NOW.
 
@@ -191,7 +207,18 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
      at this distance", and it weighs every effort with a penalty for how far
      it had to be stretched rather than accepting only near-distance ones. */
   const prediction = predictRaceFromLegacyMethod(records, distance, excluded, workouts);
-  const best = prediction?.source || null;
+  /* EASY RUNS ARE NOT A RACE, AND HEART RATE KNOWS IT. An athlete who only
+     jogs was projected from their fastest jog, as if it were their limit.
+     Their heart rate says what their threshold actually is; carried to the
+     goal distance (stretched by the same volume shortfall as any effort), it
+     is used whenever it says more than the logged runs do — and an athlete
+     with no runs fit to predict from at all now gets a projection too. */
+  const heart = heartRateEffort(records, localDayIso());
+  const heartSeconds = heart ? equivalentSeconds(heart.seconds, heart.miles, distance,
+    distance > heart.miles ? Math.max(0, Math.min(1, 1 - volume / (volumeForPace(heart.seconds / heart.miles) || volume || 1))) : 0) : 0;
+  const fromHeart = Boolean(heart && heartSeconds > 0 && (!prediction || heartSeconds < prediction.seconds));
+  const best = fromHeart ? { miles: heart!.miles, seconds: heart!.seconds } : prediction?.source || null;
+  const pace = improvementRate(records);
   const evidence = raceEvidenceState(records);
   if (best && !evidence.enough) {
     const more = Math.max(0, MIN_RACE_EVIDENCE_RUNS - evidence.runs);
@@ -215,17 +242,17 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
      again here would charge the athlete for it twice — which read as Preston's
      5K sliding from "reachable, but not on this volume" to "out of reach"
      without anything about him changing. */
-  const nowAtDistance = prediction!.seconds;
+  const nowAtDistance = fromHeart ? heartSeconds : prediction!.seconds;
   /* WHAT THE PREDICTION IS BUILT ON, named at full precision. The distance was
      printed with toFixed(0), so a 1.4-mile effort appeared as "your 1-mile" —
      which turned an obviously bad log into a credible-sounding claim and hid
      the one detail that would have told the athlete not to believe it. */
-  const from = `your ${round1(best.miles)} mi in ${clock(best.seconds)}`;
-  const ceiling = reachableSeconds(nowAtDistance, weeks);
+  const from = fromHeart ? `your heart-rate data (threshold about ${clock(best.seconds / best.miles)}/mi)` : `your ${round1(best.miles)} mi in ${clock(best.seconds)}`;
+  const ceiling = reachableSeconds(nowAtDistance, weeks, pace.rate);
   const shortfall = (nowAtDistance - targetSeconds) / nowAtDistance;
   /* What the horizon actually buys, stated as the number it is — saying "it
      takes about 16 weeks" to someone who has 16 weeks is not an answer. */
-  const affordable = 1 - reachableSeconds(1, weeks);
+  const affordable = 1 - reachableSeconds(1, weeks, pace.rate);
 
   if (targetSeconds >= nowAtDistance) {
     return { goal: goal.title, verdict: 'reachable',
@@ -236,7 +263,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
 
   if (targetSeconds < ceiling) {
     return { goal: goal.title, verdict: 'out-of-reach',
-      say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are worth about ${clock(nowAtDistance)} today, so this asks for ${Math.round(shortfall * 100)}% — and ${Math.round(weeks)} weeks of good training buys about ${Math.round(affordable * 100)}%.`,
+      say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are worth about ${clock(nowAtDistance)} today, so this asks for ${Math.round(shortfall * 100)}% — and ${Math.round(weeks)} weeks ${!pace.measured ? 'of good training' : (pace.secondsPerMilePerWeek || 0) > 0.5 ? `at the rate your heart rate shows you improving (${pace.secondsPerMilePerWeek} s/mi a week)` : 'at your recent rate — pace at the same heart rate has held flat lately —'} buys about ${Math.round(affordable * 100)}%.`,
       insteadOf: `${clock(ceiling)} is the reachable target for this date. Keep ${clock(targetSeconds)} for next year.`,
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: volume < volumeNeeded * 0.7

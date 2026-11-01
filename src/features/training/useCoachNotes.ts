@@ -18,6 +18,7 @@ import { workoutEfforts } from '../../lib/workoutEvidence';
 import { liftPositions } from '../../lib/liftProgression';
 import { canonicalLiftKey } from '../../lib/liftAliases';
 import { localDayIso } from '../../lib/time';
+import { easyRunsTooHard, estimateMaxHr, heartRateRuns } from '../../lib/heartRate';
 import { coachNotes, nextNote, type CoachNote, type CoachNoteInput } from '../../lib/coachNotes';
 import { weekReview } from '../../lib/weekReview';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
@@ -164,8 +165,12 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
       ? { loggedPace: clockText(easyPace), easyRange: `${clockText(paces.easyFast)}–${clockText(paces.easySlow)}` }
       : null;
 
+    const maxHr = estimateMaxHr(records as never[], setup?.birthDate, todayIso);
+    const easyTooHard = maxHr ? easyRunsTooHard(heartRateRuns(records as never[]), maxHr.bpm, todayIso, judged.map(verdict => verdict.date)) : null;
+
     const notes = coachNotes({
       todayIso,
+      easyTooHard,
       verdicts: judged.map(verdict => ({ date: verdict.date, outcome: verdict.outcome, say: verdict.say, text: verdict.text })),
       levelMoves: moves,
       trend: sessionTrend(judged),
