@@ -4,7 +4,7 @@ export type WearableConnection={provider:WearableProvider;status:'Connected'|'Av
 export const wearableConnections:WearableConnection[]=[
   {provider:'Apple Health',status:'Requires native app',capabilities:['Sleep','HRV','Resting HR','Workouts','Heart-rate zones']},
   {provider:'Health Connect',status:'Requires native app',capabilities:['Sleep','HRV when supplied','Resting HR','Exercise sessions','Planned workouts']},
-  {provider:'Garmin',status:'Partner approval required',capabilities:['Sleep','Stress','Heart rate','Activities','Body Battery']},
+  {provider:'Garmin',status:'Available',capabilities:['Sleep','Stress','Heart rate','Activities','Body Battery']},
   {provider:'Fitbit',status:'Available',capabilities:['Sleep','HRV','Resting HR','Activities','SpO₂']},
 ];
 export interface WearableAdapter{provider:WearableProvider;authorize():Promise<void>;sync(from:string,to:string):Promise<DailyHealthSnapshot[]>}

@@ -8,6 +8,8 @@
 .connection-actions button { min-height: 36px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--text); padding: 8px 12px; font-weight: 800; }
 .connection-actions .danger { color: var(--bad); }
 .connection-message { margin: 0; padding: 16px 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+/* Inside a connection row (Garmin) the message is a line of the row, not a footer. */
+article .connection-message { padding: 4px 0 0; border-top: 0; }
 .mobile-plan-settings { display: none; }
 .mobile-swipe-hint { display: none; }
 

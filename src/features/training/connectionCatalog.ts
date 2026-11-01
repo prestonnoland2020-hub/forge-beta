@@ -1,5 +1,6 @@
-/* EVERY WATCH AND HEALTH APP FORGE MEANS TO READ. Only Strava is live; the
-   rest wait on a developer program approval or a native build, so none of
+/* EVERY WATCH AND HEALTH APP FORGE MEANS TO READ. Strava and Garmin are live
+   (Garmin's row turns into a Connect button once its function secrets are
+   set — see ProfilePage); the rest wait on a developer program approval or a native build, so none of
    them gets a Connect button that cannot connect. `viaStrava` marks watches
    whose recorded workouts already reach Forge through Strava today — the
    honest answer to "does my Garmin work?" before its own API is approved. */
@@ -13,12 +14,12 @@ export type CatalogConnection = {
   data: string[];
   viaStrava?: boolean;
   /* Why it is not live yet, for the owner's checklist — never shown to athletes. */
-  blocker: 'partner-approval' | 'self-serve-app' | 'native-ios' | 'native-android';
+  blocker: 'live' | 'partner-approval' | 'self-serve-app' | 'native-ios' | 'native-android';
 };
 
 export const connectionCatalog: CatalogConnection[] = [
   { id: 'apple-watch', name: 'Apple Watch', kind: 'watch', data: ['Workouts', 'Heart rate', 'HRV', 'Sleep'], viaStrava: true, blocker: 'native-ios' },
-  { id: 'garmin', name: 'Garmin', kind: 'watch', data: ['Activities', 'Sleep', 'Stress', 'Body Battery'], viaStrava: true, blocker: 'partner-approval' },
+  { id: 'garmin', name: 'Garmin', kind: 'watch', data: ['Activities', 'Sleep', 'Stress', 'Body Battery'], viaStrava: true, blocker: 'live' },
   { id: 'fitbit', name: 'Fitbit & Pixel Watch', kind: 'watch', data: ['Activities', 'Sleep', 'HRV', 'Resting HR'], viaStrava: true, blocker: 'self-serve-app' },
   { id: 'samsung', name: 'Samsung Galaxy Watch', kind: 'watch', data: ['Exercise', 'Sleep', 'Heart rate'], blocker: 'native-android' },
   { id: 'whoop', name: 'WHOOP', kind: 'watch', data: ['Recovery', 'Strain', 'Sleep', 'HRV'], viaStrava: true, blocker: 'self-serve-app' },

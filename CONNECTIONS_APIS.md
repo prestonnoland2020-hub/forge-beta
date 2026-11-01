@@ -73,6 +73,37 @@ actually use has its own connection. Before switching it off:
   plus Garmin through Strava). `cardiodedupe` and `stravamerge` are the
   starting points.
 
+## Garmin (approved, built)
+
+Garmin is approved. The connector is built as two edge functions:
+
+- `garmin-connect`: the athlete's side. It handles authorize (OAuth 2.0 with
+  PKCE), callback, sync, disconnect, and status. Deploy it with JWT
+  verification on.
+- `garmin-webhook`: where Garmin pushes data. It handles activities, dailies,
+  sleeps, HRV, respiration, and deregistrations, in both push and ping mode.
+  Deploy it with JWT verification **off**. It checks a `?key=` secret instead.
+
+Setup:
+
+1. Run the migration `20261031010000_garmin_connection.sql`.
+2. Set these Supabase function secrets: `GARMIN_CLIENT_ID`,
+   `GARMIN_CLIENT_SECRET`, and `GARMIN_WEBHOOK_KEY` (any long random string).
+3. In the Garmin portal:
+   - **Redirect URL:** `https://prestonnoland2020-hub.github.io/forge-beta/?garmin=callback`
+     (add `http://localhost:5173/?garmin=callback` for local testing).
+   - **Push endpoints** for Activities, Dailies, Sleeps, HRV, Respiration, and
+     Deregistration, all set to
+     `https://czefovdclflufixdpbnp.supabase.co/functions/v1/garmin-webhook?key=<GARMIN_WEBHOOK_KEY>`.
+
+The Garmin row on the Connections screen turns into a Connect button only after
+the secrets are set. Before that it keeps showing "Via Strava today". On
+connect, Forge asks Garmin to backfill 90 days. "Sync now" asks for the last 7
+days. Garmin delivers both by push, so data shows up a few minutes later, not
+right away. Activities merge into the log through the same import Strava uses.
+A run that comes in from both Garmin and Strava (same kind of activity,
+starting within 5 minutes) is kept only once.
+
 ## Going live with one
 
 When a provider is approved, add an edge function modeled on `strava-connect`
