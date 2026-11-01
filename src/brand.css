@@ -375,3 +375,18 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 .coach-checkin-backdrop { padding-bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 28px); }
 .workout-finish-bar { padding-bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 24px); }
 .ss-sheet-foot { padding-bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 24px); }
+
+/* ---- Settings -------------------------------------------------------------
+   Grouped like the phone's own Settings: a small label over each group, the
+   groups spaced apart, and the one appearance choice as a switch in its row.
+   Sign out is red and has no chevron, because it goes nowhere. */
+.settings-groups { display: grid; gap: var(--s5); }
+.settings-groups > section { display: grid; gap: var(--s2); }
+.settings-groups h3 { margin: 0; padding: 0 var(--s5); font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.simple-settings-list > .settings-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--s4); min-height: 56px; padding: var(--s3) var(--s4) var(--s3) var(--s5); }
+.simple-settings-list > .settings-row > div:first-child { display: grid; gap: 2px; min-width: 0; }
+.simple-settings-list .settings-switch { display: flex; flex: none; gap: 2px; padding: 2px; border-radius: var(--r-sm); background: var(--surface-2); }
+.settings-switch button { min-width: 64px; min-height: var(--control-s); padding: 0 var(--s3); border: 0; border-radius: var(--r-xs); background: transparent; color: var(--ink-2); font: 700 var(--fs-small) var(--body);
+  transition: background var(--dur-standard) var(--ease-strike), color var(--dur-quick) var(--ease-respond); }
+.settings-switch button.active { background: var(--surface-1); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .14); }
+.simple-settings-list > button.settings-sign-out strong { color: var(--bad); }

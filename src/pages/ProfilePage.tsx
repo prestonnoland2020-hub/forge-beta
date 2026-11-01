@@ -12,20 +12,20 @@ import { connectionCatalog } from '../features/training/connectionCatalog';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { useAppearance, themeChoices, groundChoices, accentChoices } from '../features/preferences/AppearanceProvider';
+import { useAppearance } from '../features/preferences/AppearanceProvider';
 import { beginStravaConnection, disconnectStrava, finishStravaConnection, getActivityConnection, syncStravaActivities, type ActivityConnectionStatus } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
 import { beginGarminConnection, disconnectGarmin, finishGarminConnection, getGarminConnection, loadGarminHealth, syncGarmin, type GarminConnectionStatus } from '../features/training/garminConnectionService';
 
-type View='profile'|'settings'|'coach'|'connections'|'appearance'|'billing'|'devices'|'faq';
-const VIEWS=['profile','settings','coach','connections','appearance','billing','devices','faq'] as const;
+type View='profile'|'settings'|'coach'|'connections'|'billing'|'devices'|'faq';
+const VIEWS=['profile','settings','coach','connections','billing','devices','faq'] as const;
 const isView=(value:string|null):value is View=>(VIEWS as readonly string[]).includes(String(value));
 export function ProfilePage(){
-  const {user,signOut}=useAuth();const {setup}=useProfileSetup();const {profile,recovery,health,syncWearableHealth}=useAdaptiveTraining();const {goals}=useGoals();const {records,addRecord}=useWorkoutHistory();const {settings:appearance,setTheme,setGround,setAccent,setIcon,resolved:resolvedTheme,resolvedIcon}=useAppearance();/* THE VIEW LIVES IN THE URL. The app header names the sub-screen and draws
+  const {user,signOut}=useAuth();const {setup}=useProfileSetup();const {profile,recovery,health,syncWearableHealth}=useAdaptiveTraining();const {goals}=useGoals();const {records,addRecord}=useWorkoutHistory();const {setTheme,resolved:resolvedTheme}=useAppearance();/* THE VIEW LIVES IN THE URL. The app header names the sub-screen and draws
      its back arrow from `?view=`, so switching views here has to go through
      the address — a local state the header could not see left it saying
      "Profile" over the appearance settings. */
-  const [params,setParams]=useSearchParams();const requested=params.get('view');const view:View=isView(requested)?requested:'profile';const setView=(next:View)=>setParams(next==='profile'?{}:{view:next});const {notes,upsert}=useAthleteNotes();const {isPro}=useBilling();
+  const [params,setParams]=useSearchParams();const requested=params.get('view');const view:View=requested==='appearance'?'settings':isView(requested)?requested:'profile';const setView=(next:View)=>setParams(next==='profile'?{}:{view:next});const {notes,upsert}=useAthleteNotes();const {isPro}=useBilling();
   const [activity,setActivity]=useState<ActivityConnectionStatus|null>(null);const [connectionMessage,setConnectionMessage]=useState('');const [connectionBusy,setConnectionBusy]=useState(false);const latest=health[health.length-1];const name=setup?.displayName||'Athlete';const initials=name.split(' ').map(part=>part[0]).join('').slice(0,2).toUpperCase();const metric=setup?.units==='Metric';const distanceUnit=metric?'km':'mi';const distanceValue=(miles:number)=>Number((metric?miles*1.609344:miles).toFixed(1));const weeklyDistance=distanceValue(profile.weeklyMileage);const longestDistance=distanceValue(profile.longestRunMiles);const runsShown=setup?.primaryFocus!=='Strength'||Number(longestDistance)>0;
   const loadConnection=async()=>{/* A status check that cannot reach the server is not news: it printed "Failed to send a request to the Edge Function" under Sign out. Connections already reads as not connected, and acting on it reports a real error. */try{setActivity(await getActivityConnection())}catch{setActivity(null)}};
   /* GARMIN, DIRECT. Data arrives by push, so after connecting or syncing the
@@ -43,23 +43,46 @@ export function ProfilePage(){
         the athlete. The tab strip that used to sit under the profile head
         overflowed a phone and hid the billing tab off its right edge; a list
         cannot hide anything. */}
-    {view==='settings'&&<section className="simple-settings-list">
-      <button type="button" onClick={()=>setView('appearance')}><div><strong>Appearance</strong><span>Light or dark, ground, accent and app icon</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('coach')}><div><strong>Coach &amp; notifications</strong><span>Check-ins, reminders and what Forge trains around</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('connections')}><div><strong>Connections</strong><span>{activity?.connected?'Strava connected · watches and health apps':'Strava, smartwatches and health apps'}</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('devices')}><div><strong>Recovery &amp; smartwatch</strong><span>Readiness data and device connections</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('billing')}><div><strong>Plan and billing</strong><span>{isPro?'Forge Pro':'Forge Free'} · usage, payment and account</span></div><b>›</b></button>
-      <button type="button" onClick={()=>setView('faq')}><div><strong>FAQ</strong><span>How Forge measures, plans and protects your training</span></div><b>›</b></button>
-      {/* The legal pages were reachable only from the sign-in screen, which a
-          signed-in athlete never sees again. */}
-      <button type="button" onClick={()=>{window.location.hash='/legal/privacy'}}><div><strong>Privacy &amp; legal</strong><span>Privacy, health data, terms, cookies and refunds</span></div><b>›</b></button>
-    </section>}
-    {/* A way out. There was no sign-out anywhere — the only exit was deleting
-        the account — so a shared phone or a wrong Google account was stuck. */}
-    {view==='settings'&&<section className="simple-settings-list">
-      <button type="button" onClick={()=>{if(window.confirm('Sign out of Forge on this device? Everything that has reached your account stays there.'))void signOut().catch(reason=>setConnectionMessage(reason instanceof Error?reason.message:'Could not sign out.'))}}><div><strong>Sign out</strong><span>{user?.email||'Signed in'}</span></div><b>›</b></button>
-      {connectionMessage&&view==='settings'&&<p className="connection-message">{connectionMessage}</p>}
-    </section>}
+    {/* SETTINGS, IN THREE SHORT GROUPS. Display is one switch, right here —
+        light or dark is the only appearance choice there is, so it does not
+        need a page of its own. Then what Forge connects to and how it coaches,
+        then the account. Sign out stands alone at the bottom, where every
+        phone puts it. */}
+    {view==='settings'&&<div className="settings-groups">
+      <section aria-labelledby="settings-display"><h3 id="settings-display">Display</h3>
+        <div className="simple-settings-list">
+          <div className="settings-row"><div><strong>Appearance</strong><span>Light or dark</span></div>
+            <div className="settings-switch" role="radiogroup" aria-label="Appearance">
+              {(['light','dark'] as const).map(tone=><button type="button" role="radio" key={tone} aria-checked={resolvedTheme===tone} className={resolvedTheme===tone?'active':''} onClick={()=>setTheme(tone)}>{tone==='light'?'Light':'Dark'}</button>)}
+            </div>
+          </div>
+        </div>
+      </section>
+      <section aria-labelledby="settings-training"><h3 id="settings-training">Training</h3>
+        <div className="simple-settings-list">
+          <button type="button" onClick={()=>setView('coach')}><div><strong>Coach &amp; notifications</strong><span>Check-ins, reminders, limitations</span></div><b>›</b></button>
+          <button type="button" onClick={()=>setView('connections')}><div><strong>Connections</strong><span>{activity?.connected?'Strava connected · watches and health apps':'Strava, smartwatches and health apps'}</span></div><b>›</b></button>
+          <button type="button" onClick={()=>setView('devices')}><div><strong>Recovery &amp; smartwatch</strong><span>Readiness and devices</span></div><b>›</b></button>
+        </div>
+      </section>
+      <section aria-labelledby="settings-account"><h3 id="settings-account">Account</h3>
+        <div className="simple-settings-list">
+          <button type="button" onClick={()=>setView('billing')}><div><strong>Plan &amp; billing</strong><span>{isPro?'Forge Pro':'Forge Free'}</span></div><b>›</b></button>
+          <button type="button" onClick={()=>setView('faq')}><div><strong>Help &amp; FAQ</strong><span>How Forge plans and measures</span></div><b>›</b></button>
+          {/* The legal pages were reachable only from the sign-in screen, which
+              a signed-in athlete never sees again. */}
+          <button type="button" onClick={()=>{window.location.hash='/legal/privacy'}}><div><strong>Privacy &amp; legal</strong><span>Privacy, health data and terms</span></div><b>›</b></button>
+        </div>
+      </section>
+      {/* A way out. There was no sign-out anywhere — the only exit was deleting
+          the account — so a shared phone or a wrong Google account was stuck. */}
+      <section aria-label="Sign out">
+        <div className="simple-settings-list">
+          <button type="button" className="settings-sign-out" onClick={()=>{if(window.confirm('Sign out of Forge on this device? Everything that has reached your account stays there.'))void signOut().catch(reason=>setConnectionMessage(reason instanceof Error?reason.message:'Could not sign out.'))}}><div><strong>Sign out</strong><span>{user?.email||'Signed in'}</span></div></button>
+        </div>
+        {connectionMessage&&<p className="connection-message">{connectionMessage}</p>}
+      </section>
+    </div>}
     {view==='billing'&&<BillingSettings/>}
     {view==='coach'&&<div className="stack-l coach-settings"><NotificationSettings/><CoachBodyLog notes={notes} upsert={upsert}/></div>}
     {view==='profile'&&<>{/* Running numbers only for someone who runs: a lifter's profile was half zeros. */}<section className={runsShown?'simple-profile-stats':'simple-profile-stats two'}><div><span>WORKOUTS</span><strong>{records.length}</strong></div>{runsShown&&<div><span>RUN · LAST 7 DAYS</span><strong>{weeklyDistance} {distanceUnit}</strong></div>}{runsShown&&<div><span>LONGEST RUN</span><strong>{longestDistance} {distanceUnit}</strong></div>}<div><span>ACTIVE GOALS</span><strong>{goals.length}</strong></div></section><section className="simple-settings-list"><Link to="/split"><div><strong>Split</strong><span>Training and rest-day structure</span></div><b>›</b></Link><Link to="/exercises"><div><strong>Exercise library</strong><span>Browse every movement Forge knows</span></div><b>›</b></Link><Link to="/partners"><div><strong>Training partners</strong><span>Up to five people and what they trained</span></div><b>›</b></Link><button type="button" onClick={()=>setView('settings')}><div><strong>Settings</strong><span>Appearance, coach, connections, billing</span></div><b>›</b></button></section></>}
@@ -79,139 +102,6 @@ export function ProfilePage(){
         ['What does Strava add?','Recorded runs, rides and rows import automatically into your training log and count toward mileage and endurance goals. Strava does not supply sleep or HRV.'],
         ['What changes my split cursor?','Completing real training on a recommended day advances the cycle. A body-weight check-in or a note never consumes the workout you still owe.'],
       ].map(([q,a])=><details className="card faq-item" key={q}><summary>{q}</summary><p>{a}</p></details>)}
-    </div>}
-    {view==='appearance'&&<div className="appearance">
-      {/* Three sections, in the order they matter: the ground you read on,
-          then the one colour that is not neutral, then what sits on the home
-          screen. Each previews itself from the real thing. */}
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · TONE</span>
-          <h2>Light or dark</h2>
-          <p>One choice, applied everywhere. It saves to your account, so a new phone opens looking the same.</p>
-        </header>
-        <div className="theme-grid" role="radiogroup" aria-label="Tone">
-          {themeChoices.map(choice=>{
-            const active=appearance.theme===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card active':'pick-card'} onClick={()=>setTheme(choice.id)}>
-              {/* data-force-tone puts the OTHER tone's ladder on the element
-                  itself — custom properties inherit, so the swatch renders in a
-                  tone the page is not in without a single hardcoded hex, and it
-                  follows the athlete's chosen ground for free. */}
-              <span className={`theme-swatch theme-swatch-${choice.id}`} aria-hidden="true"
-                data-ground={appearance.ground}
-                data-force-tone={choice.id==='system'?undefined:choice.id}>
-                {choice.id==='system'
-                  ? <>
-                      <span className="ts-half" data-ground={appearance.ground} data-force-tone="dark"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
-                      <span className="ts-half" data-ground={appearance.ground} data-force-tone="light"><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></span>
-                    </>
-                  : <><span className="ts-bar"/><span className="ts-line"/><span className="ts-line short"/></>}
-              </span>
-              <span className="pick-meta">
-                <strong>{choice.name}</strong>
-                <small>{choice.description}</small>
-                {active&&<em>{choice.id==='system'?`ON — currently ${resolvedTheme}`:'ON'}</em>}
-              </span>
-            </button>;
-          })}
-        </div>
-      </section>
-
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · GROUND</span>
-          <h2>What it&rsquo;s built from</h2>
-          <p>Tone is how bright the app is. Ground is what the greys are made of. Every ground uses the same steps of lightness, so this one is purely a matter of taste &mdash; nothing here can make anything harder to read.</p>
-        </header>
-        <div className="ground-grid" role="radiogroup" aria-label="Ground">
-          {groundChoices.map(choice=>{
-            const active=appearance.ground===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card ground-card active':'pick-card ground-card'}
-              onClick={()=>setGround(choice.id)}>
-              {/* Both tones at once. A ground's character is mostly in its
-                  dark ladder — the light ones are damped on purpose — so a
-                  swatch showing only the tone you are currently in would make
-                  Carbon and Ink look identical and the choice arbitrary.
-                  data-ground + data-force-tone put the real ladders on these
-                  elements, so this is the ground, not a picture of it. */}
-              <span className="ground-swatch" aria-hidden="true">
-                <span className="gs-half" data-ground={choice.id} data-force-tone="dark"><i/><i/></span>
-                <span className="gs-half" data-ground={choice.id} data-force-tone="light"><i/><i/></span>
-              </span>
-              <span className="pick-meta">
-                <strong>{choice.name}</strong>
-                <small>{choice.description}</small>
-                {active&&<em>ON</em>}
-              </span>
-            </button>;
-          })}
-        </div>
-      </section>
-
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · ACCENT</span>
-          <h2>Your colour</h2>
-          <p>The one colour in Forge that is not a shade of grey. It marks what is yours — today&rsquo;s lift, your line on a chart, the button that starts the set.</p>
-        </header>
-        <div className="accent-grid" role="radiogroup" aria-label="Accent">
-          {accentChoices.map(choice=>{
-            const active=appearance.accent===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card accent-card active':'pick-card accent-card'}
-              onClick={()=>setAccent(choice.id)}>
-              {/* data-accent scopes the real tokens to this element, so the chip
-                  is the accent rather than a hand-picked stand-in for it — and it
-                  is drawn in the tone the athlete is currently reading in. */}
-              <span className="accent-swatch" data-accent={choice.id} aria-hidden="true">
-                <i/><b>AA</b>
-              </span>
-              <span className="pick-meta">
-                <strong>{choice.name}</strong>
-                <small>{choice.description}</small>
-                {active&&<em>ON</em>}
-              </span>
-            </button>;
-          })}
-        </div>
-        <p className="appearance-note">Every accent is checked against both grounds before it ships: the text and the buttons clear WCAG AA at 4.5:1 whichever tone you pair it with. None of these is a worse app than another.</p>
-      </section>
-
-      <section className="appearance-section">
-        <header>
-          <span className="eyebrow">APPEARANCE · APP ICON</span>
-          <h2>Home screen</h2>
-          <p>Which Forge sits on your phone. Matching your accent is the default, so this changes with your colour unless you pin one.</p>
-        </header>
-        <div className="icon-grid" role="radiogroup" aria-label="App icon">
-          <button type="button" role="radio" aria-checked={appearance.icon==='match'}
-            className={appearance.icon==='match'?'pick-card icon-card active':'pick-card icon-card'}
-            onClick={()=>setIcon('match')}>
-            <span className="icon-stack" aria-hidden="true">
-              {/* The resolved icon sits in front, flanked by two others, so the
-                  tile reads as "whichever one you pick" instead of a sixth icon. */}
-              <img src={`./icons/${resolvedIcon==='signal'?'flare':'signal'}/icon-192.png`} alt=""/>
-              <img src={`./icons/${resolvedIcon==='amber'?'tide':'amber'}/icon-192.png`} alt=""/>
-              <img src={`./icons/${resolvedIcon}/icon-192.png`} alt=""/>
-            </span>
-            <strong>Match accent</strong>
-            <small>{accentChoices.find(choice=>choice.id===resolvedIcon)?.name}</small>
-          </button>
-          {accentChoices.map(choice=>{
-            const active=appearance.icon===choice.id;
-            return <button type="button" key={choice.id} role="radio" aria-checked={active}
-              className={active?'pick-card icon-card active':'pick-card icon-card'}
-              onClick={()=>setIcon(choice.id)}>
-              <img src={`./icons/${choice.id}/icon-192.png`} alt="" aria-hidden="true"/>
-              <strong>{choice.name}</strong>
-              <small>{active?'On your phone':'\u00a0'}</small>
-            </button>;
-          })}
-        </div>
-      </section>
     </div>}
   </div>;
 }
