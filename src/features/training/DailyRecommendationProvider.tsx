@@ -5,6 +5,7 @@ import { buildDailyRecommendation,recommendationFingerprint,DAILY_RECOMMENDATION
 import { useAuth } from '../auth/AuthProvider';
 import { useGoals } from '../goals/GoalsProvider';
 import { enduranceTarget } from '../../lib/qualitySession';
+import { peakConflict } from '../../lib/interference';
 import { paceModel } from '../../lib/paceModel';
 import { medianWeeklyMiles } from '../../lib/goalTrajectory';
 import { useProfileSetup } from '../profile/ProfileSetupProvider';
@@ -13,7 +14,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF,EXPOSURES_BEFORE_MAX} from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,blockIsOver,planBlockFor,runningPeaks,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF,EXPOSURES_BEFORE_MAX} from './aiPlanService';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
@@ -190,6 +191,11 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const applyPlan=useCallback((generatedBase:DailyRecommendation)=>{
     const storedPlan=readLocalAiPlan();
     if(!generatedBase||!storedPlan)return generatedBase;
+    /* A FINISHED BLOCK PRESCRIBES NOTHING. Its weeks are clamped, so past the
+       end this read the last week forever — a max single or a race-week taper
+       repeated every day while the Plan tab said "Block complete". Between
+       blocks Today is the engine's day, the same as before a block existed. */
+    if(blockIsOver(storedPlan,date))return generatedBase;
     const rawWeek=storedPlan.plan.weeks[currentWeekIndex(storedPlan)];
     if(!rawWeek)return generatedBase;
     /* Same correction the Plan page applies: the athlete's stated running days
@@ -202,7 +208,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        called 3.5. One window, one answer. */
     const planRhythm=(()=>{try{return (JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null')?.rhythm==='weekly'?'weekly':'rolling') as 'weekly'|'rolling'}catch{return 'rolling' as const}})();
     const windowDays=weekCycleDays(storedPlan.startDate,currentWeekIndex(storedPlan),days,planRhythm,{position:generatedBase.splitDay.position});
-    const week=resolveWeekRunning(rawWeek,windowDays,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage,readiness:recovery?.readiness,goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile,goalMiles:enduranceTarget(goals)?.miles,paces:paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[])},{weekIndex:currentWeekIndex(storedPlan),blockWeeks:storedPlan.plan.weeks.length,waveIndex:waveIndexOf(storedPlan,currentWeekIndex(storedPlan))});
+    const week=resolveWeekRunning(rawWeek,windowDays,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage,/* The profile's readiness, as the Plan tab resolves with: a low-confidence guess counts as ready, so a hard run is never dropped here and kept there. */readiness:profile?.readiness,goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile,goalMiles:enduranceTarget(goals)?.miles,paces:paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[])},planBlockFor(storedPlan,goals));
     /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
        second opinion that could contradict the block — 4 × 200 m on a leg
        day the plan had given an easy run. With a stored plan, today's cardio
@@ -345,13 +351,20 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const todayIndex=Math.max(0,Math.min(6,Math.round((noon.getTime()-weekStart.getTime())/86400000)));
     const todayHoldsTheAttempt=attemptDays.has(todayIndex);
     const isMaxWeek=waveSlot(waveIdx).isMax;
-    const waveFor=(exercise:string,fallback:{weight:number;reps:number})=>{
+    /* ONE PEAK AT A TIME, decided the way the Plan tab decides it: when the
+       race is nearer than the lift goal, the attempt holds at the double. */
+    const horizons=planBlockFor(storedPlan,goals);
+    const raceOwnsWeek=(tests:boolean)=>peakConflict({liftingMaxWeek:tests,runningPeakWeek:runningPeaks(week.phase),weeksToRace:horizons.weeksToRace,weeksToLiftGoal:horizons.weeksToLiftGoal})?.owner==='running';
+    const waveFor=(exercise:string,fallback:{weight:number;reps:number},planned=false)=>{
       const key=canonicalLiftKey(exercise);
       const live={best:liveBests.get(key)||0,single:liveSingles.get(key)||0};
       const tests=testsOneRepMax(exercise,goalLifts);
       /* No logged history for this lift yet: nothing to wave off, so the
          engine's baseline stands and the card still asks for a first set. */
-      if(!live.best)return{weight:fallback.weight,reps:fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
+      /* The day's PLANNED lift asks for the week's reps, as the Plan tab and the
+         coach do — "find your weight × 2" in a max week, not the engine's
+         generic five. Only a lift the plan does not name keeps the engine's. */
+      if(!live.best)return{weight:fallback.weight,reps:planned?Math.max(2,waveSlot(waveIdx).reps):fallback.reps,isMax:false,source:'baseline' as const,rationale:`Week ${week.week} of your program (${week.phase}) — log this lift once and it joins the wave.`};
       /* A tested single the athlete is not taking today falls back to the
          double the lift already earned, rather than being offered twice. */
       /* THE CHECK-IN KEEPS ITS PROMISE. The card says "Backing today off — no
@@ -361,11 +374,11 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
          with high strength fatigue) the lift holds what it already did. */
       const lowReadiness=recovery.confidence!=='Low'&&recovery.readiness<55;
       const recovering=recovery.confidence!=='Low'&&(recovery.readiness<65||recovery.strengthFatigue==='High');
-      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness,holding:recovering,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
+      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness&&!raceOwnsWeek(tests),holding:recovering,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
       const accessorySessions=liveSessions.get(key)||0;
       /* No session yet means the best is the starting number from setup, and the card says so. */
       const fromWhat=accessorySessions?`your best calc max ${live.best}`:`the starting number you gave (calc max ${live.best}) — your first logged set replaces it`;
-      const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
+      const slotLabel=prescription.isMax?'MAX WEEK — 1RM attempt':!tests?`${prescription.reps}-rep slot`:isMaxWeek&&raceOwnsWeek(tests)?'MAX WEEK — your race is closer, so the attempt holds at a heavy double':isMaxWeek?'MAX WEEK — the attempt is scheduled on another day this week':`${prescription.reps}-rep week`;
       /* A waved number IS derived from logged history — Today only prints a
          weight when the set says so, and an unwaved 'baseline' flag was
          hiding real prescriptions behind "Log a baseline set". */
@@ -384,7 +397,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       const leads=!applied&&(sameLift(set.exercise,match.exercise)||!generatedBase.topSets.some(other=>sameLift(other.exercise,match.exercise))&&set===generatedBase.topSets[0]);
       if(leads)applied=true;
       const exercise=leads?match.exercise:set.exercise;
-      const wave=waveFor(exercise,set);
+      const wave=waveFor(exercise,set,leads);
       return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:calculateEstimatedOneRepMax(wave.weight,wave.reps)||0,rationale:wave.rationale};
     });
     return{...cardioBase,topSets};

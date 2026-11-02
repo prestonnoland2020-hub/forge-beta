@@ -1,4 +1,4 @@
-import { goalFeasibility, weeksUntil } from './goalFeasibility';
+import { goalFeasibility, openGoals, weeksUntil } from './goalFeasibility';
 import { buildMileageRamp, rampArrival, type MileageRamp } from './mileageRamp';
 import { localDayIso } from './time';
 import type { CreatedGoal } from '../components/GoalBuilder';
@@ -80,7 +80,7 @@ export function mileageGap(goals: CreatedGoal[], records: WorkoutRecord[], bound
   if (raceSoon) return null;
   /* The hungriest goal wins: the volume that serves it serves the rest, and
      two alerts about one setting is one too many. */
-  const blocked = goalFeasibility(goals, records, { maxWeeklyMileage: ceiling })
+  const blocked = goalFeasibility(openGoals(goals), records, { maxWeeklyMileage: ceiling })
     .filter(verdict => verdict.verdict !== 'reachable' && (verdict.needs?.weeklyMiles || 0) > 0)
     .sort((a, b) => b.needs!.weeklyMiles - a.needs!.weeklyMiles)[0];
   if (!blocked?.needs) return null;

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { HYROX_NO_GOAL, hyroxGoalOf, hyroxPlanDetail, withHyroxPaces } from '../lib/hyroxSession';
 import { bestRunDay, type PlannedDay } from '../lib/interference';
 import { paceModel } from '../lib/paceModel';
-import { enduranceTarget, nextRace, raceWeekIndex } from '../lib/qualitySession';
+import { enduranceTarget } from '../lib/qualitySession';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
 import type { PlannedCardio } from './CardioPlanBuilder';
@@ -28,7 +28,7 @@ import { recoveryTrend } from '../lib/recoveryEngine';
 import { estimateMaxHr, heartRateRuns, heartRateTargets, type HeartRateTargets } from '../lib/heartRate';
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
-  weeksRemaining, currentWeekIndex, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
+  weeksRemaining, currentWeekIndex, planBlockFor, rememberPlannedMiles, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
   bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
   calendarEmptyState, provenMax,
 } from '../features/training/aiPlanService';
@@ -269,25 +269,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const goalLifts = useMemo(() => goalLiftNames(goals), [goals]);
   /* The dated endurance goal the hard run is built for. */
   const runGoal = useMemo(() => enduranceTarget(goals), [goals]);
-  /* HOW LONG EACH GOAL HAS LEFT. When a max attempt and a race-effort week
-     land in the same seven days, the nearer goal keeps the week — it is the
-     only one for which this week cannot be replaced.
-
-     Counted in weeks OF THE BLOCK, because that is what the week index the
-     plan compares them with is. Counted from today, a race five weeks out in
-     a block started three weeks ago sat three weeks late on the block's
-     calendar. The race is the next one that is neither past nor a tune-up. */
-  const horizons = useMemo(() => {
-    const race = nextRace(goals);
-    const lift = goals
-      .filter(goal => goal.type === 'Strength' && goal.date && goal.date >= localDayIso())
-      .map(goal => goal.date)
-      .sort()[0];
-    return (startDate: string) => ({
-      weeksToRace: race?.date ? raceWeekIndex(race.date, startDate) : Infinity,
-      weeksToLiftGoal: lift ? raceWeekIndex(lift, startDate) : Infinity,
-    });
-  }, [goals]);
   /* EVERY TRAINING PACE, FROM ONE PIECE OF EVIDENCE. Built from the athlete's
      hardest recent continuous run, corrected for how far their weekly running
      falls short of what that pace is normally built on — so a fast mile off
@@ -310,8 +291,8 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
       goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
       goalMiles: runGoal?.miles,
       paces: basePaces,
-    }, localDayIso());
-  }, [records, stored, setup, runGoal, basePaces]);
+    }, localDayIso(), undefined, goals);
+  }, [records, stored, setup, runGoal, basePaces, goals]);
 
   /* AND THE SESSIONS THE ATHLETE COMPLETED ARE EVIDENCE ABOUT THEM, not only
      the races they ran. See workoutEvidence: a judged session becomes a dated
@@ -644,13 +625,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces, levels: levels.levels}, { weekIndex: index, blockWeeks: storedPlanData.weeks.length, waveIndex: waveIndexOf(stored, index), currentWaveIndex: waveIndexOf(stored, currentWeekIndex(stored)), currentWeekIndex: currentWeekIndex(stored), liftingMaxWeek: waveSlot(waveIndexOf(stored, index)).isMax, ...horizons(stored.startDate) }, { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces, levels: levels.levels}, planBlockFor(stored, goals, index), { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),
   };
   const currentIndex = currentWeekIndex(stored);
   const plannedMiles = plan.weeks.map(item => Number(item.mileage) || 0);
+  rememberPlannedMiles(stored, plannedMiles);
   const weekIndex = Math.max(0, Math.min(viewWeek ?? currentIndex, plan.weeks.length - 1));
   const week = plan.weeks[weekIndex];
   const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi', { goal: Boolean(hyroxGoalOf(goals)), detail: hyroxPlanDetail(goals) }, hrTargets);
@@ -703,11 +685,13 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     if (next >= 0 && next < plan.weeks.length) setViewWeek(next === currentIndex ? null : next);
   };
 
+  /* A finished block is a record of what was planned, not this week. */
+  const blockDone = weeksRemaining(stored) <= 0;
   return <div className="pv" {...swipe}>
     {/* AFTER THE LAST WEEK the tab used to freeze on "Week 10 of 10" with
         every row marked Missed and no way forward. A finished block says so
         and offers the next one. */}
-    {weeksRemaining(stored) <= 0 && <section className="card pv-state">
+    {blockDone && <section className="card pv-state">
       <span className="eyebrow">BLOCK COMPLETE</span>
       <h3>Your {plan.weeks.length}-week block is done</h3>
       <p>The next block starts from what you lifted and ran in this one. Build it when you are ready to keep going.</p>
@@ -732,7 +716,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {/* Today belongs to today. Looking at week six, there is no "today" in it,
         and a card headed TODAY over a week in October would be a lie. */}
     <WeekList sessions={weekSessions} unit={unit} records={records} todayHref={weekIndex === currentIndex ? workoutHref : undefined}
-      title={weekIndex === currentIndex ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
+      title={weekIndex === currentIndex && !blockDone ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />
     {liveAdjusted ? <p className="pv-footnote">Loads follow your latest logged bests.</p> : null}
     {/* THE WEEK FIRST. With a real account the mileage gap, the plan-pressure
@@ -752,7 +736,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {/* And when the block itself is the problem, the coach says so here and
         hands the rebuild the instruction, rather than leaving the athlete to
         press Regenerate and think of something to type. */}
-    <PlanPressureCard onReshape={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />
+    {/* "This block is asking too much — reshape it" about a block that has
+        already ended; the card above offers the next one instead. */}
+    {!blockDone && <PlanPressureCard onReshape={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />}
     <PlanActions
       saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
       onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}

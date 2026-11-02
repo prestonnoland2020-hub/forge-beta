@@ -8,7 +8,8 @@
 
 import type { WorkoutRecord } from './WorkoutHistoryProvider';
 import type { AiPlanWeek, RunningAthlete, SplitDayRef, StoredAiPlan } from './aiPlanService';
-import { resolveWeekRunning, weekIndexOn } from './aiPlanService';
+import { blockEndIso, planBlockFor, resolveWeekRunning, weekIndexOn } from './aiPlanService';
+import type { EnduranceGoalRef } from '../../lib/qualitySession';
 import { parsePrescription, sessionVerdict, workEfforts, type SessionVerdict } from '../../lib/sessionVerdict';
 import type { LegacyCardioInterval } from '../../lib/cardioSession';
 
@@ -47,6 +48,9 @@ export function sessionVerdicts(
   athlete: RunningAthlete,
   todayIso: string,
   limit = 8,
+  /* The goals decide the race taper and which peak owns a week; judged
+     without them, a session was held to a different week than Plan drew. */
+  goals: EnduranceGoalRef[] = [],
 ): DatedVerdict[] {
   if (!stored?.plan?.weeks?.length) return [];
   const out: DatedVerdict[] = [];
@@ -54,8 +58,7 @@ export function sessionVerdicts(
   const resolvedWeek = (index: number) => {
     if (!weekCache.has(index)) {
       const raw = stored.plan.weeks[index];
-      weekCache.set(index, resolveWeekRunning(raw, splitDays, athlete,
-        { weekIndex: index, blockWeeks: stored.plan.weeks.length, waveIndex: index }));
+      weekCache.set(index, resolveWeekRunning(raw, splitDays, athlete, planBlockFor(stored, goals, index)));
     }
     return weekCache.get(index) as AiPlanWeek;
   };
@@ -63,7 +66,10 @@ export function sessionVerdicts(
   const recent = [...records]
     .filter(record => {
       const age = daysBetween(record.date, todayIso);
-      return age >= 0 && age <= VERDICT_WINDOW_DAYS && record.date >= stored.startDate;
+      /* Inside the block only: a run after it ended was not prescribed
+         by its last week, which is what the clamped week index would judge
+         it against. */
+      return age >= 0 && age <= VERDICT_WINDOW_DAYS && record.date >= stored.startDate && record.date < blockEndIso(stored);
     })
     .sort((a, b) => b.date.localeCompare(a.date));
 

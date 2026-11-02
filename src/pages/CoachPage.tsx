@@ -12,10 +12,10 @@ import { requestForgeCoach } from '../features/training/coachService';
 import { enduranceTarget } from '../lib/qualitySession';
 import { paceModel } from '../lib/paceModel';
 import { localDayIso } from '../lib/time';
-import { readLocalAiPlan, currentWeekIndex, resolvePlanWeek, goalLiftNames, weekCycleDays, waveIndexOf, bestsFromHistory} from '../features/training/aiPlanService';
+import { readLocalAiPlan, currentWeekIndex, blockIsOver, blockEndIso, planBlockFor, resolvePlanWeek, goalLiftNames, weekCycleDays, bestsFromHistory} from '../features/training/aiPlanService';
 import { sameLift, canonicalLiftKey } from '../lib/liftAliases';
 import { goalTrajectories, weeklyRunning, bodyWeightSeries, medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
-import { goalFeasibility, competingRaces } from '../lib/goalFeasibility';
+import { goalFeasibility, competingRaces, openGoals } from '../lib/goalFeasibility';
 import { normalizeMuscleGroups } from '../lib/muscleGroups';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { buildCareerSummary } from '../features/training/careerSummary';
@@ -46,7 +46,9 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
      and a corrected total. */
   const resolvedWeek=useMemo(()=>{
     const stored=readLocalAiPlan();
-    if(!stored)return null;
+    /* Past the block's last day there is no current week to quote; the
+       context says the block is finished instead. */
+    if(!stored||blockIsOver(stored))return null;
     const index=currentWeekIndex(stored);
     const raw=stored.plan.weeks[index];
     if(!raw)return null;
@@ -64,7 +66,7 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     const cycleDays=splitDays.map(day=>({name:day.name,dayType:day.dayType,exercises:day.exercises||[]}));
     const planRhythm=(savedPlan as {rhythm?:string}|null)?.rhythm==='weekly'?'weekly':'rolling';
     const windowDays=weekCycleDays(stored.startDate,index,cycleDays,planRhythm,recommendation?{position:recommendation.splitDay.position,dateIso:anchorDate}:undefined);
-    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles,recentWeeklyMileage:medianWeeklyMiles(records),recentLongestRun:longestContinuousRun(records), readiness: recovery?.readiness, goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile, goalMiles:enduranceTarget(goals)?.miles, paces:paceModel(records,enduranceTarget(goals),localDayIso(),medianWeeklyMiles(records),setup?.excludedEfforts||[])},{weekIndex:index,blockWeeks:stored.plan.weeks.length,waveIndex:waveIndexOf(stored,index)},{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric',anchors:history.anchors,sessions:history.sessions,misses:history.misses,lastAt:history.lastAt},windowDays);
+    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles,recentWeeklyMileage:medianWeeklyMiles(records),recentLongestRun:longestContinuousRun(records), readiness: profile.readiness, goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile, goalMiles:enduranceTarget(goals)?.miles, paces:paceModel(records,enduranceTarget(goals),localDayIso(),medianWeeklyMiles(records),setup?.excludedEfforts||[])},planBlockFor(stored,goals,index),{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric',anchors:history.anchors,sessions:history.sessions,misses:history.misses,lastAt:history.lastAt},windowDays);
   },[records,goals,setup,profile,splitDays.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const dynamicAnswers:Record<string,string>={
     'What should I train today?':recommendation?`${recommendation.splitDay.name} is next because completed workout history placed the split at position ${recommendation.splitDay.position}. ${recommendation.topSets.filter(set=>set.selected).map(set=>set.source==='history'?`${set.exercise}: ${set.weight} ${weightUnit} × ${set.reps}`:`${set.exercise}: establish a baseline`).join(' · ')}${recommendation.cardio?.selected?` · ${recommendation.cardio.summary}`:''}`:`${dueDay?.name||fallbackDay?.name||'Your next split day'} is due. ${intelligence.reason}`,
@@ -109,11 +111,11 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     /* THE CONSISTENCY TEST READS WHAT THE COACH IS TOLD. In preview mode the
        request never leaves the device; the context is left on window so a
        test can check it says the same day, lifts and miles as the screens. */
-    const coachRequest={question:value,scope:'today' as const,context:{conversationHistory:conversation.slice(-10),aiProgram:storedProgram&&programWeek?{generatedAt:storedProgram.generatedAt,summary:storedProgram.plan.summary,blockWeeks:storedProgram.plan.weeks.length,currentWeek:{week:programWeek.week,phase:programWeek.phase,mileage:programWeek.mileage,longRun:`${programWeek.longRunMiles} mi @ ${programWeek.longRunPace} on ${programWeek.longRunDay}`,quality:`${programWeek.quality}${programWeek.qualityPace?` @ ${programWeek.qualityPace}`:''} on ${programWeek.qualityDay}`,easy:(programWeek.easyDays||[]).map((day,index)=>`${day}: ${programWeek.easyRuns?.[index] ?? '?'} mi @ ${programWeek.easyPace}`).join('; ')||'No easy runs this week',topSets:/* An unlogged lift carries weight 0 as "no number yet"; the coach must not read it as zero pounds. */programWeek.topSets.map(set=>set.unlogged?{splitDay:set.splitDay,exercise:set.exercise,reps:set.reps,weight:'not logged yet — athlete finds their weight'}:set),note:programWeek.note}}:null,athleteHealthNotes:notesForCoachContext(notes),athleteSex:setup?.sex||null,coachActionsApplied:readAppliedActions().slice(-12),/* weeklyPlan removed: a SECOND planner with its own numbers and its own
+    const coachRequest={question:value,scope:'today' as const,context:{conversationHistory:conversation.slice(-10),aiProgram:storedProgram&&blockIsOver(storedProgram,todayIso)?{status:'complete',summary:storedProgram.plan.summary,blockWeeks:storedProgram.plan.weeks.length,endedOn:blockEndIso(storedProgram),note:'The block is finished and the next one has not been built. There is no current plan week: do not quote week numbers, mileage or top sets from it as this week. Today is the deterministic recommendation alone; say the next block is built from the Plan tab.'}:storedProgram&&programWeek?{generatedAt:storedProgram.generatedAt,summary:storedProgram.plan.summary,blockWeeks:storedProgram.plan.weeks.length,currentWeek:{week:programWeek.week,phase:programWeek.phase,mileage:programWeek.mileage,longRun:`${programWeek.longRunMiles} mi @ ${programWeek.longRunPace} on ${programWeek.longRunDay}`,quality:`${programWeek.quality}${programWeek.qualityPace?` @ ${programWeek.qualityPace}`:''} on ${programWeek.qualityDay}`,easy:(programWeek.easyDays||[]).map((day,index)=>`${day}: ${programWeek.easyRuns?.[index] ?? '?'} mi @ ${programWeek.easyPace}`).join('; ')||'No easy runs this week',topSets:/* An unlogged lift carries weight 0 as "no number yet"; the coach must not read it as zero pounds. */programWeek.topSets.map(set=>set.unlogged?{splitDay:set.splitDay,exercise:set.exercise,reps:set.reps,weight:'not logged yet — athlete finds their weight'}:set),note:programWeek.note}}:null,athleteHealthNotes:notesForCoachContext(notes),athleteSex:setup?.sex||null,coachActionsApplied:readAppliedActions().slice(-12),/* weeklyPlan removed: a SECOND planner with its own numbers and its own
        claim that 'the goal lift is trained once this week, other strength days
        are accessory'. Both are false under the current design and the coach was
        being handed them alongside the real block. */
-    wearableRecovery,wearableRecoveryAvailable:Boolean(wearableRecovery),profile:{weeklyMileage:profile.weeklyMileage,runningDays:profile.runningDays,experience:profile.experience,strengthFatigue:profile.strengthFatigue},goals:goals.map(goal=>({title:goal.title,type:goal.type,target:goal.target,date:goal.date,exercise:goal.exercise})),
+    wearableRecovery,wearableRecoveryAvailable:Boolean(wearableRecovery),profile:{weeklyMileage:profile.weeklyMileage,runningDays:profile.runningDays,experience:profile.experience,strengthFatigue:profile.strengthFatigue},goals:goals.map(goal=>({title:goal.title,type:goal.type,target:goal.target,date:goal.date,exercise:goal.exercise,/* Past its date: done, not being trained for. */...(goal.date&&goal.date<todayIso?{deadlinePassed:true}:{})})),
       /* WHAT THE COACH WAS NEVER TOLD, AND SO REPORTED AS MISSING.
 
          "Am I on track?" used to return a list of gaps and two complaints —
@@ -126,12 +128,12 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
          A gap is not an answer. These three are the arithmetic that makes one:
          where each goal is heading at the athlete's own rate, what they have
          actually run week by week, and what they weigh. */
-      goalTrajectory:goalTrajectories(goals,records,setup?.excludedEfforts||[]),
+      goalTrajectory:goalTrajectories(openGoals(goals,todayIso),records,setup?.excludedEfforts||[]),
       /* WHETHER EACH GOAL IS REACHABLE AT ALL, and the clash when several races
          share a date. The coach had the gap and the rate; it did not have the
          verdict, so it could describe how far away a goal was without ever
          saying it was not going to happen. */
-      goalFeasibility:goalFeasibility(goals,records,{maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,excludedEfforts:setup?.excludedEfforts||[]}),
+      goalFeasibility:goalFeasibility(openGoals(goals,todayIso),records,{maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,excludedEfforts:setup?.excludedEfforts||[]}),
       competingRaces:competingRaces(goals),
       weeklyRunning:weeklyRunning(records),
       /* THE NUMBERS THE COACH MAY QUOTE ABOUT RUNNING, computed once in
