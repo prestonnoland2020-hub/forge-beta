@@ -1,5 +1,6 @@
 import { goalFeasibility, weeksUntil } from './goalFeasibility';
 import { buildMileageRamp, rampArrival, type MileageRamp } from './mileageRamp';
+import { localDayIso } from './time';
 import type { CreatedGoal } from '../components/GoalBuilder';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 
@@ -24,6 +25,9 @@ export const CEILING_HEADROOM = 1.1;
 export const SAFE_STEP = 1.1;
 /* Below this share of the needed volume, the ramp is not going to arrive. */
 export const ARRIVAL_SHARE = 0.85;
+/* A race this close owns the running: the block is peaking or tapering, and
+   a ramp for some later goal would ask for volume the race cannot spare. */
+export const RACE_FOCUS_WEEKS = 6;
 
 export type MileageBounds = {
   minWeeklyMileage?: number | string;
@@ -66,6 +70,14 @@ export function mileageGap(goals: CreatedGoal[], records: WorkoutRecord[], bound
   if (!bounds) return null;
   const ceiling = Number(bounds.maxWeeklyMileage) || 0;
   const floor = Number(bounds.minWeeklyMileage) || 0;
+  /* RACE WEEKS ARE NOT BUILD WEEKS. An athlete weeks from a marathon was
+     offered a ramp every time they opened the app — for a 5K months out.
+     Whatever a later goal needs, the next race decides the running until it
+     is run. */
+  /* weeksUntil reads a past date as zero, so a race already run is ruled out
+     by the date itself — otherwise it would hold this silent forever. */
+  const raceSoon = goals.some(goal => goal.type === 'Endurance' && goal.date && goal.date >= localDayIso() && weeksUntil(goal.date) <= RACE_FOCUS_WEEKS);
+  if (raceSoon) return null;
   /* The hungriest goal wins: the volume that serves it serves the rest, and
      two alerts about one setting is one too many. */
   const blocked = goalFeasibility(goals, records, { maxWeeklyMileage: ceiling })

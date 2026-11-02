@@ -149,15 +149,20 @@ export function MileageCheckOnGoal({ goal, onClose }: { goal: CreatedGoal; onClo
    different answer and worth hearing again. */
 const CHECK_KEY = 'forge-mileage-check-v1';
 const today = () => new Date().toISOString().slice(0, 10);
+/* THE FINGERPRINT IS WHAT WOULD MAKE IT A DIFFERENT ANSWER. It held the exact
+   weekly miles and the weeks left, so one more run or one more Monday was a
+   "change" and the dialog came back — and the date check below brought it
+   back every morning regardless. Running is read in five-mile bands, and the
+   weeks left are not in it at all: the clock running down is not news. */
 const fingerprintOf = (gap: MileageGap) =>
-  [gap.goal, gap.kind, gap.needed, gap.ceiling, gap.floor, Math.round(gap.base), gap.weeksAvailable].join('|');
+  [gap.goal, gap.kind, gap.needed, gap.ceiling, gap.floor, Math.floor(gap.base / 5)].join('|');
 
 const alreadyAsked = (fingerprint: string) => {
   try {
     const raw = localStorage.getItem(CHECK_KEY);
     if (!raw) return false;
     const seen = JSON.parse(raw) as { fingerprint?: string; date?: string };
-    return seen.fingerprint === fingerprint && seen.date === today();
+    return seen.fingerprint === fingerprint;
   } catch { return false; }
 };
 const rememberAsked = (fingerprint: string) => {

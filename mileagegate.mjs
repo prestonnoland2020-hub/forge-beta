@@ -191,5 +191,17 @@ check('and a goal with room and time says nothing at all',
   mileageGap([{ id: 'e', title: 'Easy 5K', type: 'Endurance', target: '30:00', metric: '5K time', date: ahead(30) }],
     hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 50 }) === null);
 
+/* A marathon five weeks out and a 5K months away. The 5K is short of
+   running, but the next race owns the mileage until it is run. */
+console.log('\nA race inside six weeks holds the ramp off');
+const marathon = { id: 'm', title: 'Full Marathon', type: 'Endurance', target: '3:15:00', metric: 'Marathon time', date: ahead(5) };
+check('the 5K alone still asks', Boolean(mileageGap([fiveK], records, { minWeeklyMileage: 10, maxWeeklyMileage: 18 })));
+check('with the marathon five weeks out it is silent',
+  mileageGap([marathon, fiveK], records, { minWeeklyMileage: 10, maxWeeklyMileage: 18 }) === null);
+check('a marathon already run does not hold it off',
+  Boolean(mileageGap([{ ...marathon, date: iso(3) }, fiveK], records, { minWeeklyMileage: 10, maxWeeklyMileage: 18 })));
+check('nor does one seven weeks out',
+  Boolean(mileageGap([{ ...marathon, date: ahead(7) }, fiveK], records, { minWeeklyMileage: 10, maxWeeklyMileage: 18 })));
+
 console.log(`\n${fails ? `${fails} failed` : 'All checks passed'}`);
 process.exit(fails ? 1 : 0);
