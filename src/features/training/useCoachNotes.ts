@@ -7,13 +7,13 @@ import { useProfileSetup } from '../profile/ProfileSetupProvider';
 import { useAdaptiveTraining } from './AdaptiveTrainingProvider';
 import { useDailyRecommendation } from './DailyRecommendationProvider';
 import { sessionVerdicts } from './sessionVerdicts';
-import { readLocalAiPlan, currentWeekIndex, goalLiftNames, type StoredAiPlan } from './aiPlanService';
+import { readLocalAiPlan, currentWeekIndex, blockIsOver, goalLiftNames, type StoredAiPlan } from './aiPlanService';
 import { sessionTrend, parsePrescription } from '../../lib/sessionVerdict';
 import { paceModel, easyTooFast, loggedEasyPace } from '../../lib/paceModel';
 import { enduranceTarget, clockText, QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../../lib/qualitySession';
 import { medianWeeklyMiles, longestContinuousRun } from '../../lib/goalTrajectory';
 import { milesBetween, last7DayRuns, receiptLine } from '../../lib/stats';
-import { goalFeasibility, competingRaces } from '../../lib/goalFeasibility';
+import { goalFeasibility, competingRaces, openGoals } from '../../lib/goalFeasibility';
 import { progressionLevels } from '../../lib/progressionLevels';
 import { workoutEfforts } from '../../lib/workoutEvidence';
 import { liftPositions } from '../../lib/liftProgression';
@@ -102,7 +102,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
     };
     const excluded = setup?.excludedEfforts || [];
     const basePaces = paceModel(records, runGoal, todayIso, medianWeeklyMiles(records), excluded);
-    const judged = sessionVerdicts(records, stored, split, { ...athlete, paces: basePaces }, todayIso);
+    const judged = sessionVerdicts(records, stored, split, { ...athlete, paces: basePaces }, todayIso, undefined, goals);
     /* The same paces the Plan draws, HYROX table included, so the coach never
        quotes a pace the week does not show. */
     const paces = withHyroxPaces(paceModel(records, runGoal, todayIso, medianWeeklyMiles(records), excluded, workoutEfforts(judged)), goals);
@@ -117,7 +117,9 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
     /* THIS WEEK AND LAST, ON THE PLAN'S OWN CALENDAR. */
     let week: CoachNoteInput['week'] = null;
     let closedWeek: CoachNoteInput['closedWeek'] = null;
-    if (stored && stored.plan.weeks.length) {
+    /* A finished block has no "this week" — measuring the last seven days
+       against its final week's mileage was a target nobody had set. */
+    if (stored && stored.plan.weeks.length && !blockIsOver(stored, todayIso)) {
       const index = currentWeekIndex(stored);
       const startIso = addDays(stored.startDate, index * 7);
       const endIso = addDays(startIso, 6);
@@ -144,7 +146,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
       }));
 
     /* GOALS WHOSE VERDICT MOVED since the athlete last saw one. */
-    const feasibility = goalFeasibility(goals, records, { maxWeeklyMileage: athlete.maxWeeklyMileage, excludedEfforts: excluded, workoutEfforts: workoutEfforts(judged) });
+    const feasibility = goalFeasibility(openGoals(goals, todayIso), records, { maxWeeklyMileage: athlete.maxWeeklyMileage, excludedEfforts: excluded, workoutEfforts: workoutEfforts(judged) });
     const goalChanges = feasibility.flatMap(item => {
       const name = item.goal;
       const before = remembered.goalVerdicts[name];
@@ -186,7 +188,12 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
        plan; it is keyed to its start date so it is said once. */
     const weekStart = (() => {
       if (stored && stored.plan.weeks.length) {
-        const index = currentWeekIndex(stored);
+        /* Counted on the plan's own cadence and NOT clamped into the block:
+           clamped, the week after the block ended still read as the last
+           week, so the final week was never reviewed. Past the end the weeks
+           carry on at the same seven-day step. */
+        const elapsed = Math.floor((Date.parse(`${todayIso}T12:00:00`) - Date.parse(`${stored.startDate}T12:00:00`)) / (7 * 86400000));
+        const index = Math.max(0, elapsed);
         const thisStart = addDays(stored.startDate, index * 7);
         return index > 0 ? addDays(thisStart, -7) : null;
       }
@@ -207,7 +214,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
       const prs: Array<{ lift: string; weight: number; reps: number }> = [];
       inWeek.forEach(record => (record.topSets || []).forEach(set => { if (set.completed === false) return; const key = canonicalLiftKey(set.lift); const max = calculateEstimatedOneRepMax(Number(set.weight) || 0, Number(set.reps) || 0) || 0; if (max > (bestBefore.get(key) || 0) && !prs.some(pr => canonicalLiftKey(pr.lift) === key)) prs.push({ lift: set.lift, weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 }); }));
       const nextText = (() => {
-        if (stored && stored.plan.weeks.length) { const wk = stored.plan.weeks[currentWeekIndex(stored)]; if (wk?.quality) return `${wk.quality}${wk.qualityDay ? ` on ${wk.qualityDay}` : ''}`; }
+        if (stored && stored.plan.weeks.length) { if (blockIsOver(stored, todayIso)) return 'Your block is done — build the next one on the Plan tab'; const wk = stored.plan.weeks[currentWeekIndex(stored)]; if (wk?.quality) return `${wk.quality}${wk.qualityDay ? ` on ${wk.qualityDay}` : ''}`; }
         const set = recommendation?.topSets.find(item => item.selected);
         return recommendation ? `${recommendation.splitDay.name}${set ? ` — ${set.exercise}${set.weight ? ` ${set.weight} × ${set.reps}` : ''}` : ''}` : '';
       })();
@@ -235,7 +242,7 @@ export function useCoachNotes(): { note: CoachNote | null; pending: number; ackn
      change keeps its old verdict until that change is acknowledged. */
   useEffect(() => {
     const pendingGoals = new Set(notes.filter(note => note.kind === 'goal-moved' && !remembered.seen[note.key]).map(note => note.key.split(':')[1]));
-    const feasibility = goalFeasibility(goals, records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] });
+    const feasibility = goalFeasibility(openGoals(goals), records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] });
     const next: Record<string, string> = { ...remembered.goalVerdicts };
     let changed = false;
     for (const item of feasibility) {

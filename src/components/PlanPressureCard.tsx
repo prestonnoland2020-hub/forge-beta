@@ -10,7 +10,7 @@ import { readLocalAiPlan } from '../features/training/aiPlanService';
 import { paceModel } from '../lib/paceModel';
 import { enduranceTarget } from '../lib/qualitySession';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
-import { goalFeasibility } from '../lib/goalFeasibility';
+import { goalFeasibility, openGoals } from '../lib/goalFeasibility';
 import { bestsFromHistory, FAILURES_BEFORE_BACKOFF, goalLiftNames } from '../features/training/aiPlanService';
 import { localDayIso } from '../lib/time';
 
@@ -49,7 +49,7 @@ export function PlanPressureCard({ onReshape }: { onReshape: (instruction: strin
     const expected = perWeek * 2;
     const missedSessions = expected ? Math.max(0, expected - trained) : 0;
 
-    const goalsBehind = goalFeasibility(goals, records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] })
+    const goalsBehind = goalFeasibility(openGoals(goals), records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [] })
       .some(verdict => verdict.verdict !== 'reachable');
 
     /* HOW THE HARD SESSIONS ACTUALLY WENT. Prescribed against run, for every
@@ -68,7 +68,7 @@ export function PlanPressureCard({ onReshape }: { onReshape: (instruction: strin
       goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
       goalMiles: runGoal?.miles,
       paces: paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || []),
-    }, localDayIso()));
+    }, localDayIso(), undefined, goals));
 
     return planPressure({ checkIns, backedOffLifts, missedSessions, goalsBehind, sessions });
   }, [checkIns, records, goals, setup]);

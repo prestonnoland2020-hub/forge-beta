@@ -43,10 +43,14 @@ export function runningBehind(startDate: string | undefined, plannedMiles: numbe
   const elapsed = Math.floor((new Date(`${today}T12:00:00`).getTime() - new Date(`${startDate}T12:00:00`).getTime()) / 604800000);
   /* Two whole weeks have to be behind us; the week in progress is not judged. */
   if (elapsed < 2) return null;
+  /* Only weeks the block planned. Past its end the last week's mileage was
+     clamped onto every week after it, so a finished block went on calling the
+     athlete behind a plan that no longer existed. */
+  if (elapsed - 1 >= plannedMiles.length) return null;
   const weeks = [elapsed - 2, elapsed - 1].map(index => {
     const start = addDays(startDate, index * 7);
     const end = addDays(start, 6);
-    const planned = plannedMiles[Math.min(index, plannedMiles.length - 1)] || 0;
+    const planned = plannedMiles[index] || 0;
     const ran = round1(records.filter(record => record.date >= start && record.date <= end).reduce((sum, record) => sum + runMilesOfRecord(record), 0));
     return { start, planned, ran };
   });

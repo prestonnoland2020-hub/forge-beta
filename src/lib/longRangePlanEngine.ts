@@ -1,7 +1,6 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
-import { qualitySession, enduranceTarget } from './qualitySession';
+import { qualitySession, enduranceTarget, nextRace, raceWeekIndex } from './qualitySession';
 import { phaseFor } from './trainingPhase';
-import { weeksUntil } from './goalFeasibility';
 import { paceModel } from './paceModel';
 import { eventProfileFor } from './eventProfile';
 import { deloadWeek } from './interference';
@@ -41,7 +40,10 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
   /* ONE FUNCTION PICKS THE RACE, on both paths. Sorting by date alone left the
      winner to database order whenever two goals shared a date — see
      enduranceTarget, which breaks the tie on distance. */
-  const endurance=(enduranceTarget(goals)?.goal as CreatedGoal|undefined)||goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];const deadline=[endurance,strength].filter(Boolean).map(goal=>new Date(goal!.date).getTime()).sort()[0];/* THE HORIZON STOPS AT THE RACE.
+  const endurance=(enduranceTarget(goals)?.goal as CreatedGoal|undefined)||goals.filter(goal=>goal.type==='Endurance').sort((a,b)=>a.date.localeCompare(b.date))[0];const strength=goals.filter(goal=>goal.type==='Strength').sort((a,b)=>a.date.localeCompare(b.date))[0];/* THE DATES THAT STEER THE ROADMAP are the next race that is neither past
+     nor a tune-up, and a lift goal still ahead. A race from last month gave a
+     deadline in the past, which collapsed the roadmap to a single race week. */
+  const today=localDayIso();const race=nextRace(goals,today);const raceWeek=race?.date?raceWeekIndex(race.date,today):undefined;const liftDeadline=strength?.date&&strength.date>=today?strength.date:undefined;const deadline=[race?.date,liftDeadline].filter(Boolean).map(date=>new Date(`${date}T12:00:00`).getTime()).sort()[0];/* THE HORIZON STOPS AT THE RACE.
 
      `Math.max(8, …)` floored this at eight weeks no matter how close the event
      was, so a half marathon three weeks out produced an eight-week roadmap
@@ -53,7 +55,8 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
 
      Eight weeks is a sensible floor for someone with no date at all; it is
      nonsense as an override of a date they gave. */
-  const available=deadline?Math.max(1,Math.ceil((deadline-Date.now())/604800000)):weeksRequested;
+  /* It runs THROUGH race week: the race's own week is the last one shown. */
+  const available=deadline?Math.max(1,typeof raceWeek==='number'&&new Date(`${race!.date}T12:00:00`).getTime()===deadline?raceWeek+1:Math.ceil((deadline-Date.now())/604800000)):weeksRequested;
   const total=deadline
     ? Math.min(52,Math.max(1,Math.min(available,weeksRequested)))
     : Math.min(52,Math.max(8,weeksRequested));const startMileage=endurance?Math.max(0,profile.weeklyMileage):0;const hasRunBaseline=Boolean(endurance&&startMileage>0);const peak=hasRunBaseline?Math.max(startMileage,startMileage*enduranceScale(endurance)):0;/* THE EASY PACE IS ANCHORED TO RUNNING, not to everything on feet. A mile
@@ -62,12 +65,17 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
      was quietly setting the program's tempo. runQuality decides what may anchor
      a pace; the rule is written once and every surface reads it. */
   const loggedPaces=records.flatMap(record=>((record.cardioSessions||[]) as CardioLogDraft[]).flatMap(session=>{const miles=cardioMiles(session);const minutes=summarizeCardioDraft(session).minutes;return anchorsPace(miles,minutes*60)?[minutes/miles]:[]})).sort((a,b)=>a-b);const loggedEasyPace=loggedPaces.length?loggedPaces[Math.floor(loggedPaces.length/2)]:0;const currentStrength=historyMax(records,strength?.exercise)||num(strength?.current);const targetStrength=num(strength?.target);
+  /* ONE PHASE PER WEEK, from the race's week and the event's own taper length,
+     so the mileage and the label cannot disagree about which weeks taper. */
+  const taperWeeks=eventProfileFor(eventMiles(endurance)).shape.taperWeeks??2;
+  const phaseAt=(index:number)=>phaseFor({weekIndex:index,blockWeeks:total,weeksToRace:endurance?raceWeek:undefined,deloading:deloadWeek(index,WAVE_LENGTH),shape:eventProfileFor(eventMiles(endurance)).shape});
+  const tapersAt=(index:number)=>Boolean(endurance)&&(typeof raceWeek==='number'&&raceWeek>=0?['Taper','Race'].includes(phaseAt(index)):index+1>Math.max(1,total-taperWeeks));
   /* ONE DEFINITION OF A WEEK'S MILEAGE, so "this week" and "last week" cannot
      be computed two different ways. */
   const weekMileage=(index:number)=>{
     if(!hasRunBaseline)return 0;
     const progress=index/Math.max(1,total-1);
-    const taper=Boolean(endurance)&&index+1>Math.max(1,total-2);
+    const taper=tapersAt(index);
     const test=waveSlot(index).isMax;
     const deload=!taper&&!test&&deloadWeek(index,WAVE_LENGTH);
     /* A SHORT HORIZON DOES NOT LICENSE A BIG JUMP. The smooth ramp divides the
@@ -84,7 +92,7 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
   return Array.from({length:total},(_,index)=>{
     const week=index+1;const weekDate=new Date();weekDate.setHours(12,0,0,0);weekDate.setDate(weekDate.getDate()+index*7);/* A taper is the two weeks before the race, and on a horizon shorter than
        three weeks every remaining week is one of them. */
-    const taper=Boolean(endurance)&&week>Math.max(1,total-2);
+    const taper=tapersAt(index);
     /* The roadmap and the program render on the SAME screen, so they cannot
        run different calendars. Max week and the deload are the wave's — the
        5-week 8/6/4/2/1 cycle, deloading on the 2-rep week so the attempt
@@ -97,7 +105,7 @@ export function buildLongRangePlan(goals:CreatedGoal[],profile:AdaptiveProfile,w
        running test week, on the same screen where the block called it a build.
        One function now names the phase, shaped by the event, and the max week
        is asked about separately wherever it actually matters. */
-    const test=waveSlot(index).isMax;const deloadCut=deloadWeek(index,WAVE_LENGTH);const phase:PlanWeek['phase']=phaseFor({weekIndex:index,blockWeeks:total,weeksToRace:endurance?weeksUntil(endurance.date):undefined,deloading:deloadCut,shape:eventProfileFor(eventMiles(endurance)).shape});const deload=phase==='Deload';const progress=index/Math.max(1,total-1);const mileage=weekMileage(index);/* THE CHANGE IS AGAINST LAST WEEK'S ACTUAL MILEAGE, not against a smooth
+    const test=waveSlot(index).isMax;const phase:PlanWeek['phase']=phaseAt(index);const deload=phase==='Deload';const progress=index/Math.max(1,total-1);const mileage=weekMileage(index);/* THE CHANGE IS AGAINST LAST WEEK'S ACTUAL MILEAGE, not against a smooth
        build curve that was never run. This re-evaluated the ramp for index-1
        and ignored the taper, deload and test multipliers that had actually been
        applied to that week — so the week after a deload showed "+9%" where the

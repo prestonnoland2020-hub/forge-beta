@@ -49,7 +49,7 @@ export type EventProfile = {
 export const EVENT_PROFILES: EventProfile[] = [
   {
     key: 'marathon', label: 'Marathon', miles: 26.219,
-    shape: { foundationShare: 0.4, buildShare: 0.35 }, longRunShare: 0.35,
+    shape: { foundationShare: 0.4, buildShare: 0.35, taperWeeks: 3 }, longRunShare: 0.35,
     rotation: {
       Foundation: ['threshold', 'threshold', 'intervals'],
       Build: ['threshold', 'racepace', 'threshold'],
@@ -60,7 +60,7 @@ export const EVENT_PROFILES: EventProfile[] = [
   },
   {
     key: 'half', label: 'Half marathon', miles: 13.109,
-    shape: { foundationShare: 0.35, buildShare: 0.35 }, longRunShare: 0.32,
+    shape: { foundationShare: 0.35, buildShare: 0.35, taperWeeks: 2 }, longRunShare: 0.32,
     rotation: {
       Foundation: ['threshold', 'threshold', 'intervals'],
       Build: ['threshold', 'intervals', 'racepace'],
@@ -71,7 +71,7 @@ export const EVENT_PROFILES: EventProfile[] = [
   },
   {
     key: '10k', label: '10K', miles: 6.214,
-    shape: { foundationShare: 0.3, buildShare: 0.4 }, longRunShare: 0.3,
+    shape: { foundationShare: 0.3, buildShare: 0.4, taperWeeks: 1 }, longRunShare: 0.3,
     rotation: {
       Foundation: ['threshold', 'threshold', 'intervals'],
       Build: ['threshold', 'intervals', 'threshold'],
@@ -82,7 +82,7 @@ export const EVENT_PROFILES: EventProfile[] = [
   },
   {
     key: '5k', label: '5K', miles: 3.107,
-    shape: { foundationShare: 0.3, buildShare: 0.4 }, longRunShare: 0.3,
+    shape: { foundationShare: 0.3, buildShare: 0.4, taperWeeks: 1 }, longRunShare: 0.3,
     rotation: {
       Foundation: ['threshold', 'threshold', 'intervals'],
       Build: ['threshold', 'intervals', 'threshold'],
@@ -93,7 +93,7 @@ export const EVENT_PROFILES: EventProfile[] = [
   },
   {
     key: '2mile', label: '2 Mile', miles: 2,
-    shape: { foundationShare: 0.28, buildShare: 0.37 }, longRunShare: 0.28,
+    shape: { foundationShare: 0.28, buildShare: 0.37, taperWeeks: 1 }, longRunShare: 0.28,
     rotation: {
       Foundation: ['threshold', 'intervals', 'threshold'],
       Build: ['intervals', 'threshold', 'reps'],
@@ -104,7 +104,7 @@ export const EVENT_PROFILES: EventProfile[] = [
   },
   {
     key: 'mile', label: 'Mile', miles: 1,
-    shape: { foundationShare: 0.25, buildShare: 0.35 }, longRunShare: 0.25,
+    shape: { foundationShare: 0.25, buildShare: 0.35, taperWeeks: 1 }, longRunShare: 0.25,
     rotation: {
       Foundation: ['threshold', 'intervals', 'strides'],
       Build: ['intervals', 'reps', 'threshold'],

@@ -52,8 +52,8 @@ const block = weeks => Array.from({ length: weeks }, (_, index) =>
 const twelve = block(12);
 check('a block starts in Foundation', twelve[0] === 'Foundation', twelve[0]);
 check('and ends on the race', twelve[11] === 'Race', twelve[11]);
-check(`the ${TAPER_WEEKS} weeks before it are the taper`,
-  twelve.slice(9, 11).every(phase => phase === 'Taper'), twelve.slice(9, 11).join(', '));
+check(`the ${shape.taperWeeks} week before a 5K is the taper`,
+  twelve.slice(11 - shape.taperWeeks, 11).every(phase => phase === 'Taper') && twelve[10 - shape.taperWeeks] !== 'Taper', twelve.slice(8, 11).join(', '));
 check('it passes through Build and Specific on the way',
   twelve.includes('Build') && twelve.includes('Specific'), twelve.join(' '));
 check('a cut week is a deload', twelve[3] === 'Deload');

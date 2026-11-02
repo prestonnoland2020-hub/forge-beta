@@ -6,7 +6,7 @@ import { NumberInput } from './NumberInput';
 import { tap } from '../lib/haptics';
 import { useNavigate } from 'react-router-dom';
 import { saveAthleteSettings } from '../features/profile/settingsSync';
-import { readLocalAiPlan } from '../features/training/aiPlanService';
+import { readLocalAiPlan, rememberedPlannedMiles } from '../features/training/aiPlanService';
 
 /* THE COACH SAYING THE MILEAGE IS TOO HIGH, WITH THE NUMBERS IN YOUR HANDS.
 
@@ -103,6 +103,10 @@ export function RunningBehindNudge() {
   const navigate = useNavigate();
   const stored = useMemo(() => readLocalAiPlan(), []);
   const plannedMiles = useMemo(() => {
+    /* What the Plan tab drew for these weeks; the raw block, held to the
+       athlete's range, only until the Plan tab has drawn it. */
+    const drawn = stored ? rememberedPlannedMiles(stored) : null;
+    if (drawn) return drawn;
     const min = Number(setup?.minWeeklyMileage) || 0; const max = Number(setup?.maxWeeklyMileage) || Infinity;
     return (stored?.plan.weeks || []).map(week => Math.max(min, Math.min(max, Number(week.mileage) || 0)));
   }, [stored, setup?.minWeeklyMileage, setup?.maxWeeklyMileage]);

@@ -252,7 +252,7 @@ check('the order they arrive in does not change the answer',
 check('a genuinely sooner race still outranks a longer later one',
   enduranceTarget([...sameDay, { type: 'Endurance', exercise: 'Full Marathon', title: 'Marathon', target: '3:30:00', date: '2027-04-19' }]).goal.exercise === '5K');
 check('and a sooner race wins even when it is the shortest',
-  enduranceTarget([...sameDay, { type: 'Endurance', exercise: 'Mile', title: 'Spring mile', target: '4:55', date: '2026-10-01' }]).goal.title === 'Spring mile');
+  enduranceTarget([...sameDay, { type: 'Endurance', exercise: 'Mile', title: 'Spring mile', target: '4:55', date: '2026-10-01' }], '2026-09-01').goal.title === 'Spring mile');
 check('a goal with no time set cannot steer the block',
   enduranceTarget([{ type: 'Endurance', exercise: '10K', title: '10K', target: '', date: '2026-10-01' }, ...sameDay]).goal.exercise === '5K');
 check('a target saved with its unit still steers the block',
