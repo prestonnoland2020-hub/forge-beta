@@ -36,7 +36,7 @@
    corners of its rectangular shape. The theme picks between Google's two
    variants — light (#FFFFFF fill, #747775 stroke, #1F1F1F label) and dark
    (#131314 fill, #8E918F stroke, #E3E3E3 label) — and nothing else about the
-   app reaches it, so the accent, Saira and the card radius stop at its edge.
+   app reaches it, so the accent, SF Pro and the card radius stop at its edge.
 
    Hover and press are Google's state layers, a wash of the label colour at 8%
    and 12%, laid on by ::after so the fill itself never shifts. Disabled is

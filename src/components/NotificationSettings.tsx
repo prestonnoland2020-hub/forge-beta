@@ -47,7 +47,7 @@ export function NotificationSettings() {
   const toggle = async (key: keyof NotificationPrefs) => {
     const next = { ...prefs, [key]: !prefs[key] };
     setPrefs(next); saveNotificationPrefs(next);
-    if (!next.morningWorkout && !next.injuryFollowUp && !next.partnerTrained) {
+    if (!next.morningWorkout && !next.injuryFollowUp && !next.partnerTrained && !next.watchSynced) {
       await disablePush();
       return;
     }
@@ -58,13 +58,14 @@ export function NotificationSettings() {
        morning brief OFF is a message the server has to receive too. */
     /* An explicit change, so the new values travel — this is the only call
        that may alter what the server has stored. */
-    if (granted === 'granted') setRegistered(await syncPushSubscription({ morningWorkout: next.morningWorkout, partnerTrained: next.partnerTrained }));
+    if (granted === 'granted') setRegistered(await syncPushSubscription({ morningWorkout: next.morningWorkout, partnerTrained: next.partnerTrained, watchSynced: next.watchSynced }));
   };
   return <section className="card notification-settings">
     <header><span className="eyebrow">NOTIFICATIONS</span><h3>Check-ins from Forge</h3></header>
     <div className="toggle-row"><div><strong>Morning workout</strong><span>Your day's training, each morning.</span></div><input type="checkbox" aria-label="Morning workout notifications" checked={prefs.morningWorkout} onChange={() => void toggle('morningWorkout')} /></div>
     <div className="toggle-row"><div><strong>Injury follow-ups</strong><span>A daily check-in while a body-log entry is active.</span></div><input type="checkbox" aria-label="Injury follow-up notifications" checked={prefs.injuryFollowUp} onChange={() => void toggle('injuryFollowUp')} /></div>
     <div className="toggle-row"><div><strong>A partner trained</strong><span>Once a day, when a training partner logs a session.</span></div><input type="checkbox" aria-label="Training partner notifications" checked={prefs.partnerTrained} onChange={() => void toggle('partnerTrained')} /></div>
+    <div className="toggle-row"><div><strong>Garmin synced</strong><span>When your watch syncs a session, with the top set it was matched to.</span></div><input type="checkbox" aria-label="Garmin sync notifications" checked={prefs.watchSynced} onChange={() => void toggle('watchSynced')} /></div>
     {health && <small className={health.registered && health.lastDelivered ? 'notification-note' : 'notification-note warn'}>{describePushHealth(health)}</small>}
     {!notificationsSupported() && <small className="notification-note">This browser does not support system notifications; Ask Forge still shows every check-in.</small>}
     {/* THE ONE THING IOS WILL NOT DO FROM A BROWSER TAB. Web push reaches an

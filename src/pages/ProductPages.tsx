@@ -478,7 +478,10 @@ function WorkoutEditor() {
     /* Editing a custom day takes the chips as they now stand — unticking one
        removes it — plus whatever the logged lifts train. */
     const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:editingCustom?Array.from(new Set([...blankMuscles,...exerciseDriven])):(blankMuscles.length||exerciseDriven.length)?Array.from(new Set([...blankMuscles,...exerciseDriven])):(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
-    const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id))};
+    const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id)),
+      /* The session's length came from the watch, not this form; editing the
+         day re-saves it whole, and leaving it out erased the Garmin minutes. */
+      ...(editingRecord?.durationMinutes?{durationMinutes:editingRecord.durationMinutes}:{})};
     /* A second session added to an already-saved day keeps THAT DAY's identity.
        Without this, the split cursor has advanced by the time the athlete comes
        back, and the add stamps the NEXT day's muscles and slot onto a finished

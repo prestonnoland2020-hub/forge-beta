@@ -420,6 +420,14 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
     say: `On the numbers this holds: ${Math.round(best)} today, ${Math.round(target)} needed, ${Math.round(weeks)} weeks to find ${Math.round(needed * 100)}%.` };
 }
 
+/* A GOAL WHOSE DAY HAS GONE is history, not a target. Judged as live it has
+   zero weeks left and reads as out of reach, so the coach announced a missed
+   goal as having "moved", the plan warned it was asking too much for a goal
+   already over, and the mileage nudge argued for a race already run. The
+   screens that ask "what is this athlete working toward" ask with these. */
+export const openGoals = <T extends { date?: string }>(goals: T[], todayIso = localDayIso()): T[] =>
+  goals.filter(goal => !goal.date || goal.date >= todayIso);
+
 export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], cap?: { maxWeeklyMileage?: number; excludedEfforts?: string[]; workoutEfforts?: CurveEffort[] }): Feasibility[] {
   const ceiling = Number(cap?.maxWeeklyMileage) || 0;
   const excluded = cap?.excludedEfforts || [];

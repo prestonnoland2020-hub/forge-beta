@@ -11,14 +11,23 @@ import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { isBufferActive } from '../features/training/athleteNotesService';
 import { isSickNote, limitationIn } from '../lib/bodyLog';
 import { Icon } from '../components/Icon';
+import { sessionLength } from '../lib/time';
 import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate';
 import { TodayNudges } from '../components/TodayNudges';
+import { RunningBehindNudge } from '../components/RunningBehindCard';
 
 const todayIso = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+
+/* The plan summary leads with the activity ("Easy Run · 2.5 miles · 9:20/mi");
+   under a title that already says it, the detail starts after it. */
+const runDetail = (title: string, summary: string) => {
+  const [first, ...rest] = summary.split(' · ');
+  return rest.length && title.toLowerCase().includes(first.toLowerCase()) ? rest.join(' · ') : summary;
+};
 
 export function HomePage() {
   const { recommendation, loading, syncError, toggleTopSet, setCardioSelected } = useDailyRecommendation();
@@ -76,6 +85,9 @@ export function HomePage() {
     {completedToday ? <section className="td-card done">
       <div className="td-card-top"><span className="td-chip done"><Icon name="check" size={12} stroke={3} />Done</span><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></div>
       <h3 className="td-title">{completedToday.title}</h3>
+      {/* How long the lifting took, from the watch's strength session — matched
+          to the day by date, so it sits with the top set it belongs to. */}
+      {completedToday.durationMinutes ? <p className="td-session-length"><Icon name="watch" size={13} />{completedSets.length ? 'Lifting' : 'Session'} · {sessionLength(completedToday.durationMinutes)} · from your watch</p> : null}
       {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <ul className="td-lines">
         {completedSets.map((set, index) => <li key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><b>{set.weight} {weightUnit} × {set.reps}</b></li>)}
         {(completedToday.cardioSessions || []).map(session => <li key={session.id}><span>{session.activity}</span><b>{formatCardioSummary(session)}</b></li>)}
@@ -94,8 +106,11 @@ export function HomePage() {
         {recommendation.cardio && <li><label className={recommendation.cardio.selected ? 'on' : ''}>
           <input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
-          <span>{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}</span>
-          <b>{cardioPlanSummary(recommendation.cardio.session.plan)}</b>
+          {/* A run's detail is a sentence, not a number, so it goes under its
+              name rather than in the number column — where it could not wrap
+              and pushed the whole card wider than the screen. */}
+          <span className="td-stack">{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}
+            <em className="td-detail">{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</em></span>
         </label></li>}
       </ul>}
       {!recommendedSets.length && dayType !== 'rest' && dayType !== 'cardio' && dayType !== 'hyrox' && <Link className="td-fix" to="/exercises"><span><b>Choose exercises for this day</b>Forge needs a lift mapped to it.</span><Icon name="arrow" size={16} /></Link>}
@@ -130,6 +145,7 @@ export function HomePage() {
     {/* Below the workout, never above it: the day's training is the card
         Today exists for. */}
     <TodayNudges />
+    <RunningBehindNudge />
 
     {/* Under the workout, because this is the screen where you decide whether
         to train and a partner who has already trained is the one thing that

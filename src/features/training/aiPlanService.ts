@@ -4,7 +4,7 @@ import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
 import { calculateEstimatedOneRepMax, repMaxCoefficient, weightForReps, PRESCRIPTION_REP_CAP, REP_MAX_CAP } from '../../lib/strength';
 import { supabase } from '../../lib/supabase';
 import { localDayIso } from '../../lib/time';
-import { qualitySession, qualityPhaseFor, QUALITY_MAX_SHARE } from '../../lib/qualitySession';
+import { qualitySession, qualityPhaseFor, QUALITY_MAX_SHARE, nextRace, raceWeekIndex, type EnduranceGoalRef } from '../../lib/qualitySession';
 import { peakConflict } from '../../lib/interference';
 import { eventProfileFor } from '../../lib/eventProfile';
 import type { PaceModel } from '../../lib/paceModel';
@@ -13,7 +13,7 @@ import type { Levels } from '../../lib/progressionLevels';
 
 /* A running week is a peak when it is the race itself, the sharpening before
    it, or the specific phase where the race-pace work lives. */
-const runningPeaks = (phase: string | undefined) => {
+export const runningPeaks = (phase: string | undefined) => {
   const resolvedPhase = normalizePhase(phase);
   return resolvedPhase === 'Race' || resolvedPhase === 'Taper' || resolvedPhase === 'Specific';
 };
@@ -79,6 +79,26 @@ export const planFingerprint = (input: unknown) => {
 const readLocal = (): StoredAiPlan | null => { try { return JSON.parse(localStorage.getItem(localKey) || 'null'); } catch { return null; } };
 /* Synchronous cache read for surfaces (Today, Coach) that align to the plan. */
 export const readLocalAiPlan = readLocal;
+
+/* THE WEEKLY MILES THE PLAN TAB SHOWS, kept for the screens that only need
+   the totals. Today's running nudge measured the athlete against the stored
+   block's raw mileage — "20 planned" — under a Plan tab that resolved the
+   same weeks to 18 and 16. Re-deriving the resolved week there would be a
+   fifth copy of the resolver; reading what the Plan tab last drew is one
+   source. Keyed to the block, so a rebuilt block never reads an old one. */
+const plannedMilesKey = 'forge-plan-miles-v1';
+export const rememberPlannedMiles = (stored: Pick<StoredAiPlan, 'generatedAt' | 'startDate'>, miles: number[]) => {
+  try {
+    const next = JSON.stringify({ generatedAt: stored.generatedAt, startDate: stored.startDate, miles });
+    if (localStorage.getItem(plannedMilesKey) !== next) localStorage.setItem(plannedMilesKey, next);
+  } catch { /* full */ }
+};
+export const rememberedPlannedMiles = (stored: Pick<StoredAiPlan, 'generatedAt' | 'startDate'>): number[] | null => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(plannedMilesKey) || 'null') as { generatedAt?: string; startDate?: string; miles?: number[] } | null;
+    return saved && saved.generatedAt === stored.generatedAt && saved.startDate === stored.startDate && Array.isArray(saved.miles) ? saved.miles : null;
+  } catch { return null; }
+};
 const writeLocal = (stored: StoredAiPlan) => { try { localStorage.setItem(localKey, JSON.stringify(stored)); } catch { /* full */ } };
 
 export async function loadStoredAiPlan(hasUser: boolean): Promise<StoredAiPlan | null> {
@@ -305,7 +325,8 @@ export const isRestDay = (day: { name?: string; type?: string; dayType?: string 
    surface builds it here now. */
 export function bestsFromHistory(
   records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean; prescribedReps?: number }> }>,
-): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>>; lastAt: LiftAnchors } {
+  todayIso = localDayIso(),
+): { bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>>; lastAt: LiftAnchors; returning: Map<string, { factor: number; daysOff: number }> } {
   const bests = new Map<string, number>();
   const singles = new Map<string, number>();
   /* HOW MANY TIMES THIS LIFT HAS BEEN TRAINED, counted in days rather than in
@@ -325,6 +346,8 @@ export function bestsFromHistory(
      plan should restart them. */
   const lastAt: LiftAnchors = new Map();
   const lastOn = new Map<string, string>();
+  /* The last day each lift was trained, made or missed, for the time-off check below. */
+  const lastTrained = new Map<string, string>();
   /* THE HEAVIEST SET AT EACH REP COUNT, kept as itself. A single number per
      lift means every week of the wave is an extrapolation from one set —
      usually the athlete's best high-rep set, because that is what estimates
@@ -342,6 +365,9 @@ export function bestsFromHistory(
   ordered.forEach((record, order) => (record.topSets || []).forEach(set => {
     if (!set.lift || !set.weight || !set.reps) return;
     const key = canonicalLiftKey(set.lift);
+    /* A missed set is still a day under the bar: it ends a layoff as surely as
+       a completed one, so it counts before the miss bookkeeping returns. */
+    if (record.date && record.date > (lastTrained.get(key) || '')) lastTrained.set(key, record.date);
     /* A MISS BELONGS TO THE REP COUNT THAT WAS ASKED FOR, not the one the
        athlete managed. Asked for a double and got a single is a miss at the
        DOUBLE, and the double is the load the back-off has to drop. A set with
@@ -384,6 +410,26 @@ export function bestsFromHistory(
     if (set.weight > (byReps.get(reps) || 0)) byReps.set(reps, set.weight);
     anchors.set(key, byReps);
   }));
+  /* TIME OFF IS NOT FREE. A lift last trained five weeks ago was prescribed
+     from the numbers of five weeks ago, as if nothing had happened in
+     between — and the first session back is exactly where a too-heavy bar
+     turns into three misses and a back-off, or an injury. Strength fades
+     slowly but it fades: from three weeks off the loads ease 5%, from five
+     weeks 10%, from eight weeks 15%. The ease is applied to what the
+     prescription is written from — the working max, the per-rep anchors and
+     the last completed loads — so every surface eases together, and the first
+     set logged back resets the clock. A Real 1RM single is left alone: it is
+     a fact about what was lifted, not a prescription. */
+  const returning = new Map<string, { factor: number; daysOff: number }>();
+  const todayMs = new Date(`${todayIso}T12:00:00`).getTime();
+  for (const [key, last] of lastTrained) {
+    const daysOff = Math.floor((todayMs - new Date(`${last}T12:00:00`).getTime()) / 86400000);
+    const factor = daysOff >= 56 ? 0.85 : daysOff >= 35 ? 0.9 : daysOff >= 21 ? 0.95 : 1;
+    if (factor === 1) continue;
+    returning.set(key, { factor, daysOff });
+    if (bests.has(key)) bests.set(key, bests.get(key)! * factor);
+    for (const map of [anchors.get(key), lastAt.get(key)]) map?.forEach((weight, reps) => map.set(reps, weight * factor));
+  }
   /* A LIFT WITH NO LOGGED SET TAKES THE ATHLETE'S STARTING NUMBER, if they
      gave one in setup. It fills the best and the anchor at that rep count
      only: no session is counted and no single is recorded, so the wave starts
@@ -398,7 +444,7 @@ export function bestsFromHistory(
     anchors.set(key, new Map([[Math.min(Math.max(Math.round(start.reps), 1), 10), start.weight]]));
   }
   const sessions = new Map([...sessionDays].map(([key, days]) => [key, days.size] as const));
-  return { bests, singles, anchors, sessions, misses, lastAt };
+  return { bests, singles, anchors, sessions, misses, lastAt, returning };
 }
 
 /* Every lift's heaviest set at each rep count, 1-10. */
@@ -549,7 +595,11 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const phaseBlockWeeks = Math.max(1, Number(block?.blockWeeks) || 10);
   const goalPaceForPhase = Math.max(0, Number(athlete.goalPaceSecondsPerMile) || 0);
   const storedPhase = normalizePhase(week.phase);
-  const knowsRaceDate = typeof block?.weeksToRace === 'number' && Number.isFinite(block.weeksToRace);
+  /* No race is "unknown", never "infinitely far": an Infinity here became a
+     taper that starts at week Infinity, and the walk up to it never ended —
+     the Plan tab froze in the last weeks of any block without a race. */
+  const raceIndex: number | undefined = Number.isFinite(block?.weeksToRace) ? Number(block!.weeksToRace) : undefined;
+  const knowsRaceDate = raceIndex !== undefined;
   const computedPhase: TrainingPhase = goalPaceForPhase
     ? phaseFor({
         weekIndex: phaseWeekIndex,
@@ -626,8 +676,12 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const RACE_WEEK_EASY_MILES = 4;
   const TAPER_FIRST_SHARE = 0.68;
   const TAPER_LAST_SHARE = 0.5;
+  /* A marathon's third week out is the first step down, and a small one. */
+  const TAPER_EARLY_SHARE = 0.78;
   const TAPER_LONG_SHARE = 0.6;
-  const TAPER_WEEKS_BEFORE_RACE = 2;
+  /* As long as the event needs: a week for a 5K, three for a marathon. */
+  const TAPER_WEEKS_BEFORE_RACE = eventProfileFor(Number(athlete.goalMiles) || undefined).shape.taperWeeks ?? 2;
+  const taperShareAt = (gap: number) => gap <= 1 ? TAPER_LAST_SHARE : gap === 2 ? TAPER_FIRST_SHARE : TAPER_EARLY_SHARE;
   /* What a non-long run is worth, relative to the long one. */
   const OTHER_RUN_SHARE = 0.6;
   const WEEK_ON_WEEK_MAX = 1.2;
@@ -704,8 +758,8 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      deload, or the race itself. Measured against the line, an athlete's volume
      doubled the Monday after their marathon — the curve had kept climbing
      while they raced. The same shaping is applied to the week before. */
-  const away = (index: number) => (typeof block?.weeksToRace === 'number' ? block.weeksToRace - index : Number.NaN);
-  const raceAt = typeof block?.weeksToRace === 'number' ? block.weeksToRace : Number.NaN;
+  const away = (index: number) => (raceIndex !== undefined ? raceIndex - index : Number.NaN);
+  const raceAt = raceIndex ?? Number.NaN;
   /* The volume the block had reached before it started tapering. It is the
      peak the taper steps down from, and the level training resumes at once the
      race is behind them. */
@@ -721,7 +775,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
        first week back is a recovery week off that peak; after that the normal
        climb applies, and the week-on-week limit carries them up to it. */
     if (gap < 0) return Math.min(line, peakBefore * (gap === -1 ? DELOAD_SHARE : 1));
-    if (gap > 0 && gap <= TAPER_WEEKS_BEFORE_RACE) return line * (gap <= 1 ? TAPER_LAST_SHARE : TAPER_FIRST_SHARE);
+    if (gap > 0 && gap <= TAPER_WEEKS_BEFORE_RACE) return line * taperShareAt(gap);
     return ((index + (deloadIndex - weekIndex)) % 5 + 5) % 5 === 3 ? line * DELOAD_SHARE : line;
   };
   /* AND THE CHAIN HAS TO BE CONSISTENT. Shaping one week back was not enough:
@@ -767,23 +821,32 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      mileage is a statement about training, and a taper is the deliberate
      exception to it. */
   const tapering = phase === 'Taper';
-  const lastTaperWeek = typeof block?.weeksToRace === 'number'
-    ? block.weeksToRace - weekIndex <= 1
+  const lastTaperWeek = raceIndex !== undefined
+    ? raceIndex - weekIndex <= 1
     : weekIndex >= blockWeeks - 2;
-  const taperShare = tapering ? (lastTaperWeek ? TAPER_LAST_SHARE : TAPER_FIRST_SHARE) : 1;
+  const taperShare = tapering
+    ? (raceIndex !== undefined ? taperShareAt(raceIndex - weekIndex) : lastTaperWeek ? TAPER_LAST_SHARE : TAPER_FIRST_SHARE)
+    : 1;
   /* AND IT STEPS DOWN FROM THE PEAK, not from wherever the climb had reached.
      Measured against the still-rising curve, the second taper week came out
      bigger than the first — a taper that went back up. The base is the last
      week before the taper began, for every taper week, so the steps can only
      descend. */
-  const taperStart = typeof block?.weeksToRace === 'number'
-    ? Math.max(0, block.weeksToRace - TAPER_WEEKS_BEFORE_RACE)
+  const taperStart = raceIndex !== undefined
+    ? Math.max(0, raceIndex - TAPER_WEEKS_BEFORE_RACE)
     : Math.max(0, blockWeeks - 1 - TAPER_WEEKS_BEFORE_RACE);
-  const taperBase = tapering ? climbAt(taperStart - 1) : 0;
+  /* The base is the week actually run before the taper — the climb's line
+     where it was reached, the rate-limited week where it was not — so every
+     taper week steps down from the same number. */
+  const taperBase = tapering ? Math.min(climbAt(taperStart - 1), taperStart > 0 ? shapedSeries(taperStart - 1) : climbAt(taperStart - 1)) : 0;
   const target = racing && raceMiles
     ? round1(raceMiles + RACE_WEEK_EASY_MILES)
     : tapering
-      ? round1(Math.min(chosen, climb, previousWeek, taperBase) * taperShare)
+      /* Measured against the base, not against last week. Inside a three-week
+         taper last week is already cut, and capping by it again compounded
+         the cuts — and where last week was rate-limited and this one was not,
+         the taper stepped back up. */
+      ? round1(Math.min(chosen, climb, taperBase) * taperShare)
       : clampMiles(round1(deloading ? Math.min(chosen, climb, previousWeek) * DELOAD_SHARE : chosen));
 
   /* THE WEEK'S REAL BUDGET, decided before anything is sized against it. The
@@ -803,8 +866,10 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   /* And durability stops growing in a taper: a long-run personal best nine
      days before a race is not a taper, it is a race nobody entered. */
   const taperingNow = phase === 'Taper';
+  /* Held where the taper began, so a three-week taper's long runs only come
+     down; measured from this week, the second taper week's ran longer. */
   const longCap = taperingNow
-    ? longRunCap(longestKnown, Math.max(0, weekIndex - 2)) * TAPER_LONG_SHARE
+    ? longRunCap(longestKnown, Math.max(0, Math.min(weekIndex, taperStart) - 2)) * TAPER_LONG_SHARE
     : longRunCap(longestKnown, weekIndex);
   /* A long run the athlete has already been doing is the floor for the long
      run, not a stretch goal — bounded by the week's volume, so it cannot eat
@@ -1468,12 +1533,11 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
   return { ...resolved, topSets, adjusted };
 }
 
-/* How many plan weeks remain from today. Week 1 starts at startDate. */
-export const weeksRemaining = (stored: StoredAiPlan): number => {
-  const start = new Date(`${stored.startDate}T12:00:00`).getTime();
-  const elapsed = Math.floor((Date.now() - start) / 604800000);
-  return stored.plan.weeks.length - elapsed;
-};
+/* How many plan weeks remain from today. Week 1 starts at startDate. Counted
+   in calendar days, as blockIsOver is: from the clock, the Plan tab said the
+   block was still running until noon on the morning Today had moved on. */
+export const weeksRemaining = (stored: StoredAiPlan): number =>
+  stored.plan.weeks.length - Math.floor((new Date(`${localDayIso()}T12:00:00`).getTime() - new Date(`${stored.startDate}T12:00:00`).getTime()) / 604800000);
 
 /* The plan week that covers today (clamped into the block). This is a CALENDAR
    position and nothing else: week 1 is the week of startDate, and today is
@@ -1501,6 +1565,56 @@ export const weekIndexOn = (stored: StoredAiPlan, dayIso: string): number => {
    a max week / what rep count is this" asks here. */
 export const waveIndexOf = (stored: Pick<StoredAiPlan, 'waveOffset'>, weekIndex: number): number =>
   weekIndex + (stored.waveOffset || 0);
+
+/* THE FIRST DAY THE BLOCK NO LONGER COVERS. currentWeekIndex clamps into the
+   block, so on the day after week 10 ends it still answers "week 10" — which
+   is right for the Plan tab's scroll position and wrong for everything that
+   asks what to do TODAY. Today kept handing out the last week's max single
+   and taper runs, and the coach kept quoting "week 10 of 10" as the current
+   week, while the Plan tab said the block was complete. Every surface that
+   prescribes asks this first. */
+export const blockEndIso = (stored: Pick<StoredAiPlan, 'startDate' | 'plan'>): string => {
+  const end = new Date(`${stored.startDate}T12:00:00`);
+  end.setDate(end.getDate() + stored.plan.weeks.length * 7);
+  return localDayIso(end);
+};
+export const blockIsOver = (stored: Pick<StoredAiPlan, 'startDate' | 'plan'>, dayIso = localDayIso()): boolean =>
+  dayIso >= blockEndIso(stored);
+
+/* HOW LONG EACH GOAL HAS LEFT, in weeks of the block that starts on
+   `startDate` — the race is the next one that is neither past nor a tune-up,
+   the lift goal the nearest one not yet due. The Plan tab worked this out for
+   itself and Today and the coach never did, so a week where the race and a
+   max attempt collided was a heavy double on Plan and a 1RM attempt on Today,
+   and only Plan tapered to the race date. */
+export function goalHorizons(goals: EnduranceGoalRef[], startDate: string, todayIso = localDayIso()): { weeksToRace: number; weeksToLiftGoal: number } {
+  const race = nextRace(goals, todayIso);
+  const lift = goals
+    .filter(goal => goal.type === 'Strength' && goal.date && goal.date >= todayIso)
+    .map(goal => String(goal.date))
+    .sort()[0];
+  return {
+    weeksToRace: race?.date ? raceWeekIndex(race.date, startDate) : Infinity,
+    weeksToLiftGoal: lift ? raceWeekIndex(lift, startDate) : Infinity,
+  };
+}
+
+/* WHERE A WEEK SITS, as resolvePlanWeek and resolveWeekRunning need to be
+   told it. One builder, because every field left off changes the answer: a
+   surface that omitted the horizons resolved a different taper and a
+   different max attempt from the same stored week. */
+export function planBlockFor(stored: StoredAiPlan, goals: EnduranceGoalRef[], weekIndex = currentWeekIndex(stored)) {
+  const current = currentWeekIndex(stored);
+  return {
+    weekIndex,
+    blockWeeks: stored.plan.weeks.length,
+    waveIndex: waveIndexOf(stored, weekIndex),
+    currentWaveIndex: waveIndexOf(stored, current),
+    currentWeekIndex: current,
+    liftingMaxWeek: waveSlot(waveIndexOf(stored, weekIndex)).isMax,
+    ...goalHorizons(goals, stored.startDate),
+  };
+}
 
 /* WHERE THE ATHLETE IS IN THE WAVE, read from what they logged rather than
    asked about. The most recent completed top set on a goal lift names the rung

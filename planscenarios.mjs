@@ -182,7 +182,10 @@ for (const athlete of ATHLETES) {
 
                     if (deloading && phase === 'Deload' && previous && w.mileage > previous * (runningDays <= 2 ? 1.12 : 1.02)) flag('the deload week is not lighter', `${id} → ${w.mileage} after ${previous}`);
                     if (phase === 'Taper') {
-                      if (peak > 8 && w.mileage > peak * (runningDays <= 2 ? 0.95 : 0.85)) flag('the taper does not taper', `${id} → ${w.mileage} against a peak of ${peak}`);
+                      /* The first week of a marathon's three-week taper is a small
+                         step (~80%); the 2-week limit applies from the next week. */
+                      const earlyTaper = raceAway - index >= 3;
+                      if (peak > 8 && w.mileage > peak * (runningDays <= 2 ? 0.95 : earlyTaper ? 0.9 : 0.85)) flag('the taper does not taper', `${id} → ${w.mileage} against a peak of ${peak}`);
                       if (lastTaper && w.mileage > lastTaper * 1.02) flag('the taper goes back up', `${id} → ${w.mileage} after ${lastTaper}`);
                       lastTaper = w.mileage;
                     } else if (phase !== 'Race') { peak = Math.max(peak, w.mileage); }

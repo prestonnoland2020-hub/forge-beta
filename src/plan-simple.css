@@ -104,7 +104,7 @@
    the clamp ended in "..." while the ones that did not wrapped — so the list
    had no rhythm to scan down at all. The summary is a glance, not a session:
    one line, elided, and the whole session is one tap away. */
-.pv-row-body small{color:var(--ink-2);font-size:14px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-row-body small{color:var(--ink-2);font-size:14px;line-height:1.4;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .pv-row-state{font-size:12px;font-weight:800;color:var(--ink-3);min-width:16px;text-align:right;white-space:nowrap}
 .pv-row.today{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .pv-row.today .pv-row-date b,.pv-row.today .pv-row-date small,.pv-row.today .pv-row-state{color:var(--accent-text)}

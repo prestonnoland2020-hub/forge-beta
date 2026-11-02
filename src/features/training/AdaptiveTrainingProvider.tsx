@@ -53,7 +53,7 @@ const today=localDateIso();
 const unavailableHealth=():DailyHealthSnapshot=>({date:today,provider:'Unavailable',sleepMinutes:0,acuteLoad:0,sourceUpdatedAt:new Date().toISOString()});
 const initialHistory:RunResult[]=[];
 type StoredPrefs=Omit<AdaptiveProfile,'readiness'|'sleepHours'|'strengthFatigue'|'watchConnected'>;
-type Value={profile:AdaptiveProfile;recovery:RecoveryState;health:DailyHealthSnapshot[];history:RunResult[];updateProfile:(change:Partial<StoredPrefs>)=>void;syncWearableHealth:(snapshots:DailyHealthSnapshot[])=>void;setHistory:(history:RunResult[])=>void};
+type Value={profile:AdaptiveProfile;recovery:RecoveryState;watchConnected:boolean;health:DailyHealthSnapshot[];history:RunResult[];updateProfile:(change:Partial<StoredPrefs>)=>void;syncWearableHealth:(snapshots:DailyHealthSnapshot[])=>void;setHistory:(history:RunResult[])=>void};
 const Context=createContext<Value|null>(null);
 
 export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
@@ -70,7 +70,18 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
       completed:countsAsRunVolume(distanceMiles,totals.minutes*60)}})).filter(run=>run.completed),[records]);
   const combinedHistory=useMemo(()=>{const loggedIds=new Set(loggedRunHistory.map(run=>run.id));return[...history.filter(run=>!loggedIds.has(run.id)),...loggedRunHistory].sort((a,b)=>b.date.localeCompare(a.date))},[history,loggedRunHistory]);
   const strengthLoad=useMemo(()=>{const cutoff=Date.now()-7*86400000;const effortLoad:Record<string,number>={Easy:2,Moderate:3,Hard:5,'Max effort':7};return records.filter(record=>record.lift&&new Date(`${record.date}T12:00:00`).getTime()>=cutoff).reduce((sum,record)=>sum+(effortLoad[record.effort||'']||3),0)},[records]);
-  const latest=health[health.length-1]||unavailableHealth();
+  /* TODAY'S READING, OR NONE. The newest snapshot was read whatever its age,
+     so a watch that last synced a week ago kept setting today's readiness from
+     that morning. Garmin dates sleep by the morning it ends, so today's or
+     yesterday's snapshot counts; anything older is no reading at all. */
+  const newest=health[health.length-1];
+  const ageOf=(date:string)=>Math.round((new Date(`${localDateIso(new Date())}T12:00:00`).getTime()-new Date(`${date}T12:00:00`).getTime())/86400000);
+  const latest=newest&&newest.provider!=='Unavailable'&&ageOf(newest.date)<=1?newest:unavailableHealth();
+  /* A WATCH THAT IS SENDING DATA ANSWERS "HOW DO YOU FEEL" ITSELF. While one
+     has synced in the last three days, the coach stops asking and readiness
+     comes from sleep, HRV and resting heart rate. A watch that has gone quiet
+     longer than that is not answering, so the question comes back. */
+  const watchConnected=Boolean(newest&&newest.provider!=='Unavailable'&&ageOf(newest.date)<=3);
   /* THE ATHLETE'S OWN ANSWER IS PART OF THE RECOVERY STATE, not a second
      opinion sitting beside it. Everything downstream — the volume scale, the
      hold on load when fatigue is high, the repeat-instead-of-progress rule —
@@ -91,7 +102,7 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
        running still overrides the stated figures where there is any, because
        what someone has actually run outranks what they once typed. */
     const stated={runningDays:Number(setup?.runningDays)||prefs.runningDays,statedWeekly:Number(setup?.weeklyMileage)||prefs.weeklyMileage,statedLongest:Number(setup?.longestRun)||prefs.longestRunMiles};
-    return{...prefs,runningDays:stated.runningDays,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):stated.statedWeekly,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):stated.statedLongest,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected:latest.provider!=='Unavailable'}},[prefs,recovery,latest,loggedRunHistory,setup]);
+    return{...prefs,runningDays:stated.runningDays,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):stated.statedWeekly,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):stated.statedLongest,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected}},[prefs,recovery,latest,loggedRunHistory,setup,watchConnected]);
   useEffect(()=>localStorage.setItem('forge-training-preferences',JSON.stringify(prefs)),[prefs]);
   useEffect(()=>localStorage.setItem('forge-run-history',JSON.stringify(history)),[history]);
   /* RECOVERY ON LAUNCH, NOT ON A VISIT TO PROFILE. Garmin pushes sleep, HRV
@@ -102,6 +113,6 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
   const {user}=useAuth();
   useEffect(()=>{if(isDemoMode||!user)return;let live=true;void loadGarminHealth().then(days=>{if(live&&days.length)syncWearableHealth(days)}).catch(()=>undefined);return()=>{live=false}},[user?.id]);
   const syncWearableHealth=(snapshots:DailyHealthSnapshot[])=>{const verified=snapshots.filter(item=>item.provider!=='Unavailable');const next=verified.length?verified.sort((a,b)=>a.date.localeCompare(b.date)):[unavailableHealth()];setHealth(next);if(verified.length)localStorage.setItem('forge-health-snapshots',JSON.stringify(next));else localStorage.removeItem('forge-health-snapshots')};
-  return <Context.Provider value={{profile,recovery,health,history:combinedHistory,updateProfile:change=>setPrefs(value=>({...value,...change})),syncWearableHealth,setHistory}}>{children}</Context.Provider>
+  return <Context.Provider value={{profile,recovery,watchConnected,health,history:combinedHistory,updateProfile:change=>setPrefs(value=>({...value,...change})),syncWearableHealth,setHistory}}>{children}</Context.Provider>
 }
 export function useAdaptiveTraining(){const value=useContext(Context);if(!value)throw new Error('useAdaptiveTraining must be used inside AdaptiveTrainingProvider');return value}

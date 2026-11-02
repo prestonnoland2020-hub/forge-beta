@@ -281,3 +281,15 @@
 .top-set-entry.swiped .top-set-delete{display:block}
 .top-set-delete:active{filter:brightness(.92)}
 .logged-top-set-actions .text-button.danger{color:var(--bad)}
+/* The synced-day popup asks what the log page asks, as three numbered steps. */
+.strava-review-step{display:grid;gap:8px;min-width:0}
+.strava-review-step .field-caption{font-weight:800;font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.strava-review-choices{display:flex;flex-wrap:wrap;gap:8px}
+.strava-review-choices .muscle-chip{max-width:100%;overflow-wrap:anywhere;text-align:left}
+.strava-review-sets{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.strava-review-sets li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;background:var(--surface-sunken)}
+.strava-review-sets li span{min-width:0;overflow-wrap:anywhere;font-weight:700}
+.strava-review-sets li small{color:var(--good);font-weight:700}
+/* Side by side, "Looks right" and "Save this day" each broke onto two lines
+   at phone width; stacked, each reads as one. */
+@media (max-width:420px){.strava-review-sheet footer{grid-template-columns:1fr}}

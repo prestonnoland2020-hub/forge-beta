@@ -18,7 +18,12 @@ check('past ten reps the estimate stops climbing', calculateEstimatedOneRepMax(1
 
 /* 2. Preston's squat: 415x8 all-out, a real 480 single. */
 const day = (date, lift, weight, reps) => ({ topSets: [{ lift, weight, reps, completed: true }], date });
-const { bests, anchors } = bestsFromHistory([day('2026-08-20', 'Squat', 415, 8), day('2026-07-02', 'Squat', 480, 1)]);
+/* THE DAY AFTER THE LAST SESSION. Loads ease after three weeks off, so a
+   fixture dated months ago would be read as a lifter coming back from a break
+   unless "today" is pinned to the history it describes. */
+const dayAfter = recs => { const last = recs.map(r => r.date).sort().pop(); const d = new Date(`${last}T12:00:00`); d.setDate(d.getDate() + 1); return d; };
+const fresh = recs => bestsFromHistory(recs, dayAfter(recs).toISOString().slice(0, 10));
+const { bests, anchors } = fresh([day('2026-08-20', 'Squat', 415, 8), day('2026-07-02', 'Squat', 480, 1)]);
 const squat = anchors.get('squat');
 const at = reps => Math.ceil(loadFromAnchors(squat, bests.get('squat'), reps, 5) / 5) * 5;
 check('the 8-rep week asks one step past the set he did', at(8) === 420, `${at(8)}`);
@@ -27,16 +32,16 @@ check('the 4-rep week sits between his two anchors', at(4) > at(6) && at(4) < at
 check('the wave still descends 8 -> 2', at(8) < at(6) && at(6) < at(4), `${at(8)}/${at(6)}/${at(4)}`);
 
 /* 3. An old light set at one rep count never holds back a stronger lifter. */
-const stale = bestsFromHistory([day('2024-01-01', 'Bench', 185, 8), day('2026-08-01', 'Bench', 315, 2)]);
+const stale = fresh([day('2024-01-01', 'Bench', 185, 8), day('2026-08-01', 'Bench', 315, 2)]);
 const bench = stale.anchors.get('bench');
 const benchAt = reps => Math.ceil(loadFromAnchors(bench, stale.bests.get('bench'), reps, 5) / 5) * 5;
 check('a stale 185x8 does not write the 8-rep week', benchAt(8) > 240, `${benchAt(8)}`);
 
 /* 3b. Repeating a rep count moves the bar; missing it holds the bar. */
-const climb = bestsFromHistory([day('2026-08-01', 'Squat', 460, 4)]).anchors.get('squat');
+const climb = fresh([day('2026-08-01', 'Squat', 460, 4)]).anchors.get('squat');
 const climbAt = reps => Math.ceil(loadFromAnchors(climb, 502, reps, 5) / 5) * 5;
 check('coming back to 4 reps asks for 465, not 460', climbAt(4) === 465, `${climbAt(4)}`);
-const missed = bestsFromHistory([day('2026-08-01', 'Squat', 460, 4), day('2026-09-01', 'Squat', 465, 3)]).anchors.get('squat');
+const missed = fresh([day('2026-08-01', 'Squat', 460, 4), day('2026-09-01', 'Squat', 465, 3)]).anchors.get('squat');
 check('a missed rep holds the 4-rep week at 465', Math.ceil(loadFromAnchors(missed, 502, 4, 5) / 5) * 5 === 465);
 
 /* 4. With no anchors at all, the calculated max still stands in. */
@@ -44,7 +49,7 @@ check('a lift with no history falls back to the curve', Math.round(loadFromAncho
 
 /* 4b. A stale single does not cap max week when the rep work has moved on,
    and a runaway estimate cannot ask for a tenth of a PR in one session. */
-const stalest = bestsFromHistory([
+const stalest = fresh([
   day('2026-06-01', 'Squat', 475, 1), day('2026-09-04', 'Squat', 460, 4), day('2026-08-16', 'Squat', 408, 8),
 ]);
 const attemptFor = single => wavePrescription(stalest.bests.get('squat'), 4, { bestSingle: single, tests: true, anchors: stalest.anchors.get('squat') }).weight;
@@ -52,7 +57,7 @@ check('recent fours push the attempt past a spring single', attemptFor(475) > 49
 check('and the jump is capped at a tenth of the single', attemptFor(300) <= 330, `${attemptFor(300)}`);
 
 /* 4c. A ten-week block climbs instead of repeating itself. */
-const blockAnchors = bestsFromHistory([day('2026-09-04', 'Squat', 460, 4), day('2026-08-16', 'Squat', 408, 8)]);
+const blockAnchors = fresh([day('2026-09-04', 'Squat', 460, 4), day('2026-08-16', 'Squat', 408, 8)]);
 const week = (wave, project) => wavePrescription(blockAnchors.bests.get('squat'), wave, { bestSingle: 475, tests: wave % 5 === 4, anchors: blockAnchors.anchors.get('squat'), projectSteps: project }).weight;
 check('the second pass at 8 reps is heavier than the first', week(5, 1) > week(0, 0), `${week(0, 0)} -> ${week(5, 1)}`);
 check('the second max week is heavier than the first', week(4, 0) < week(9, 1), `${week(4, 0)} -> ${week(9, 1)}`);

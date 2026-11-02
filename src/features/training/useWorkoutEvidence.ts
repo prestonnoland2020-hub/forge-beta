@@ -61,6 +61,6 @@ export function useWorkoutEvidence(): Effort[] {
       goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
       goalMiles: runGoal?.miles,
       paces: basePaces,
-    }, localDayIso()));
-  }, [records, stored, setup, runGoal, basePaces]);
+    }, localDayIso(), undefined, goals));
+  }, [records, stored, setup, runGoal, basePaces, goals]);
 }
