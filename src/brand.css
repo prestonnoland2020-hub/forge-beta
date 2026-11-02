@@ -90,14 +90,14 @@
   --line: var(--hairline);
   border-radius: var(--r-lg);
   border-color: transparent !important;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card) !important;
   corner-shape: superellipse(1.4);
   line-height: 1.4;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :is(.card, .feed-card, .form-card, .compact-card, .kpi-tile, .gx-card, .gx-hero, .gx-empty, .td-card, .partners-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections) { box-shadow: none; }
+  :root:not([data-theme="light"]) :is(.card, .feed-card, .form-card, .compact-card, .kpi-tile, .gx-card, .gx-hero, .gx-empty, .td-card, .partners-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections) { box-shadow: none !important; }
 }
-:root[data-theme="dark"] :is(.card, .feed-card, .form-card, .compact-card, .kpi-tile, .gx-card, .gx-hero, .gx-empty, .td-card, .partners-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections) { box-shadow: none; }
+:root[data-theme="dark"] :is(.card, .feed-card, .form-card, .compact-card, .kpi-tile, .gx-card, .gx-hero, .gx-empty, .td-card, .partners-card, .recommendation-card, .day-editor-panel, .plan-day-list, .plan-studio-header, .simple-profile-head, .simple-settings-list, .simple-connections) { box-shadow: none !important; }
 
 /* Buttons: radius 14, label 18 bold at every size, M by default. Press is
    0.97 in 90 ms on the Strike curve. */
@@ -198,22 +198,22 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
    between the sides on the Strike curve, so it reads as one control with a
    state rather than two buttons. */
 .gx-mode { display: grid; gap: var(--s2); }
-.gx-mode-label { font: 700 var(--fs-label) var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.gx-mode-label { font: 600 var(--fs-label) var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
 .gx-mode-track {
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding: 4px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-pill);
+  border: 0;
+  border-radius: var(--r-md);
   background: var(--surface-sunken);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / .12);
+  box-shadow: none;
 }
 .gx-mode-thumb {
   position: absolute;
   top: 4px; bottom: 4px; left: 4px;
   width: calc(50% - 4px);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   background: var(--accent-strong);
   box-shadow: 0 2px 6px rgb(0 0 0 / .22);
   transition: transform var(--dur-standard) var(--ease-strike);
@@ -224,7 +224,7 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
   z-index: 1;
   min-height: 44px;
   border: 0;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--ink-2);
   font: 700 var(--fs-body) var(--body);
@@ -404,3 +404,36 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 }
 /* Wider than 900px the sidebar carries the mark; the header would repeat it. */
 @media (min-width: 901px) { .top-brand { display: none; } }
+
+/* ---- One look on every screen ----------------------------------------------
+   Rules above that older page stylesheets had drifted from. A card's inside is
+   16 on a phone (the opening card of a screen, 24); every small caps label is
+   the guide's one label; every stat a card shows is the Numeral role. */
+@media (max-width: 600px) {
+  .page .card { padding: var(--s4); }
+  .gx-hero { padding: var(--s5); }
+}
+.pv > section.pv-week > header h3, .classic-calendar .calendar-kpis span, .simple-profile-stats span {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.gx-target, .simple-profile-stats strong, .classic-calendar .calendar-kpis strong {
+  font-family: var(--display) !important;
+  font-style: italic !important;
+  font-weight: 800 !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+/* The profile's numbers are a card like the ones around them, not a ruled box. */
+.simple-profile-stats {
+  border-color: transparent !important;
+  border-radius: var(--r-lg) !important;
+  background-color: var(--surface-1);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .simple-profile-stats { box-shadow: none; } }
+:root[data-theme="dark"] .simple-profile-stats { box-shadow: none; }
