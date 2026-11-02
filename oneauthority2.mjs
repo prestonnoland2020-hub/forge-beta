@@ -18,13 +18,16 @@ const mk = (date, lift, weight, reps) => ({ id: date + lift, date, title: 'Legs'
   topSets: [{ id: date + lift + 't', muscle: 'Quads', lift, weight, reps, completed: true, calculatedMax: calculateEstimatedOneRepMax(weight, reps) }],
   lift, weight, reps, calculatedMax: calculateEstimatedOneRepMax(weight, reps), hasCardio: false, cardioSessions: [] });
 const ADAM = [mk('2026-09-02', 'Squat', 255, 2), mk('2026-08-18', 'Squat', 225, 10), mk('2026-08-10', 'Squat', 245, 3), mk('2026-07-30', 'Squat', 235, 3)];
+/* Pinned to the day after his last session: loads ease after three weeks off,
+   and this fixture is about what he lifted, not a break. */
+const TODAY = new Date('2026-09-03T12:00:00');
 const recovery = { readiness: 100, confidence: 'Low', strengthFatigue: 'Low', hardTrainingAllowed: true };
 const logger = exposures => buildTrainingIntelligence({ records: ADAM, recovery,
   templates: [{ exercise: 'Squat', calculatedMax: 0, exposureIndex: exposures }],
-  goalMaxByLift: { squat: 315 }, loadBiasPercent: 0 }).topSets[0];
+  goalMaxByLift: { squat: 315 }, loadBiasPercent: 0, today: TODAY }).topSets[0];
 
 console.log('\n  the ten-rep set is still the highest estimate in his history');
-const { bests, anchors } = bestsFromHistory(ADAM);
+const { bests, anchors } = bestsFromHistory(ADAM, '2026-09-03');
 check('225 x 10 estimates 300', calculateEstimatedOneRepMax(225, 10) === 300);
 check('his double estimates 262', calculateEstimatedOneRepMax(255, 2) === 262);
 check('and 300 is what a single number would call his max', bests.get('squat') === 300, String(bests.get('squat')));
@@ -46,7 +49,7 @@ check('a single, above the double it replaces', maxWeek.reps === 1 && maxWeek.we
 console.log('\n  and a lift he has no goal on is not marched up to a max at all');
 const accessory = buildTrainingIntelligence({ records: ADAM, recovery,
   templates: [{ exercise: 'Squat', calculatedMax: 0, exposureIndex: 4 }],
-  goalMaxByLift: {}, loadBiasPercent: 0 }).topSets[0];
+  goalMaxByLift: {}, loadBiasPercent: 0, today: TODAY }).topSets[0];
 check('it takes a rep slot from the 12/10/8/6 cycle', [12, 10, 8, 6].includes(accessory.reps), `${accessory.weight} x ${accessory.reps}`);
 check('and never a tested single', accessory.reps !== 1);
 
