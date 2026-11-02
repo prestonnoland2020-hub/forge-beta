@@ -7,7 +7,7 @@ import { formatCardioSummary, type CardioLogDraft } from '../lib/cardioSession';
 import { markStravaReviewed, pendingStravaReviews, stravaReviewHasStrength, stravaReviewSource, cardioClass } from '../features/training/stravaImportService';
 import { sessionLength } from '../lib/time';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
-import { splitDayKey } from '../lib/liftAliases';
+import { sameLift, splitDayKey } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { primaryMusclesFor } from '../lib/liftAliases';
 import { DialField } from './NumberDial';
@@ -301,7 +301,7 @@ export function StravaReviewModal() {
         <label>{loggedTopSets.length || sets.length ? 'Another top set' : 'Lift'}
           <select value={lift} onChange={event => setLift(event.target.value)}>
             <option value="">{loggedTopSets.length || sets.length ? 'No more' : 'No top set'}</option>
-            {liftOptions.filter(name => !allSets.some(set => set.lift === name) || name === lift).map(name => <option key={name}>{name}</option>)}
+            {liftOptions.filter(name => !allSets.some(set => sameLift(set.lift, name)) || name === lift).map(name => <option key={name}>{name}</option>)}
           </select>
         </label>
         {lift && <div className="strava-review-numbers">

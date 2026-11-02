@@ -16,9 +16,13 @@ const recovery = { readiness: 100, confidence: 'Low', strengthFatigue: 'Low', ha
 /* A SQUAT GOAL, because this is a test about the 8/6/4/2/1 wave and a lift
    with no goal on it does not run that wave — it runs the 12/10/8/6 accessory
    cycle, which is tested separately. */
+/* THE DAY AFTER THE LAST SESSION. Loads ease after three weeks off, so a
+   fixture dated months ago would be read as a lifter coming back from a break
+   unless "today" is pinned to the history it describes. */
+const dayAfter = recs => { const last = recs.map(r => r.date).sort().pop(); const d = new Date(`${last}T12:00:00`); d.setDate(d.getDate() + 1); return d; };
 const ask = (records, exposures = 3) => buildTrainingIntelligence({ records, recovery,
   templates: [{ exercise: 'Squat', calculatedMax: 0, exposureIndex: exposures }],
-  goalMaxByLift: { squat: 400 }, loadBiasPercent: 0 }).topSets[0];
+  goalMaxByLift: { squat: 400 }, loadBiasPercent: 0, today: dayAfter(records) }).topSets[0];
 
 const BASE = [mk('2026-09-02', 255, 2), mk('2026-08-18', 225, 10), mk('2026-08-10', 245, 3), mk('2026-07-30', 235, 3)];
 

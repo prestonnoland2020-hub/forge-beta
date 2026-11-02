@@ -5,6 +5,7 @@ import { calculateEstimatedOneRepMax } from './strength';
 import { canonicalLiftKey, sameLift } from './liftAliases';
 import { bestsFromHistory } from '../features/training/aiPlanService';
 import { startingNumbers } from './startingNumbers';
+import { localDayIso } from './time';
 /* One Epley, and it treats a logged single as itself rather than inflating
    405x1 into a 419 max. */
 const epleyMax=(weight:number,reps:number)=>calculateEstimatedOneRepMax(weight,reps)||0;
@@ -53,7 +54,7 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
   /* Every lift's heaviest set at each rep count. The Plan tab has always
      written its loads from these; the logger did not, and the two screens
      disagreed by forty pounds on the same lift on the same morning. */
-  const {anchors:liftAnchors,singles:liftSingles,sessions:liftSessions,misses:liftMisses,lastAt:liftLastAt}=bestsFromHistory(records);
+  const {anchors:liftAnchors,singles:liftSingles,sessions:liftSessions,misses:liftMisses,lastAt:liftLastAt}=bestsFromHistory(records,localDayIso(today));
 
   const topSets=templates.map(template=>{
     const logged=strengthResults(records).filter(record=>sameLift(record.lift,template.exercise)&&record.weight&&record.reps).sort((a,b)=>b.date.localeCompare(a.date)||(b.calculatedMax??epleyMax(b.weight,b.reps))-(a.calculatedMax??epleyMax(a.weight,a.reps)));

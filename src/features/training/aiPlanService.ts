@@ -326,7 +326,7 @@ export function bestsFromHistory(
      plan should restart them. */
   const lastAt: LiftAnchors = new Map();
   const lastOn = new Map<string, string>();
-  /* The last day each lift was actually completed, for the time-off check below. */
+  /* The last day each lift was trained, made or missed, for the time-off check below. */
   const lastTrained = new Map<string, string>();
   /* THE HEAVIEST SET AT EACH REP COUNT, kept as itself. A single number per
      lift means every week of the wave is an extrapolation from one set —
@@ -345,6 +345,9 @@ export function bestsFromHistory(
   ordered.forEach((record, order) => (record.topSets || []).forEach(set => {
     if (!set.lift || !set.weight || !set.reps) return;
     const key = canonicalLiftKey(set.lift);
+    /* A missed set is still a day under the bar: it ends a layoff as surely as
+       a completed one, so it counts before the miss bookkeeping returns. */
+    if (record.date && record.date > (lastTrained.get(key) || '')) lastTrained.set(key, record.date);
     /* A MISS BELONGS TO THE REP COUNT THAT WAS ASKED FOR, not the one the
        athlete managed. Asked for a double and got a single is a miss at the
        DOUBLE, and the double is the load the back-off has to drop. A set with
@@ -375,7 +378,6 @@ export function bestsFromHistory(
       byRepsLast.set(repSlot, set.weight);
       lastAt.set(key, byRepsLast);
     }
-    if (record.date && record.date > (lastTrained.get(key) || '')) lastTrained.set(key, record.date);
     const days = sessionDays.get(key) || new Set<string>();
     days.add(dayKey);
     sessionDays.set(key, days);
