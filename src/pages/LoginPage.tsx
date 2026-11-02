@@ -64,7 +64,6 @@ export function LoginPage() {
     <main className="login-page">
       <a className="login-brand" href="#/" aria-label="Forge home">
         <ForgeStrikeMark />
-        <span className="strike-word"><span>F</span><span>O</span><span>R</span><span>G</span><span>E</span></span>
       </a>
 
       <section className="login-card" aria-labelledby="login-title">
