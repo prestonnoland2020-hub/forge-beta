@@ -391,11 +391,21 @@ export function bestsFromHistory(
        latest one — later records only replace it if their date is genuinely
        newer, which covers a caller that has not sorted. */
     const stamp = record.date || '';
-    const seenOn = lastOn.get(settledKey);
+    /* "THE LAST LOAD COMPLETED AT 6" HAS TO BE A SET OF 6. A set filed under
+       the reps it was ASKED for was right for misses and wrong here: asked for
+       265×6 on a sick day, the athlete did 160×10 — and that 160 became the
+       last completed 6, so three near-misses at 265×5 backed the plan off to
+       160×6, a hundred pounds below anything they had failed. A set that did
+       not answer the prescription is filed under the reps it actually was. */
+    const lastSlot = set.prescribedReps && !answeredThePlan(set.prescribedReps, set.reps)
+      ? Math.min(Math.max(Math.round(set.reps), 1), PRESCRIPTION_REP_CAP)
+      : repSlot;
+    const lastKey = `${key}|${lastSlot}`;
+    const seenOn = lastOn.get(lastKey);
     if (seenOn === undefined || stamp > seenOn) {
-      lastOn.set(settledKey, stamp);
+      lastOn.set(lastKey, stamp);
       const byRepsLast = lastAt.get(key) || new Map<number, number>();
-      byRepsLast.set(repSlot, set.weight);
+      byRepsLast.set(lastSlot, set.weight);
       lastAt.set(key, byRepsLast);
     }
     const days = sessionDays.get(key) || new Set<string>();
