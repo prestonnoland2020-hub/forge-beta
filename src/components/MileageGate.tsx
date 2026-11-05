@@ -92,17 +92,23 @@ export function MileageGate({ onChanged }: { onChanged?: (next: { minWeeklyMilea
   const show = (miles: number) => Math.round(metric ? miles * 1.609344 : miles);
   const gap = useMemo(() => mileageGap(goals, records, setup), [goals, records, setup]);
 
-  if (!gap || done) return null;
+  /* ONE "LEAVE IT" FOR EVERY PLACE THIS IS SAID. The startup dialog
+     remembered a dismissal until the numbers behind it changed; this card,
+     the same ask on Plan, forgot it the moment the athlete left the tab — so
+     "Build the ramp" was back on every visit to Plan, after being answered on
+     the way in. Both read and write the same answer now. */
+  if (!gap || done || alreadyAsked(fingerprintOf(gap))) return null;
+  const answer = () => { rememberAsked(fingerprintOf(gap)); setDone(true); };
   /* The new bounds go back to the caller too: the Plan tab keeps its own
      copy of the range, and a setup-only change was overwritten by it. */
-  const commit = (next: typeof setup) => { if (next) saveSetup(next); setDone(true); onChanged?.(next || null); };
+  const commit = (next: typeof setup) => { if (next) saveSetup(next); answer(); onChanged?.(next || null); };
 
   return <GateCard
     gap={gap} unit={unit} show={show}
     heading="Not enough running for this goal"
     onBuild={() => commit(setup && applyMileageRamp(setup, gap))}
     onMinimum={() => commit(setup && applyMileageGap(setup, gap))}
-    onDismiss={() => setDone(true)} />;
+    onDismiss={answer} />;
 }
 
 /* THE SAME ANSWER AT THE MOMENT THE GOAL IS MADE.
