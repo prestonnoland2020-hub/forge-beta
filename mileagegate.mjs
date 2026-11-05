@@ -11,7 +11,7 @@
    point. This pins which alert fires, what it offers, and that accepting it
    never writes an unsafe number. */
 import { mileageGap, applyMileageGap, applyMileageRamp, CEILING_HEADROOM } from './src/lib/mileageGap.ts';
-import { goalFeasibility } from './src/lib/goalFeasibility.ts';
+import { goalFeasibility, volumeForRace } from './src/lib/goalFeasibility.ts';
 
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
@@ -137,17 +137,31 @@ check('and neither appears when there is nothing to say',
   bothPending(false, false).mileageShows === false && bothPending(false, false).checkInShows === false);
 
 console.log('\nPreston\'s live account, exactly as stored');
-/* weeklyMileage 17, min 2, max 40; five endurance goals. The hungriest is the
-   sub-5 mile, which needs about 45 a week against a ceiling of 40 — a
-   contradiction he cannot train his way out of without raising the ceiling. */
+/* weeklyMileage 17, min 2; a sub-5 mile and a sub-19 5K. The hungriest is the
+   sub-5 mile, which needs about 25 a week — so a ceiling of 20 is a
+   contradiction he cannot train his way out of without raising it. (It was
+   once told 45, a 5K figure read off a mile pace; see volumeForRace.) */
+const HIS_MILE = { id: 'm', title: 'Mile goal', type: 'Endurance', target: '4:59', metric: 'Mile time', date: ahead(15) };
 const his = mileageGap(
   [{ id: 'm', title: 'Mile goal', type: 'Endurance', target: '4:59', metric: 'Mile time', date: ahead(15) },
    { id: 'k', title: '5K goal', type: 'Endurance', target: '18:59', metric: '5K time', date: ahead(15) }],
-  running(4), { weeklyMileage: 17, minWeeklyMileage: 2, maxWeeklyMileage: 40 });
+  running(4), { weeklyMileage: 17, minWeeklyMileage: 2, maxWeeklyMileage: 20 });
 check('his account has something to say', Boolean(his), `${his?.kind} → ${his?.target}`);
 check('and it is the ceiling, not the ramp', his?.kind === 'ceiling', `${his?.needed} needed vs ${his?.ceiling} ceiling`);
 check('the hungriest goal is the one that speaks', /Mile/.test(his?.goal || ''), his?.goal);
 check('and the offer clears what the goal needs', his.target > his.ceiling, `${his.ceiling} → ${his.target}`);
+
+console.log('\nThe volume a goal needs depends on the race, not only its pace');
+/* "Build the ramp" asked for 45 miles a week for a 4:59 mile, on every visit
+   to Plan, against a ceiling of 25. A mile is mostly speed. */
+const atCeiling = mileageGap([HIS_MILE], running(4), { weeklyMileage: 17, minWeeklyMileage: 15, maxWeeklyMileage: 25 });
+check('a 4:59 mile under a 25-mile ceiling is not a ceiling problem', atCeiling?.kind !== 'ceiling', `${atCeiling?.kind} needs ${atCeiling?.needed}`);
+check('a sub-5 mile needs well under 45', volumeForRace(299, 1) <= 30, String(volumeForRace(299, 1)));
+check('a sub-19 5K still needs about 22', volumeForRace(367, 3.10686) === 22, String(volumeForRace(367, 3.10686)));
+check('a marathon at the same pace as a 5K needs more than the 5K', volumeForRace(367, 26.2188) > volumeForRace(367, 3.10686) * 1.5,
+  `${volumeForRace(367, 26.2188)} vs ${volumeForRace(367, 3.10686)}`);
+check('a 3:00 marathon needs more than a 1:30 half', volumeForRace(412, 26.2188) > volumeForRace(412, 13.1094),
+  `${volumeForRace(412, 26.2188)} vs ${volumeForRace(412, 13.1094)}`);
 
 console.log('\nAnd doing what it asks turns it off');
 /* "I already clicked into it and changed it — why is it still here?"
@@ -186,7 +200,7 @@ check('it does not offer a floor it knows will not arrive', rushed === null, `${
 check('and the goal verdict is the one that speaks instead',
   goalFeasibility(soon, hisLog, { maxWeeklyMileage: 50 })[0]?.verdict === 'out-of-reach');
 check('a ceiling below the goal still outranks everything',
-  mileageGap(HIS_GOALS, hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 30 })?.kind === 'ceiling');
+  mileageGap(HIS_GOALS, hisLog, { weeklyMileage: 17, minWeeklyMileage: 15, maxWeeklyMileage: 20 })?.kind === 'ceiling');
 check('and a goal with room and time says nothing at all',
   mileageGap([{ id: 'e', title: 'Easy 5K', type: 'Endurance', target: '30:00', metric: '5K time', date: ahead(30) }],
     hisLog, { weeklyMileage: 17, minWeeklyMileage: 20, maxWeeklyMileage: 50 }) === null);
