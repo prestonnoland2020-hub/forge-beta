@@ -107,8 +107,8 @@ const milesOf = (goal: CreatedGoal) => {
    nearer 1.15. So the exponent rises with the volume shortfall, and only when
    extrapolating UP in distance: going the other way, a long-run result
    predicting a short race needs no such help. */
-export { RIEGEL, RIEGEL_UNDERTRAINED, equivalentSeconds, volumeForPace } from './riegel';
-import { equivalentSeconds, volumeForPace } from './riegel';
+export { RIEGEL, RIEGEL_UNDERTRAINED, equivalentSeconds, volumeForPace, volumeForRace } from './riegel';
+import { equivalentSeconds, volumeForPace, volumeForRace } from './riegel';
 
 /* HOW FAST A RACE TIME CAN HONESTLY IMPROVE. Around 1% a week is a good block
    for someone with room to grow; sustained double digits over a season is not
@@ -218,7 +218,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
   const weeks = weeksUntil(goal.date);
   const volume = recentWeeklyMiles(records);
   const goalPace = targetSeconds / distance;
-  const volumeNeeded = volumeForPace(goalPace);
+  const volumeNeeded = volumeForRace(goalPace, distance);
 
   /* ONE PREDICTOR, SO THE CARD CANNOT DISAGREE WITH ITSELF.
 
@@ -295,14 +295,14 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
       insteadOf: `${clock(ceiling)} is the reachable target for this date. Keep ${clock(targetSeconds)} for next year.`,
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: volume < volumeNeeded * 0.7
-        ? `${clock(goalPace)}/mi is normally built on about ${Math.round(volumeNeeded)} miles a week. You are running ${volume.toFixed(0)}.`
+        ? `${clock(goalPace)}/mi over ${round1(distance)} mi is normally built on about ${Math.round(volumeNeeded)} miles a week. You are running ${volume.toFixed(0)}.`
         : `Add work at ${clock(goalPace)}/mi — the pace has to be trained, not just the distance.` };
   }
 
   /* Reachable on the clock, but the volume behind it may not be there. */
   if (volume < volumeNeeded * 0.7) {
     return { goal: goal.title, prediction: predicted, verdict: 'needs-more',
-      say: `Reachable, but not on ${volume.toFixed(0)} miles a week. ${clock(goalPace)}/mi is normally built on about ${Math.round(volumeNeeded)}.`,
+      say: `Reachable, but not on ${volume.toFixed(0)} miles a week. ${clock(goalPace)}/mi over ${round1(distance)} mi is normally built on about ${Math.round(volumeNeeded)}.`,
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: `Build to ${Math.round(volumeNeeded)} miles a week over the next ${Math.min(8, Math.round(weeks / 2))} weeks, no more than 10% up per week.` };
   }
@@ -446,7 +446,7 @@ export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], 
        constraint contradicted each other in his own settings for months. The
        cap is his to keep; being told it does not reach the goal is the point. */
     if (ceiling && goal.type === 'Endurance') {
-      const needed = volumeForPace(clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss')) / (milesOf(goal) || 1));
+      const needed = volumeForRace(clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss')) / (milesOf(goal) || 1), milesOf(goal) || 0);
       if (needed > ceiling) {
         return [{ ...result,
           needs: { weeklyMiles: Math.round(needed), running: result.needs?.running ?? 0, ceiling: Math.round(ceiling) },

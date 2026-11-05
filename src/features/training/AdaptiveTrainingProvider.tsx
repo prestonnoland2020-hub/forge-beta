@@ -10,6 +10,8 @@ import { isDemoMode } from '../../lib/env';
 import { loadGarminHealth } from './garminConnectionService';
 import { cardioMiles,isRunningCardio,summarizeCardioDraft } from '../../lib/cardioSession';
 import { countsAsRunVolume } from '../../lib/runQuality';
+import { useAthleteNotes } from './useAthleteNotes';
+import { isBufferActive } from './athleteNotesService';
 
 export type RunningExperience='New'|'Recreational'|'Experienced'|'Competitive';
 export type Environment='Road'|'Track'|'Trail'|'Treadmill'|'Mixed';
@@ -89,7 +91,16 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
      person produced the number. Without a watch this was readiness 100 every
      day of every athlete's life. */
   const {checkIns}=useCheckIns();
-  const recovery=useMemo(()=>applyCheckIn(deriveRecoveryState(latest,health,strengthLoad,prefs.injuryConstraint),checkIns,localDateIso(new Date())),[latest,health,strengthLoad,prefs.injuryConstraint,checkIns]);
+  /* AN INJURY IS A NOTE WITH A WINDOW, NOT A CHECKBOX THAT NEVER UNTICKS.
+     "I have an injury or limitation" in setup capped readiness at 35 for as
+     long as it stayed ticked — which, for an athlete who ticked it once and
+     whose injury note was cleared months ago, was forever. Sleep, HRV and
+     resting HR synced every morning and the score never moved off 35, and
+     every lift held its load "for readiness". The cap now follows an injury
+     note that is still inside its buffer, which the athlete can clear. */
+  const {notes}=useAthleteNotes();
+  const injuredNow=useMemo(()=>notes.some(note=>note.kind==='injury'&&isBufferActive(note)),[notes]);
+  const recovery=useMemo(()=>applyCheckIn(deriveRecoveryState(latest,health,strengthLoad,injuredNow),checkIns,localDateIso(new Date())),[latest,health,strengthLoad,injuredNow,checkIns]);
   const profile=useMemo<AdaptiveProfile>(()=>{/* WHAT THE ATHLETE RUNS IN A WEEK, FROM THE ONE DEFINITION.
 
      This summed the last SEVEN DAYS, which is not a weekly average, it is one
@@ -102,7 +113,7 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
        running still overrides the stated figures where there is any, because
        what someone has actually run outranks what they once typed. */
     const stated={runningDays:Number(setup?.runningDays)||prefs.runningDays,statedWeekly:Number(setup?.weeklyMileage)||prefs.weeklyMileage,statedLongest:Number(setup?.longestRun)||prefs.longestRunMiles};
-    return{...prefs,runningDays:stated.runningDays,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):stated.statedWeekly,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):stated.statedLongest,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected}},[prefs,recovery,latest,loggedRunHistory,setup,watchConnected]);
+    return{...prefs,injuryConstraint:injuredNow,runningDays:stated.runningDays,weeklyMileage:loggedRunHistory.length?Number(observedWeekly.toFixed(1)):stated.statedWeekly,longestRunMiles:loggedRunHistory.length?Number(observedLongest.toFixed(1)):stated.statedLongest,readiness:recovery.confidence==='Low'?100:recovery.readiness,sleepHours:recovery.confidence==='Low'?8:latest.sleepMinutes/60,strengthFatigue:recovery.strengthFatigue,watchConnected}},[prefs,recovery,latest,loggedRunHistory,setup,watchConnected,injuredNow]);
   useEffect(()=>localStorage.setItem('forge-training-preferences',JSON.stringify(prefs)),[prefs]);
   useEffect(()=>localStorage.setItem('forge-run-history',JSON.stringify(history)),[history]);
   /* RECOVERY ON LAUNCH, NOT ON A VISIT TO PROFILE. Garmin pushes sleep, HRV
@@ -111,7 +122,12 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
      signs in. One owner-scoped query; an athlete with no watch gets nothing
      back and keeps whatever this device already had. */
   const {user}=useAuth();
-  useEffect(()=>{if(isDemoMode||!user)return;let live=true;void loadGarminHealth().then(days=>{if(live&&days.length)syncWearableHealth(days)}).catch(()=>undefined);return()=>{live=false}},[user?.id]);
+  /* AND AGAIN EVERY TIME THE APP COMES BACK. A phone keeps the app alive in
+     the background for days, so "on sign-in" meant once: the watch synced
+     this morning's sleep and HRV to the server and the app kept scoring
+     readiness from whatever it read days ago. It re-reads on returning to the
+     foreground and every fifteen minutes while it is on screen. */
+  useEffect(()=>{if(isDemoMode||!user)return;let live=true;const read=()=>{void loadGarminHealth().then(days=>{if(live&&days.length)syncWearableHealth(days)}).catch(()=>undefined)};read();const onVisible=()=>{if(document.visibilityState==='visible')read()};document.addEventListener('visibilitychange',onVisible);window.addEventListener('focus',onVisible);const timer=window.setInterval(onVisible,15*60000);return()=>{live=false;document.removeEventListener('visibilitychange',onVisible);window.removeEventListener('focus',onVisible);window.clearInterval(timer)}},[user?.id]);
   const syncWearableHealth=(snapshots:DailyHealthSnapshot[])=>{const verified=snapshots.filter(item=>item.provider!=='Unavailable');const next=verified.length?verified.sort((a,b)=>a.date.localeCompare(b.date)):[unavailableHealth()];setHealth(next);if(verified.length)localStorage.setItem('forge-health-snapshots',JSON.stringify(next));else localStorage.removeItem('forge-health-snapshots')};
   return <Context.Provider value={{profile,recovery,watchConnected,health,history:combinedHistory,updateProfile:change=>setPrefs(value=>({...value,...change})),syncWearableHealth,setHistory}}>{children}</Context.Provider>
 }

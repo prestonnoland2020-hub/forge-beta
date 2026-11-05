@@ -79,7 +79,19 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
        came first, so Bench was in the block's focus line and prescribed
        nowhere. All of the day's sets are its prescription. */
     const daySets = (week.topSets || []).filter(set => set.splitDay === day.name);
-    const topSets = daySets.length ? daySets : (week.topSets || []).filter(set => splitDayKey(set.splitDay) === splitDayKey(day.name));
+    const matched = daySets.length ? daySets : (week.topSets || []).filter(set => splitDayKey(set.splitDay) === splitDayKey(day.name));
+    /* A DAY THE CYCLE VISITS TWICE IS STORED TWICE. An 8-day rolling split
+       with two "Sharms" days gets one block row per visit, both labelled
+       "Sharms" — and filtering by name handed BOTH rows to EACH visit, so
+       Thursday read "Shoulder Press 160×6 · Shoulder Press 160×6". One
+       visit prescribes each lift once. */
+    const seenLifts = new Set<string>();
+    const topSets = matched.filter(set => {
+      const key = canonicalLiftKey(set.exercise);
+      if (seenLifts.has(key)) return false;
+      seenLifts.add(key);
+      return true;
+    });
     const topSet = topSets[0];
     return { date, day, topSet, topSets, lower: isLowerBodyDay(day, topSet) };
   });
