@@ -595,14 +595,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
 
   /* A stored block renders even offline/demo; only GENERATION needs a user. */
   const canGenerate = !isDemoMode && Boolean(user);
-  if (storeLoading) return <div className="pv"><section className="card pv-state"><span className="eyebrow">Your plan</span><h3>Loading your plan…</h3></section></div>;
+  if (storeLoading) return <div className="pv"><section className="card pv-state"><span className="eyebrow">YOUR PLAN</span><h3>Loading your plan…</h3></section></div>;
   if (!stored && !canGenerate) return <LongRangeTrainingPlan goals={goals} profile={profile} splitDays={splitDays} rhythm={rhythm} />;
   /* Before the block exists the tab is still useful: it says the one thing
      that is missing, in the athlete's terms, and shows the pre-program plan
      below it so there is always a week to train from. */
   if (!stored && !baselineReady) return <div className="pv">
     <section className="card pv-state">
-      <span className="eyebrow">Before your plan</span>
+      <span className="eyebrow">BEFORE YOUR PLAN</span>
       <h3>Forge builds from what you log</h3>
       <p>Every set and run in your plan comes from your own numbers, so it needs a few first. {baseline.filter(item => item.done).length} of {baseline.length} done — when the last one lands, the block builds itself.</p>
       <div className="pv-checklist">{baseline.map(item => <div key={item.key} className={item.done ? 'done' : ''}><b>{item.done ? <Icon name="check"/> : <Icon name="circle"/>}</b><span>{item.label}</span></div>)}</div>
@@ -612,7 +612,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   </div>;
   if (!stored) return <div className="pv">
     <section className={`card pv-state${generating ? ' busy' : ''}`}>
-      <span className="eyebrow">Your plan</span>
+      <span className="eyebrow">YOUR PLAN</span>
       <h3>{generating ? 'Building your plan…' : 'Your plan isn’t built yet'}</h3>
       <p>{generating ? generatingStage : error || 'A 10-week block — two full 8 / 6 / 4 / 2 / max waves — built from your goals, your split, and what you have logged.'}</p>
       {generating && <small className="pv-eta">About a minute — it’s reading everything you’ve logged.</small>}
@@ -704,7 +704,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         every row marked Missed and no way forward. A finished block says so
         and offers the next one. */}
     {blockDone && <section className="card pv-state">
-      <span className="eyebrow">Block complete</span>
+      <span className="eyebrow">BLOCK COMPLETE</span>
       <h3>Your {plan.weeks.length}-week block is done</h3>
       <p>The next block starts from what you lifted and ran in this one. Build it when you are ready to keep going.</p>
       {canGenerate && <button type="button" className="button" disabled={generating} onClick={() => setRefreshAsk(true)}>{generating ? 'Building…' : 'Build the next block'}</button>}
@@ -737,7 +737,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
         about the plan, not today's training, so they follow it. */}
     {untrainedGoalLifts.length > 0 && <section className="card untrained-goal-banner">
       <div>
-        <span className="eyebrow">Not in your split</span>
+        <span className="eyebrow">NOT IN YOUR SPLIT</span>
         <strong>{untrainedGoalLifts.join(' and ')} {untrainedGoalLifts.length === 1 ? 'is a goal, but no day trains it' : 'are goals, but no day trains them'}</strong>
       </div>
       <a className="button" href="#/split">Add it to a day <Icon name="arrow"/></a>

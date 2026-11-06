@@ -87,7 +87,7 @@ export function ForgeWritesIt({ dateIso, session, onSession }: { dateIso: string
 
   if (session) {
     return <section className="card forge-writes-it written">
-      <div className="section-title compact-title"><div><span className="eyebrow">Forge wrote today</span><h3>{session.name}</h3></div></div>
+      <div className="section-title compact-title"><div><span className="eyebrow">FORGE WROTE TODAY</span><h3>{session.name}</h3></div></div>
       <p className="forge-writes-rationale">{session.rationale}</p>
       <button type="button" className="text-button" onClick={() => { onSession(null); setKind(null); }}>Write a different one</button>
     </section>;

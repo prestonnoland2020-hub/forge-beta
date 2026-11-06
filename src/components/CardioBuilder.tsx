@@ -534,7 +534,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       </div>)}
     </div>
     <button type="button" className="cardio-log-add-line" onClick={addLine}>＋ Add line</button>
-    <label className="cardio-log-note"><span className="field-caption">Note</span>
+    <label className="cardio-log-note"><span className="field-caption">NOTE</span>
       <input value={note} onChange={event => setNote(event.target.value)} placeholder="Optional — how it felt, route, treadmill, weather" />
     </label>
     {summary && <p className="cardio-log-summary">{summary}</p>}
@@ -552,7 +552,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       <label>Time<input inputMode="numeric" value={circuitDraft.time} onChange={event => setCircuitDraft(current => ({ ...current, time: event.target.value }))} placeholder="mm:ss" /></label>
     </div>
     <div className="cardio-circuit-stations">
-      <span className="field-caption">Stations · each round</span>
+      <span className="field-caption">STATIONS · EACH ROUND</span>
       {circuitDraft.stations.map((station, index) => <div className="cardio-circuit-station" key={index}>
         <input aria-label={`Station ${index + 1}`} value={station.name} onChange={event => updateStation(index, { name: event.target.value })} placeholder="Wall Balls" />
         <input aria-label={`Station ${index + 1} amount`} inputMode="decimal" value={station.value} onChange={event => updateStation(index, { value: event.target.value })} placeholder="20" />
@@ -561,7 +561,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       </div>)}
       <button type="button" className="cardio-log-add-line" onClick={() => setCircuitDraft(current => ({ ...current, stations: [...current.stations, { name: '', value: '', unit: 'reps' }] }))}>＋ Add station</button>
     </div>
-    <label className="cardio-log-note"><span className="field-caption">Note</span>
+    <label className="cardio-log-note"><span className="field-caption">NOTE</span>
       <input value={circuitDraft.note} onChange={event => setCircuitDraft(current => ({ ...current, note: event.target.value }))} placeholder="Optional — loads, how it felt" />
     </label>
     <div className="cardio-log-actions">
@@ -588,7 +588,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       const ownNote = syncedFrom && entry.prescription.note !== syncedFrom.note ? String(entry.prescription.note || '') : '';
       return <article className={`cardio-synced${confirmed ? ' confirmed' : ''}${describing === entry.id ? ' describing' : ''}${justLogged === entry.id ? ' just-logged' : ''}`} key={entry.id}>
         <header>
-          <span className="cardio-synced-badge"><WatchIcon />From {provider.toUpperCase()}</span>
+          <span className="cardio-synced-badge"><WatchIcon />FROM {provider.toUpperCase()}</span>
           {confirmed ? <span className="cardio-synced-state">✓ On today</span> : <span className="cardio-synced-state pending">Synced · check it</span>}
         </header>
         <div className="cardio-synced-title"><strong>{entry.activity}</strong>{watchName && <small>{watchName}</small>}</div>
@@ -615,10 +615,10 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
     </div>}
 
     {!editingEntry && (plannedCircuit && plannedCircuit.plan.stationEntries?.length ? <div className="cardio-log-planned-circuit">
-      <p className="cardio-log-planned"><span>Planned</span>{plannedCircuit.name}</p>
+      <p className="cardio-log-planned"><span>PLANNED</span>{plannedCircuit.name}</p>
       <ol>{plannedCircuit.plan.stationEntries.map(station => <li key={station.id}><strong>{station.name}</strong><span>{station.target} {station.unit === 'meters' ? 'm' : station.unit}{station.pace ? ` @ ${station.pace}` : ''}{station.load ? ` · ${station.load}` : ''}</span></li>)}</ol>
       <div className="cardio-planned-log-row"><label>Your time{plannedCircuit.plan.duration ? ` · about ${plannedCircuit.plan.duration} min` : ''}<input inputMode="numeric" placeholder="mm:ss" value={plannedTime} onChange={event => setPlannedTime(event.target.value)} /></label><button type="button" className="button secondary" onClick={logPlannedCircuit}>{plannedMinutes ? 'Log it' : 'Log without a time'}</button></div>
-    </div> : plannedSummary && !savedEntries.length && <p className="cardio-log-planned"><span>Planned</span>{plannedSummary}</p>)}
+    </div> : plannedSummary && !savedEntries.length && <p className="cardio-log-planned"><span>PLANNED</span>{plannedSummary}</p>)}
 
     {!editingEntry && <div className={`cardio-ai-box${describedEntry ? ' describing' : ''}`}>
       <label className="cardio-ai-label" htmlFor="cardio-ai-text"><SparkIcon />{describedEntry ? `Describe your ${syncedProvider(describedEntry)} ${describedEntry.activity.toLowerCase()}` : synced.length || manual.length ? 'Anything else? Describe it' : 'Describe your cardio'}</label>

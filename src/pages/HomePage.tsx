@@ -53,8 +53,8 @@ export function HomePage() {
   const [firstWeekHidden, setFirstWeekHidden] = useState(() => { try { return localStorage.getItem('forge-first-week-hidden') === '1'; } catch { return false; } });
   const hideFirstWeek = () => { setFirstWeekHidden(true); try { localStorage.setItem('forge-first-week-hidden', '1'); } catch { /* per-device convenience */ } };
 
-  if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">Today</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
-  if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">One quick setup</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split">Set up my split <Icon name="arrow"/></Link></section></div>;
+  if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">TODAY</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
+  if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">ONE QUICK SETUP</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split">Set up my split <Icon name="arrow"/></Link></section></div>;
 
   /* A stored recommendation written by an older build — or one that arrived
      half-formed — has no top sets, and reading through it turned Today into
@@ -101,11 +101,7 @@ export function HomePage() {
           <input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
           <span>{set.exercise}{set.optional && <small>Optional</small>}</span>
-          {/* A load is a record, set in mono with its unit small; an open
-              instruction stays in words. The text reads the same either way. */}
-          {set.source === 'history'
-            ? <b className="td-load">{set.weight}<small> {weightUnit}</small> × {set.reps}</b>
-            : <b className="td-load open">Work up to {set.reps || 5}</b>}
+          <b>{set.source === 'history' ? `${set.weight} ${weightUnit} × ${set.reps}` : `Work up to ${set.reps || 5}`}</b>
         </label></li>)}
         {recommendation.cardio && <li><label className={recommendation.cardio.selected ? 'on' : ''}>
           <input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} />

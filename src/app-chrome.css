@@ -37,7 +37,7 @@
     --tab-lift: 16px;
     --tab-clear: calc(var(--tab-h) + var(--tab-gap) + var(--tab-lift) + var(--safe-b, env(safe-area-inset-bottom)));
     --chrome-clear: calc(var(--tab-clear) + 28px);
-    --spring: cubic-bezier(.2, .8, .2, 1);
+    --spring: cubic-bezier(.32, 1.25, .5, 1);
     --glide: cubic-bezier(.2, .8, .2, 1);
   }
 

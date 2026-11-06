@@ -62,7 +62,7 @@
 .top-set-check {
   width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center;
   border: 2px solid var(--hairline-strong, var(--line)); color: var(--accent-contrast, #fff);
-  transition: background-color .2s ease, border-color .2s ease, transform .25s cubic-bezier(.2, .8, .2, 1);
+  transition: background-color .2s ease, border-color .2s ease, transform .25s cubic-bezier(.3, 1.4, .5, 1);
 }
 .top-set-check.done { background: var(--accent); border-color: var(--accent); transform: scale(1.04); }
 .top-set-row-name { display: grid; gap: 2px; font-size: 18px; font-weight: 800; min-width: 0; }

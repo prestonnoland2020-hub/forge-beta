@@ -27,12 +27,12 @@ check('with HYROX, Circuit and your own words', /HYROX\nCircuit\nYour words/.tes
 console.log('\nHYROX, instantly, with no coach call');
 await tapText('HYROX', 0); await p.waitForTimeout(800);
 t = await text();
-check('Forge wrote a HYROX stations day', /Forge wrote today\nHYROX stations · front half/i.test(t), between(t, 'Forge wrote', 80));
+check('Forge wrote a HYROX stations day', /FORGE WROTE TODAY\nHYROX stations · front half/i.test(t), between(t, 'FORGE WROTE', 80));
 check('the logger header carries its name', /LOGGING ·[^\n]*\nHYROX stations · front half/i.test(t), between(t, 'LOGGING', 60));
 check('the muscle picker steps aside', !/WHAT DID YOU TRAIN/.test(t));
 check('the planned session lists the stations', /Sled Push\n50 m · 152 kg/.test(t) && /SkiErg/.test(t), between(t, 'PLANNED', 200));
 check('and asks for one number', /Your time/.test(t));
-check('a runner with no run pace is told so, not given a number', /no run pace until a run establishes one/.test(t), between(t, 'Forge wrote', 300));
+check('a runner with no run pace is told so, not given a number', /no run pace until a run establishes one/.test(t), between(t, 'FORGE WROTE', 300));
 
 console.log('\nLogged and finished');
 const timeInput = await p.$('input[placeholder="mm:ss"]'); await timeInput.fill('58:30');
@@ -41,7 +41,7 @@ t = await text();
 check('the session is on the day', /HYROX stations · front half/.test(t) && /58:30/.test(t), between(t, 'CARDIO', 200));
 const btn = await p.$('button.save-workout'); await btn.scrollIntoViewIfNeeded(); await btn.click(); await p.waitForTimeout(2000);
 t = await text();
-check('Home shows the day complete under the session name', /Today · complete\nHYROX stations · front half/i.test(t), between(t, 'Today ·', 80));
+check('Home shows the day complete under the session name', /TODAY · COMPLETE\nHYROX stations · front half/i.test(t), between(t, 'TODAY ·', 80));
 
 console.log('\nWrite a different one');
 await p.evaluate(() => { location.hash = '#/workout?source=blank'; }); await p.waitForTimeout(1500);
