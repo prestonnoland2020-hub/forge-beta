@@ -47,14 +47,14 @@ export function OwnerPage() {
 
   return <div className="stack-xl owner-page">
     <section className="card">
-      <header><span className="eyebrow">Accounts</span><h2>{rows.length} signed up</h2></header>
+      <header><span className="eyebrow">ACCOUNTS</span><h2>{rows.length} signed up</h2></header>
       {/* THE THREE NUMBERS THAT MATTERED. Signed up is vanity; logged a day is
           the product working, a goal is the program working, and a push install
           is whether Forge can reach them at all. */}
       <div className="owner-tiles">
-        <div><span>Logged a day</span><strong>{active.length}</strong><small>of {rows.length}</small></div>
-        <div><span>Have a goal</span><strong>{withGoals.length}</strong><small>of {rows.length}</small></div>
-        <div><span>Reachable</span><strong>{reachable.length}</strong><small>push registered</small></div>
+        <div><span>LOGGED A DAY</span><strong>{active.length}</strong><small>of {rows.length}</small></div>
+        <div><span>HAVE A GOAL</span><strong>{withGoals.length}</strong><small>of {rows.length}</small></div>
+        <div><span>REACHABLE</span><strong>{reachable.length}</strong><small>push registered</small></div>
       </div>
     </section>
     <section className="card">

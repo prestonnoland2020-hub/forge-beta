@@ -138,14 +138,14 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
         </button>}
         {matches.map(exercise => <button type="button" className="top-set-sheet-result" key={exercise.id} onClick={() => pick(exercise)}>
           <div><strong>{exercise.name}</strong><small>{exercise.muscles.join(' · ') || 'Strength'}</small></div>
-          {suggested.includes(exercise.name) && <b>Today</b>}
+          {suggested.includes(exercise.name) && <b>TODAY</b>}
         </button>)}
         {!matches.length && !offerNew && <p className="top-set-sheet-empty">Type at least two letters to add an exercise that isn’t in your library yet.</p>}
       </div>}
 
       {lift && <>
         <div className="top-set-sheet-muscles">
-          <span className="field-caption">Muscle groups</span>
+          <span className="field-caption">MUSCLE GROUPS</span>
           {isNew && <small>A new exercise needs its mapping — it decides what this set counts toward.</small>}
           <div className="muscle-picker compact-muscle-picker">
             {STRENGTH_MUSCLES.map(muscle => <button type="button" key={muscle} className={muscles.includes(muscle) ? 'muscle-chip active' : 'muscle-chip'} aria-pressed={muscles.includes(muscle)} onClick={() => toggleMuscle(muscle)}>{muscle}</button>)}

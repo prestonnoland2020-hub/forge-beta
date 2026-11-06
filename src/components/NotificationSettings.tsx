@@ -61,7 +61,7 @@ export function NotificationSettings() {
     if (granted === 'granted') setRegistered(await syncPushSubscription({ morningWorkout: next.morningWorkout, partnerTrained: next.partnerTrained, watchSynced: next.watchSynced }));
   };
   return <section className="card notification-settings">
-    <header><span className="eyebrow">Notifications</span><h3>Check-ins from Forge</h3></header>
+    <header><span className="eyebrow">NOTIFICATIONS</span><h3>Check-ins from Forge</h3></header>
     <div className="toggle-row"><div><strong>Morning workout</strong><span>Your day's training, each morning.</span></div><input type="checkbox" aria-label="Morning workout notifications" checked={prefs.morningWorkout} onChange={() => void toggle('morningWorkout')} /></div>
     <div className="toggle-row"><div><strong>Injury follow-ups</strong><span>A daily check-in while a body-log entry is active.</span></div><input type="checkbox" aria-label="Injury follow-up notifications" checked={prefs.injuryFollowUp} onChange={() => void toggle('injuryFollowUp')} /></div>
     <div className="toggle-row"><div><strong>A partner trained</strong><span>Once a day, when a training partner logs a session.</span></div><input type="checkbox" aria-label="Training partner notifications" checked={prefs.partnerTrained} onChange={() => void toggle('partnerTrained')} /></div>

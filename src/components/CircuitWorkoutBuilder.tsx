@@ -197,7 +197,7 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
       </details>
 
       <section className="simple-circuit-stations">
-        <header><div><span className="eyebrow">Stations</span><h3>{stations.length ? `${stations.length} movements` : 'No movements yet'}</h3></div>{mode === 'manual' && <button className="button ghost add-station-button" onClick={addStation}>＋ Add station</button>}</header>
+        <header><div><span className="eyebrow">STATIONS</span><h3>{stations.length ? `${stations.length} movements` : 'No movements yet'}</h3></div>{mode === 'manual' && <button className="button ghost add-station-button" onClick={addStation}>＋ Add station</button>}</header>
         {stations.length === 0 && <div className="empty-stations">{mode === 'forge' ? 'Ask Forge to build the circuit, or choose required movements above.' : 'Choose movements above or add a station.'}</div>}
         {stations.map((station, index) => <article key={station.id}>
           <div className="station-order"><b>{index + 1}</b><button onClick={() => moveStation(index, -1)} disabled={index === 0} aria-label="Move up"><Icon name="up"/></button><button onClick={() => moveStation(index, 1)} disabled={index === stations.length - 1} aria-label="Move down"><Icon name="down"/></button></div>
