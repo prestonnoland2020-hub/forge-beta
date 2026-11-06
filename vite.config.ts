@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
@@ -15,6 +16,41 @@ export default defineConfig({
   base: './',
   define: { __FORGE_BUILD__: JSON.stringify(buildId) },
   plugins: [react(), {
+    /* A CONTENT SECURITY POLICY, BECAUSE THE HOST CANNOT SEND ONE. GitHub
+       Pages sets no response headers we control, so the policy rides in a
+       <meta> tag. It is what stops injected markup from running script or
+       shipping the session (kept in localStorage) to another host: scripts
+       come only from this origin, plus the one inline theme script by its
+       exact hash; the network reaches only this origin and Supabase.
+
+       BUILD ONLY. The dev server injects its own inline scripts for hot
+       reload, and a hash cannot follow them. frame-ancestors is not honoured
+       in a <meta> tag, so it is not claimed here. */
+    name: 'forge-content-security-policy',
+    apply: 'build' as const,
+    transformIndexHtml: {
+      order: 'post' as const,
+      handler(html: string) {
+        const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+          .map(match => `'sha256-${createHash('sha256').update(match[1]).digest('base64')}'`);
+        const policy = [
+          "default-src 'self'",
+          `script-src 'self' ${inline.join(' ')}`.trim(),
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: blob: https:",
+          "font-src 'self' data:",
+          "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+          "worker-src 'self'",
+          "manifest-src 'self'",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+          'upgrade-insecure-requests',
+        ].join('; ');
+        return html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />\n    <meta name="referrer" content="strict-origin-when-cross-origin" />`);
+      },
+    },
+  }, {
     /* WRITTEN INTO THE DIRECTORY THAT WAS ACTUALLY BUILT. This hardcoded
        'dist', so building any other outDir — the signed-in build the test
        suite serves from dist-auth, for one — stamped ITS id over dist's

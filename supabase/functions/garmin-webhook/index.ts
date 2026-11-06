@@ -83,9 +83,12 @@ async function process(payload: Record<string, unknown>) {
         const summaries: Summary[] = [];
         for (const entry of entries) {
           if (typeof entry.callbackURL === 'string') {
-            /* Ping mode: only fetch from Garmin's own API host. */
-            const callback = new URL(entry.callbackURL);
-            if (callback.hostname !== 'apis.garmin.com') continue;
+            /* Ping mode: only fetch from Garmin's own API host, and only over
+               HTTPS — the athlete's Garmin token rides on this request, and
+               an http:// callback would send it in the clear. */
+            let callback: URL;
+            try { callback = new URL(entry.callbackURL); } catch { continue; }
+            if (callback.protocol !== 'https:' || callback.hostname !== 'apis.garmin.com' || callback.port) continue;
             const token = await freshAccessToken(call, owner);
             const response = await fetch(callback, { headers: { Authorization: `Bearer ${token}` } });
             if (response.ok) { const pulled = await response.json(); if (Array.isArray(pulled)) summaries.push(...pulled); }
