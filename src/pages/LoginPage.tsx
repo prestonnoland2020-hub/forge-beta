@@ -68,7 +68,7 @@ export function LoginPage() {
       </a>
 
       <section className="login-card" aria-labelledby="login-title">
-        <span className="eyebrow accent">YOUR TRAINING, CONNECTED</span>
+        <span className="eyebrow accent">Your training, connected</span>
         <h1 id="login-title">Show up.<br />Forge ahead.</h1>
         <p>Today’s workout, your progress, and one coach that learns from every session.</p>
 
@@ -83,7 +83,7 @@ export function LoginPage() {
         </p>
       </section>
 
-      <p className="login-footer">TRAIN WITH INTENT</p>
+      <p className="login-footer">Train with intent</p>
     </main>
   );
 }

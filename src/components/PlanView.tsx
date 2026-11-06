@@ -170,7 +170,7 @@ export function TodayCard({ session, unit, logged, workoutHref }: {
   const nothing = !session.lifts.length && !session.run && !session.summary;
   return <section className={`card pv-today${done ? ' done' : ''}${isRest ? ' rest' : ''}`}>
     <header>
-      <span className="eyebrow">TODAY · {longDate(session.date).toUpperCase()}</span>
+      <span className="eyebrow">Today · {longDate(session.date).toUpperCase()}</span>
       <h2>{done ? 'Logged' : isRest ? 'Rest day' : session.title}</h2>
       {/* WHAT WAS DONE, NOT WHAT WAS PLANNED. This printed the planned day's
           name under "Logged", so a day the athlete trained off-plan read
