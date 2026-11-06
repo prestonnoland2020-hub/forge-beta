@@ -340,7 +340,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         </div>
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
-          {hasRecoveryData && <NavLink className="top-readiness" to="/profile?view=connections"><span>{recovery.readiness}</span><small>READY</small></NavLink>}
+          {hasRecoveryData && <NavLink className="top-readiness" to="/profile?view=connections"><span>{recovery.readiness}</span><small>Ready</small></NavLink>}
           <NavLink className="top-insights" to="/insights" aria-label="Progress"><NavGlyph name="chart"/></NavLink>
           {location.pathname !== '/workout' && <NavLink className="top-log" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></NavLink>}
           {/* Settings has one door, the first row of Profile. A gear on every
@@ -419,11 +419,13 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     {coachOpen && <button className={coachExpanded ? 'coach-bubble-backdrop expanded' : 'coach-bubble-backdrop'} type="button" aria-label="Close Forge coach" onClick={() => { if (coachExpanded) setCoachExpanded(false); else setCoachOpen(false); }} />}
     <div className={`${coachExpanded ? 'coach-bubble-shell expanded' : 'coach-bubble-shell'}${location.pathname === '/coach' || location.pathname === '/workout' ? ' coach-bubble-hidden' : ''}`}>
       <section className={coachOpen ? 'coach-bubble-panel open' : 'coach-bubble-panel'} aria-hidden={!coachOpen} aria-label="Forge AI coach">
-        <header><div><span>AI COACH</span><strong>Ask Forge</strong></div><div className="coach-window-actions"><button type="button" onClick={() => setCoachExpanded(value => !value)} aria-label={coachExpanded ? 'Restore Forge coach' : 'Expand Forge coach'} title={coachExpanded ? 'Restore' : 'Expand'}>{coachExpanded ? <Icon name="collapse"/> : <Icon name="expand"/>}</button><button type="button" onClick={() => { setCoachOpen(false); setCoachExpanded(false); }} aria-label="Close Forge coach">×</button></div></header>
+        <header><div><span>AI coach</span><strong>Ask Forge</strong></div><div className="coach-window-actions"><button type="button" onClick={() => setCoachExpanded(value => !value)} aria-label={coachExpanded ? 'Restore Forge coach' : 'Expand Forge coach'} title={coachExpanded ? 'Restore' : 'Expand'}>{coachExpanded ? <Icon name="collapse"/> : <Icon name="expand"/>}</button><button type="button" onClick={() => { setCoachOpen(false); setCoachExpanded(false); }} aria-label="Close Forge coach">×</button></div></header>
         <div className="coach-bubble-content">{coach}</div>
       </section>
       <button type="button" className={coachOpen ? 'coach-bubble-toggle active' : 'coach-bubble-toggle'} onClick={() => { tap(); setCoachOpen(open => !open); if (coachOpen) setCoachExpanded(false); }} aria-expanded={coachOpen} aria-label={coachOpen ? 'Close Forge coach' : 'Open Forge coach'}>
-        <span>{coachOpen ? '×' : <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9L12 2.5zM18.5 15l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z"/></svg>}</span><b>{coachOpen ? 'Close' : 'Ask Forge'}</b>
+        {/* The coach is Forge, so its button carries Forge's mark — not the
+            sparkle every AI feature in every app wears. */}
+        <span>{coachOpen ? '×' : <i className="coach-mark" aria-hidden="true" />}</span><b>{coachOpen ? 'Close' : 'Ask Forge'}</b>
       </button>
     </div>
   </div>;

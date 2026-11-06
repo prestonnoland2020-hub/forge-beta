@@ -39,7 +39,7 @@ const check = (label, cond, detail) => { console.log(`${cond ? 'PASS' : 'FAIL'} 
   await p.addInitScript(seedPlan, [days, setup, goals]);
   await p.goto('http://localhost:4191/#/workout', { waitUntil: 'domcontentloaded' });
   await p.waitForTimeout(1900);
-  const pickerGone = await p.evaluate(() => !document.querySelector('.derived-muscles') && !/MUSCLE GROUPS/.test(document.querySelector('.session-details')?.innerText || ''));
+  const pickerGone = await p.evaluate(() => !document.querySelector('.derived-muscles') && !/Muscle groups/i.test(document.querySelector('.session-details')?.innerText || ''));
   check('Session Details has no muscle picker', pickerGone);
   await fillLift(p, 'Bench Press', '245', '5');
   await p.waitForTimeout(400);

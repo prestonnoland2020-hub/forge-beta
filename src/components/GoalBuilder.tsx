@@ -183,11 +183,11 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 </select>
 </label>}{(customEnduranceEvent!==''||!standardEnduranceEvents.includes(exercise))&&<label className="full-field">Event name<input autoFocus value={customEnduranceEvent} placeholder="e.g. Lakeside 15K, Trail Ultra, Stadium Stair Climb" onChange={e=>{setCustomEnduranceEvent(e.target.value);setExercise(e.target.value)}}/><small>Name the event your way; Forge will standardize how progress is measured.</small></label>}
 </div>}{type==='endurance'&&isCustomRun&&<div className="running-event-builder">
-<div><span className="field-caption">CUSTOM RUNNING EVENT</span><strong>Define the course</strong><small>The race distance describes the event. Your selected progress metric still determines the goal.</small></div>
+<div><span className="field-caption">Custom running event</span><strong>Define the course</strong><small>The race distance describes the event. Your selected progress metric still determines the goal.</small></div>
 <div className="running-event-fields"><label>Race distance<input inputMode="decimal" value={eventDistance} onChange={e=>setEventDistance(e.target.value)} /></label><label>Distance unit<select value={eventDistanceUnit} onChange={e=>setEventDistanceUnit(e.target.value)}><option>miles</option><option>kilometers</option><option>meters</option></select></label><label>Surface<select value={eventSurface} onChange={e=>setEventSurface(e.target.value)}><option>Road</option><option>Track</option><option>Trail</option><option>Treadmill</option><option>Mixed terrain</option></select></label></div>
 <div className="event-summary"><span>{eventDistance || '—'} {eventDistanceUnit}</span><b>{eventSurface}</b><small>Forge can use this distance for finish-time, pace, and training-volume calculations.</small></div>
 </div>}{type==='endurance'&&exercise==='HYROX'&&<div className="event-template">
-<div className="event-template-head"><div><span className="field-caption">RECOGNIZED EVENT TEMPLATE</span><strong>HYROX race structure loaded</strong></div><label>Division<select value={eventDivision} onChange={e=>setEventDivision(e.target.value)}><option>Women's Open</option><option>Men's Open</option><option>Women's Pro</option><option>Men's Pro</option><option>Doubles Women</option><option>Doubles Men</option><option>Doubles Mixed</option><option>Relay Women</option><option>Relay Men</option><option>Relay Mixed</option></select></label></div>
+<div className="event-template-head"><div><span className="field-caption">Recognized event template</span><strong>HYROX race structure loaded</strong></div><label>Division<select value={eventDivision} onChange={e=>setEventDivision(e.target.value)}><option>Women's Open</option><option>Men's Open</option><option>Women's Pro</option><option>Men's Pro</option><option>Doubles Women</option><option>Doubles Men</option><option>Doubles Mixed</option><option>Relay Women</option><option>Relay Men</option><option>Relay Mixed</option></select></label></div>
 <p>8 × 1 km runs, with one station after every run. Division controls the prescribed competition loads.</p>
 <ol>{['1,000 m SkiErg','50 m Sled Push','50 m Sled Pull','80 m Burpee Broad Jumps','1,000 m Row','200 m Farmers Carry','100 m Sandbag Lunges','100 Wall Balls'].map((station,index)=><li key={station}><i>{index+1}</i><span><b>1 km Run</b><small>{station}</small></span></li>)}</ol>
 <small className="template-note">Forge will track overall finish time, run splits, station splits, transition time, and division-specific loads separately.</small>
@@ -214,7 +214,7 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
     and Strava data arrive AS logged sessions, so “connected” is not a
     different source — it is the same log filling itself in. The old six-way
     dropdown was a decision with one right answer. */}
-{!inline&&<div className="automatic-source wide"><span>AUTOMATIC</span><strong>Tracked from your logged data</strong><small>{type==='body'?'Body-weight check-ins on your training days feed this goal — connected wearables log them for you.':'Relevant logged workouts feed this goal automatically.'}</small></div>}
+{!inline&&<div className="automatic-source wide"><span>Automatic</span><strong>Tracked from your logged data</strong><small>{type==='body'?'Body-weight check-ins on your training days feed this goal — connected wearables log them for you.':'Relevant logged workouts feed this goal automatically.'}</small></div>}
 <label>Target date<input type="date" value={targetDate} onChange={e=>setTargetDate(e.target.value)} />
 </label>
 {!inline&&<small className="goal-rule">Historical workouts remain unchanged if this goal is edited later.</small>}
@@ -245,7 +245,7 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
     {step===2&&goalFields}
     {step===3&&<div className="goal-fields">
 <div className="goal-selection-banner">
-<span>GOAL SUMMARY</span>
+<span>Goal summary</span>
 <strong>{title}</strong>
 <small>{metric} · Target {targetDate}</small>
 </div>

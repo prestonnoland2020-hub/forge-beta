@@ -90,6 +90,11 @@ import './app-polish.css';
    file that decides how a title looks. */
 import './brand.css';
 import './today-hero.css';
+/* Geist Mono for every number an athlete reads (--num), then the logbook
+   layer, which decides the look and so loads after everything else. */
+import '@fontsource/geist-mono/latin-400.css';
+import '@fontsource/geist-mono/latin-500.css';
+import './forge-logbook.css';
 import { startNativeChrome } from './features/shell/nativeChrome';
 
 // OAuth providers return to the public app URL before the hash route. Send the

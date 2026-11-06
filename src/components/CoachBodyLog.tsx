@@ -38,7 +38,7 @@ export function CoachBodyLog({ notes, upsert, prefill, onPrefillConsumed }: {
 
   return <section className="card body-log-card">
     <header className="body-log-head">
-      <div><span className="eyebrow">COACH LEARNINGS</span><h3>Body log</h3></div>
+      <div><span className="eyebrow">Coach learnings</span><h3>Body log</h3></div>
       {!adding && <button type="button" className="button secondary small-button" onClick={() => { setKind('injury'); setBufferDays(defaultBufferDays('injury')); setAdding(true); }}>＋ Tell Forge</button>}
     </header>
     <p className="body-log-copy">Report an injury, unusual fatigue, or a limitation. Forge trains around it for the buffer window and checks back in.</p>
