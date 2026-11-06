@@ -150,6 +150,14 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
     return 0;
   });
 
+  const singleWheel = kind !== 'clock' && kind !== 'distance';
+  const [typing, setTyping] = useState(false);
+  const [typed, setTyped] = useState('');
+  const snapToWheel = (input: number): number | null => {
+    const values = columns[0].values;
+    if (!Number.isFinite(input) || input < values[0] || input > values[values.length - 1]) return null;
+    return values.reduce((closest, item) => Math.abs(item - input) < Math.abs(closest - input) ? item : closest, values[0]);
+  };
   const shown = kind === 'distance' ? (isShortUnit(unit) ? String(whole) : `${whole}.${String(fraction).padStart(2, '0')}`)
     : kind === 'clock' ? `${whole}:${String(fraction).padStart(2, '0')}`
     : String(whole);
@@ -191,6 +199,17 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
           : <Wheel values={columns[0].values} selected={whole} onSelect={setWhole} />}
         {suffix && <span className="dial-suffix">{suffix}</span>}
       </div>
+      {/* A LONG SPIN HAS A SHORTCUT. Testers going from 135 to 235 scrolled a
+          hundred pounds of wheel, four or five flicks each. Typing is offered,
+          not forced: the number still lands on a real wheel value (snapped to
+          the plate step and clamped to the range), so 2250 cannot get in. */}
+      {singleWheel && <div className="dial-type">
+        {typing
+          ? <input autoFocus type="text" inputMode="decimal" aria-label={`Type ${title.toLowerCase()}`} value={typed}
+              onChange={event => { const text = event.target.value.replace(/[^0-9.]/g, ''); setTyped(text); const snapped = snapToWheel(Number(text)); if (text && snapped !== null) setWhole(snapped); }}
+              onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); tap(); confirm(); } }} placeholder={String(whole)} />
+          : <button type="button" className="text-button" onClick={() => { tap(); setTyping(true); }}>Type it instead</button>}
+      </div>}
     </div>
   </div>;
 }

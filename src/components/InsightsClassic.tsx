@@ -294,12 +294,12 @@ export function InsightsClassic() {
     {lifts.length > 0 && <section className="card ic-card">
       <header className="ic-head"><i /><h3>PR progress</h3></header>
       <select value={selectedLift} onChange={event => setPrLift(event.target.value)}>{lifts.map(lift => <option key={lift}>{lift}</option>)}</select>
-      <div className="ic-toggle" role="group" aria-label="PR metric">{([['1rm', '1RM'], ['calc', 'Calculated Max']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
+      <div className="ic-toggle" role="group" aria-label="PR metric">{([['1rm', '1RM'], ['calc', 'Estimated 1RM']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
       <div className="ic-range" role="group" aria-label="Date range">{([['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', 'All']] as const).map(([value, label]) => <button type="button" key={value} className={prRange === value ? 'active' : ''} onClick={() => setPrRange(value)}>{label}</button>)}</div>
-      {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in this range. Try “Calculated Max” to include multi-rep sets.` : `Not enough ${selectedLift} sets in this range to chart.`}</p>}
+      {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in this range. Try “Estimated 1RM” to include multi-rep sets.` : `Not enough ${selectedLift} sets in this range to chart.`}</p>}
       {prStats.best && <div className="kpi-grid ic-chart-kpis">
         <div className="kpi-tile"><b>{prStats.best.weight} {unit}</b><span>Weight lifted</span><small>{prStats.best.reps > 1 ? `×${prStats.best.reps} reps · ` : ''}{shortDate(prStats.best.date)}</small></div>
-        <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === '1rm' ? '1RM' : 'Calculated max'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
+        <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === '1rm' ? '1RM' : 'Estimated 1RM'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
       </div>}
     </section>}
 

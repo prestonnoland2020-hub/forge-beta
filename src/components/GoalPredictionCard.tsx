@@ -33,7 +33,7 @@ export function GoalPredictionCard({ verdict, date, unit, hoursFirst }: { verdic
     <div className="goal-prediction-head"><span>Forge’s prediction</span><button type="button" className="text-button" aria-expanded={open} onClick={() => setOpen(value => !value)}>{open ? 'Hide' : 'How Forge predicts'}</button></div>
     <OnboardingGoalPath path={path} date={date} />
     {open && <ul className="goal-prediction-rules">
-      <li><b>Now</b> is {race ? 'what your logged runs are worth at this distance today' : 'your best calculated max from logged top sets — or the best you entered, until you log one'}.</li>
+      <li><b>Now</b> is {race ? 'what your logged runs are worth at this distance today' : 'your best estimated 1-rep max from logged top sets — or the best you entered, until you log one'}.</li>
       <li><b>Typical</b> is where most athletes land: {race ? 'about 0.6% faster a week, for longer on longer races' : 'about 0.35% a week for 12 weeks, then slower'}{race ? '' : ' — or your own rate, once a lift has 12 weeks of history'}.</li>
       <li><b>Best case</b> is the most training finds: {race ? 'about 1% a week, scaled up for half and full marathons' : 'about 1% a week for 12 weeks, then ¼%; new lifts climb faster at first'}.</li>
       <li>{race ? 'These rates come from coaching practice and are being checked against real Forge results.' : 'These rates come from real Forge training history.'} Forge records this prediction and checks it against what you actually hit on {shortDate(date)}, so the model keeps getting more accurate.</li>

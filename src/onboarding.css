@@ -223,3 +223,16 @@ textarea.ob-input{min-height:96px;resize:vertical}
 .goal-prediction .ob-path-head strong{font-size:14px}
 .goal-prediction-rules{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px;line-height:1.45;color:var(--muted)}
 .goal-prediction-rules b{color:var(--text)}
+
+/* Consent: required vs optional are visibly different groups. */
+.ob-check-group{margin:8px 0 -6px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ob-screen .setup-check.required{border-color:color-mix(in srgb,var(--accent) 35%,var(--border))}
+.ob-screen .setup-check.required.done{border-color:var(--accent);background:color-mix(in srgb,var(--tint) 8%,var(--surface-sunken))}
+.ob-screen .setup-check.optional{border-style:dashed}
+.ob-screen .setup-check.nudge{animation:ob-nudge .5s ease;border-color:var(--accent)}
+@keyframes ob-nudge{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@media (prefers-reduced-motion:reduce){.ob-screen .setup-check.nudge{animation:none}}
+.ob-next.waiting{opacity:.55}
+/* The last agreement must be able to scroll clear of the sticky action bar. */
+.ob-screen{scroll-padding-bottom:160px}
+.ob-screen:has(.setup-check.required){padding-bottom:140px}

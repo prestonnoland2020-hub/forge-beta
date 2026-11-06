@@ -311,18 +311,23 @@ function OnboardingForm() {
     const pounds = EXAMPLES[data.sex || 'Unspecified'][lift] || EXAMPLES[data.sex || 'Unspecified']['Back Squat'];
     return String(data.units === 'Metric' ? Math.round(pounds / 2.2046 / 2.5) * 2.5 : pounds);
   };
-  const startingList = shownLifts.map(lift => ({ lift, weight: Number(numberFor(lift).weight), reps: Number(numberFor(lift).reps) }))
+  const startingList = shownLifts.map(lift => ({ lift, weight: Number(numberFor(lift).weight), reps: Number(numberFor(lift).reps.trim() || '5') }))
     .filter(item => item.weight > 0 && item.weight <= 1500 && item.reps >= 1 && item.reps <= 20);
   /* WHAT A TOP SET IS WORTH, AS THEY TYPE IT. One heavy set is enough to
      estimate a max, and the max is what every later weight is written from;
      showing the estimate and what it means at other reps is the explanation. */
   const plate = data.units === 'Metric' ? 2.5 : 5;
-  const maxFor = (lift: string) => { const value = numberFor(lift); return calculateEstimatedOneRepMax(Number(value.weight), Number(value.reps)) || 0; };
+  /* REPS DEFAULT TO THE 5 THE FIELD SHOWS. Testers typed a weight, left reps
+     on its grey "5", and were stopped with an error -- 21 of 55 tripped on
+     these fields. A weight with no reps now reads as a set of five. */
+  const repsOrDefault = (reps: string) => reps.trim() || '5';
+  const maxFor = (lift: string) => { const value = numberFor(lift); return value.weight.trim() ? calculateEstimatedOneRepMax(Number(value.weight), Number(repsOrDefault(value.reps))) || 0 : 0; };
   const atReps = (max: number, reps: number) => Math.round(weightForReps(max, reps) / plate) * plate;
   const goalLiftMax = goalKind === 'lift' && goalUnit !== 'reps' ? maxFor(goalExercise) : 0;
-  const halfFilled = shownLifts.filter(lift => { const value = numberFor(lift); return Boolean(value.weight.trim()) !== Boolean(value.reps.trim()); });
+  const halfFilled = shownLifts.filter(lift => { const value = numberFor(lift); return !value.weight.trim() && Boolean(value.reps.trim()); });
   const submitNumbers = () => {
-    if (halfFilled.length) return fail(`Add ${numberFor(halfFilled[0]).weight.trim() ? 'reps' : 'a weight'} for ${CORE_LIFT_LABELS[halfFilled[0]] || halfFilled[0]}, or tap ✕ to skip it.`);
+    if (halfFilled.length) return fail(`Add a weight for ${CORE_LIFT_LABELS[halfFilled[0]] || halfFilled[0]}, or tap ✕ to skip it.`);
+    shownLifts.forEach(lift => { const value = numberFor(lift); if (value.weight.trim() && !value.reps.trim()) setNumber(lift, 'reps', '5'); });
     tap(); go(1);
   };
   /* A HYROX athlete who said Female or Male gets that Open division
@@ -438,6 +443,14 @@ function OnboardingForm() {
   const nameReady = Boolean(data.displayName.trim());
   const targetReady = Boolean(goalTarget.trim()) && (goalExercise !== 'HYROX' || Boolean(division));
   const safetyNeeded = !isEditing && (!data.acceptedSafety || !agreedTerms || !healthConsent);
+  const missingAgreements = isEditing ? 0 : [agreedTerms, healthConsent, data.acceptedSafety].filter(value => !value).length;
+  const showMissingAgreement = () => {
+    tap();
+    const box = document.querySelector<HTMLElement>('.ob-screen .setup-check.required:not(.done)');
+    if (!box) return;
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box.classList.remove('nudge'); void box.offsetWidth; box.classList.add('nudge');
+  };
   const STEP_FORM = 'ob-step-form';
 
   /* Each screen is a body and, where something has to be confirmed rather
@@ -542,7 +555,7 @@ function OnboardingForm() {
       case 'numbers': return {
         body: <>
           <h1>What can you lift right now?</h1>
-          <p className="ob-lead">One top set per lift: a heavy set you could repeat today. It tells Forge your max, and the top set you log each workout keeps it current. Tap ✕ on any you don’t know.</p>
+          <p className="ob-lead">One top set per lift: a heavy set you could repeat today. Just the weight is fine — reps count as 5 unless you change them. Tap ✕ on any you don’t know.</p>
           <div className="ob-numbers">{shownLifts.map(lift => {
             const value = numberFor(lift);
             const name = CORE_LIFT_LABELS[lift] || lift;
@@ -594,20 +607,26 @@ function OnboardingForm() {
               </div>}
             </section>;
           })}</div>
-          <label className="setup-check"><input type="checkbox" checked={data.injuryConstraint} onChange={event => { tap(); set('injuryConstraint', event.target.checked); }} /><span><strong>I have an injury or limitation</strong><small>Forge will train around it.</small></span></label>
-          {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
-          {!isEditing && <label className="setup-check"><input type="checkbox" checked={agreedTerms} onChange={event => { tap(); setError(''); setAgreedTerms(event.target.checked); }} /><span><strong>I’m 18 or older and I agree to the Terms of Use and Privacy Policy.</strong><small><a className="text-button" href="#/legal/terms" target="_blank" rel="noreferrer">Read the Terms</a> · <a className="text-button" href="#/legal/privacy" target="_blank" rel="noreferrer">Read the Privacy Policy</a></small></span></label>}
-          {!isEditing && <label className="setup-check"><input type="checkbox" checked={healthConsent} onChange={event => { tap(); setError(''); setHealthConsent(event.target.checked); }} /><span><strong>I consent to Forge using the health information I record — body weight, check-ins and injury notes — to build and adjust my training.</strong><small>Never sold, never used for ads. Withdraw any time by deleting it. <a className="text-button" href="#/legal/health" target="_blank" rel="noreferrer">Consumer Health Data Notice</a></small></span></label>}
-          {!isEditing && <label className="setup-check safety"><input type="checkbox" checked={data.acceptedSafety} onChange={event => { tap(); set('acceptedSafety', event.target.checked); }} /><span><strong>I understand Forge is training guidance, not medical advice, and I’ll stop and report any pain.</strong><small><button type="button" className="text-button" onClick={() => setSafetyOpen(value => !value)}>{safetyOpen ? 'Hide details' : 'Read details'}</button></small></span></label>}
+          {!isEditing && <p className="ob-check-group">Required to start · {3 - missingAgreements} of 3 ticked</p>}
+          {!isEditing && <label className={agreedTerms ? 'setup-check required done' : 'setup-check required'}><input type="checkbox" checked={agreedTerms} onChange={event => { tap(); setError(''); setAgreedTerms(event.target.checked); }} /><span><strong>I’m 18 or older and I agree to the Terms of Use and Privacy Policy.</strong><small><a className="text-button" href="#/legal/terms" target="_blank" rel="noreferrer">Read the Terms</a> · <a className="text-button" href="#/legal/privacy" target="_blank" rel="noreferrer">Read the Privacy Policy</a></small></span></label>}
+          {!isEditing && <label className={healthConsent ? 'setup-check required done' : 'setup-check required'}><input type="checkbox" checked={healthConsent} onChange={event => { tap(); setError(''); setHealthConsent(event.target.checked); }} /><span><strong>I consent to Forge using the health information I record — body weight, check-ins and injury notes — to build and adjust my training.</strong><small>Never sold, never used for ads. Withdraw any time by deleting it. <a className="text-button" href="#/legal/health" target="_blank" rel="noreferrer">Consumer Health Data Notice</a></small></span></label>}
+          {!isEditing && <label className={data.acceptedSafety ? 'setup-check safety required done' : 'setup-check safety required'}><input type="checkbox" checked={data.acceptedSafety} onChange={event => { tap(); set('acceptedSafety', event.target.checked); }} /><span><strong>I understand Forge is training guidance, not medical advice, and I’ll stop and report any pain.</strong><small><button type="button" className="text-button" onClick={() => setSafetyOpen(value => !value)}>{safetyOpen ? 'Hide details' : 'Read details'}</button></small></span></label>}
           {safetyOpen && <div className="disclaimer-copy">
             <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
             <p>Strength and endurance training carry real risk. Check with a physician before starting or changing a program — especially with a heart condition, injury, chronic illness, or during pregnancy. Stop any exercise that causes pain, dizziness, or unusual shortness of breath.</p>
             <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue in Ask Forge so training can work around it — and see a professional when something does not resolve.</p>
           </div>}
+          {/* OPTIONAL, AND SAYS SO. Testers read "tick the boxes" and ticked this
+              one too -- it looked exactly like the three required agreements. */}
+          <p className="ob-check-group">Optional</p>
+          <label className="setup-check optional"><input type="checkbox" checked={data.injuryConstraint} onChange={event => { tap(); set('injuryConstraint', event.target.checked); }} /><span><strong>I have an injury or limitation</strong><small>Forge will train around it.</small></span></label>
+          {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
         </>,
         action: <>
-          {safetyNeeded && !error && <p className="ob-action-hint">Tick the three boxes above to continue</p>}
-          <button className="button ob-next" disabled={saving || safetyNeeded} onClick={finish}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
+          {safetyNeeded && !error && <p className="ob-action-hint">{missingAgreements === 1 ? 'Tick 1 more required box to continue' : `Tick ${missingAgreements} more required boxes to continue`}</p>}
+          {/* NOT DISABLED. A greyed button gave no reason; testers tapped it over
+              and over. A tap now scrolls to the first unticked agreement. */}
+          <button className={safetyNeeded ? 'button ob-next waiting' : 'button ob-next'} disabled={saving} onClick={() => { if (safetyNeeded) { showMissingAgreement(); return; } void finish(); }}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
         </>,
         };
       }
