@@ -74,7 +74,7 @@ export function GarminConnectPrompt() {
       <header>
         <div>
           <BrandMark id="garmin" name="Garmin" />
-          <span className="eyebrow">NEW · DIRECT FROM GARMIN</span>
+          <span className="eyebrow">New · direct from Garmin</span>
           <strong id="garmin-prompt-title">Connect your Garmin</strong>
         </div>
         <button type="button" className="strava-review-close" onClick={later} aria-label="Not now">×</button>

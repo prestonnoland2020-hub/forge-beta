@@ -62,7 +62,7 @@
 .top-set-check {
   width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center;
   border: 2px solid var(--hairline-strong, var(--line)); color: var(--accent-contrast, #fff);
-  transition: background-color .2s ease, border-color .2s ease, transform .25s cubic-bezier(.3, 1.4, .5, 1);
+  transition: background-color .2s ease, border-color .2s ease, transform .25s cubic-bezier(.2, .8, .2, 1);
 }
 .top-set-check.done { background: var(--accent); border-color: var(--accent); transform: scale(1.04); }
 .top-set-row-name { display: grid; gap: 2px; font-size: 18px; font-weight: 800; min-width: 0; }
@@ -100,10 +100,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .workout-finish-bar {
   position: sticky; bottom: 0; z-index: 6; display: grid; gap: 12px;
   margin: 0 calc(-1 * var(--gutter, 16px)); padding: 18px var(--gutter, 16px) calc(12px + var(--safe-b, env(safe-area-inset-bottom)));
-  /* Fades to the ground the page is actually painted with at the bottom of
-     the screen. --bg is a shade lighter than that ground, so the bar showed
-     as a pale box under the Finish button. */
-  background: linear-gradient(to bottom, transparent, var(--surface-sunken, var(--bg)) 24px);
+  background: linear-gradient(to bottom, transparent, var(--bg) 24px);
 }
 .workout-finish-bar .save-workout {
   position: static !important; width: 100% !important; box-shadow: none !important;

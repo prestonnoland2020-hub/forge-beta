@@ -186,11 +186,14 @@
   /* A card in light tone floats on the page with this, not an outline: two
      soft layers, the way iOS lifts a grouped list off its background. Dark
      tone needs no shadow, because the step in surface does the lifting. */
-  --shadow-card: 0 1px 2px rgba(20, 24, 26, .04), 0 6px 20px rgba(20, 24, 26, .05);
+  /* THE LOGBOOK: a card is a ruled page, not a floating tile — a 1px line
+     does the separating in both tones, so no card carries a shadow. */
+  --shadow-card: none;
   --fs-label: 12px; --fs-small: 14px; --fs-body: 16px; --fs-lead: 18px; --fs-title: 20px;
   --fs-h2: 26px; --fs-h1: 40px; --fs-numeral: 64px; --fs-hero: 72px;
   --dur-tap: 90ms; --dur-quick: 160ms; --dur-standard: 280ms; --dur-emphasis: 420ms; --dur-signature: 1200ms;
-  --ease-settle: cubic-bezier(.2, 1.5, .4, 1);
+  /* No overshoot anywhere: things arrive and stop. */
+  --ease-settle: cubic-bezier(.2, .8, .2, 1);
   --ease-clear: cubic-bezier(.4, 0, 1, 1);
   --ease-respond: cubic-bezier(0, 0, .2, 1);
 
@@ -212,8 +215,12 @@
   --display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
-  --title-weight: 900;
-  --title-stretch: 112%;
+  /* Every number an athlete reads — a load, a rep count, a max — is set in
+     Geist Mono, so the app reads like a training log: the numbers line up
+     and look like records, the words around them stay SF Pro. */
+  --num: 'Geist Mono', var(--mono);
+  --title-weight: 700;
+  --title-stretch: 100%;
   --title-tracking: -.02em;
 }
 
@@ -283,7 +290,7 @@
     --mark-face: #f3f5f5;
     --mark-shade: #7b807e;
     --mark-shadow: rgba(0, 0, 0, .34);
-    --page-glow: var(--accent-wash);
+    --page-glow: transparent;
     --grid-line: rgba(255, 255, 255, .035);
   }
 }
@@ -339,7 +346,7 @@
   --mark-face: #f3f5f5;
   --mark-shade: #7b807e;
   --mark-shadow: rgba(0, 0, 0, .34);
-  --page-glow: var(--accent-wash);
+  --page-glow: transparent;
   --grid-line: rgba(255, 255, 255, .035);
 }
 

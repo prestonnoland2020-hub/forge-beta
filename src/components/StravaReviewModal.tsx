@@ -261,7 +261,7 @@ export function StravaReviewModal() {
     <div className="strava-review-sheet">
       <header>
         <div>
-          <span className="eyebrow">SYNCED FROM {source.toUpperCase()}</span>
+          <span className="eyebrow">Synced from {source.toUpperCase()}</span>
           <strong>{cardioOnly ? record.title : 'Log this workout'}</strong>
           <small>{[dateLabel, watchLength, cardio?.summary].filter(Boolean).join(' · ')}</small>
         </div>

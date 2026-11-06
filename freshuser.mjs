@@ -52,10 +52,10 @@ const between = (t, a, len) => { const i = t.indexOf(a); return i < 0 ? '' : t.s
   const todayDay = between(home, 'UP NEXT\n', 60).split('\n')[1];
   await p.evaluate(() => { location.hash = '#/plan'; }); await p.waitForTimeout(2200);
   const plan = await text(p);
-  const planDay = between(plan, 'TODAY ·', 80).split('\n')[1];
+  const planDay = between(plan, 'Today ·', 80).split('\n')[1];
   check(`Today says ${todayDay}`, todayDay === 'Chest & Back', todayDay);
   check('and the Plan tab says the same', planDay === todayDay, planDay);
-  check('the goal lift sits on Lower Body, not the first strength day', !/TODAY[^]*?Back Squat[^]*?THIS WEEK/.test(plan) && /Lower Body\nTop set · Back Squat/.test(plan), between(plan, 'TODAY ·', 120));
+  check('the goal lift sits on Lower Body, not the first strength day', !/TODAY[^]*?Back Squat[^]*?THIS WEEK/.test(plan) && /Lower Body\nTop set · Back Squat/.test(plan), between(plan, 'Today ·', 120));
 
   console.log('\nThe logger keeps its day until it is finished');
   await p.evaluate(() => { location.hash = '#/'; }); await p.waitForTimeout(1200);
@@ -68,7 +68,7 @@ const between = (t, a, len) => { const i = t.indexOf(a); return i < 0 ? '' : t.s
   const btn = await p.$('button.save-workout'); await btn.scrollIntoViewIfNeeded(); await btn.click(); await p.waitForTimeout(2000);
   check('Finish Day leaves the logger', /#\/$/.test(p.url()), p.url());
   t = await text(p);
-  check('and Home shows the day complete with the set on it', /TODAY · COMPLETE\nChest & Back/.test(t) && /185 lb ×5/.test(t), between(t, 'TODAY ·', 80));
+  check('and Home shows the day complete with the set on it', /Today · complete\nChest & Back/i.test(t) && /185 lb ×5/.test(t), between(t, 'Today ·', 80));
   check('no check-in interrupts a day already trained', !/how are you holding up/.test(t));
   await c.close();
 }
