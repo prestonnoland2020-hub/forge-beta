@@ -100,7 +100,10 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .workout-finish-bar {
   position: sticky; bottom: 0; z-index: 6; display: grid; gap: 12px;
   margin: 0 calc(-1 * var(--gutter, 16px)); padding: 18px var(--gutter, 16px) calc(12px + var(--safe-b, env(safe-area-inset-bottom)));
-  background: linear-gradient(to bottom, transparent, var(--bg) 24px);
+  /* Fades to the ground the page is actually painted with at the bottom of
+     the screen. --bg is a shade lighter than that ground, so the bar showed
+     as a pale box under the Finish button. */
+  background: linear-gradient(to bottom, transparent, var(--surface-sunken, var(--bg)) 24px);
 }
 .workout-finish-bar .save-workout {
   position: static !important; width: 100% !important; box-shadow: none !important;
