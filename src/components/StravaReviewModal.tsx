@@ -308,7 +308,7 @@ export function StravaReviewModal() {
           <DialField label="Weight" kind="weight" unit="lb" value={weight} onChange={setWeight} />
           <DialField label="Reps" kind="reps" value={reps} onChange={setReps} />
         </div>}
-        {hasTopSet && max ? <small className="strava-review-max">{Number(reps) === 1 ? 'Real 1RM' : 'Calculated max'} {max}</small> : null}
+        {hasTopSet && max ? <small className="strava-review-max">{Number(reps) === 1 ? 'Real 1RM' : 'Est. 1-rep max'} {max}</small> : null}
         {hasTopSet && <button type="button" className="button ghost" onClick={addSet}>＋ Add another lift</button>}
       </section>}
 

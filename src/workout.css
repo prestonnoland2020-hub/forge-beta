@@ -293,3 +293,6 @@
 /* Side by side, "Looks right" and "Save this day" each broke onto two lines
    at phone width; stacked, each reads as one. */
 @media (max-width:420px){.strava-review-sheet footer{grid-template-columns:1fr}}
+.dial-type{display:flex;justify-content:center;padding:4px 16px 12px}
+.dial-type .text-button{background:none;border:0;color:var(--accent-text);font-weight:700;font-size:14px;padding:8px 12px;text-decoration:underline}
+.dial-type input{width:140px;text-align:center;font:800 22px var(--display-font);padding:10px 12px;border-radius:12px;border:1px solid var(--accent);background:var(--surface-sunken);color:var(--text)}

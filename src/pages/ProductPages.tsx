@@ -45,8 +45,8 @@ function CompletedDayReview({record,unit,records,metric}:{record:WorkoutRecord;u
         const isPr=max>0&&max>priorBest(set.lift);
         return <article className={isPr?'is-pr':''} key={`${set.lift}-${index}`}>
           <div><strong>{set.lift}</strong><small>{set.muscle}</small></div>
-          <div><b>{set.weight} {unit} <em>×</em> {set.reps}</b><small>{set.reps===1?`Real 1RM ${set.weight} ${unit}`:max?`Calc max ${max} ${unit}`:'Calculated max unavailable'}</small></div>
-          {isPr&&<i className="pr-flag" title="Best calculated max on record">PR</i>}
+          <div><b>{set.weight} {unit} <em>×</em> {set.reps}</b><small>{set.reps===1?`Real 1RM ${set.weight} ${unit}`:max?`Est. 1-rep max ${max} ${unit}`:'Estimate unavailable'}</small></div>
+          {isPr&&<i className="pr-flag" title="Best estimated 1-rep max on record">PR</i>}
         </article>;
       })}</div>
     </section>}
