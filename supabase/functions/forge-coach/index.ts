@@ -326,6 +326,19 @@ Return one editable cardio/circuit using only exact movement names and units in 
       console.warn('forge-coach-schema-rejected', await aiResponse.text().catch(() => ''));
       aiResponse = await askProvider({ ...providerPayload, text: { verbosity: 'low' } });
     }
+    /* A 429 is either a burst over the account's rate limit, which clears in
+       seconds, or `insufficient_quota`, which never clears until billing is
+       topped up. Retry the first once; log the body either way so the two are
+       told apart in the function logs instead of both reading "(429)". */
+    if (aiResponse.status === 429) {
+      const detail = await aiResponse.text().catch(() => '');
+      console.warn('forge-coach-provider-429', detail);
+      if (!detail.includes('insufficient_quota')) {
+        const wait = Math.min(Number(aiResponse.headers.get('retry-after')) || 2, 5);
+        await new Promise(resolve => setTimeout(resolve, wait * 1000));
+        aiResponse = await askProvider(providerPayload);
+      }
+    }
     if (!aiResponse.ok) throw new Error(`Coach service failed (${aiResponse.status}).`);
     const responseBody = await aiResponse.json();
     const answer = outputText(responseBody);
