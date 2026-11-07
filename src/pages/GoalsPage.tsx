@@ -7,7 +7,7 @@ import { useVo2Version } from '../features/training/useVo2Version';
 import { GoalPredictionCard } from '../components/GoalPredictionCard';
 import { goalFeasibility } from '../lib/goalFeasibility';
 import { expectedRunMiles, goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
-import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
+import { predictRaceFromLegacyMethod, testedRaceSeconds } from '../lib/cardioPrediction';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -83,10 +83,14 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const enduranceNow = useMemo(() => goals.map(goal => {
     if (goal.type !== 'Endurance') return null;
     const miles = expectedRunMiles(goal);
-    return miles ? predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null : null;
-  }), [goals, records, setup?.excludedEfforts, workouts, vo2Version]);
+    if (!miles) return null;
+    /* Estimated is the race predictor; tested is a time actually run at the
+       distance — the same switch the strength goals use. */
+    return maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || []) : predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
+  }), [goals, records, setup?.excludedEfforts, workouts, vo2Version, maxMode]);
   const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
+  const hasRunTime = goals.some(goal => goal.type === 'Endurance' && /mm:ss|hh:mm/i.test(String(goal.unit || goal.target || '')) && expectedRunMiles(goal) !== null);
   /* The bars start empty and fill one frame after the page mounts, so the
      width transition runs; each card is a beat behind the one above it. */
   const [filled, setFilled] = useState(false);
@@ -133,13 +137,15 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
        near the top of a phone; on a wide screen they sit side by side. */}
     <div className="gx-head">
     {/* A switch should look like one: a label saying what it switches, a thumb that slides, and a line saying what the chosen side counts. */}
-    {hasStrength && <div className="gx-mode" data-mode={maxMode}>
-      <span className="gx-mode-label" id="gx-mode-label">Strength goals use</span>
+    {(hasStrength || hasRunTime) && <div className="gx-mode" data-mode={maxMode}>
+      <span className="gx-mode-label" id="gx-mode-label">{hasStrength && hasRunTime ? 'Strength and running goals use' : hasStrength ? 'Strength goals use' : 'Running goals use'}</span>
       <div className="gx-mode-track" role="radiogroup" aria-labelledby="gx-mode-label">
         <i className="gx-mode-thumb" aria-hidden="true" />
         {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Estimated max' : 'Tested max'}</button>)}
       </div>
-      <p className="gx-mode-hint">{maxMode === 'calculated' ? 'Estimated from your best rep sets.' : 'Only singles you actually lifted.'}</p>
+      <p className="gx-mode-hint">{maxMode === 'calculated'
+        ? (hasStrength && hasRunTime ? 'Estimated from your best sets and runs.' : hasStrength ? 'Estimated from your best rep sets.' : 'Predicted from your best runs.')
+        : (hasStrength && hasRunTime ? 'Only singles you lifted and distances you ran.' : hasStrength ? 'Only singles you actually lifted.' : 'Only times you actually ran at the distance.')}</p>
     </div>}
 
     {goals.length > 0 && (() => {
@@ -188,7 +194,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
             <button className="gx-face" onClick={() => { tap(); toggleGoal(index); }} aria-expanded={isOpen}>
               <span className="gx-top"><strong className="gx-title">{goal.title}</strong><span className={`gx-pill tone-${item.tone}`}>{item.label}</span></span>
               <span className="gx-numbers">
-                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'calc max') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
+                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'calc max') : goal.type === 'Endurance' && item.current !== null && item.currentText.includes(':') ? (maxMode === 'tested' ? 'tested' : 'est.') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
                 <span className="gx-arrow" aria-hidden="true"><Icon name="arrow" size={14}/></span>
                 <span className="gx-target">{item.targetText}<small>goal</small></span>
               </span>

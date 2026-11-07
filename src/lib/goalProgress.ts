@@ -116,6 +116,9 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
     /* For a time goal the predictor wins over a typed starting time — it is
        built from what was actually run, and the goal detail already shows it
        as CURRENT. A typed time stays the fallback when nothing is logged. */
+    /* TESTED, for a time goal, is a time actually run at the distance (the
+       page hands it over as enduranceNow) or a time typed on the goal — never
+       the prediction. With neither there is no bar, and it says why. */
     current = (time && enduranceNow ? enduranceNow : entered) || null;
     if (current && target) share = clamp01(time ? target / current : current / target);
   }
@@ -126,6 +129,6 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
     : verdict.verdict === 'reachable' ? 'on-track'
     : verdict.verdict === 'out-of-reach' ? 'off-track'
     : 'needs-work';
-  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (goal.type === 'Strength' && mode === 'tested' && goal.unit !== 'reps' ? 'No tested max yet' : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
+  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? 'No tested time yet' : 'No tested max yet') : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
   return { share, current, currentText: current ? show(current) : '—', targetText: target ? show(target) : String(goal.target || ''), tone, label };
 }
