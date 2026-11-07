@@ -6,6 +6,7 @@ import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { lastCompletedSet } from './LastPerformance';
 import { STRENGTH_MUSCLES } from './TopSetSheet';
 import { tap } from '../lib/haptics';
+import { topSetRecord, type RecordResult } from '../lib/personalRecords';
 
 type Props = {
   sets: LoggedTopSet[];
@@ -49,6 +50,18 @@ const setKey = (set: LoggedTopSet) => set.id || `${set.muscle}::${set.lift}::${s
    while its numbers are being filled in. */
 const rowKey = (set: LoggedTopSet, index: number) => set.id || `${set.muscle}::${set.lift}::${index}`;
 
+/* The line under a saved set that says it was a record. A new calculated max
+   is acknowledged here and only here — no pop-up. A real 1RM PR gets the
+   confetti on save, and keeps this line afterwards so the day remembers it. */
+const recordLabel = (record: RecordResult, unit: string) => record.kind === 'oneRepMax'
+  ? '1RM PR'
+  : `New calc max · ${record.value}`;
+const PrBadge = ({ record, unit, fresh }: { record: RecordResult; unit: string; fresh: boolean }) =>
+  <small className={`top-set-pr ${record.kind === 'oneRepMax' ? 'big' : 'calc'}${fresh ? ' fresh' : ''}`}>
+    <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" /></svg>
+    {recordLabel(record, unit)}
+  </small>;
+
 
 /* A SAVED SET IS A LINE, NOT A CARD. Every set rendered as a full card whether
    it was still being filled in or already logged, so a day with four lifts on
@@ -91,6 +104,12 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
     setSwipeOffset(current => (current < -REVEAL / 2 ? -REVEAL : 0));
   };
   const closeSwipe = () => { setSwipedKey(null); setSwipeOffset(0); };
+  /* A record badge animates in once, when the set becomes saved while this
+     screen is open — not every time a day that already holds a record is
+     opened. The confetti for a real 1RM PR is the parent's: it fires on every
+     save path, the add-a-lift sheet included. */
+  const loggedAtMount = useRef<Set<string> | null>(null);
+  if (loggedAtMount.current === null) loggedAtMount.current = new Set(loggedKeys);
   const [creatingExercise, setCreatingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [newExerciseMuscles, setNewExerciseMuscles] = useState<string[]>([]);
@@ -158,6 +177,8 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
       const displayedSet = isCorrecting ? editDraft : set;
       const previous = displayedSet.lift ? lastCompletedSet(records.filter(record => record.date < date), displayedSet.lift) : undefined;
       const max = displayedSet.weight && displayedSet.reps ? calculateEstimatedOneRepMax(displayedSet.weight, displayedSet.reps) : null;
+      const record = logged && !isCorrecting ? topSetRecord(records, set, date) : null;
+      const fresh = Boolean(record && !loggedAtMount.current?.has(setKey(set)));
       const changeDisplayedSet = (change: Partial<LoggedTopSet>) => {
         if (isCorrecting) setEditDraft(current => current ? { ...current, ...change } : current);
         else onChange(index, change);
@@ -198,7 +219,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
                 as how much is left, at a glance. */}
             <button type="button" className="top-set-row" aria-expanded="false" onClick={() => { if (offset) { closeSwipe(); return; } tap(); toggle(set, index); }}>
               <span className={logged ? 'top-set-check done' : 'top-set-check'} aria-hidden="true">{logged && <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5 10 17l9-10" /></svg>}</span>
-              <span className="top-set-row-name">{set.lift}{!logged && askText && <small>Today {askText}</small>}</span>
+              <span className="top-set-row-name">{set.lift}{!logged && askText && <small>Today {askText}</small>}{record && <PrBadge record={record} unit={unit} fresh={fresh} />}</span>
               {logged
                 ? <span className="top-set-row-figures">{set.weight} {unit} × {set.reps}</span>
                 : <span className="top-set-row-log">Log</span>}
@@ -212,7 +233,7 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
           <button type="button" className="top-set-entry-toggle" aria-expanded="true" onClick={() => { if (isCorrecting) { cancelCorrection(); return; } tap(); toggle(set, index); }}><h3>{displayedSet.lift || 'Choose a lift'}</h3></button>
           {logged && !isCorrecting ? <div className="logged-top-set-actions"><button type="button" className="text-button" onClick={() => startCorrection(set, index)}>Edit</button><button type="button" className="text-button danger" onClick={() => onDeleteLogged(index, set)}>Delete</button></div> : isCorrecting ? <button type="button" className="text-button" onClick={cancelCorrection}>Cancel</button> : null}
         </div>
-        {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} × {set.reps}</strong>{max ? <small>About {max} {unit} for one rep</small> : null}</div> : <>
+        {logged && !isCorrecting ? <div className="logged-top-set-summary"><strong>{set.weight} {unit} × {set.reps}</strong>{max ? <small>About {max} {unit} for one rep</small> : null}{record && <PrBadge record={record} unit={unit} fresh={false} />}</div> : <>
           {(!displayedSet.lift || swapKey === rowKey(set, index)) && <label className="top-set-exercise-field">Lift<select value={displayedSet.lift} onChange={event => { if (event.target.value === '__new__') { setCreatingExercise(true); setCreateError(''); return; } chooseExercise(event.target.value); }}><option value="">Choose exercise</option>{options.map(exercise => <option key={exercise.id}>{exercise.name}</option>)}<option value="__new__">＋ Add a new exercise…</option></select></label>}
           {/* ONE LINE OF CONTEXT, not two labelled boxes: what the plan asks
               for today, else what you did last time, else that this is the

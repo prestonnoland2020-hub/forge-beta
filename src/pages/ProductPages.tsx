@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageIntro, Metric } from '../components/AppShell';
 import { openCoachBubble } from '../features/training/coachService';
@@ -10,6 +10,9 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioMiles, formatCardioSummary, isLoggedCardio, summarizeCardioDraft, type CardioLogDraft } from '../lib/cardioSession';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { TopSetCards } from '../components/TopSetCards';
+import { PrCelebration } from '../components/PrCelebration';
+import { topSetRecord } from '../lib/personalRecords';
+import { success as successHaptic } from '../lib/haptics';
 import { TopSetSheet, type TopSetDraft } from '../components/TopSetSheet';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
 import { sameLift, primaryMusclesFor, canonicalLiftKey } from '../lib/liftAliases';
@@ -210,6 +213,8 @@ function WorkoutEditor() {
   const [topSets,setTopSets]=useState<LoggedTopSet[]>(initialTopSets);
   /* One way to add a top set: the sheet. */
   const [addingTopSet,setAddingTopSet]=useState(false);
+  const [prCelebration,setPrCelebration]=useState<{lift:string;weight:number;previous:number|null}|null>(null);
+  const dismissPrCelebration=useCallback(()=>setPrCelebration(null),[]);
   const openTopSetSheet=()=>{interacted.current=true;setAddingTopSet(true)};
   const [saved,setSaved]=useState(false);
   const [quickLoggedKeys,setQuickLoggedKeys]=useState<string[]>([]);const [quickLogMessage,setQuickLogMessage]=useState('');
@@ -370,7 +375,11 @@ function WorkoutEditor() {
     const planned=topSets.find(row=>row.prescribedReps&&sameLift(row.lift,set.lift));
     return planned?{prescribedReps:planned.prescribedReps,prescribedWeight:planned.prescribedWeight}:{};
   };
-  const quickLogTopSet=(set:LoggedTopSet)=>{if(!set.lift||!set.weight||!set.reps)return;if(!dayLabel){setQuickLogMessage(noDayReason);return}interacted.current=true;const completed={...set,...prescriptionFor(set),completed:true,calculatedMax:calculateEstimatedOneRepMax(set.weight,set.reps)??undefined};const primary=liftPrimary(set.lift);/* A DAY IS NAMED AFTER THE SPLIT DAY IT IS, NOT THE FIRST LIFT ON IT. Saving
+  const quickLogTopSet=(set:LoggedTopSet)=>{if(!set.lift||!set.weight||!set.reps)return;if(!dayLabel){setQuickLogMessage(noDayReason);return}interacted.current=true;/* A RECORD IS SAID WHEN IT HAPPENS. Judged before the save lands, against
+     everything already logged: a real 1RM PR gets the confetti, a new
+     calculated max gets its line on the set (TopSetCards) and a buzz. */
+    const record=topSetRecord(records,set,sessionIso,false);if(record){successHaptic();if(record.kind==='oneRepMax')setPrCelebration({lift:set.lift,weight:set.weight,previous:record.previous})}
+    const completed={...set,...prescriptionFor(set),completed:true,calculatedMax:calculateEstimatedOneRepMax(set.weight,set.reps)??undefined};const primary=liftPrimary(set.lift);/* A DAY IS NAMED AFTER THE SPLIT DAY IT IS, NOT THE FIRST LIFT ON IT. Saving
      one set created "Top set · Back Squat", so a history of real training days
      read as a list of lifts — and the day carried the lift's muscles alone,
      not the day's. When the session belongs to a split day, that day names it
@@ -584,6 +593,7 @@ function WorkoutEditor() {
     {!editingRecord&&workoutSource==='blank'&&<ForgeWritesIt dateIso={sessionIso} session={written} onSession={setWritten}/>}
     {!topSets.length&&!cardioOnlyDay&&<section className="card form-card top-set-launch"><div className="section-title compact-title"><div><h3>Lifts</h3></div></div><button type="button" className="button add-top-set-button" onClick={openTopSetSheet}>＋ Add a lift</button></section>}
     {addingTopSet&&<TopSetSheet unit={weightUnit} exercises={strengthCatalogue} suggested={allowedStrengthExercises.map(exercise=>exercise.name)} dayMuscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} existing={topSets.map(set=>set.lift).filter(Boolean)} onClose={()=>setAddingTopSet(false)} onSave={saveTopSetFromSheet} blockedReason={noDayReason}/>}
+    {prCelebration&&<PrCelebration lift={prCelebration.lift} weight={prCelebration.weight} previous={prCelebration.previous} unit={weightUnit} onDone={dismissPrCelebration}/>}
     {topSets.length>0&&<TopSetCards planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={loggedTopSetKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={openTopSetSheet} onRemove={removeTopSet} onDeleteLogged={deleteLoggedTopSet} onCreateExercise={createExerciseForTopSet} blockedReason={noDayReason}/>}
     {quickLogMessage&&<div className="quick-log-flash" role="status"><small>{quickLogMessage}</small></div>}
     <CardioBuilder onEntriesChange={(hasEntries,entries)=>{setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions??todayRecord?.cardioSessions} plannedSummary={written&&workoutSource==='blank'?written.summary:usingSplit&&chosenRecommendation?.cardio?.selected?chosenRecommendation.cardio.summary:undefined} plannedCircuit={written&&workoutSource==='blank'?{name:written.name,plan:written.plan}:usingSplit&&chosenRecommendation?.cardio?.selected&&chosenRecommendation.cardio.session.plan.structure==='Circuit'?{name:chosenRecommendation.cardio.title,plan:chosenRecommendation.cardio.session.plan}:undefined}/>
