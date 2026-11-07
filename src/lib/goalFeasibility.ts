@@ -47,6 +47,11 @@ export type Feasibility = {
   say: string;
   /* What would be reachable instead, when the goal is not. */
   insteadOf?: string;
+  /* THE COACH'S SUGGESTED GOAL, ready to apply in one tap: the reachable
+     target for the same date when this one is out of reach, or the next
+     target once this one is reached. targetText is written in the goal's own
+     format ("315", "19:20"); label is what the button row shows. */
+  suggest?: { targetText: string; label: string; why: string; date?: string };
   /* WHAT THE GOAL ACTUALLY NEEDS, AS NUMBERS RATHER THAN A SENTENCE.
      A paragraph telling an athlete to "build to 32 miles a week" is a chore
      list. Given the figures, the app can offer to do it — raise the ceiling
@@ -293,6 +298,7 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
     return { goal: goal.title, prediction: predicted, verdict: 'out-of-reach',
       say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are worth about ${clock(nowAtDistance)} today, so this asks for ${Math.round(shortfall * 100)}% — and ${Math.round(weeks)} weeks ${!pace.measured ? 'of good training' : (pace.secondsPerMilePerWeek || 0) > 0.5 ? `at the rate your heart rate shows you improving (${pace.secondsPerMilePerWeek} s/mi a week)` : 'at your recent rate — pace at the same heart rate has held flat lately —'} buys about ${Math.round(affordable * 100)}%.`,
       insteadOf: `${clock(ceiling)} is the reachable target for this date. Keep ${clock(targetSeconds)} for next year.`,
+      suggest: { targetText: clock(Math.ceil(ceiling)), label: `${clock(Math.ceil(ceiling))} by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`, why: 'Reachable by your date' },
       needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
       change: volume < volumeNeeded * 0.7
         ? `${clock(goalPace)}/mi over ${round1(distance)} mi is normally built on about ${Math.round(volumeNeeded)} miles a week. You are running ${volume.toFixed(0)}.`
@@ -377,11 +383,11 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   const target = Number.parseFloat(String(goal.target).replace(/[^0-9.]/g, ''));
   if (!target || !goal.exercise) return null;
   const weeks = weeksUntil(goal.date);
-  const sets: Array<{ date: string; max: number }> = [];
+  const sets: Array<{ date: string; max: number; weight: number; reps: number }> = [];
   records.forEach(record => (record.topSets || []).forEach(set => {
     if (set.completed === false || !set.lift || !sameLift(set.lift, String(goal.exercise))) return;
     const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
-    if (max > 0) sets.push({ date: record.date, max });
+    if (max > 0) sets.push({ date: record.date, max, weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 });
   }));
   /* NOTHING LOGGED YET IS NOT NOTHING KNOWN. The best entered with the goal
      and the starting set from setup are the numbers the rest of Goals already
@@ -395,8 +401,26 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
       say: `No ${goal.exercise} on file, so there is nothing to project from.`,
       change: `Log one heavy set of ${goal.exercise} and this becomes a real number.` };
   }
-  if (best >= target) return { goal: goal.title, verdict: 'reachable', say: `Reached — your best ${goal.exercise} already estimates ${Math.round(best)}.`,
-    prediction: { start: Math.round(best), typical: Math.round(best), ceiling: Math.round(best), target, better: 'higher', weeks: Math.max(0, Math.round(weeksUntil(goal.date))) } };
+  if (best >= target) {
+    /* SAY WHICH SET, WHEN, AND WHAT IS NEXT. "Reached — your best Bench
+       already estimates 405" told the athlete nothing they could act on. */
+    const top = sets.reduce<(typeof sets)[number] | null>((winner, set) => !winner || set.max > winner.max ? set : winner, null);
+    const over = Math.round(best - target);
+    const when = top ? new Date(`${top.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const tested = top && top.reps === 1;
+    const say = top
+      ? `Reached ${when}: ${top.weight} × ${top.reps} ${tested ? 'is a true single' : `estimates ${Math.round(best)}`}${over > 0 ? `, ${over} over your ${Math.round(target)} goal` : ''}.${tested ? '' : ` A heavy single would confirm it.`}`
+      : `Reached on the number you entered (${Math.round(best)}). Log a heavy set to confirm it.`;
+    /* The next target: what a typical block adds by the same date, or over
+       eight weeks when the date is close. Only offered when it is a real step. */
+    const span = Math.max(8, weeks);
+    const next = Math.floor(liftTypical(best, span, measuredLiftRate(sets)) / 5) * 5;
+    const nextBy = new Date(Date.now() + span * 7 * 86400000).toISOString().slice(0, 10);
+    const nextByLabel = weeks >= 8 ? new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : new Date(`${nextBy}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return { goal: goal.title, verdict: 'reachable', say,
+      ...(next >= best + 5 ? { suggest: { targetText: String(next), label: `${next} ${goal.unit || 'lb'} by ${nextByLabel}`, why: 'Your next target', ...(weeks >= 8 ? {} : { date: nextBy }) } } : {}),
+      prediction: { start: Math.round(best), typical: Math.round(best), ceiling: Math.round(best), target, better: 'higher', weeks: Math.max(0, Math.round(weeksUntil(goal.date))) } };
+  }
   /* An entered best is a lift they already know, not one they are learning. */
   const newLift = sets.length > 0 && new Set(sets.map(set => set.date)).size < NEW_LIFT_SESSIONS;
   const ceiling = liftCeiling(best, weeks, newLift);
@@ -409,7 +433,10 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
     const weeksNeeded = weeksToLift(best, target, newLift);
     return { goal: goal.title, prediction: predicted, verdict: 'out-of-reach',
       say: `Not by ${by}. You are at ${Math.round(best)} and ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks is more than training finds${weeksNeeded ? ` — about ${weeksNeeded} weeks is` : ''}.`,
-      insteadOf: `${Math.round(ceiling / 5) * 5} is the reachable target for this date.` };
+      /* Rounded DOWN to the plate step: rounded up, a 233 ceiling became a
+         235 suggestion that was itself out of reach the moment it was used. */
+      insteadOf: `${Math.floor(ceiling / 5) * 5} is the reachable target for this date.`,
+      suggest: { targetText: String(Math.floor(ceiling / 5) * 5), label: `${Math.floor(ceiling / 5) * 5} ${goal.unit || 'lb'} by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`, why: 'Reachable by your date' } };
   }
   if (target > typical) {
     return { goal: goal.title, prediction: predicted, verdict: 'reachable',

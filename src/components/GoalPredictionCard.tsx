@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../features/billing/BillingProvider';
+import { useGoals } from '../features/goals/GoalsProvider';
 import { nudgeUpgrade } from './UpgradeSheet';
 import type { Feasibility } from '../lib/goalFeasibility';
 import { secondsToClock } from '../lib/goalInput';
@@ -22,14 +23,34 @@ const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateStrin
 function GoalFix({ verdict }: { verdict: Feasibility }) {
   const { isPro, loading } = useBilling();
   const navigate = useNavigate();
-  const fix = [verdict.insteadOf, verdict.change].filter(Boolean).join(' ');
+  const { goals, saveGoal } = useGoals();
+  const [used, setUsed] = useState(false);
+  const suggest = verdict.suggest;
+  /* One row. When the coach has a goal to suggest, that IS the fix -- the
+     sentence version of it (insteadOf) would only repeat it. */
+  const fix = suggest ? '' : [verdict.insteadOf, verdict.change].filter(Boolean).join(' ');
   const behind = verdict.verdict !== 'reachable';
-  useEffect(() => { if (!loading && !isPro && behind && fix) nudgeUpgrade('goal-behind'); }, [loading, isPro, behind, fix]);
-  if (!fix) return null;
-  if (isPro) return <p className="goal-fix"><b>What to change</b>{fix}</p>;
-  return <button type="button" className="goal-fix locked" onClick={() => navigate('/profile?view=billing')}>
-    <b>What to change</b><span>Forge Pro shows the fix for this goal</span><em className="pro-tag">PRO</em>
+  useEffect(() => { if (!loading && !isPro && behind && (fix || suggest)) nudgeUpgrade('goal-behind'); }, [loading, isPro, behind, fix, suggest]);
+  if (!fix && !suggest) return null;
+  if (!isPro) return <button type="button" className="goal-fix locked" onClick={() => navigate('/profile?view=billing')}>
+    <b>{suggest ? 'Coach suggests' : 'What to change'}</b><span>Forge Pro shows {suggest ? 'a goal you can reach' : 'the fix for this goal'}</span><em className="pro-tag">PRO</em>
   </button>;
+  if (!suggest) return <p className="goal-fix"><b>What to change</b>{fix}</p>;
+  const index = goals.findIndex(goal => goal.title === verdict.goal);
+  const apply = () => {
+    if (index < 0) return;
+    const goal = goals[index];
+    const oldTarget = String(goal.target || '').trim();
+    /* "400 lb Bench" -> "425 lb Bench": the title carries the number when the
+       athlete wrote it that way; a title without it is left alone. */
+    const title = oldTarget && goal.title.includes(oldTarget.replace(/\s*lb$/i, '')) ? goal.title.replace(oldTarget.replace(/\s*lb$/i, ''), suggest.targetText) : goal.title;
+    saveGoal({ ...goal, title, target: suggest.targetText, ...(suggest.date ? { date: suggest.date } : {}) }, index);
+    setUsed(true);
+  };
+  return <div className="goal-fix suggest">
+    <span><b>Coach suggests · {suggest.why}</b>{suggest.label}</span>
+    {used ? <em className="goal-fix-done">Goal updated</em> : index >= 0 && <button type="button" className="button small" onClick={apply}>Use it</button>}
+  </div>;
 }
 
 export function GoalPredictionCard({ verdict, date, unit, hoursFirst }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean }) {

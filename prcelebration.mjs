@@ -71,7 +71,7 @@ console.log('\nA new calculated max is a nod');
 await addViaSheet('Back Squat', 305, 5);
 check('no pop-up for a calculated max', !(await has('.pr-celebration')));
 const squat = await rowText('Back Squat');
-check('the line says it is a new calculated max', /New calc max · 343/.test(squat), squat);
+check('the line says it is a new calculated max', /New est. max · 343/.test(squat), squat);
 check('and it animates in, because it just happened', await has('.top-set-pr.calc.fresh'));
 
 console.log('\nA real 1RM PR is the big one');
@@ -91,16 +91,16 @@ console.log('\nNot every set is a record');
 await addViaSheet('Back Squat', 225, 5);
 check('a lighter set gets nothing', !(await has('.pr-celebration')));
 const light = await rowText('Back Squat', '225');
-check('no badge on the lighter set', light && !/calc max|1RM PR/.test(light), JSON.stringify(await rows()));
+check('no badge on the lighter set', light && !/est. max|1RM PR/.test(light), JSON.stringify(await rows()));
 
 console.log('\nA first ever set is a baseline');
 await addViaSheet('Deadlift', 405, 1);
 check('no confetti for a lift with no history', !(await has('.pr-celebration')));
 const dl = await rowText('Deadlift');
-check('and no badge', dl && !/1RM PR|calc max/.test(dl), dl);
+check('and no badge', dl && !/1RM PR|est. max/.test(dl), dl);
 
 await p.reload(); await p.waitForTimeout(2600); await dismissModals();
-check('on reopening the day the records are still marked', /New calc max/.test(await rowText('Back Squat', '305')) && /1RM PR/.test(await rowText('Bench Press')), JSON.stringify(await rows()));
+check('on reopening the day the records are still marked', /New est. max/.test(await rowText('Back Squat', '305')) && /1RM PR/.test(await rowText('Bench Press')), JSON.stringify(await rows()));
 check('but nothing re-animates', !(await has('.top-set-pr.fresh')));
 
 await b.close();

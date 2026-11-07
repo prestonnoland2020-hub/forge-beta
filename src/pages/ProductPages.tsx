@@ -36,7 +36,7 @@ function CompletedDayReview({record,unit,records,metric}:{record:WorkoutRecord;u
   const bestMax=topSets.reduce((best,set)=>Math.max(best,maxOf(set)),0);
   const stats=[
     topSets.length?{key:'sets',label:'Top sets',value:String(topSets.length),suffix:''}:null,
-    bestMax?{key:'max',label:'Best calc max',value:String(bestMax),suffix:unit}:null,
+    bestMax?{key:'max',label:'Best est. max',value:String(bestMax),suffix:unit}:null,
     distance>=0.05?{key:'distance',label:'Distance',value:distance.toFixed(distance<10?2:1),suffix:metric?'km':'mi'}:null,
     minutes>=0.5?{key:'time',label:'Moving time',value:minutes>=60?`${Math.floor(minutes/60)}:${String(Math.round(minutes%60)).padStart(2,'0')}`:String(Math.round(minutes)),suffix:minutes>=60?'hr':'min'}:null,
   ].filter(Boolean) as Array<{key:string;label:string;value:string;suffix:string}>;
