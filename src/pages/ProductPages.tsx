@@ -36,7 +36,7 @@ function CompletedDayReview({record,unit,records,metric}:{record:WorkoutRecord;u
   const bestMax=topSets.reduce((best,set)=>Math.max(best,maxOf(set)),0);
   const stats=[
     topSets.length?{key:'sets',label:'Top sets',value:String(topSets.length),suffix:''}:null,
-    bestMax?{key:'max',label:'Best calc max',value:String(bestMax),suffix:unit}:null,
+    bestMax?{key:'max',label:'Best est. max',value:String(bestMax),suffix:unit}:null,
     distance>=0.05?{key:'distance',label:'Distance',value:distance.toFixed(distance<10?2:1),suffix:metric?'km':'mi'}:null,
     minutes>=0.5?{key:'time',label:'Moving time',value:minutes>=60?`${Math.floor(minutes/60)}:${String(Math.round(minutes%60)).padStart(2,'0')}`:String(Math.round(minutes)),suffix:minutes>=60?'hr':'min'}:null,
   ].filter(Boolean) as Array<{key:string;label:string;value:string;suffix:string}>;
@@ -336,28 +336,41 @@ function WorkoutEditor() {
   const todayRecord=records.find(record=>record.date===sessionIso);
   const cardioKey=(entries:CardioLogDraft[]=[])=>JSON.stringify(entries.map(entry=>`${entry.id}:${entry.summary}`));
   const cardioSignature=useRef(cardioKey(editingRecord?.cardioSessions??todayRecord?.cardioSessions));
+  /* WATCH SESSIONS THAT ARRIVE WHILE THIS SCREEN IS OPEN. The builder holds
+     the cardio list it was opened with, and both saves below write a day's
+     cardio as exactly that list -- so a Garmin run imported while the
+     athlete was lifting was erased the moment they tapped Finish (Nov 7: a
+     2.01 mi run, imported at 11:49, gone at 2:12). Every save now carries
+     forward the synced sessions the stored day has gained, except any the
+     athlete deleted here on purpose. */
+  const removedCardioIds=useRef(new Set<string>());
+  const lastCardioIds=useRef(new Set((editingRecord?.cardioSessions??todayRecord?.cardioSessions??[]).map(entry=>String(entry.id))));
+  const noteCardioRemovals=(entries:CardioLogDraft[])=>{const now=new Set(entries.map(entry=>String(entry.id)));lastCardioIds.current.forEach(id=>{if(!now.has(id))removedCardioIds.current.add(id)});lastCardioIds.current=now};
+  const withSyncedCardio=(entries:CardioLogDraft[],stored?:WorkoutRecord)=>{const have=new Set(entries.map(entry=>String(entry.id)));const missing=(stored?.cardioSessions||[]).filter(session=>/^(garmin|strava|garmin-export)-/.test(String(session.id||''))&&!have.has(String(session.id))&&!removedCardioIds.current.has(String(session.id)));return missing.length?[...entries,...missing]:entries};
   const persistCardio=(allEntries:CardioLogDraft[])=>{
     /* A SESSION NEEDS ONE REAL NUMBER. An entry saved with no distance and no
        time is not a workout: it counts for nothing in mileage, nothing in pace
        history, and it reached Adam's training partner as "Run —". Time alone
        still counts — a 45-minute bike has no distance and is real training. */
+    const target0=editingRecord?records.find(record=>record.id===editingRecord.id)||editingRecord:records.find(record=>record.date===sessionIso);
     const entries=allEntries.filter(isLoggedCardio);
-    const signature=cardioKey(entries);
+    const withWatch=withSyncedCardio(entries,target0);
+    const signature=cardioKey(withWatch);
     if(signature===cardioSignature.current)return;
     interacted.current=true;
-    const target=editingRecord||records.find(record=>record.date===sessionIso);
+    const target=target0;
     /* Adopting what is already stored is not a change worth writing back. */
     if(target&&signature===cardioKey(target.cardioSessions)){cardioSignature.current=signature;return}
     cardioSignature.current=signature;
     if(target){
       const {id,...saved}=target;
-      const muscles=Array.from(new Set([...(saved.muscles||[]).filter(muscle=>muscle!=='Cardio'),...(entries.length?['Cardio']:[])]));
-      updateRecord(id,{...saved,muscles,cardioSessions:entries,hasCardio:entries.length>0});
+      const muscles=Array.from(new Set([...(saved.muscles||[]).filter(muscle=>muscle!=='Cardio'),...(withWatch.length?['Cardio']:[])]));
+      updateRecord(id,{...saved,muscles,cardioSessions:withWatch,hasCardio:withWatch.length>0});
       return;
     }
-    if(!entries.length)return;
+    if(!withWatch.length)return;
     addRecord({date:sessionIso,title:usingSplit?(plannedDay?.name||'Planned Workout'):written?.name||'Custom Workout',
-      muscles:['Cardio'],cardioSessions:entries,hasCardio:true,...recommendationMetadata});
+      muscles:['Cardio'],cardioSessions:withWatch,hasCardio:true,...recommendationMetadata});
   };
   /* WHAT WAS ASKED, SAVED BESIDE WHAT WAS DONE. Progression was inferred by
      counting sessions, so any set advanced the block — a double asked for and a
@@ -495,7 +508,9 @@ function WorkoutEditor() {
     /* Editing a custom day takes the chips as they now stand — unticking one
        removes it — plus whatever the logged lifts train. */
     const contentMuscles=assignedDayMuscles?.length?assignedDayMuscles:editingCustom?Array.from(new Set([...blankMuscles,...exerciseDriven])):(blankMuscles.length||exerciseDriven.length)?Array.from(new Set([...blankMuscles,...exerciseDriven])):(editingRecord?.muscles||[]).filter(muscle=>muscle!=='Cardio');
-    const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio,cardioSessions:hasCardio?cardioSessions:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id)),
+    const storedDay=editingRecord?records.find(record=>record.id===editingRecord.id)||editingRecord:records.find(record=>record.date===sessionIso);
+    const finishCardio=withSyncedCardio(hasCardio?cardioSessions:[],storedDay);
+    const draft={date:sessionIso,title,muscles:Array.from(new Set([...contentMuscles,...(hasCardio?['Cardio']:[])])),topSets:savedTopSets.length?savedTopSets:undefined,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax,hasCardio:hasCardio||finishCardio.length>0,cardioSessions:finishCardio.length?finishCardio:undefined,effort:effort||undefined,notes:notes.trim()||undefined,bodyWeight:bodyWeightToSave,...recommendationMetadata,selectedRecommendationTopSetIds:savedTopSets.map(set=>set.recommendationTopSetId).filter((id):id is string=>Boolean(id)),
       /* The session's length came from the watch, not this form; editing the
          day re-saves it whole, and leaving it out erased the Garmin minutes. */
       ...(editingRecord?.durationMinutes?{durationMinutes:editingRecord.durationMinutes}:{})};
@@ -596,7 +611,7 @@ function WorkoutEditor() {
     {prCelebration&&<PrCelebration lift={prCelebration.lift} weight={prCelebration.weight} previous={prCelebration.previous} unit={weightUnit} onDone={dismissPrCelebration}/>}
     {topSets.length>0&&<TopSetCards planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={loggedTopSetKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={openTopSetSheet} onRemove={removeTopSet} onDeleteLogged={deleteLoggedTopSet} onCreateExercise={createExerciseForTopSet} blockedReason={noDayReason}/>}
     {quickLogMessage&&<div className="quick-log-flash" role="status"><small>{quickLogMessage}</small></div>}
-    <CardioBuilder onEntriesChange={(hasEntries,entries)=>{setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions??todayRecord?.cardioSessions} plannedSummary={written&&workoutSource==='blank'?written.summary:usingSplit&&chosenRecommendation?.cardio?.selected?chosenRecommendation.cardio.summary:undefined} plannedCircuit={written&&workoutSource==='blank'?{name:written.name,plan:written.plan}:usingSplit&&chosenRecommendation?.cardio?.selected&&chosenRecommendation.cardio.session.plan.structure==='Circuit'?{name:chosenRecommendation.cardio.title,plan:chosenRecommendation.cardio.session.plan}:undefined}/>
+    <CardioBuilder onEntriesChange={(hasEntries,entries)=>{noteCardioRemovals(entries);setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions??todayRecord?.cardioSessions} plannedSummary={written&&workoutSource==='blank'?written.summary:usingSplit&&chosenRecommendation?.cardio?.selected?chosenRecommendation.cardio.summary:undefined} plannedCircuit={written&&workoutSource==='blank'?{name:written.name,plan:written.plan}:usingSplit&&chosenRecommendation?.cardio?.selected&&chosenRecommendation.cardio.session.plan.structure==='Circuit'?{name:chosenRecommendation.cardio.title,plan:chosenRecommendation.cardio.session.plan}:undefined}/>
     <details className="card form-card session-details" open={Boolean(editingRecord&&(editingRecord.notes||editingRecord.effort||editingRecord.bodyWeight))}><summary><span><strong>Notes &amp; body weight</strong><small>Optional</small></span></summary><div className="field-grid session-context"><DialField label="Today's body weight" kind="bodyweight" unit={weightUnit} value={bodyWeight} onChange={setBodyWeight} hint={setup?.currentWeight?`Optional · last on file ${setup.currentWeight} ${weightUnit}`:'Optional'} /><label>Session effort<select value={effort} onChange={e=>setEffort(e.target.value)}><option value="">Not recorded</option><option>Easy</option><option>Moderate</option><option>Hard</option><option>Max effort</option></select></label></div><label>Workout notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4} placeholder="How did it feel?" /></label></details>
     {/* THE ONE ACTION THE SCREEN IS FOR, pinned where the thumb is, saying
         how much of the day is done — on a bar of its own, so it never sits on

@@ -35,6 +35,10 @@ check('a longer run counts at its own pace', Math.round(testedRaceSeconds([run('
 const noTime = goalProgress(fiveK, [], verdict, null, 'tested', null);
 check('with no run that long there is no bar, and it says why', noTime.share === null && noTime.label === 'No tested time yet', JSON.stringify(noTime));
 
+check('a run from years ago is not a tested time', testedRaceSeconds([run('2020-01-06', 3.27, 15.9)], 3.10686) === null);
+check('a time far faster than the estimate is not a tested time', testedRaceSeconds([run('2026-10-20', 5.47, 30)], 3.10686, [], 19 * 60 + 50) === null);
+check('a real recent time within reach of the estimate counts', testedRaceSeconds([run('2026-10-20', 4, 30)], 3.10686, [], 19 * 60 + 50) !== null);
+
 console.log('\nThe page');
 const page = readFileSync('./src/pages/GoalsPage.tsx', 'utf8');
 check('every goal is measured in the chosen mode', /goalProgress\(goal, records, verdicts\[index\], setup, maxMode[,)]/.test(page));

@@ -249,7 +249,6 @@ body, .app-frame, .app-frame .app-main { background: var(--bg) !important; }
 .onboarding-shell .button:active { transform: translateY(1px) scale(.985); }
 
 /* Small status words are read, so they are ink on their tint, not tint on tint. */
-.app-frame :is(.gx-pill.tone-reached, .gx-tally b.good) { color: var(--ink) !important; }
 .app-frame .ss-library-new { color: var(--ink) !important; }
 .app-frame .ss-num { color: var(--ink-2) !important; }
 
@@ -262,3 +261,4 @@ body, .app-frame, .app-frame .app-main { background: var(--bg) !important; }
 .app-frame .simple-profile-head .avatar { border: 0 !important; }
 /* The record badge is a celebration, not a label: it keeps its tracked capitals. */
 .app-frame .pr-celebration-eyebrow { letter-spacing: .12em !important; }
+

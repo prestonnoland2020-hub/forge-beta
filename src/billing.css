@@ -299,3 +299,10 @@
 
 /* A Link styled as a button inside the coach's change card keeps button ink. */
 .coach-actions footer a.button { color: var(--accent-ink, #fff); text-decoration: none; font-size: 1.05rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+
+/* The coach's suggested goal: one row, one button. */
+.goal-fix.suggest { grid-template-columns: 1fr auto; align-items: center; gap: var(--s3); }
+.goal-fix.suggest span { display: grid; gap: 2px; font-weight: 700; font-size: 1rem; }
+.goal-fix.suggest span b { font-weight: 800; }
+.goal-fix.suggest .button.small { padding: 8px 14px; font-size: .9rem; }
+.goal-fix-done { font-style: normal; font-weight: 700; color: var(--success, var(--accent-text)); font-size: var(--fs-small); }

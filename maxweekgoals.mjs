@@ -10,7 +10,7 @@
    one 1RM attempt. A goal lift that the split does not train is not invented.
    A split that hits the same lift twice in the week keeps one attempt and the
    other exposure takes the heavy double. */
-import { resolvePlanWeek, bestsFromHistory, chooseMaxAttempts, attemptSlot, resolveWeekRunning } from './src/features/training/aiPlanService.ts';
+import { resolvePlanWeek, bestsFromHistory, chooseMaxAttempts, resolveWeekRunning } from './src/features/training/aiPlanService.ts';
 import { peakConflict } from './src/lib/interference.ts';
 import { calculateEstimatedOneRepMax } from './src/lib/strength.ts';
 
@@ -77,16 +77,17 @@ console.log('\nNo more than one attempt per goal lift per week');
    visit: the old picker looked at each day's first set only, so both kept the
    single. */
 const attempts = chooseMaxAttempts([
-  { day: 1, exercise: 'Hack Squat', reps: 2, hasHold: false, cost: 0 },
-  { day: 1, exercise: 'Squat', reps: 1, hasHold: true, cost: 2 },
-  { day: 4, exercise: 'Squat', reps: 1, hasHold: true, cost: 0 },
-  { day: 4, exercise: 'Bench', reps: 1, hasHold: true, cost: 0 },
-  { day: 6, exercise: 'Back Squat', reps: 1, hasHold: true, cost: 1 },
+  { cost: 0, sets: [] },
+  { cost: 2, sets: [{ exercise: 'Hack Squat', reps: 2, hasHold: false }, { exercise: 'Squat', reps: 1, hasHold: true }] },
+  { cost: 0, sets: [] }, { cost: 0, sets: [] },
+  { cost: 0, sets: [{ exercise: 'Squat', reps: 1, hasHold: true }, { exercise: 'Bench', reps: 1, hasHold: true }] },
+  { cost: 0, sets: [] },
+  { cost: 1, sets: [{ exercise: 'Back Squat', reps: 1, hasHold: true }] },
 ]);
-const squatSlots = [...attempts].filter(slot => slot.endsWith('|squat') || slot.endsWith('|back squat'));
-check('one attempt for Squat, whichever spelling', squatSlots.length === 1, [...attempts].join(', '));
-check('on its cheapest day', attempts.has(attemptSlot(4, 'Squat')), [...attempts].join(', '));
-check('and Bench on the same day keeps its own', attempts.has(attemptSlot(4, 'Bench')));
+const squatEntries = [...attempts.keys()].filter(key => /squat/.test(key) && !/hack/.test(key));
+check('one attempt for Squat, whichever spelling', squatEntries.length === 1, JSON.stringify([...attempts]));
+check('on its cheapest day', attempts.get(squatEntries[0]) === 4, JSON.stringify([...attempts]));
+check('and Bench on the same day keeps its own', attempts.get('bench') === 4, JSON.stringify([...attempts]));
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

@@ -29,7 +29,7 @@ import { estimateMaxHr, heartRateRuns, heartRateTargets, type HeartRateTargets }
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, planBlockFor, rememberPlannedMiles, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
-  bestsFromHistory, chooseMaxAttempts, attemptSlot, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
+  bestsFromHistory, chooseMaxAttempts, loggedSinglesByLift, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
   calendarEmptyState, provenMax,
 } from '../features/training/aiPlanService';
 import { liftPositions, rungFor } from '../lib/liftProgression';
@@ -64,7 +64,7 @@ const isLowerBodyDay = (day: SplitDay, topSet?: { exercise: string }) =>
    is where it is, and that sentence is the difference between an instruction
    and coaching. */
 type WeekPlan = { sessions: Session[]; days: PlannedDay[]; longIndex: number; hardIndex: number };
-function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi', hyrox: { goal: boolean; detail: string } = { goal: false, detail: HYROX_NO_GOAL }, hr: HeartRateTargets | null = null): WeekPlan {
+function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, splitDays: SplitDay[], rhythm: 'rolling' | 'weekly', anchor?: { position: number }, distanceUnit = 'mi', hyrox: { goal: boolean; detail: string } = { goal: false, detail: HYROX_NO_GOAL }, hr: HeartRateTargets | null = null, singlesLogged?: Map<string, Set<string>>): WeekPlan {
   /* The window comes from `weekCycleDays` — the same function the volume math
      uses. This was a byte-identical second copy of that rotation, which meant
      the schedule and the mileage that must agree were computed twice and free
@@ -124,22 +124,13 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     const poolIndex = easyPool.indexOf(info.day.name);
     if (poolIndex >= 0) { easyPool.splice(poolIndex, 1); easySet.add(index); }
   });
-  /* Pass 1.5 — one attempt per lift per max week. A rolling split can hit the
-     same day three times in seven days, which prescribed the same 1RM attempt
-     three times over. The attempt goes to that lift's cleanest session — no
-     long run, no quality work — and the day's other appearances drop back to
-     the heavy double the lift already earned. */
-  const attempts = chooseMaxAttempts(dayInfos.flatMap((info, index) => info.topSets.map(set => ({
-    day: index,
-    exercise: set.exercise,
-    reps: set.reps,
-    hasHold: Boolean(set.hold),
+  /* Pass 1.5 — one attempt per goal lift per max week (see chooseMaxAttempts). */
+  const attempts = chooseMaxAttempts(dayInfos.map((info, index) => ({
+    iso: localDayIso(info.date),
+    sets: info.topSets.map(set => ({ exercise: set.exercise, reps: set.reps, hasHold: Boolean(set.hold) })),
     cost: (index === longIndex ? 2 : 0) + (index === qualityIndex ? 3 : 0) + (easySet.has(index) ? 1 : 0),
-  }))));
-  const attemptDays = new Set([...attempts].map(slot => Number(slot.split('|')[0])));
-  /* Every set on the day, not just its first, gives up a duplicate attempt. */
-  const settle = (index: number) => (set: AiPlanTopSet | undefined) =>
-    set && set.reps === 1 && set.hold && !attempts.has(attemptSlot(index, set.exercise)) ? { ...set, ...set.hold } : set;
+  })), singlesLogged);
+  const attemptDays = new Set(attempts.values());
   const placedDays: PlannedDay[] = dayInfos.map((info, index) => ({
     name: info.day.name, index,
     lowerBody: info.lower,
@@ -147,9 +138,12 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
     maxAttempt: attemptDays.has(index),
   }));
   /* Pass 2 — render sessions. */
-  const rendered = dayInfos.map(({ date, day, topSet: rawTopSet, topSets: rawTopSets }, index) => {
-    const topSet = settle(index)(rawTopSet);
-    const extraSets = (rawTopSets || []).slice(1).map(set => settle(index)(set)!);
+  const rendered = dayInfos.map(({ date, day, topSets: rawTopSets }, index) => {
+    /* Every set is checked, not just the first: a second goal lift on the day
+       holds its double unless this is the day its attempt was given. */
+    const sets = (rawTopSets || []).map(set => set.reps === 1 && set.hold && attempts.get(canonicalLiftKey(set.exercise)) !== index ? { ...set, ...set.hold } : set);
+    const topSet = sets[0];
+    const extraSets = sets.slice(1);
     const type = day.dayType.toLowerCase();
     let runText = ''; let runKind: '' | 'Long run' | 'Hard run' | 'Easy run' = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
     /* HEART RATE BESIDE PACE. Pace is the target; heart rate is the check that
@@ -651,7 +645,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   rememberPlannedMiles(stored, plannedMiles);
   const weekIndex = Math.max(0, Math.min(viewWeek ?? currentIndex, plan.weeks.length - 1));
   const week = plan.weeks[weekIndex];
-  const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi', { goal: Boolean(hyroxGoalOf(goals)), detail: hyroxPlanDetail(goals) }, hrTargets);
+  const weekPlan = aiWeekSessions(week, stored.startDate, weekIndex, splitDays, rhythm, anchor, metric ? 'km' : 'mi', { goal: Boolean(hyroxGoalOf(goals)), detail: hyroxPlanDetail(goals) }, hrTargets, loggedSinglesByLift(records));
   const sessions = weekPlan.sessions;
 
   /* The week's headline set: the heaviest GOAL lift scheduled that week — any

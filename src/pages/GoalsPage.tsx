@@ -86,7 +86,8 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     if (!miles) return null;
     /* Estimated is the race predictor; tested is a time actually run at the
        distance — the same switch the strength goals use. */
-    return maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || []) : predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
+    const estimate = predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
+    return maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || [], estimate) : estimate;
   }), [goals, records, setup?.excludedEfforts, workouts, vo2Version, maxMode]);
   const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
@@ -194,7 +195,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
             <button className="gx-face" onClick={() => { tap(); toggleGoal(index); }} aria-expanded={isOpen}>
               <span className="gx-top"><strong className="gx-title">{goal.title}</strong><span className={`gx-pill tone-${item.tone}`}>{item.label}</span></span>
               <span className="gx-numbers">
-                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'calc max') : goal.type === 'Endurance' && item.current !== null && item.currentText.includes(':') ? (maxMode === 'tested' ? 'tested' : 'est.') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
+                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'est. max') : goal.type === 'Endurance' && item.current !== null && item.currentText.includes(':') ? (maxMode === 'tested' ? 'tested' : 'est.') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
                 <span className="gx-arrow" aria-hidden="true"><Icon name="arrow" size={14}/></span>
                 <span className="gx-target">{item.targetText}<small>goal</small></span>
               </span>
