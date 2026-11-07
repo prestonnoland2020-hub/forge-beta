@@ -105,9 +105,12 @@
      projections and the coach's own suggestions — the things the app is
      guessing rather than recording. With a blue accent, a blue "info" would be
      invisible on exactly the charts where the distinction matters most. */
-  --good: #1f7a3d;
-  --warn: #8a5a00;
-  --bad: #b3261e;
+  /* Status, tuned to the palette: a green leaning toward the brand's teal-blue,
+     an amber leaning toward its warm tan, a brick red — still clearly
+     good / careful / behind, but from the same family as the blue and charcoal. */
+  --good: #1a6e52;
+  --warn: #86601a;
+  --bad: #ad3a30;
   --info: #6d4ac4;
 
   /* ---- Data --------------------------------------------------------------
@@ -263,9 +266,9 @@
     --ink-2: #b9c1c0;
     --ink-3: #939997;
 
-    --good: #58d68d;
-    --warn: #f6c453;
-    --bad: #ef8a7b;
+    --good: #6cc3a0;
+    --warn: #dcb46a;
+    --bad: #e3897e;
     --info: #b49bff;
 
     --chart-2: #fb923c;
@@ -319,9 +322,9 @@
   --ink-2: #b9c1c0;
   --ink-3: #939997;
 
-  --good: #58d68d;
-  --warn: #f6c453;
-  --bad: #ef8a7b;
+  --good: #6cc3a0;
+  --warn: #dcb46a;
+  --bad: #e3897e;
   --info: #b49bff;
 
   --chart-2: #fb923c;

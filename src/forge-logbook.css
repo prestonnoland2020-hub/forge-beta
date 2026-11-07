@@ -262,16 +262,3 @@ body, .app-frame, .app-frame .app-main { background: var(--bg) !important; }
 /* The record badge is a celebration, not a label: it keeps its tracked capitals. */
 .app-frame .pr-celebration-eyebrow { letter-spacing: .12em !important; }
 
-/* ── Goals in the brand's colour ───────────────────────────────────────── */
-/* A goal that is on track or reached is the good news the app exists for, so
-   it wears the brand blue, not a mint green from outside the palette. Amber
-   and red stay: they only appear when a goal is behind, and should stand out. */
-.app-frame :is(.gx-hero.ring-good .gx-ring-fill) { stroke: var(--accent) !important; }
-.app-frame :is(.tone-on-track, .tone-reached) .gx-bar i { background: var(--accent) !important; }
-.app-frame :is(.gx-tally .good, .gx-pill.tone-on-track, .gx-pill.tone-reached) {
-  background: var(--accent-wash) !important; color: var(--accent-text) !important;
-}
-.app-frame .tone-reached .gx-title::after { color: var(--accent-text) !important; }
-.app-frame .goal-tracker-simple.goal-complete { border-color: var(--accent) !important; box-shadow: inset 0 4px var(--accent) !important; }
-.app-frame .goal-complete > header { background: linear-gradient(110deg, var(--accent-wash), transparent) !important; }
-.app-frame .goal-complete .goal-trajectory-chart { background: linear-gradient(120deg, var(--accent-wash), var(--surface-1)) !important; }
