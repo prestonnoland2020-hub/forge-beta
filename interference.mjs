@@ -40,15 +40,18 @@ check('Friday and Saturday are too close', near(4, 5, 7));
 check('Friday and Sunday are not', !near(4, 6, 7));
 check('and Sunday runs into Monday', near(6, 0, 7), 'the cycle has no seam');
 
-console.log('\nOne peak at a time — and the nearer goal owns the week');
+console.log('\nOne peak at a time — and a max week always keeps its max');
 check('a max week with no hard running is no conflict',
   peakConflict({ liftingMaxWeek: true, runningPeakWeek: false }) === null);
 check('a hard running week with no max is no conflict',
   peakConflict({ liftingMaxWeek: false, runningPeakWeek: true }) === null);
+/* The nearer goal used to own the week, and a tie went to the race, which
+   left a block with no tested max. The attempt has one week per wave; a hard
+   run can move. */
 const raceSooner = peakConflict({ liftingMaxWeek: true, runningPeakWeek: true, weeksToRace: 3, weeksToLiftGoal: 14 });
-check('the race is closer, so the running keeps the week', raceSooner?.owner === 'running');
-check('and the max attempt backs off rather than disappearing',
-  /heavy double/.test(raceSooner.say), raceSooner.say);
+check('even with the race closer, the max attempt keeps the week', raceSooner?.owner === 'lifting');
+check('and the hard run steps back to easy around it',
+  /easy effort/.test(raceSooner.say), raceSooner.say);
 const liftSooner = peakConflict({ liftingMaxWeek: true, runningPeakWeek: true, weeksToRace: 20, weeksToLiftGoal: 2 });
 check('the lift goal is closer, so the attempt keeps the week', liftSooner?.owner === 'lifting');
 check('with no race date at all the lift wins by default',
@@ -70,10 +73,10 @@ check('with the max attempt owning the week, the hard run steps back',
   /max attempt/i.test(yielded.quality), yielded.quality);
 check('but the week keeps its volume — backing off is not skipping',
   yielded.mileage >= normal.mileage * 0.9, `${yielded.mileage} vs ${normal.mileage} mi`);
-const raceOwns = resolveWeekRunning(week, days, base,
-  { weekIndex: 8, blockWeeks: 10, waveIndex: 9, liftingMaxWeek: true, weeksToRace: 12, weeksToLiftGoal: 30 });
-check('and when the race is the near goal the running is untouched',
-  !/max attempt/i.test(raceOwns.quality), raceOwns.quality);
+const raceWeek = resolveWeekRunning({ ...week, phase: 'Race', quality: '5K race' }, days, base,
+  { weekIndex: 8, blockWeeks: 10, waveIndex: 9, liftingMaxWeek: true, weeksToRace: 0, weeksToLiftGoal: 30 });
+check('but a race on the max week is still the race, not an easy run',
+  !/max attempt/i.test(raceWeek.quality), raceWeek.quality);
 
 console.log('\nThe deloads are the same deload');
 check('the lifting wave cuts on its 2-rep week', deloadWeek(3));
