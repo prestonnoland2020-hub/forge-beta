@@ -290,14 +290,27 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
    continuous effort that actually covered the goal distance counts (2% slack
    for GPS), and a longer one is read at its own average pace, so the number
    is something the athlete has run, never a projection up from a shorter
-   effort. Efforts the athlete threw out of the predictor stay out here too.
-   Null when no effort that long has been logged. */
-export function testedRaceSeconds(records: WorkoutRecord[], goalMiles: number, excluded: string[] = []): number | null {
+   effort.
+
+   AND IT HAS TO BE CURRENT. A lifting single holds for a long time; a race
+   time does not — by six months without that kind of running most of it is
+   gone. Preston's 5K card read "15:06 tested" off a 2020 run synced in from
+   Strava, against an estimate of 19:50. So only the last six months count,
+   and a time more than 10% faster than everything else Forge knows about the
+   athlete (the estimate) is a mislabeled ride or a GPS jump, not a test.
+   Efforts the athlete threw out of the predictor stay out here too. Null
+   when nothing qualifies. */
+export const TESTED_WINDOW_DAYS = 182;
+export const TESTED_MAX_BEAT = 0.10;
+export function testedRaceSeconds(records: WorkoutRecord[], goalMiles: number, excluded: string[] = [], estimateSeconds: number | null = null, todayIso = today()): number | null {
   if (!goalMiles) return null;
+  const floor = estimateSeconds ? estimateSeconds * (1 - TESTED_MAX_BEAT) : 0;
   let best: number | null = null;
   for (const run of trustedEfforts(raceEvidenceEfforts(records), excluded)) {
     if (run.miles < goalMiles * 0.98) continue;
+    if ((dateMs(todayIso) - dateMs(run.date)) / DAY > TESTED_WINDOW_DAYS) continue;
     const seconds = run.seconds * (goalMiles / run.miles);
+    if (seconds < floor) continue;
     if (best === null || seconds < best) best = seconds;
   }
   return best;
