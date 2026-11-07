@@ -95,6 +95,41 @@ const volumeShortfallFor = (secondsPerMile: number, weeklyMiles: number) => {
   return Math.max(0, Math.min(1, 1 - weeklyMiles / needed));
 };
 
+/* FITNESS FADES WHEN THE RUNNING STOPS — the curve does not know that.
+
+   A hard run is a measurement of the day it was run. VO2 max and heart rate
+   at pace are re-read every run, so they detrain on their own; the curve
+   through old hard runs never would. The physiology (Coyle 1984; Mujika &
+   Padilla 2000; Hickson 1985):
+
+     - the first ~10 days off cost next to nothing
+     - after that VO2 max falls roughly 0.25% a day with no running —
+       about 7% at three weeks, 15% by two months — and race pace with it
+     - REDUCED training holds it: running a third or more of the volume that
+       built the fitness keeps nearly all of it for months
+
+   So the hard runs' time is slowed by the days since the freshest one, past
+   ten, scaled by how far the last four weeks of running have fallen below
+   40% of the six weeks before that effort. Keep running and nothing fades.
+   Capped at 15%. */
+export const DETRAIN_GRACE_DAYS = 10;
+export const DETRAIN_PER_DAY = 0.0025;
+export const DETRAIN_MAX = 0.15;
+export const MAINTAIN_SHARE = 0.4;
+export function detrainingFactor(records: WorkoutRecord[], effortDate: string, todayIso = today()): number {
+  const days = Math.max(0, (dateMs(todayIso) - dateMs(effortDate)) / DAY);
+  if (days <= DETRAIN_GRACE_DAYS) return 1;
+  const entries = runVolumeEntries(records);
+  const milesBetween = (fromMs: number, toMs: number) => entries.reduce((sum, entry) => { const at = dateMs(entry.date); return at > fromMs && at <= toMs ? sum + entry.miles : sum; }, 0);
+  const effortMs = dateMs(effortDate);
+  const before = milesBetween(effortMs - 42 * DAY, effortMs) / 6;
+  const recent = milesBetween(dateMs(todayIso) - 28 * DAY, dateMs(todayIso)) / 4;
+  /* No base to compare against: judge on whether there is running at all. */
+  const kept = before > 0 ? Math.min(1, recent / (before * MAINTAIN_SHARE)) : recent > 0 ? 1 : 0;
+  const loss = Math.min(DETRAIN_MAX, (days - DETRAIN_GRACE_DAYS) * DETRAIN_PER_DAY) * (1 - kept);
+  return 1 + loss;
+}
+
 /* EVERY CONTINUOUS RUN THAT COULD STAND AS RACE EVIDENCE, one per effort,
    dated. The predictor reads these; the feasibility gate counts them. */
 export function raceEvidenceEfforts(records: WorkoutRecord[]): Array<{ date: string; miles: number; seconds: number }> {
@@ -199,8 +234,11 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   const shortfall = volumeShortfallFor(provisional / goalMiles, weeklyMiles);
   const vo2Seconds = vo2Raw ? Math.round(goalMiles > FIVE_K ? vo2Raw * Math.pow(goalMiles / FIVE_K, (RIEGEL_UNDERTRAINED - RIEGEL) * shortfall) : vo2Raw) : null;
   const heartSeconds = heart && heartRaw ? Math.round(equivalentSeconds(heart.seconds, heart.miles, goalMiles, shortfall)) : null;
-  const prediction = curve ? predictFromCurve(curve, goalMiles, shortfall) : null;
+  const fresh = curve ? predictFromCurve(curve, goalMiles, shortfall) : null;
   const freshest = curve ? Math.min(...curve.sources.map(item => daysAgo(item.date))) : 0;
+  const freshestDate = curve ? curve.sources.map(item => item.date).sort().at(-1)! : '';
+  const detrain = curve ? detrainingFactor(records, freshestDate) : 1;
+  const prediction = fresh ? { ...fresh, seconds: Math.round(fresh.seconds * detrain), low: Math.round(fresh.low * detrain), high: Math.round(fresh.high * detrain) } : null;
 
   const parts: Array<{ seconds: number; weight: number }> = [];
   if (vo2Seconds) parts.push({ seconds: vo2Seconds, weight: AEROBIC_WEIGHT });
@@ -226,7 +264,8 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   if (heartSeconds) said.push(`the pace your heart rate holds on recent runs (${Math.round(share(AEROBIC_WEIGHT) * 100)}%)`);
   if (curve && prediction) said.push(`your best ${curve.sources.length === 1 ? 'hard run' : `${curve.sources.length} hard runs`} (${Math.round(share(curveWeight) * 100)}%, freshest ${freshest === 0 ? 'today' : freshest === 1 ? '1 day ago' : `${freshest} days ago`})`);
   const listed = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said.at(-1)}` : said[0];
-  const reason = `Built from ${listed}, adjusted for your ${Math.round(weeklyMiles)} miles a week.${!curve ? ' One timed hard run will sharpen it.' : ''}`;
+  const faded = detrain > 1.005 ? ` Your hard runs are read ${Math.round((detrain - 1) * 100)}% slower because your running has dropped off since them.` : '';
+  const reason = `Built from ${listed}, adjusted for your ${Math.round(weeklyMiles)} miles a week.${faded}${!curve ? ' One timed hard run will sharpen it.' : ''}`;
 
   const best = curve?.sources[0];
   return {
