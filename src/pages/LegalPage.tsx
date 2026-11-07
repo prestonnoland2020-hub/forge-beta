@@ -265,7 +265,7 @@ export function LegalPage() {
   const current = DOCUMENTS[which] ? which : 'privacy';
   return <main className="legal-page">
     <header className="legal-head">
-      <a className="login-brand" href="#/" aria-label="Forge home"><span className="brand-mark" aria-hidden="true"><i /></span><span>FORGE</span></a>
+      <a className="login-brand" href="#/" aria-label="Forge home"><span className="brand-mark" aria-hidden="true"><i /></span></a>
       <nav className="legal-nav" aria-label="Legal documents">
         {Object.entries(DOCUMENTS).map(([key, doc]) =>
           <Link key={key} to={`/legal/${key}`} className={key === current ? 'active' : ''} aria-current={key === current ? 'page' : undefined}>{doc.label}</Link>)}
