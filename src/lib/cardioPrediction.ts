@@ -8,7 +8,7 @@ import { weeklyMilesFrom, type DatedMiles } from './runVolume';
 import { runLines } from './stats';
 import { trustedEfforts, CONFIRMED_PREFIX } from './effortAudit';
 import { fitnessCurve, predictFromCurve, type Effort as CurveEffort } from './fitnessCurve';
-import { latestVo2, vo2RaceSeconds, CURVE_HALF_LIFE_DAYS, CURVE_WEIGHT_FLOOR } from './vo2';
+import { latestVo2, vo2RaceSeconds, CURVE_FULL_DAYS, CURVE_HALF_LIFE_DAYS, CURVE_WEIGHT_FLOOR } from './vo2';
 
 /* VO2 max and heart rate at pace each count this much in an estimate; see predictRaceFromLegacyMethod. */
 export const AEROBIC_WEIGHT = 1;
@@ -177,9 +177,9 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
                     through every run the watch put a heart rate on
        hard runs    the fitness curve through their best continuous efforts
 
-     VO2 max and heart rate count 1 each. Hard runs count 1 when the freshest
-     is from this week, halving every six weeks it ages, down to a quarter —
-     so a fresh time trial is a third of the answer, never the whole of it.
+     VO2 max and heart rate count 1 each. Hard runs count 1 while the freshest
+     is up to six weeks old (a third of the answer), then halve every six
+     weeks after that, down to a quarter.
      Blended in log space, so 18:00 and 20:00 average the same either way. */
   const vo2 = latestVo2();
   const heart = heartRateEffort(records, today());
@@ -205,7 +205,7 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   const parts: Array<{ seconds: number; weight: number }> = [];
   if (vo2Seconds) parts.push({ seconds: vo2Seconds, weight: AEROBIC_WEIGHT });
   if (heartSeconds) parts.push({ seconds: heartSeconds, weight: AEROBIC_WEIGHT });
-  const curveWeight = prediction ? Math.max(CURVE_WEIGHT_FLOOR, 0.5 ** (freshest / CURVE_HALF_LIFE_DAYS)) : 0;
+  const curveWeight = prediction ? Math.max(CURVE_WEIGHT_FLOOR, 0.5 ** (Math.max(0, freshest - CURVE_FULL_DAYS) / CURVE_HALF_LIFE_DAYS)) : 0;
   if (prediction) parts.push({ seconds: prediction.seconds, weight: curveWeight });
   const total = parts.reduce((sum, part) => sum + part.weight, 0);
   const seconds = Math.round(Math.exp(parts.reduce((sum, part) => sum + part.weight * Math.log(part.seconds), 0) / total));

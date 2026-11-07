@@ -60,8 +60,9 @@ export function rememberVo2(reading: Vo2Reading | null) {
   } catch { /* storage unavailable: predictions simply go without it */ }
 }
 
-/* HOW FAST A HARD RUN'S SAY FADES in the running estimate: its weight halves
-   every six weeks the freshest one ages, down to a quarter. VO2 max and heart
+/* HOW FAST A HARD RUN'S SAY FADES in the running estimate: full weight for
+   six weeks, then it halves every six weeks after that, down to a quarter. VO2 max and heart
    rate at pace lead the estimate — see predictRaceFromLegacyMethod. */
+export const CURVE_FULL_DAYS = 42;
 export const CURVE_HALF_LIFE_DAYS = 42;
 export const CURVE_WEIGHT_FLOOR = 0.25;
