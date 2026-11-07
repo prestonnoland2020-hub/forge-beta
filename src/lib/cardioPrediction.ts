@@ -234,3 +234,20 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
     sources: curve.sources.map(item => ({ date: item.date, miles: round2(item.miles), seconds: Math.round(item.seconds) })),
   };
 }
+
+/* THE TESTED TIME AT A DISTANCE — the running side of "Tested max". Only a
+   continuous effort that actually covered the goal distance counts (2% slack
+   for GPS), and a longer one is read at its own average pace, so the number
+   is something the athlete has run, never a projection up from a shorter
+   effort. Efforts the athlete threw out of the predictor stay out here too.
+   Null when no effort that long has been logged. */
+export function testedRaceSeconds(records: WorkoutRecord[], goalMiles: number, excluded: string[] = []): number | null {
+  if (!goalMiles) return null;
+  let best: number | null = null;
+  for (const run of trustedEfforts(raceEvidenceEfforts(records), excluded)) {
+    if (run.miles < goalMiles * 0.98) continue;
+    const seconds = run.seconds * (goalMiles / run.miles);
+    if (best === null || seconds < best) best = seconds;
+  }
+  return best;
+}
