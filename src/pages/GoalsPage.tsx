@@ -3,6 +3,7 @@ import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
 import { GoalProgressCard } from '../components/GoalProgressCard';
+import { useVo2Version } from '../features/training/useVo2Version';
 import { GoalPredictionCard } from '../components/GoalPredictionCard';
 import { goalFeasibility } from '../lib/goalFeasibility';
 import { expectedRunMiles, goalProgress, type GoalProgress, type MaxMode } from '../lib/goalProgress';
@@ -68,9 +69,10 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   /* Every goal is asked about on its own, because goalFeasibility drops the
      ones it cannot judge and an index into a shortened list points at the
      wrong goal. */
+  const vo2Version = useVo2Version();
   const verdicts = useMemo(
     () => goals.map(goal => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts })[0]),
-    [goals, records, setup?.maxWeeklyMileage, workouts],
+    [goals, records, setup?.maxWeeklyMileage, workouts, vo2Version],
   );
   /* CALCULATED OR TESTED, for every strength number on the page at once —
      the cards, their bars and the overall ring. Remembered on this device. */
@@ -82,7 +84,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     if (goal.type !== 'Endurance') return null;
     const miles = expectedRunMiles(goal);
     return miles ? predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null : null;
-  }), [goals, records, setup?.excludedEfforts, workouts]);
+  }), [goals, records, setup?.excludedEfforts, workouts, vo2Version]);
   const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
   /* The bars start empty and fill one frame after the page mounts, so the

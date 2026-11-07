@@ -77,3 +77,21 @@ export async function loadGarminHealth(): Promise<DailyHealthSnapshot[]> {
     sourceUpdatedAt: row.source_updated_at,
   }));
 }
+
+/* The latest Garmin VO2 max (from the userMetrics summary), for the race
+   predictions. Null when Garmin has not sent one in the window. */
+export async function loadGarminVo2(): Promise<{ value: number; date: string } | null> {
+  const since = new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from('health_daily_snapshots')
+    .select('snapshot_date,vo2_max')
+    .eq('provider', 'garmin')
+    .not('vo2_max', 'is', null)
+    .gte('snapshot_date', since)
+    .order('snapshot_date', { ascending: false })
+    .limit(1);
+  if (error || !data?.length) return null;
+  const row = data[0] as { snapshot_date: string; vo2_max: number | string };
+  const value = Number(row.vo2_max);
+  return value > 0 ? { value: Math.round(value * 10) / 10, date: row.snapshot_date } : null;
+}

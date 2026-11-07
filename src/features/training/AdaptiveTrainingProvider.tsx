@@ -7,7 +7,8 @@ import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { useProfileSetup } from '../profile/ProfileSetupProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { isDemoMode } from '../../lib/env';
-import { loadGarminHealth } from './garminConnectionService';
+import { loadGarminHealth, loadGarminVo2 } from './garminConnectionService';
+import { rememberVo2 } from '../../lib/vo2';
 import { cardioMiles,isRunningCardio,summarizeCardioDraft } from '../../lib/cardioSession';
 import { countsAsRunVolume } from '../../lib/runQuality';
 import { useAthleteNotes } from './useAthleteNotes';
@@ -127,7 +128,7 @@ export function AdaptiveTrainingProvider({children}:{children:ReactNode}){
      this morning's sleep and HRV to the server and the app kept scoring
      readiness from whatever it read days ago. It re-reads on returning to the
      foreground and every fifteen minutes while it is on screen. */
-  useEffect(()=>{if(isDemoMode||!user)return;let live=true;const read=()=>{void loadGarminHealth().then(days=>{if(live&&days.length)syncWearableHealth(days)}).catch(()=>undefined)};read();const onVisible=()=>{if(document.visibilityState==='visible')read()};document.addEventListener('visibilitychange',onVisible);window.addEventListener('focus',onVisible);const timer=window.setInterval(onVisible,15*60000);return()=>{live=false;document.removeEventListener('visibilitychange',onVisible);window.removeEventListener('focus',onVisible);window.clearInterval(timer)}},[user?.id]);
+  useEffect(()=>{if(isDemoMode||!user)return;let live=true;const read=()=>{void loadGarminHealth().then(days=>{if(live&&days.length)syncWearableHealth(days)}).catch(()=>undefined);void loadGarminVo2().then(reading=>{if(live)rememberVo2(reading)}).catch(()=>undefined)};read();const onVisible=()=>{if(document.visibilityState==='visible')read()};document.addEventListener('visibilitychange',onVisible);window.addEventListener('focus',onVisible);const timer=window.setInterval(onVisible,15*60000);return()=>{live=false;document.removeEventListener('visibilitychange',onVisible);window.removeEventListener('focus',onVisible);window.clearInterval(timer)}},[user?.id]);
   const syncWearableHealth=(snapshots:DailyHealthSnapshot[])=>{const verified=snapshots.filter(item=>item.provider!=='Unavailable');const next=verified.length?verified.sort((a,b)=>a.date.localeCompare(b.date)):[unavailableHealth()];setHealth(next);if(verified.length)localStorage.setItem('forge-health-snapshots',JSON.stringify(next));else localStorage.removeItem('forge-health-snapshots')};
   return <Context.Provider value={{profile,recovery,watchConnected,health,history:combinedHistory,updateProfile:change=>setPrefs(value=>({...value,...change})),syncWearableHealth,setHistory}}>{children}</Context.Provider>
 }
