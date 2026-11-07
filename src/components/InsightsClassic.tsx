@@ -223,8 +223,8 @@ export function InsightsClassic() {
     return { latest, best, delta };
   }, [enduranceSeries, endMetric]);
 
-  /* The exact chart renderer from the original app: quadratic-midpoint
-     smoothing (straight when dense), vertical gradient area fill, 2px round
+  /* The exact chart renderer from the original app: monotone-cubic
+     smoothing through every point (straight when dense), vertical gradient area fill, 2px round
      stroke, 2.4px dots with a haloed endpoint, nice ticks, and a three-date
      strip under a hairline. viewBox 280x130 stretched to 150px tall. */
   const lineChart = (points: Array<{ date: string; value: number }>, id: string) => {
@@ -256,7 +256,25 @@ export function InsightsClassic() {
     const dense = pts.length > 20;
     let lineD = `M ${pts[0].x},${pts[0].y}`;
     if (dense) lineD = 'M ' + pts.map(point => `${point.x},${point.y}`).join(' L ');
-    else for (let i = 1; i < pts.length; i++) { const point = pts[i]; const isLast = i === pts.length - 1; const endX = isLast ? point.x : (point.x + pts[i + 1].x) / 2; const endY = isLast ? point.y : (point.y + pts[i + 1].y) / 2; lineD += ` Q ${point.x},${point.y} ${endX},${endY}`; }
+    else {
+      /* THE LINE GOES THROUGH EVERY DOT. Midpoint smoothing only passed through
+         the halfway points between entries, so a dip like 320 sat visibly off
+         the curve. Monotone cubic (Fritsch–Carlson) hits every point and never
+         overshoots past one, so the line cannot invent a peak that wasn't lifted. */
+      const n = pts.length;
+      const dx = pts.slice(1).map((point, i) => point.x - pts[i].x || 1e-6);
+      const slope = pts.slice(1).map((point, i) => (point.y - pts[i].y) / dx[i]);
+      const tangent = pts.map((_, i) => i === 0 ? slope[0] : i === n - 1 ? slope[n - 2] : slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2);
+      for (let i = 0; i < n - 1; i++) {
+        if (slope[i] === 0) { tangent[i] = 0; tangent[i + 1] = 0; continue; }
+        const a = tangent[i] / slope[i], b = tangent[i + 1] / slope[i], h = a * a + b * b;
+        if (h > 9) { const t = 3 / Math.sqrt(h); tangent[i] = t * a * slope[i]; tangent[i + 1] = t * b * slope[i]; }
+      }
+      for (let i = 0; i < n - 1; i++) {
+        const p0 = pts[i], p1 = pts[i + 1], third = dx[i] / 3;
+        lineD += ` C ${p0.x + third},${p0.y + tangent[i] * third} ${p1.x - third},${p1.y - tangent[i + 1] * third} ${p1.x},${p1.y}`;
+      }
+    }
     const areaD = `${lineD} L ${pts[pts.length - 1].x},${H - PB} L ${pts[0].x},${H - PB} Z`;
     const last = pts[pts.length - 1];
     const mid = minX + (maxX - minX) / 2;

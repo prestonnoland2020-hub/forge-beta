@@ -274,14 +274,17 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 .chart-target-label { fill: var(--ink-3); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .chart-line { stroke-dasharray: 1; animation: chart-draw var(--dur-signature) var(--ease-strike) 200ms both; }
+  /* The dash lives only inside the animation (fill-mode backwards, not both).
+     Held after it ends, a one-unit dash on a non-scaling stroke fell short of
+     the path's real end on iOS, and the line stopped before the last point. */
+  .chart-line { animation: chart-draw var(--dur-signature) var(--ease-strike) 200ms backwards; }
   .chart-area { animation: chart-fade var(--dur-emphasis) var(--ease-respond) 700ms both; }
   .chart-point { animation: chart-pop var(--dur-emphasis) var(--ease-settle) both; animation-delay: calc(300ms + var(--i, 0) * 60ms); }
   .chart-now { animation: chart-pop var(--dur-emphasis) var(--ease-settle) 1100ms both; }
   .chart-halo { animation: chart-halo 2s ease-out 1400ms 2; }
   .chart-forecast, .chart-forecast-label { animation: chart-fade var(--dur-emphasis) var(--ease-respond) 1200ms both; }
 }
-@keyframes chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes chart-draw { from { stroke-dasharray: 1 1; stroke-dashoffset: 1; } to { stroke-dasharray: 1 1; stroke-dashoffset: 0; } }
 @keyframes chart-fade { from { opacity: 0; } }
 @keyframes chart-pop { from { transform: scale(0); } }
 @keyframes chart-halo { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(2.6); } }
