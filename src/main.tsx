@@ -86,6 +86,7 @@ import './device-fit.css';
    sheet, in one file that nothing older can override. */
 import './app-chrome.css';
 import './app-polish.css';
+import './pr-celebration.css';
 /* Titles, the wordmark and the loading screen. Last, because it is the one
    file that decides how a title looks. */
 import './brand.css';
