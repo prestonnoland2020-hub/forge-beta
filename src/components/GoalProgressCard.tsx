@@ -1,3 +1,4 @@
+import { useVo2Version } from '../features/training/useVo2Version';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import type { CreatedGoal } from './GoalBuilder';
 import type { GoalRoadmap } from '../lib/goalPlanEngine';
@@ -185,7 +186,8 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
      for the same question on the same card: "you are worth about 23:26 today"
      over a PROJECTED tile reading 24:02. */
   const excludedEfforts=useMemo(()=>setup?.excludedEfforts||[],[setup]);
-  const legacyPrediction=useMemo(()=>goal.type==='Endurance'&&expectedMiles?predictRaceFromLegacyMethod(records,expectedMiles,excludedEfforts,workouts):null,[goal.type,expectedMiles,records,excludedEfforts,workouts]);
+  const vo2Version=useVo2Version();
+  const legacyPrediction=useMemo(()=>goal.type==='Endurance'&&expectedMiles?predictRaceFromLegacyMethod(records,expectedMiles,excludedEfforts,workouts):null,[goal.type,expectedMiles,records,excludedEfforts,workouts,vo2Version]);
   useEffect(() => {
     if (goal.type !== 'Endurance' || !expectedMiles) {
       setAiEstimate(null); setAiEstimateError(''); return;

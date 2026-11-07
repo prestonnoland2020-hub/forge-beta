@@ -7,6 +7,7 @@ import { weeklyMilesFrom, type DatedMiles } from './runVolume';
 import { runLines } from './stats';
 import { trustedEfforts, CONFIRMED_PREFIX } from './effortAudit';
 import { fitnessCurve, predictFromCurve, type Effort as CurveEffort } from './fitnessCurve';
+import { blendWithVo2, latestVo2, vo2RaceSeconds, type Vo2Reading } from './vo2';
 
 export type RacePrediction = {
   seconds: number;
@@ -30,6 +31,9 @@ export type RacePrediction = {
   /* Every effort the level was blended from, best first — the answer to "which
      run is this off?" when the answer is no longer a single run. */
   sources?: Array<{ date: string; miles: number; seconds: number }>;
+  /* Garmin's VO2 max, when it took part: the reading, what it alone would
+     predict, and how much of the answer it carried (0–1). */
+  vo2?: { value: number; date: string; seconds: number; share: number };
 };
 
 type Run = { date: string; miles: number; seconds: number };
@@ -99,6 +103,30 @@ export function raceEvidenceEfforts(records: WorkoutRecord[]): Array<{ date: str
   }));
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const shortDate = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
+
+/* NO HARD EFFORTS LOGGED, BUT THE WATCH KNOWS SOMETHING. A prediction from
+   VO2 max alone, honestly labelled low-confidence with a wide range. */
+function fromVo2Only(vo2: Vo2Reading, goalMiles: number, runs: Run[]): RacePrediction | null {
+  const seconds = vo2RaceSeconds(vo2.value, goalMiles);
+  if (!seconds) return null;
+  const recent = runs.filter(run => daysAgo(run.date) <= 28);
+  return {
+    seconds,
+    low: Math.round(seconds * 0.95),
+    high: Math.round(seconds * 1.06),
+    exponent: 1.06,
+    fittedExponent: false,
+    confidence: 'low',
+    reason: `From your Garmin VO2 max of ${vo2.value} (${shortDate(vo2.date)}). No timed hard effort is logged in the last 180 days, so this is the watch's estimate — one hard run will sharpen it.`,
+    supportingRuns: 0,
+    recentRunMiles: Math.round(recent.reduce((sum, run) => sum + run.miles, 0) * 10) / 10,
+    recentRunDays: new Set(recent.map(run => run.date)).size,
+    vo2: { value: vo2.value, date: vo2.date, seconds, share: 1 },
+  };
+}
+
 export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number, excluded: string[] = [], workouts: CurveEffort[] = []): RacePrediction | null {
   if (!goalMiles) return null;
   /* ONE PIECE, RUN IN ONE GO — never a session's totals.
@@ -145,7 +173,8 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      filter because they are not log rows: there is nothing for the athlete to
      mark false, and effortAudit has nothing to ask about them. */
   const evidence = [...qualifying, ...workouts.filter(run => daysAgo(run.date) <= windowDays)];
-  if (!evidence.length) return null;
+  const vo2 = latestVo2();
+  if (!evidence.length) return vo2 ? fromVo2Only(vo2, goalMiles, runs) : null;
 
   /* THE CURVE, NOT THE SINGLE BEST RUN. What used to happen here was a
      tournament: score every effort by its Riegel-converted time with a penalty
@@ -161,7 +190,7 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      it, and the exponent is theirs rather than the population's. */
   const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
   const curve = fitnessCurve(evidence, today(), confirmed);
-  if (!curve) return null;
+  if (!curve) return vo2 ? fromVo2Only(vo2, goalMiles, runs) : null;
 
   /* AND THE VOLUME BEHIND IT COUNTS, but only past the distances the athlete
      has actually covered. A 17:42 5K carried straight to a marathon is a 2:37
@@ -180,14 +209,24 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   const recentRunDays = new Set(recent.map(run => run.date)).size;
   const best = curve.sources[0];
   const round2 = (value: number) => Math.round(value * 100) / 100;
+  /* THE WATCH, BLENDED IN. See vo2.ts: the older the freshest hard effort,
+     the more the athlete's current Garmin VO2 max counts. The range moves
+     with the answer, and widens to take in what the watch alone says. */
+  const freshest = Math.min(...curve.sources.map(item => daysAgo(item.date)));
+  const vo2Seconds = vo2 ? vo2RaceSeconds(vo2.value, goalMiles) : null;
+  const blended = vo2 && vo2Seconds ? blendWithVo2(prediction.seconds, freshest, vo2Seconds) : null;
+  const scale = blended ? blended.seconds / prediction.seconds : 1;
+  const low = Math.round(Math.min(prediction.low * scale, vo2Seconds && blended ? Math.min(blended.seconds, vo2Seconds) : Infinity));
+  const high = Math.round(Math.max(prediction.high * scale, vo2Seconds && blended ? Math.max(blended.seconds, vo2Seconds) : 0));
   return {
-    seconds: prediction.seconds,
-    low: prediction.low,
-    high: prediction.high,
+    seconds: blended ? blended.seconds : prediction.seconds,
+    low: blended ? low : prediction.low,
+    high: blended ? high : prediction.high,
+    ...(blended && vo2 && vo2Seconds ? { vo2: { value: vo2.value, date: vo2.date, seconds: vo2Seconds, share: blended.vo2Share } } : {}),
     exponent: Math.round(prediction.exponent * 1000) / 1000,
     fittedExponent: curve.fitted,
     confidence: prediction.confidence,
-    reason: `Fitted to your best ${curve.sources.length === 1 ? 'continuous effort' : `${curve.sources.length} continuous efforts`} in the last 180 days${curve.fitted ? `, carried at your own fade rate of ${curve.exponent.toFixed(2)} rather than the 1.06 average` : ' — not enough spread of distances yet to read your own fade rate, so the 1.06 average is used'}. Interval repeats and untimed pieces are not efforts.`,
+    reason: `Fitted to your best ${curve.sources.length === 1 ? 'continuous effort' : `${curve.sources.length} continuous efforts`} in the last 180 days${curve.fitted ? `, carried at your own fade rate of ${curve.exponent.toFixed(2)} rather than the 1.06 average` : ' — not enough spread of distances yet to read your own fade rate, so the 1.06 average is used'}. Interval repeats and untimed pieces are not efforts.${blended && vo2 ? ` Blended with your Garmin VO2 max of ${vo2.value} (${shortDate(vo2.date)}), which counts for ${Math.round(blended.vo2Share * 100)}% because your freshest hard effort is ${freshest === 0 ? 'from today' : freshest === 1 ? '1 day old' : `${freshest} days old`}.` : ''}`,
     supportingRuns: supporting,
     recentRunMiles: Math.round(recentMiles * 10) / 10,
     recentRunDays,

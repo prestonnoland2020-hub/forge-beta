@@ -116,7 +116,14 @@ export function activityRow(ownerId: string, item: Summary) {
    the others alone, so a sleep push never wipes the day's steps. */
 export function healthRows(kind: string, ownerId: string, items: Summary[]) {
   const stamp = new Date().toISOString();
-  const day = (item: Summary) => String(item.calendarDate || '').slice(0, 10);
+  /* Most summaries carry calendarDate; allDayRespiration carries only a start
+     time and the athlete's UTC offset, so its local day is worked out. */
+  const day = (item: Summary) => {
+    if (item.calendarDate) return String(item.calendarDate).slice(0, 10);
+    const start = num(item.startTimeInSeconds);
+    if (start === null) return '';
+    return new Date((start + (num(item.startTimeOffsetInSeconds) || 0)) * 1000).toISOString().slice(0, 10);
+  };
   const rows = items.filter(item => /^\d{4}-\d{2}-\d{2}$/.test(day(item))).map(item => {
     const base = { owner_id: ownerId, snapshot_date: day(item), provider: 'garmin', source_updated_at: stamp };
     if (kind === 'dailies') return { ...base, steps: num(item.steps), active_calories: num(item.activeKilocalories), resting_hr: num(item.restingHeartRateInBeatsPerMinute) };
@@ -127,7 +134,12 @@ export function healthRows(kind: string, ownerId: string, items: Summary[]) {
       return { ...base, sleep_minutes: Math.round(total / 60), sleep_efficiency: total + awake ? Math.round((total / (total + awake)) * 1000) / 10 : null };
     }
     if (kind === 'hrv') return { ...base, hrv_rmssd: num(item.lastNightAvg) };
-    if (kind === 'respiration') {
+    /* User Metrics: Garmin's daily VO2 max (running) estimate, for the race
+       predictions (src/lib/vo2.ts). */
+    if (kind === 'userMetrics') return num(item.vo2Max) ? { ...base, vo2_max: num(item.vo2Max) } : null;
+    /* Garmin delivers the respiration summary as "allDayRespiration"; only
+       "respiration" was handled, so every delivery was logged as ignored. */
+    if (kind === 'respiration' || kind === 'allDayRespiration') {
       const values = Object.values((item.timeOffsetEpochToBreaths || {}) as Record<string, number>).filter(value => typeof value === 'number');
       return { ...base, respiratory_rate: values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : null };
     }
@@ -139,14 +151,14 @@ export function healthRows(kind: string, ownerId: string, items: Summary[]) {
   return [...new Map(rows.map(row => [row.snapshot_date, row])).values()];
 }
 
-export const HEALTH_KINDS = ['dailies', 'sleeps', 'hrv', 'respiration'];
+export const HEALTH_KINDS = ['dailies', 'sleeps', 'hrv', 'respiration', 'allDayRespiration', 'userMetrics'];
 /* Both carry the activity summary model; a manual edit on Garmin Connect
    arrives as the second and replaces the first by activity id. */
 export const ACTIVITY_KINDS = ['activities', 'manuallyUpdatedActivities'];
 /* Activities come from the Activity API; the rest need the Health API. A
    program approved for one but not the other gets 403/412 on the rest, so
    each kind is requested and judged on its own. */
-export const BACKFILL_KINDS = ['activities', 'dailies', 'sleeps', 'hrv'];
+export const BACKFILL_KINDS = ['activities', 'dailies', 'sleeps', 'hrv', 'userMetrics'];
 /* Only the kinds this program may ask for. The Health API is a separate
    approval; until GARMIN_HEALTH_API is set to "true", asking for dailies,
    sleeps or HRV only earns a 403 ("User not registered with consumer") and
