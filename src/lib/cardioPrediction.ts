@@ -2,12 +2,17 @@ import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider'
 import { continuousRunEfforts } from './cardioSession';
 import { localDayIso } from './time';
 import { isRaceEvidence, countsAsRunVolume } from './runQuality';
-import { volumeForPace } from './riegel';
+import { volumeForPace, equivalentSeconds, RIEGEL, RIEGEL_UNDERTRAINED } from './riegel';
+import { heartRateEffort } from './heartRate';
 import { weeklyMilesFrom, type DatedMiles } from './runVolume';
 import { runLines } from './stats';
 import { trustedEfforts, CONFIRMED_PREFIX } from './effortAudit';
 import { fitnessCurve, predictFromCurve, type Effort as CurveEffort } from './fitnessCurve';
-import { blendWithVo2, latestVo2, vo2RaceSeconds, type Vo2Reading } from './vo2';
+import { latestVo2, vo2RaceSeconds, CURVE_HALF_LIFE_DAYS, CURVE_WEIGHT_FLOOR } from './vo2';
+
+/* VO2 max and heart rate at pace each count this much in an estimate; see predictRaceFromLegacyMethod. */
+export const AEROBIC_WEIGHT = 1;
+const FIVE_K = 3.10686;
 
 export type RacePrediction = {
   seconds: number;
@@ -34,6 +39,8 @@ export type RacePrediction = {
   /* Garmin's VO2 max, when it took part: the reading, what it alone would
      predict, and how much of the answer it carried (0–1). */
   vo2?: { value: number; date: string; seconds: number; share: number };
+  /* Heart rate at pace, when it took part: what it alone predicts and its share. */
+  heartRate?: { seconds: number; share: number };
 };
 
 type Run = { date: string; miles: number; seconds: number };
@@ -106,27 +113,6 @@ export function raceEvidenceEfforts(records: WorkoutRecord[]): Array<{ date: str
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const shortDate = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
 
-/* NO HARD EFFORTS LOGGED, BUT THE WATCH KNOWS SOMETHING. A prediction from
-   VO2 max alone, honestly labelled low-confidence with a wide range. */
-function fromVo2Only(vo2: Vo2Reading, goalMiles: number, runs: Run[]): RacePrediction | null {
-  const seconds = vo2RaceSeconds(vo2.value, goalMiles);
-  if (!seconds) return null;
-  const recent = runs.filter(run => daysAgo(run.date) <= 28);
-  return {
-    seconds,
-    low: Math.round(seconds * 0.95),
-    high: Math.round(seconds * 1.06),
-    exponent: 1.06,
-    fittedExponent: false,
-    confidence: 'low',
-    reason: `From your Garmin VO2 max of ${vo2.value} (${shortDate(vo2.date)}). No timed hard effort is logged in the last 180 days, so this is the watch's estimate — one hard run will sharpen it.`,
-    supportingRuns: 0,
-    recentRunMiles: Math.round(recent.reduce((sum, run) => sum + run.miles, 0) * 10) / 10,
-    recentRunDays: new Set(recent.map(run => run.date)).size,
-    vo2: { value: vo2.value, date: vo2.date, seconds, share: 1 },
-  };
-}
-
 export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles: number, excluded: string[] = [], workouts: CurveEffort[] = []): RacePrediction | null {
   if (!goalMiles) return null;
   /* ONE PIECE, RUN IN ONE GO — never a session's totals.
@@ -173,65 +159,91 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      filter because they are not log rows: there is nothing for the athlete to
      mark false, and effortAudit has nothing to ask about them. */
   const evidence = [...qualifying, ...workouts.filter(run => daysAgo(run.date) <= windowDays)];
-  const vo2 = latestVo2();
-  if (!evidence.length) return vo2 ? fromVo2Only(vo2, goalMiles, runs) : null;
-
-  /* THE CURVE, NOT THE SINGLE BEST RUN. What used to happen here was a
-     tournament: score every effort by its Riegel-converted time with a penalty
-     for how far it had to be stretched, and let the winner be the answer. That
-     made one row load-bearing — Preston's fake 5.47-mile at 5:29/mi won it
-     outright and paced his whole block — and it had no way to say how sure it
-     was.
-
-     fitnessCurve fits the athlete's own ln(time) = level + exponent·ln(distance)
-     through the frontier of what they have actually run, with easy days and
-     records that stand implausibly clear of the rest weighted out of it. The
-     prediction is read off the curve, the range comes from the scatter around
-     it, and the exponent is theirs rather than the population's. */
-  const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
-  const curve = fitnessCurve(evidence, today(), confirmed);
-  if (!curve) return vo2 ? fromVo2Only(vo2, goalMiles, runs) : null;
-
-  /* AND THE VOLUME BEHIND IT COUNTS, but only past the distances the athlete
-     has actually covered. A 17:42 5K carried straight to a marathon is a 2:37
-     marathon, and this predictor said so about an athlete running thirteen
-     miles a week. Inside their own range there is nothing to correct — the
-     runs happened. */
   const weeklyMiles = weeklyRunVolume(records);
-  const provisional = predictFromCurve(curve, goalMiles, 0)!;
-  const shortfall = volumeShortfallFor(provisional.seconds / goalMiles, weeklyMiles);
-  const prediction = predictFromCurve(curve, goalMiles, shortfall)!;
-
-  const near = (run: Run) => Math.abs(Math.log(goalMiles / run.miles));
-  const supporting = evidence.filter(run => near(run) <= NEAR_ENOUGH).length;
   const recent = runs.filter(run => daysAgo(run.date) <= 28);
-  const recentMiles = recent.reduce((sum, run) => sum + run.miles, 0);
+  const recentMiles = Math.round(recent.reduce((sum, run) => sum + run.miles, 0) * 10) / 10;
   const recentRunDays = new Set(recent.map(run => run.date)).size;
-  const best = curve.sources[0];
   const round2 = (value: number) => Math.round(value * 100) / 100;
-  /* THE WATCH, BLENDED IN. See vo2.ts: the older the freshest hard effort,
-     the more the athlete's current Garmin VO2 max counts. The range moves
-     with the answer, and widens to take in what the watch alone says. */
-  const freshest = Math.min(...curve.sources.map(item => daysAgo(item.date)));
-  const vo2Seconds = vo2 ? vo2RaceSeconds(vo2.value, goalMiles) : null;
-  const blended = vo2 && vo2Seconds ? blendWithVo2(prediction.seconds, freshest, vo2Seconds) : null;
-  const scale = blended ? blended.seconds / prediction.seconds : 1;
-  const low = Math.round(Math.min(prediction.low * scale, vo2Seconds && blended ? Math.min(blended.seconds, vo2Seconds) : Infinity));
-  const high = Math.round(Math.max(prediction.high * scale, vo2Seconds && blended ? Math.max(blended.seconds, vo2Seconds) : 0));
+
+  /* RUNNING FITNESS IS AEROBIC, SO THE AEROBIC READS LEAD.
+
+     A lifting max is read off the heaviest set. A running estimate is not:
+     what the athlete is worth at a distance is mostly their engine, and the
+     watch measures that every run. Three sources, each carried to the goal
+     distance on its own and each stretched by the same mileage correction:
+
+       VO2 max      Garmin's daily read, through the Daniels race equations
+       heart rate   the pace their heart rate implies at threshold, fitted
+                    through every run the watch put a heart rate on
+       hard runs    the fitness curve through their best continuous efforts
+
+     VO2 max and heart rate count 1 each. Hard runs count 1 when the freshest
+     is from this week, halving every six weeks it ages, down to a quarter —
+     so a fresh time trial is a third of the answer, never the whole of it.
+     Blended in log space, so 18:00 and 20:00 average the same either way. */
+  const vo2 = latestVo2();
+  const heart = heartRateEffort(records, today());
+  const confirmed = new Set(excluded.filter(key => key.startsWith(CONFIRMED_PREFIX)).map(key => key.slice(CONFIRMED_PREFIX.length)));
+  const curve = evidence.length ? fitnessCurve(evidence, today(), confirmed) : null;
+
+  /* MILEAGE, FOR EVERY SOURCE. Past the distance a source speaks for, the
+     athlete's weekly miles decide how much the pace fades — a 17:42 5K or a
+     VO2 max of 55 is not a 2:37 marathon off thirteen miles a week. The
+     shortfall is read at a provisional pace from whatever sources there are. */
+  const vo2Raw = vo2 ? vo2RaceSeconds(vo2.value, goalMiles) : null;
+  const heartRaw = heart ? equivalentSeconds(heart.seconds, heart.miles, goalMiles) : null;
+  const curveRaw = curve ? predictFromCurve(curve, goalMiles, 0)?.seconds ?? null : null;
+  const raw = [vo2Raw, heartRaw, curveRaw].filter((value): value is number => Boolean(value && value > 0));
+  if (!raw.length) return null;
+  const provisional = Math.exp(raw.reduce((sum, value) => sum + Math.log(value), 0) / raw.length);
+  const shortfall = volumeShortfallFor(provisional / goalMiles, weeklyMiles);
+  const vo2Seconds = vo2Raw ? Math.round(goalMiles > FIVE_K ? vo2Raw * Math.pow(goalMiles / FIVE_K, (RIEGEL_UNDERTRAINED - RIEGEL) * shortfall) : vo2Raw) : null;
+  const heartSeconds = heart && heartRaw ? Math.round(equivalentSeconds(heart.seconds, heart.miles, goalMiles, shortfall)) : null;
+  const prediction = curve ? predictFromCurve(curve, goalMiles, shortfall) : null;
+  const freshest = curve ? Math.min(...curve.sources.map(item => daysAgo(item.date))) : 0;
+
+  const parts: Array<{ seconds: number; weight: number }> = [];
+  if (vo2Seconds) parts.push({ seconds: vo2Seconds, weight: AEROBIC_WEIGHT });
+  if (heartSeconds) parts.push({ seconds: heartSeconds, weight: AEROBIC_WEIGHT });
+  const curveWeight = prediction ? Math.max(CURVE_WEIGHT_FLOOR, 0.5 ** (freshest / CURVE_HALF_LIFE_DAYS)) : 0;
+  if (prediction) parts.push({ seconds: prediction.seconds, weight: curveWeight });
+  const total = parts.reduce((sum, part) => sum + part.weight, 0);
+  const seconds = Math.round(Math.exp(parts.reduce((sum, part) => sum + part.weight * Math.log(part.seconds), 0) / total));
+  const share = (weight: number) => Math.round((weight / total) * 100) / 100;
+
+  /* THE RANGE takes in every source on its own, and never narrows below the
+     curve's own scatter (or ±5% when there is no curve to read one from). */
+  const scale = prediction ? seconds / prediction.seconds : 1;
+  const low = Math.round(Math.min(prediction ? prediction.low * scale : seconds * 0.95, ...parts.map(part => part.seconds)));
+  const high = Math.round(Math.max(prediction ? prediction.high * scale : seconds * 1.06, ...parts.map(part => part.seconds)));
+  const aerobicCount = (vo2Seconds ? 1 : 0) + (heartSeconds ? 1 : 0);
+  const confidence: RacePrediction['confidence'] = prediction
+    ? (aerobicCount && prediction.confidence === 'low' ? 'medium' : prediction.confidence)
+    : aerobicCount === 2 ? 'medium' : 'low';
+
+  const said: string[] = [];
+  if (vo2 && vo2Seconds) said.push(`your Garmin VO2 max of ${vo2.value} (${shortDate(vo2.date)}, ${Math.round(share(AEROBIC_WEIGHT) * 100)}%)`);
+  if (heartSeconds) said.push(`the pace your heart rate holds on recent runs (${Math.round(share(AEROBIC_WEIGHT) * 100)}%)`);
+  if (curve && prediction) said.push(`your best ${curve.sources.length === 1 ? 'hard run' : `${curve.sources.length} hard runs`} (${Math.round(share(curveWeight) * 100)}%, freshest ${freshest === 0 ? 'today' : freshest === 1 ? '1 day ago' : `${freshest} days ago`})`);
+  const listed = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said.at(-1)}` : said[0];
+  const reason = `Built from ${listed}, adjusted for your ${Math.round(weeklyMiles)} miles a week.${!curve ? ' One timed hard run will sharpen it.' : ''}`;
+
+  const best = curve?.sources[0];
   return {
-    seconds: blended ? blended.seconds : prediction.seconds,
-    low: blended ? low : prediction.low,
-    high: blended ? high : prediction.high,
-    ...(blended && vo2 && vo2Seconds ? { vo2: { value: vo2.value, date: vo2.date, seconds: vo2Seconds, share: blended.vo2Share } } : {}),
-    exponent: Math.round(prediction.exponent * 1000) / 1000,
-    fittedExponent: curve.fitted,
-    confidence: prediction.confidence,
-    reason: `Fitted to your best ${curve.sources.length === 1 ? 'continuous effort' : `${curve.sources.length} continuous efforts`} in the last 180 days${curve.fitted ? `, carried at your own fade rate of ${curve.exponent.toFixed(2)} rather than the 1.06 average` : ' — not enough spread of distances yet to read your own fade rate, so the 1.06 average is used'}. Interval repeats and untimed pieces are not efforts.${blended && vo2 ? ` Blended with your Garmin VO2 max of ${vo2.value} (${shortDate(vo2.date)}), which counts for ${Math.round(blended.vo2Share * 100)}% because your freshest hard effort is ${freshest === 0 ? 'from today' : freshest === 1 ? '1 day old' : `${freshest} days old`}.` : ''}`,
-    supportingRuns: supporting,
-    recentRunMiles: Math.round(recentMiles * 10) / 10,
+    seconds,
+    low,
+    high,
+    ...(vo2 && vo2Seconds ? { vo2: { value: vo2.value, date: vo2.date, seconds: vo2Seconds, share: share(AEROBIC_WEIGHT) } } : {}),
+    ...(heartSeconds ? { heartRate: { seconds: heartSeconds, share: share(AEROBIC_WEIGHT) } } : {}),
+    exponent: Math.round((prediction?.exponent ?? RIEGEL) * 1000) / 1000,
+    fittedExponent: Boolean(curve?.fitted),
+    confidence,
+    reason,
+    supportingRuns: curve ? evidence.filter(run => Math.abs(Math.log(goalMiles / run.miles)) <= NEAR_ENOUGH).length : 0,
+    recentRunMiles: recentMiles,
     recentRunDays,
-    source: { date: best.date, miles: round2(best.miles), seconds: Math.round(best.seconds) },
-    sources: curve.sources.map(item => ({ date: item.date, miles: round2(item.miles), seconds: Math.round(item.seconds) })),
+    ...(best ? { source: { date: best.date, miles: round2(best.miles), seconds: Math.round(best.seconds) } } : {}),
+    ...(curve ? { sources: curve.sources.map(item => ({ date: item.date, miles: round2(item.miles), seconds: Math.round(item.seconds) })) } : {}),
   };
 }
 
