@@ -172,7 +172,10 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const activeTab = cameFromToday ? 0 : tabs.findIndex(tab => tab.owns(location.pathname));
   /* A workout in progress and the full coach are tasks, not places: the tab
      bar steps aside for them the way a native app's does. */
-  const hideTabs = location.pathname === '/workout' || location.pathname === '/coach';
+  /* The tab bar stays on every screen, a workout and the coach included, so
+     the athlete is never left without a way to the other tabs. It still steps
+     aside for the keyboard and for an open sheet (app-chrome.css). */
+  const hideTabs = false;
   const { recovery } = useAdaptiveTraining();
   const { setup } = useProfileSetup();
   const { failures: syncFailures, retryAll } = useSyncStatus();

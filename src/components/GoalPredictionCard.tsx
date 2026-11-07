@@ -5,7 +5,6 @@ import { useGoals } from '../features/goals/GoalsProvider';
 import { nudgeUpgrade } from './UpgradeSheet';
 import type { Feasibility } from '../lib/goalFeasibility';
 import { secondsToClock } from '../lib/goalInput';
-import { OnboardingGoalPath, type GoalPath } from './OnboardingGoalPath';
 
 /* THE SAME PREDICTION SETUP SHOWED, ON THE GOAL ITSELF. Setup drew a path
    from where the athlete is to the goal and called it realistic, ambitious or
@@ -54,30 +53,34 @@ function GoalFix({ verdict }: { verdict: Feasibility }) {
 }
 
 export function GoalPredictionCard({ verdict, date, unit, hoursFirst }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean }) {
-  const [open, setOpen] = useState(false);
   const p = verdict.prediction;
   if (!p) return null;
   const race = p.better === 'lower';
   const show = (value: number) => race ? secondsToClock(value, hoursFirst || value >= 3600) : `${Math.round(value)} ${unit}`;
   /* Progress reads left to right whichever way the number goes. */
   const reach = (value: number) => race ? value <= p.target : value >= p.target;
-  const tone: GoalPath['tone'] = reach(p.typical) ? 'good' : reach(p.ceiling) ? 'stretch' : 'hard';
+  const tone = reach(p.typical) ? 'good' : reach(p.ceiling) ? 'stretch' : 'hard';
   const label = reach(p.start) ? 'Reached' : tone === 'good' ? 'Realistic' : tone === 'stretch' ? 'Ambitious' : race ? 'Too fast' : 'Too steep';
-  const path: GoalPath = {
-    from: p.start, to: p.target, weeks: Math.max(1, p.weeks),
-    fromLabel: show(p.start), toLabel: show(p.target),
-    headline: `Typical by ${shortDate(date)}: ${show(p.typical)} · best case ${show(p.ceiling)}`,
-    verdict: label, tone, note: verdict.say,
-  };
-  return <section className="goal-prediction" aria-label="Forge's prediction">
-    <div className="goal-prediction-head"><span>Forge’s prediction</span><button type="button" className="text-button" aria-expanded={open} onClick={() => setOpen(value => !value)}>{open ? 'Hide' : 'How Forge predicts'}</button></div>
-    <OnboardingGoalPath path={path} date={date} />
+  const gap = Math.abs(p.typical - p.target);
+  const gapText = race ? secondsToClock(gap, hoursFirst || gap >= 3600) : `${Math.round(gap)} ${unit}`;
+  const line = reach(p.start) ? 'Already there — hold it to the date.'
+    : Math.round(gap) === 0 ? 'Lands right on the goal.'
+    : reach(p.typical) ? <>Clears it by <b>{gapText}</b></> : <><b>{gapText}</b> short on the day</>;
+  /* One bar from zero (as on the goal card above it) to the further of the
+     goal and the best case:
+     the fill is where a typical block lands, the tick is the goal. */
+  const lo = race ? Math.max(p.start, p.target, p.ceiling, p.typical) : 0;
+  const hi = race ? Math.min(p.target, p.ceiling, p.typical) : Math.max(p.target, p.ceiling, p.typical);
+  const at = (value: number) => hi === lo ? 100 : Math.max(0, Math.min(100, ((value - lo) / (hi - lo)) * 100));
+  /* WHAT MATTERS ON THE PREDICTION: where the athlete lands by the date, how
+     far that is from the goal, and what to change. The path chart, the
+     paragraph restating it and the rules of the model were three more ways to
+     say the same number; the card that followed said it a fourth time. */
+  return <section className={`goal-prediction compact tone-${tone}`} aria-label="Forge's prediction">
+    <div className="gpc-head"><span>Projected by {shortDate(date)}</span><em>{label}</em></div>
+    <div className="gpc-num"><b>{show(p.typical)}</b><span>{line}</span></div>
+    <div className="gpc-bar" aria-hidden="true"><i style={{ width: `${at(p.typical)}%` }} /><s style={{ left: `${at(p.target)}%` }} /></div>
+    <p className="gpc-meta"><span>Best case {show(p.ceiling)}</span><span>Goal {show(p.target)}</span></p>
     <GoalFix verdict={verdict} />
-    {open && <ul className="goal-prediction-rules">
-      <li><b>Now</b> is {race ? 'what your logged runs are worth at this distance today' : 'your best estimated 1-rep max from logged top sets — or the best you entered, until you log one'}.</li>
-      <li><b>Typical</b> is where most athletes land: {race ? 'about 0.6% faster a week, for longer on longer races' : 'about 0.35% a week for 12 weeks, then slower'}{race ? '' : ' — or your own rate, once a lift has 12 weeks of history'}.</li>
-      <li><b>Best case</b> is the most training finds: {race ? 'about 1% a week, scaled up for half and full marathons' : 'about 1% a week for 12 weeks, then ¼%; new lifts climb faster at first'}.</li>
-      <li>{race ? 'These rates come from coaching practice and are being checked against real Forge results.' : 'These rates come from real Forge training history.'} Forge records this prediction and checks it against what you actually hit on {shortDate(date)}, so the model keeps getting more accurate.</li>
-    </ul>}
   </section>;
 }
