@@ -5,6 +5,7 @@
    The page now switches between the two, and the switch moves every
    strength number on it: the cards, the bars and the ring. */
 import { goalProgress } from './src/lib/goalProgress.ts';
+import { testedRaceSeconds } from './src/lib/cardioPrediction.ts';
 import { readFileSync } from 'node:fs';
 
 let fails = 0;
@@ -23,11 +24,23 @@ check('with no single there is no bar, and it says why', none.share === null && 
 const reps = { ...goal, title: '12 Pull Ups', exercise: 'Pull Ups', target: '12 reps', unit: 'reps' };
 check('a rep goal is reps in either mode', goalProgress(reps, [{ date: '2026-10-20', topSets: [{ lift: 'Pull Ups', weight: 0, reps: 9 }] }], verdict, null, 'tested').current === 9);
 
+console.log('\nRunning goals');
+const run = (date, miles, minutes) => ({ id: date, date, title: 'Run', muscles: ['Cardio'], topSets: [], hasCardio: true, cardioSessions: [{ id: date, activity: 'Run', structure: 'custom', summary: 'Run', prescription: { legacyIntervals: [{ distance: miles, unit: 'miles', time: minutes, cardioType: 'Run' }] } }] });
+const fiveK = { type: 'Endurance', title: 'Sub-20 5K', exercise: '5K Run', target: '20:00 mm:ss', unit: 'mm:ss', date: '2027-03-01', current: '' };
+const ran = [run('2026-10-20', 3.11, 21), run('2026-10-22', 1, 6.5)];
+const testedNow = testedRaceSeconds(ran, 3.10686);
+check('tested is a time actually run at the distance', testedNow !== null && Math.abs(testedNow - 21 * 60 * 3.10686 / 3.11) < 1, String(testedNow));
+check('a shorter run is not a tested 5K', testedRaceSeconds([run('2026-10-22', 1, 6.5)], 3.10686) === null);
+check('a longer run counts at its own pace', Math.round(testedRaceSeconds([run('2026-10-20', 6.2, 48)], 3.10686)) === Math.round(48 * 60 * 3.10686 / 6.2));
+const noTime = goalProgress(fiveK, [], verdict, null, 'tested', null);
+check('with no run that long there is no bar, and it says why', noTime.share === null && noTime.label === 'No tested time yet', JSON.stringify(noTime));
+
 console.log('\nThe page');
 const page = readFileSync('./src/pages/GoalsPage.tsx', 'utf8');
 check('every goal is measured in the chosen mode', /goalProgress\(goal, records, verdicts\[index\], setup, maxMode[,)]/.test(page));
 check('the choice is remembered on the device', /localStorage\.setItem\('forge-goals-max-mode', mode\)/.test(page));
-check('the switch shows only when a strength goal can use it', /\{hasStrength && <div className="gx-mode"/.test(page));
+check('the switch shows when a strength or running goal can use it', /\{\(hasStrength \|\| hasRunTime\) && <div className="gx-mode"/.test(page));
+check('running goals read the same switch', /maxMode === 'tested' \? testedRaceSeconds/.test(page));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);

@@ -8,9 +8,8 @@
 
    Garmin's VO2 max is that daily estimate. It is not a race: it is a model
    on heart rate and pace, and it can sit a few points off for an individual.
-   So it never replaces the curve; it is blended in, and it counts for more
-   the older the athlete's freshest hard effort is. A time trial last week
-   dominates; a curve built on runs from two months ago yields to the watch. */
+   It leads the running estimate alongside heart rate at pace; hard runs are
+   blended in and count for less the older the freshest one is. */
 
 export type Vo2Reading = { value: number; date: string };
 
@@ -61,20 +60,9 @@ export function rememberVo2(reading: Vo2Reading | null) {
   } catch { /* storage unavailable: predictions simply go without it */ }
 }
 
-/* HOW MUCH THE WATCH COUNTS. 0.35 against a hard effort from this week, so a
-   fresh time trial still carries about three quarters of the answer; the
-   curve's weight halves every six weeks its freshest effort ages, down to a
-   quarter -- so with nothing hard in two or three months, the watch leads. */
-export const VO2_WEIGHT = 0.35;
+/* HOW FAST A HARD RUN'S SAY FADES in the running estimate: full weight for
+   six weeks, then it halves every six weeks after that, down to a quarter. VO2 max and heart
+   rate at pace lead the estimate — see predictRaceFromLegacyMethod. */
+export const CURVE_FULL_DAYS = 42;
 export const CURVE_HALF_LIFE_DAYS = 42;
 export const CURVE_WEIGHT_FLOOR = 0.25;
-
-export function blendWithVo2(curveSeconds: number, freshestEffortAgeDays: number, vo2Seconds: number) {
-  const curveWeight = Math.max(CURVE_WEIGHT_FLOOR, 0.5 ** (Math.max(0, freshestEffortAgeDays) / CURVE_HALF_LIFE_DAYS));
-  const share = VO2_WEIGHT / (VO2_WEIGHT + curveWeight);
-  /* In log space: a time is a ratio scale, and a blend of 18:00 and 20:00
-     should not depend on which way round they are written. */
-  const seconds = Math.round(Math.exp((1 - share) * Math.log(curveSeconds) + share * Math.log(vo2Seconds)));
-  return { seconds, vo2Share: Math.round(share * 100) / 100 };
-}
-
