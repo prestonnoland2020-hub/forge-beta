@@ -46,7 +46,7 @@ await page.waitForTimeout(2600);
 const rows = await page.evaluate(() => [...document.querySelectorAll('.pv-row')].map(row => ({
   cls: row.className, text: row.innerText.replace(/\n/g, ' | '),
 })));
-const dayOf = n => rows.find(row => row.text.startsWith(new Date(Date.now() - n * 86400000).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()));
+const dayOf = n => rows.find(row => row.text.toUpperCase().startsWith(new Date(Date.now() - n * 86400000).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()));
 const legsDay = dayOf(2), gapDay = dayOf(1), todayRow = dayOf(0);
 console.log(rows.map(r => `    ${r.text}`).join('\n'));
 

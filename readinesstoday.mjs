@@ -36,7 +36,8 @@ const boot = async (checkIns) => {
   await page.goto(`${BASE}/#/?t=${Math.random()}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2800);
   const text = await page.evaluate(() => document.body.innerText);
-  const card = text.slice(text.indexOf('UP NEXT'), text.indexOf('UP NEXT') + 400);
+  const at = text.toUpperCase().indexOf('UP NEXT');
+  const card = text.slice(at, at + 400);
   await page.close();
   return { text, card };
 };

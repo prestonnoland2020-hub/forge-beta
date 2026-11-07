@@ -202,7 +202,7 @@ export function BillingSettings() {
                     <div className="billing-actions"><button type="button" className="button secondary" onClick={() => setConfirmDelete(false)}>Back</button></div>
                   </>
                 : <>
-                    <label><span>Type <b>DELETE</b> to confirm</span>
+                    <label><span>Type <b>Delete</b> to confirm</span>
                       <input value={deleteText} onChange={event => setDeleteText(event.target.value)} placeholder="DELETE" autoComplete="off" autoFocus />
                     </label>
                     <div className="billing-actions">
