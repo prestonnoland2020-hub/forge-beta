@@ -14,7 +14,7 @@ import { useCoachingStrategy } from './CoachingStrategyProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useWorkoutHistory } from './WorkoutHistoryProvider';
 import { loadCycleSnapshot,loadDailyRecommendation,saveDailyRecommendation,type CycleSnapshot } from './dailyRecommendationService';
-import { readLocalAiPlan,currentWeekIndex,blockIsOver,planBlockFor,runningPeaks,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttemptDays,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF,EXPOSURES_BEFORE_MAX} from './aiPlanService';
+import { readLocalAiPlan,currentWeekIndex,blockIsOver,planBlockFor,runningPeaks,wavePrescription,waveSlot,goalLiftNames,testsOneRepMax,resolveWeekRunning,weekCycleDays,bestsFromHistory,chooseMaxAttempts,attemptSlot,isRestDay,waveIndexOf,ACCESSORY_REPS,ACCESSORY_SESSIONS_PER_RAISE,FAILURES_BEFORE_BACKOFF,EXPOSURES_BEFORE_MAX} from './aiPlanService';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
@@ -323,18 +323,17 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     const qualityIndex=windowDays.findIndex(day=>day.name===week.qualityDay);
     const easyNames=new Set(week.easyDays||[]);
     const easySet=new Set(windowDays.map((day,index)=>easyNames.has(day.name)?index:-1).filter(index=>index>=0));
-    const attemptDays=chooseMaxAttemptDays(windowDays.map((day,index)=>{
-      const set=(week.topSets||[]).find(entry=>entry.splitDay===day.name);
-      const key=set?canonicalLiftKey(set.exercise):'';
-      const best=key?liveBests.get(key)||0:0;
-      const setTests=set?testsOneRepMax(set.exercise,goalLifts):false;
-      const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX}):null;
-      return{
-        exercise:set?.exercise,
-        reps:live?.reps,
-        hasHold:Boolean(live?.isMax),
-        cost:(index===longIndex?2:0)+(index===qualityIndex?3:0)+(easySet.has(index)?1:0),
-      };
+    /* Every set the day carries, as the Plan tab reads it — a goal lift that is
+       not the day's first set still claims, or gives up, its attempt. */
+    const attempts=chooseMaxAttempts(windowDays.flatMap((day,index)=>{
+      const seen=new Set<string>();
+      return(week.topSets||[]).filter(entry=>entry.splitDay===day.name).filter(set=>{const key=canonicalLiftKey(set.exercise);if(seen.has(key))return false;seen.add(key);return true}).map(set=>{
+        const key=canonicalLiftKey(set.exercise);
+        const best=liveBests.get(key)||0;
+        const setTests=testsOneRepMax(set.exercise,goalLifts);
+        const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX}):null;
+        return{day:index,exercise:set.exercise,reps:live?.reps,hasHold:Boolean(live?.isMax),cost:(index===longIndex?2:0)+(index===qualityIndex?3:0)+(easySet.has(index)?1:0)};
+      });
     }));
     /* WHICH SLOT OF THE WINDOW TODAY ACTUALLY IS.
 
@@ -349,7 +348,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     weekStart.setDate(weekStart.getDate()+currentWeekIndex(storedPlan)*7);
     const noon=new Date();noon.setHours(12,0,0,0);
     const todayIndex=Math.max(0,Math.min(6,Math.round((noon.getTime()-weekStart.getTime())/86400000)));
-    const todayHoldsTheAttempt=attemptDays.has(todayIndex);
+    const todayHoldsTheAttempt=(exercise:string)=>attempts.has(attemptSlot(todayIndex,exercise));
     const isMaxWeek=waveSlot(waveIdx).isMax;
     /* ONE PEAK AT A TIME, decided the way the Plan tab decides it: when the
        race is nearer than the lift goal, the attempt holds at the double. */
@@ -374,7 +373,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
          with high strength fatigue) the lift holds what it already did. */
       const lowReadiness=recovery.confidence!=='Low'&&recovery.readiness<55;
       const recovering=recovery.confidence!=='Low'&&(recovery.readiness<65||recovery.strengthFatigue==='High');
-      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness&&!raceOwnsWeek(tests),holding:recovering,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
+      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt(exercise)&&!lowReadiness&&!raceOwnsWeek(tests),holding:recovering,anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
       const accessorySessions=liveSessions.get(key)||0;
       /* No session yet means the best is the starting number from setup, and the card says so. */
       const fromWhat=accessorySessions?`your best calc max ${live.best}`:`the starting number you gave (calc max ${live.best}) — your first logged set replaces it`;
@@ -385,7 +384,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       /* A lift with no goal on it is not on the wave's calendar at all — its
          cycle advances with its own sessions, so saying "week 4 of the wave"
          over it was describing a program it is not running. */
-      const readinessNote=lowReadiness&&tests&&todayHoldsTheAttempt?` Readiness ${recovery.readiness} — the attempt waits for a better day.`:recovering?` Readiness ${recovery.readiness} — holding the load today.`:'';
+      const readinessNote=lowReadiness&&tests&&todayHoldsTheAttempt(exercise)?` Readiness ${recovery.readiness} — the attempt waits for a better day.`:recovering?` Readiness ${recovery.readiness} — holding the load today.`:'';
       return{...prescription,source:'history' as const,rationale:(tests
         ?`8/6/4/2/1 wave · week ${week.week} (${slotLabel}) · from ${fromWhat}.`
         :`${ACCESSORY_REPS.join('/')} accessory cycle · session ${accessorySessions+1} on this lift (${slotLabel}) · ${(liveMisses.get(key)?.get(prescription.reps)||0)>=FAILURES_BEFORE_BACKOFF?`three misses at these reps, so this is the last load you completed at them`:`from ${fromWhat}, which gains a plate every ${ACCESSORY_SESSIONS_PER_RAISE}th completed session`}.`)+readinessNote};

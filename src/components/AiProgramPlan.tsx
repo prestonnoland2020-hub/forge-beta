@@ -29,7 +29,7 @@ import { estimateMaxHr, heartRateRuns, heartRateTargets, type HeartRateTargets }
 import {
   generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, planBlockFor, rememberPlannedMiles, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
-  bestsFromHistory, chooseMaxAttemptDays, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
+  bestsFromHistory, chooseMaxAttempts, attemptSlot, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
   calendarEmptyState, provenMax,
 } from '../features/training/aiPlanService';
 import { liftPositions, rungFor } from '../lib/liftProgression';
@@ -129,12 +129,17 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
      three times over. The attempt goes to that lift's cleanest session — no
      long run, no quality work — and the day's other appearances drop back to
      the heavy double the lift already earned. */
-  const attemptDays = chooseMaxAttemptDays(dayInfos.map((info, index) => ({
-    exercise: info.topSet?.exercise,
-    reps: info.topSet?.reps,
-    hasHold: Boolean(info.topSet?.hold),
+  const attempts = chooseMaxAttempts(dayInfos.flatMap((info, index) => info.topSets.map(set => ({
+    day: index,
+    exercise: set.exercise,
+    reps: set.reps,
+    hasHold: Boolean(set.hold),
     cost: (index === longIndex ? 2 : 0) + (index === qualityIndex ? 3 : 0) + (easySet.has(index) ? 1 : 0),
-  })));
+  }))));
+  const attemptDays = new Set([...attempts].map(slot => Number(slot.split('|')[0])));
+  /* Every set on the day, not just its first, gives up a duplicate attempt. */
+  const settle = (index: number) => (set: AiPlanTopSet | undefined) =>
+    set && set.reps === 1 && set.hold && !attempts.has(attemptSlot(index, set.exercise)) ? { ...set, ...set.hold } : set;
   const placedDays: PlannedDay[] = dayInfos.map((info, index) => ({
     name: info.day.name, index,
     lowerBody: info.lower,
@@ -143,9 +148,8 @@ function aiWeekSessions(week: AiPlanWeek, startIso: string, weekIndex: number, s
   }));
   /* Pass 2 — render sessions. */
   const rendered = dayInfos.map(({ date, day, topSet: rawTopSet, topSets: rawTopSets }, index) => {
-    const demoted = rawTopSet?.reps === 1 && rawTopSet.hold && !attemptDays.has(index);
-    const topSet = demoted && rawTopSet?.hold ? { ...rawTopSet, ...rawTopSet.hold } : rawTopSet;
-    const extraSets = (rawTopSets || []).slice(1);
+    const topSet = settle(index)(rawTopSet);
+    const extraSets = (rawTopSets || []).slice(1).map(set => settle(index)(set)!);
     const type = day.dayType.toLowerCase();
     let runText = ''; let runKind: '' | 'Long run' | 'Hard run' | 'Easy run' = ''; let runStress: 'High' | 'Moderate' | 'Low' | undefined;
     /* HEART RATE BESIDE PACE. Pace is the target; heart rate is the check that

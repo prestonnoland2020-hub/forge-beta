@@ -915,7 +915,9 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
     runningPeakWeek: phase === 'Specific' || phase === 'Taper' || phase === 'Race',
     weeksToRace: block?.weeksToRace,
     weeksToLiftGoal: block?.weeksToLiftGoal,
-  })?.owner === 'lifting';
+  })?.owner === 'lifting' && !raceWeek;
+  /* The race itself never yields: it is a fixed date, not a session that can
+     move. The max week takes the attempts and the race stays the race. */
   const written = goalPace && hasQuality && !yielding
     ? qualitySession({
         phase,
@@ -1273,14 +1275,27 @@ export function weekCycleDays(startIso: string, weekIndex: number, splitDays: Sp
 export function chooseMaxAttemptDays(
   days: Array<{ exercise?: string; reps?: number; hasHold?: boolean; cost: number }>,
 ): Set<number> {
-  const best = new Map<string, { index: number; cost: number }>();
-  days.forEach((day, index) => {
-    if (!day.exercise || day.reps !== 1 || !day.hasHold) return;
-    const key = canonicalLiftKey(day.exercise);
+  return new Set([...chooseMaxAttempts(days.map((day, index) => ({ ...day, day: index })))].map(slot => Number(slot.split('|')[0])));
+}
+
+/* THE SAME QUESTION ASKED OF EVERY LIFT ON EVERY DAY. The day version above
+   only ever saw a day's FIRST set, so a goal lift sitting second on a day —
+   Squat after Hack Squat, Pull Ups after Bench — was never demoted when the
+   split visited it twice, and the week could carry two attempts at one lift.
+   Returns `${dayIndex}|${liftKey}` for each set that carries the week's one
+   attempt at that lift. */
+export const attemptSlot = (day: number, exercise: string) => `${day}|${canonicalLiftKey(exercise)}`;
+export function chooseMaxAttempts(
+  sets: Array<{ day: number; exercise?: string; reps?: number; hasHold?: boolean; cost: number }>,
+): Set<string> {
+  const best = new Map<string, { day: number; cost: number }>();
+  sets.forEach(set => {
+    if (!set.exercise || set.reps !== 1 || !set.hasHold) return;
+    const key = canonicalLiftKey(set.exercise);
     const held = best.get(key);
-    if (!held || day.cost < held.cost) best.set(key, { index, cost: day.cost });
+    if (!held || set.cost < held.cost || (set.cost === held.cost && set.day < held.day)) best.set(key, { day: set.day, cost: set.cost });
   });
-  return new Set([...best.values()].map(entry => entry.index));
+  return new Set([...best.entries()].map(([key, entry]) => `${entry.day}|${key}`));
 }
 
 /* ONE RESOLVED WEEK, SHARED BY EVERY SURFACE. The stored block is raw model
@@ -1502,7 +1517,14 @@ export function resolvePlanWeek<T extends AiPlanWeek>(
       weeksToLiftGoal: block.weeksToLiftGoal,
     });
     const liftYields = running?.owner === 'running';
-    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests: tests && readyEnough && !liftYields, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise), lastAt: lastAtFor(set.exercise), ramped: sessionsFor(set.exercise) + projectSteps >= EXPOSURES_BEFORE_MAX };
+    /* A PROJECTED MAX WEEK COUNTS THE SESSIONS BETWEEN HERE AND THERE. Ramped
+       was read off sessions already logged plus one per projected wave, so a
+       lift trained twice so far showed as unready for a max week eight weeks
+       out — weeks in which it would be trained eight more times. Every week
+       ahead adds that lift's own weekly exposures (one if unknown). */
+    const weeksAhead = Math.max(0, block.weekIndex - (block.currentWeekIndex ?? block.weekIndex));
+    const rampedBy = (lift: string) => sessionsFor(lift) + projectSteps + weeksAhead * Math.max(1, strength.exposuresPerWeek?.(lift) || 1) >= EXPOSURES_BEFORE_MAX;
+    const waveOptions = { metric: strength.metric, bestSingle: lookup(strength.singles, set.exercise) || 0, tests: tests && readyEnough && !liftYields, anchors: anchorsFor(set.exercise), projectSteps, accessory, sessions: sessionsFor(set.exercise) + projectSteps, misses: missesFor(set.exercise), lastAt: lastAtFor(set.exercise), ramped: rampedBy(set.exercise) };
     const live = wavePrescription(best, waveIndex, waveOptions);
     if (live.weight !== set.weight || live.reps !== set.reps) adjusted = true;
     /* On a max week a tested lift also carries the double it falls back to

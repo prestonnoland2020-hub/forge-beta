@@ -91,13 +91,19 @@ export type PeakContext = {
 
 export function peakConflict({ liftingMaxWeek, runningPeakWeek, weeksToRace = Infinity, weeksToLiftGoal = Infinity }: PeakContext): PeakConflict | null {
   if (!liftingMaxWeek || !runningPeakWeek) return null;
-  /* THE NEARER GOAL OWNS THE WEEK. Not the bigger one, not the one the athlete
-     mentioned first — the one that runs out of time soonest, because that is
-     the only one where this week is irreplaceable. */
-  const runningFirst = weeksToRace <= weeksToLiftGoal;
-  return runningFirst
-    ? { owner: 'running', say: 'Your race is closer than your lift goal, so this week belongs to the running. The max attempt holds at a heavy double and moves to the next wave.' }
-    : { owner: 'lifting', say: 'Your lift goal is closer than your race, so this week belongs to the max attempt. The hard run drops to an easy effort and the race-specific work moves a week.' };
+  /* A MAX WEEK ALWAYS TESTS ITS GOAL LIFTS. The nearer goal used to own the
+     week, and a tie went to the race — so a block whose 5K and lift goals sat
+     a day apart turned its one max week into doubles for every goal lift, and
+     the block ended without a single tested max. The attempt is the thing
+     there is exactly one of per wave; a hard run can move. So the max keeps
+     the week and the running steps back to easy effort around it. The race
+     horizons are kept on the context for the notes that still read them. */
+  void weeksToRace;
+  /* No lift goal, no attempt: the wave still has a max week on the calendar,
+     but nothing is tested in it, so there is nothing for the running to make
+     room for. */
+  if (!Number.isFinite(weeksToLiftGoal)) return null;
+  return { owner: 'lifting', say: 'This is your max week, so it belongs to the max attempts. The hard run drops to an easy effort around them.' };
 }
 
 /* THE DELOADS ARE THE SAME DELOAD. The lifting wave owns the clock, because it
