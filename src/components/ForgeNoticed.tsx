@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useCoachNotes } from '../features/training/useCoachNotes';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useCoachActions } from '../features/training/useCoachActions';
 import { openCoachBubble } from '../features/training/coachService';
 import { Icon } from './Icon';
+import { useBilling } from '../features/billing/BillingProvider';
 import { localDayIso } from '../lib/time';
 
 /* NOW AND AGAIN, NOT EVERY VISIT. A card that sat on Today every time the app
@@ -35,6 +36,7 @@ const daysSince = (from: string, to: string) => Math.round((Date.parse(`${to}T12
 export function ForgeNoticed() {
   const { note: next, acknowledge } = useCoachNotes();
   const coach = useCoachActions();
+  const { isPro } = useBilling();
   const { pathname } = useLocation();
   const today = localDayIso();
   /* NOT BEFORE THERE IS SOMETHING TO NOTICE. With fewer than three training
@@ -84,7 +86,10 @@ export function ForgeNoticed() {
             <strong>{note.review.ran}<small>{note.review.plannedMiles ? `/${note.review.plannedMiles}` : ''} {note.review.unit}</small></strong>
           </div>}
           {note.review.prs.length > 0 && <div className="wk-prs">{note.review.prs.slice(0, 3).map(pr => <span key={pr.lift}><Icon name="trophy" size={14}/> {pr.lift} {pr.weight}×{pr.reps}</span>)}</div>}
-          {note.review.change && <p className="wk-change">{note.review.change}</p>}
+          {/* The week in numbers is free; what to change next week is Pro. */}
+          {note.review.change && (isPro
+            ? <p className="wk-change">{note.review.change}</p>
+            : <Link className="goal-fix locked" to="/profile?view=billing"><b>What to change next week</b><span>Forge Pro shows it</span><em className="pro-tag">PRO</em></Link>)}
           {note.review.next && <p className="wk-next"><span>Next</span>{note.review.next}</p>}
         </div>
       : note.lines

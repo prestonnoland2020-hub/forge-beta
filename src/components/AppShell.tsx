@@ -26,6 +26,7 @@ import { importStravaActivities } from '../features/training/stravaImportService
 import { getGarminConnection, syncGarmin } from '../features/training/garminConnectionService';
 import { tap, tick } from '../lib/haptics';
 import { Icon } from './Icon';
+import { UpgradeSheet } from './UpgradeSheet';
 
 /* One flat nav. The old "Manage" drawer hid Goals behind two taps and held a
    standalone exercise library that duplicated what the Log screen already does;
@@ -414,6 +415,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     {/* What Forge noticed comes last and only now and again: it waits for any
         of the dialogs above to be answered first. */}
     <ForgeNoticed />
+    <UpgradeSheet />
     {/* Open, the coach is a sheet over a dimmed screen, and tapping the dim
         closes it — on a phone always, on a desktop when expanded. */}
     {coachOpen && <button className={coachExpanded ? 'coach-bubble-backdrop expanded' : 'coach-bubble-backdrop'} type="button" aria-label="Close Forge coach" onClick={() => { if (coachExpanded) setCoachExpanded(false); else setCoachOpen(false); }} />}

@@ -56,7 +56,7 @@ function UsageRow({ endpoint, usage }: { endpoint: string; usage: { dailyLimit: 
    the destructive action reduced to a red row that opens its confirmation. */
 export function BillingSettings() {
   const { user } = useAuth();
-  const { entitlements, subscription, isPro, refresh, loading } = useBilling();
+  const { entitlements, subscription, isPro, refresh, loading, trialDays } = useBilling();
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -87,14 +87,17 @@ export function BillingSettings() {
   if (loading) return <section className="card billing-hero"><div><span className="eyebrow">Your plan</span><h2 className="billing-tier">Checking…</h2></div></section>;
 
   const founder = entitlements.tier === 'founder';
-  const tierWord = founder ? 'Owner' : isPro ? 'Pro' : 'Free';
+  const onTrial = trialDays !== null;
+  const tierWord = founder ? 'Owner' : onTrial ? 'Pro trial' : isPro ? 'Pro' : 'Free';
   const status = founder
     ? 'No limits apply to this account.'
+    : onTrial
+      ? `${trialDays === 1 ? '1 day' : `${trialDays} days`} left of your free Pro trial. Nothing is charged — subscribe below to keep Pro when it ends.`
     : isPro
       ? subscription?.cancel_at_period_end
         ? `Pro ends ${renewalDate || 'at the end of this period'}. You keep everything you have logged.`
         : `Renews ${renewalDate || 'automatically'}${subscription?.source === 'apple' ? ' through the App Store' : ''}.`
-      : 'Everything you log is free, forever. Pro raises the coaching limits.';
+      : 'Everything you log is free, forever. Free shows whether each goal is on track; Pro fixes what is behind.';
 
   return <div className="settings-groups billing-settings">
     <section className="card billing-hero" data-tier={entitlements.tier} aria-label="Your plan">
@@ -113,12 +116,12 @@ export function BillingSettings() {
       <p className="billing-group-note">Coaching answers and program rebuilds each call an AI model. Logging, history and your split are never metered.</p>
     </section>}
 
-    {!isPro && <section aria-labelledby="billing-pro">
+    {(!isPro || onTrial) && <section aria-labelledby="billing-pro">
       <h3 id="billing-pro">Upgrade</h3>
       <div className="card billing-offer">
         <header>
           <h2 className="billing-tier">Forge <em>Pro</em></h2>
-          <p>More of the part that coaches you.</p>
+          <p>Free shows the problem. Pro fixes it — a real coach for about $10 a month, not $150–200.</p>
         </header>
         <ul className="billing-features">{PRO_FEATURES.map(feature => <li key={feature}><Icon name="check" size={16} stroke={2.6} />{feature}</li>)}</ul>
         <div className="billing-plans" role="group" aria-label="Choose a plan">

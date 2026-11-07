@@ -146,6 +146,10 @@ WOMEN'S HEALTH. athleteSex may be supplied ("Female", "Male", "Unspecified" or n
 
 NUMBERS YOU MAY QUOTE. runningFacts carries the athlete's running as Forge counted it: last7Days.miles with the runs behind it, longestRun30d, longestRunEver. weeklyRunning is the week-by-week series. Every distance, pace, time or count you state must appear in the context; never add up the log yourself, and never call a run "your longest" unless runningFacts says it is.`;
 
+/* Pain, injury, illness, pregnancy and postpartum -- the reports the coach
+   turns into a rest day, an injury note or a lighter week. */
+const SAFETY_PATTERN = /\b(pain|painful|hurt|hurts|hurting|injur\w*|sore|strain\w*|sprain\w*|tweak\w*|pulled|sick|ill|illness|unwell|fever|flu|covid|cold|vomit\w*|nause\w*|dizz\w*|faint\w*|bleed\w*|pregnan\w*|postpartum|period|cramps?|cleared to|doctor|physio)\b/i;
+
 const CONTEXT_LIMIT = 30000;
 function fitContext(raw: Record<string, unknown>): string {
   let json = JSON.stringify(raw);
@@ -168,6 +172,7 @@ Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   let caller: Awaited<ReturnType<typeof requireCaller>> | null = null;
   let spent = false;
+  let meteredAs = 'forge-coach';
   try {
     caller = await requireCaller(request);
     const body = await request.json();
@@ -175,7 +180,16 @@ Deno.serve(async request => {
     if (!question) throw new HttpError(400, 'Ask Forge a question first.');
     /* Metered BEFORE the provider call, and only after the request is known to
        be well-formed -- a blank question must not cost the athlete a use. */
-    await consumeQuota(caller, 'forge-coach');
+    /* SAFETY IS NEVER BEHIND THE PAYWALL. A free athlete who has used today's
+       questions can still tell the coach their knee hurts or they are sick,
+       and get the rest day or the injury note that follows. These are metered
+       on their own, generous allowance (forge-coach-safety) -- still a meter,
+       because the model still costs money -- and never use up the regular
+       questions. Cardio logging and workout building are not safety talk. */
+    const scopeName = String(body.scope || '');
+    const safetyQuestion = scopeName !== 'cardio-log' && scopeName !== 'workout' && SAFETY_PATTERN.test(question);
+    meteredAs = safetyQuestion ? 'forge-coach-safety' : 'forge-coach';
+    await consumeQuota(caller, meteredAs);
     spent = true;
     /* TRIM THE BULK, NOT THE END. A blind slice cut the JSON mid-string and,
        with the training history sitting before the summaries in the payload,
@@ -379,7 +393,7 @@ Return one editable cardio/circuit using only exact movement names and units in 
        back -- a provider outage is not something they should pay for. A 429
        never reaches here: consumeQuota rolls its own count back before it
        throws, so `spent` is still false. */
-    if (spent && caller) await refundQuota(caller, 'forge-coach');
+    if (spent && caller) await refundQuota(caller, meteredAs);
     return errorResponse(error, corsHeaders);
   }
 });

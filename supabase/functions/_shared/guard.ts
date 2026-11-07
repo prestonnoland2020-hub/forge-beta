@@ -95,7 +95,11 @@ export async function consumeQuota(caller: Caller, endpoint: string): Promise<Qu
     throw new HttpError(
       429,
       tier === 'free'
-        ? `You have used all your free Forge AI ${window}. Forge Pro raises this substantially.`
+        ? endpoint === 'forge-plan'
+          ? 'This month\'s free program build is used. Forge Pro rebuilds your program whenever your goals or split change.'
+          : endpoint === 'forge-coach-safety'
+            ? `You have asked about pain or illness a lot ${window}. If something is wrong, rest and see a professional.`
+            : `That was your last free coach question ${window}. Forge Pro answers up to 60 a day. Questions about pain, injury or illness stay free.`
         : `You have reached the Forge Pro fair-use limit ${window}. It resets ${result.reason === 'monthly' ? 'on the 1st' : 'at midnight UTC'}.`,
       { tier, reason: result.reason, upgrade: tier === 'free' },
     );
