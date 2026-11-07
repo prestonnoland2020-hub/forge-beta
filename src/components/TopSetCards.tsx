@@ -55,7 +55,7 @@ const rowKey = (set: LoggedTopSet, index: number) => set.id || `${set.muscle}::$
    confetti on save, and keeps this line afterwards so the day remembers it. */
 const recordLabel = (record: RecordResult, unit: string) => record.kind === 'oneRepMax'
   ? '1RM PR'
-  : `New calc max · ${record.value}`;
+  : `New est. max · ${record.value}`;
 const PrBadge = ({ record, unit, fresh }: { record: RecordResult; unit: string; fresh: boolean }) =>
   <small className={`top-set-pr ${record.kind === 'oneRepMax' ? 'big' : 'calc'}${fresh ? ' fresh' : ''}`}>
     <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" /></svg>
