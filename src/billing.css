@@ -254,3 +254,48 @@
 }
 .simple-settings-list > button:last-child { border-bottom: 0; }
 .simple-settings-list > button > div { display: grid; gap: 4px; }
+
+/* ---- Free shows the problem; Pro fixes it. ---- */
+
+/* The small PRO marker on anything Pro applies or unlocks. */
+.pro-tag {
+  display: inline-block; margin-left: var(--s2); padding: 1px 7px;
+  border-radius: var(--r-pill); background: var(--accent-wash); color: var(--accent-text);
+  font: 800 .62rem/1.6 var(--display); letter-spacing: .1em; font-style: normal; vertical-align: middle;
+}
+
+/* "What to change" on a goal card and the weekly review. Pro reads the fix;
+   free sees that there is one and where it lives. */
+.goal-fix { display: grid; gap: 2px; margin: var(--s3) 0 0; padding: var(--s3) var(--s4); border-radius: var(--r-md); background: var(--surface-2); color: var(--ink); font-size: var(--fs-small); text-align: left; }
+.goal-fix b { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.goal-fix.locked { width: 100%; grid-template-columns: 1fr auto; align-items: center; border: 1px dashed var(--accent); background: transparent; cursor: pointer; text-decoration: none; }
+.goal-fix.locked b { grid-column: 1; }
+.goal-fix.locked span { grid-column: 1; color: var(--ink-2); }
+.goal-fix.locked .pro-tag { grid-column: 2; grid-row: 1 / span 2; }
+
+/* One quiet line under the coach: trial days left, or free questions left. */
+.coach-plan-line { margin: 0 0 var(--s2); font-size: var(--fs-small); color: var(--ink-3); }
+.coach-plan-line a { color: var(--accent-text); font-weight: 700; }
+
+/* The upgrade sheet. */
+.upgrade-backdrop { position: fixed; inset: 0; z-index: 60; border: 0; background: var(--scrim, rgba(0,0,0,.45)); }
+.upgrade-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; margin: 0 auto; max-width: 520px;
+  display: grid; gap: var(--s3); padding: var(--s3) var(--s5) calc(var(--s5) + env(safe-area-inset-bottom));
+  border-radius: 24px 24px 0 0; background: var(--surface-1); color: var(--ink);
+  box-shadow: 0 -12px 40px rgba(0,0,0,.25); animation: upgrade-rise .35s cubic-bezier(.2,.9,.3,1.2);
+}
+.upgrade-grip { justify-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--ink-3); opacity: .4; }
+.upgrade-sheet .eyebrow { color: var(--accent-text); }
+.upgrade-sheet h2 { margin: 0; font: 800 var(--fs-h2)/1.15 var(--display); }
+.upgrade-sheet p { margin: 0; color: var(--ink-2); }
+.upgrade-pitch { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.upgrade-pitch li { display: flex; gap: var(--s2); align-items: center; font-weight: 600; }
+.upgrade-pitch svg { color: var(--accent-text); flex: none; }
+.upgrade-sheet footer { display: grid; gap: var(--s2); margin-top: var(--s2); }
+.upgrade-sheet footer .button { width: 100%; justify-content: center; }
+@keyframes upgrade-rise { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .upgrade-sheet { animation: none; } }
+
+/* A Link styled as a button inside the coach's change card keeps button ink. */
+.coach-actions footer a.button { color: var(--accent-ink, #fff); text-decoration: none; font-size: 1.05rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }

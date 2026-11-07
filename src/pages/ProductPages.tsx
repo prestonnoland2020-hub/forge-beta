@@ -15,6 +15,7 @@ import { useDailyRecommendation } from '../features/training/DailyRecommendation
 import { sameLift, primaryMusclesFor, canonicalLiftKey } from '../lib/liftAliases';
 import { DialField } from '../components/NumberDial';
 import { ForgeWritesIt, type WrittenSession } from '../components/ForgeWritesIt';
+import { nudgeUpgrade } from '../components/UpgradeSheet';
 import { Icon } from '../components/Icon';
 
 function CompletedDayReview({record,unit,records,metric}:{record:WorkoutRecord;unit:string;records:WorkoutRecord[];metric:boolean}) {
@@ -389,7 +390,14 @@ function WorkoutEditor() {
     const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set([...dayMuscles,...(primary.length?primary:[set.muscle])])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
     /* Saving a set keeps the session OPEN — only "Finish Day" completes the
        recommendation. The athlete keeps logging sets and cardio freely. */
-    setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`Saved ${set.lift} · ${set.weight} ${weightUnit} × ${set.reps}`)};
+    setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`Saved ${set.lift} · ${set.weight} ${weightUnit} × ${set.reps}`);
+    /* UPGRADE MOMENTS (UpgradeSheet decides whether to show: once each, free
+       athletes only, never two in a day). After the save, never instead of it. */
+    const firstEver=!records.some(record=>(record.topSets||[]).length||record.lift);
+    const askedWeight=Number(completed.prescribedWeight)||0;const askedReps=Number(completed.prescribedReps)||0;
+    const missed=askedWeight>0&&askedReps>0&&(completed.weight<askedWeight||completed.reps<askedReps);
+    if(missed)window.setTimeout(()=>nudgeUpgrade('missed-lift',`${set.lift}: ${set.weight} × ${set.reps} against ${askedWeight} × ${askedReps} asked. One miss never lowers your plan. Pro’s coach tells you why it happened and what to change next time.`),1200);
+    else if(firstEver)window.setTimeout(()=>nudgeUpgrade('first-top-set'),1200)};
   /* DELETING A SAVED SET TAKES IT OUT OF THE DAY, not just off the screen.
      A set could be corrected but never removed, so a lift logged on the wrong
      day or mis-tapped from the sheet was permanent — and it kept counting

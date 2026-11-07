@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthProvider';
-import { fetchEntitlements, fetchSubscription, FREE_FALLBACK, remaining, type Entitlements, type SubscriptionRow } from './entitlements';
+import { fetchEntitlements, fetchSubscription, FREE_FALLBACK, remaining, startTrial, trialDaysLeft, type Entitlements, type SubscriptionRow } from './entitlements';
 
 /* One source of truth for "what can this account do", shared by the billing
    screen, the coach's remaining-questions line, and the paywall that appears
@@ -16,6 +16,8 @@ type Value = {
   subscription: SubscriptionRow | null;
   loading: boolean;
   isPro: boolean;
+  /* Days left on the 7-day trial, or null when not on one. */
+  trialDays: number | null;
   refresh: () => Promise<void>;
   /* Set when the server refuses on quota, so any screen can show the paywall
      with the reason the server actually gave. */
@@ -43,6 +45,24 @@ export function BillingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  /* THE TRIAL STARTS WHEN SETUP ENDS. The coach is only impressive once it
+     has the athlete's numbers, so the 7 days begin after onboarding -- for a
+     new athlete when they tap Enter Forge, and for anyone who finished setup
+     before trials existed, the next time they open the app. The server
+     decides eligibility; this only asks. */
+  const [askedForTrial, setAskedForTrial] = useState(false);
+  useEffect(() => {
+    if (!user || loading || askedForTrial) return;
+    if (entitlements.tier !== 'free' || entitlements.trialUsed) return;
+    setAskedForTrial(true);
+    void startTrial().then(started => { if (started) void refresh(); });
+  }, [user, loading, askedForTrial, entitlements.tier, entitlements.trialUsed, refresh]);
+  useEffect(() => {
+    const onboarded = () => { setAskedForTrial(false); void refresh(); };
+    window.addEventListener('forge:onboarded', onboarded);
+    return () => window.removeEventListener('forge:onboarded', onboarded);
+  }, [refresh]);
+
   /* Returning from Stripe Checkout lands here with ?checkout=success, but the
      webhook that grants the entitlement may not have arrived yet. Poll briefly
      rather than showing a paying customer the free tier. */
@@ -63,6 +83,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     subscription,
     loading,
     isPro: entitlements.tier === 'pro' || entitlements.tier === 'founder',
+    trialDays: trialDaysLeft(entitlements),
     refresh,
     paywall,
     showPaywall: (message: string, upgrade: boolean) => setPaywall({ message, upgrade }),

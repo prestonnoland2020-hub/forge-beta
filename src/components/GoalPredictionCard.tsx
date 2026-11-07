@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useBilling } from '../features/billing/BillingProvider';
+import { nudgeUpgrade } from './UpgradeSheet';
 import type { Feasibility } from '../lib/goalFeasibility';
 import { secondsToClock } from '../lib/goalInput';
 import { OnboardingGoalPath, type GoalPath } from './OnboardingGoalPath';
@@ -12,6 +15,22 @@ import { OnboardingGoalPath, type GoalPath } from './OnboardingGoalPath';
    the promise that the prediction is checked on the goal date. */
 
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+/* THE VERDICT IS FREE; THE FIX IS PRO. Every athlete sees whether a goal is
+   on track. What to change -- the reachable target, the mileage it is built
+   on, the pace to train -- is the coaching, and it is what Pro pays for. */
+function GoalFix({ verdict }: { verdict: Feasibility }) {
+  const { isPro, loading } = useBilling();
+  const navigate = useNavigate();
+  const fix = [verdict.insteadOf, verdict.change].filter(Boolean).join(' ');
+  const behind = verdict.verdict !== 'reachable';
+  useEffect(() => { if (!loading && !isPro && behind && fix) nudgeUpgrade('goal-behind'); }, [loading, isPro, behind, fix]);
+  if (!fix) return null;
+  if (isPro) return <p className="goal-fix"><b>What to change</b>{fix}</p>;
+  return <button type="button" className="goal-fix locked" onClick={() => navigate('/profile?view=billing')}>
+    <b>What to change</b><span>Forge Pro shows the fix for this goal</span><em className="pro-tag">PRO</em>
+  </button>;
+}
 
 export function GoalPredictionCard({ verdict, date, unit, hoursFirst }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean }) {
   const [open, setOpen] = useState(false);
@@ -32,6 +51,7 @@ export function GoalPredictionCard({ verdict, date, unit, hoursFirst }: { verdic
   return <section className="goal-prediction" aria-label="Forge's prediction">
     <div className="goal-prediction-head"><span>Forge’s prediction</span><button type="button" className="text-button" aria-expanded={open} onClick={() => setOpen(value => !value)}>{open ? 'Hide' : 'How Forge predicts'}</button></div>
     <OnboardingGoalPath path={path} date={date} />
+    <GoalFix verdict={verdict} />
     {open && <ul className="goal-prediction-rules">
       <li><b>Now</b> is {race ? 'what your logged runs are worth at this distance today' : 'your best estimated 1-rep max from logged top sets — or the best you entered, until you log one'}.</li>
       <li><b>Typical</b> is where most athletes land: {race ? 'about 0.6% faster a week, for longer on longer races' : 'about 0.35% a week for 12 weeks, then slower'}{race ? '' : ' — or your own rate, once a lift has 12 weeks of history'}.</li>

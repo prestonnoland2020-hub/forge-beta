@@ -427,6 +427,8 @@ function OnboardingForm() {
       if (data.injuryConstraint && data.limitationNotes.trim() && !isEditing) void saveNote(createNote('injury', data.limitationNotes.trim(), extractArea(data.limitationNotes)));
       const from = (location.state as { from?: string } | null)?.from;
       success();
+      /* Setup is done: the 7-day Pro trial can start (BillingProvider asks the server). */
+      if (!isEditing) window.dispatchEvent(new Event('forge:onboarded'));
       navigate(importStrava && !isEditing ? '/profile?view=connections' : from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
     } catch (reason) {
       fail(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
