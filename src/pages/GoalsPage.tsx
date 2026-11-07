@@ -86,7 +86,8 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     if (!miles) return null;
     /* Estimated is the race predictor; tested is a time actually run at the
        distance — the same switch the strength goals use. */
-    return maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || []) : predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
+    const estimate = predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
+    return maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || [], estimate) : estimate;
   }), [goals, records, setup?.excludedEfforts, workouts, vo2Version, maxMode]);
   const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
