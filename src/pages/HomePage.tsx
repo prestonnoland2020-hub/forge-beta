@@ -16,6 +16,7 @@ import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate
 import { TodayNudges } from '../components/TodayNudges';
 import { RunningBehindNudge } from '../components/RunningBehindCard';
 import { WrappedEntry } from '../components/WrappedEntry';
+import { SplitGuidePrompt, SplitReadyNote } from '../components/SplitGuidePrompt';
 
 const todayIso = () => {
   const now = new Date();
@@ -55,7 +56,7 @@ export function HomePage() {
   const hideFirstWeek = () => { setFirstWeekHidden(true); try { localStorage.setItem('forge-first-week-hidden', '1'); } catch { /* per-device convenience */ } };
 
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">Today</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
-  if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">One quick setup</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split">Set up my split <Icon name="arrow"/></Link></section></div>;
+  if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">One quick setup</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split?guide=1&from=home">Build my split step by step <Icon name="arrow"/></Link></section><SplitGuidePrompt /></div>;
 
   /* A stored recommendation written by an older build — or one that arrived
      half-formed — has no top sets, and reading through it turned Today into
@@ -69,6 +70,8 @@ export function HomePage() {
   const quiet = !recommendedSets.length && !recommendation.cardio && (dayType === 'rest' || dayType === 'cardio');
 
   return <div className="forge-feed today">
+    <SplitGuidePrompt />
+    <SplitReadyNote dayName={recommendation.splitDay.name} />
 
     {syncError && <div className="save-confirmation save-warning">Your workout is ready here. Account sync will retry automatically.</div>}
     <StravaReviewModal />

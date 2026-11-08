@@ -39,6 +39,7 @@ import './plan-workflow.css';
 import './rhythm.css';
 import './library.css';
 import './circuit-builder.css';
+import './split-guide.css';
 import './split-muscles.css';
 import './goal-builder.css';
 import './goal-edit.css';

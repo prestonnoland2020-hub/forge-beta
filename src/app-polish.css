@@ -631,3 +631,17 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .ss-create-note { margin: 0; font-size: 15px; color: var(--ink-2, var(--muted)); }
 .ss-create-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .ss-create-actions .button:last-child { min-width: 150px; }
+
+/* SWIPE TO DELETE A SPLIT DAY. The row slides over a red Delete that sits
+   behind it; the row keeps its own look (.ss-day > button above). */
+.ss-day { position: relative; border-radius: 14px; overflow: hidden; }
+.ss-day > button.ss-day-row { position: relative; z-index: 1; transition: transform .22s cubic-bezier(.2, .8, .2, 1); touch-action: pan-y; }
+.ss-day > button.ss-day-delete { position: absolute; inset: 0 0 0 auto; z-index: 0; width: 92px; min-height: 0; display: grid; place-items: center; grid-template-columns: none; padding: 0; border: 0; border-radius: 0 14px 14px 0; background: var(--danger, #d64545); color: #fff; font-weight: 800; font-size: 15px; text-align: center; }
+.ss-swipe-hint { margin: -2px 2px 0; font-size: 13px; color: var(--ink-3, var(--muted)); }
+
+/* THE WAY INTO THE SPLIT GUIDE. */
+.ss-guide-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 16px; border: 0; border-radius: 16px; text-align: left; background: color-mix(in srgb, var(--accent) 12%, var(--surface-1)); color: var(--ink, var(--text)); }
+.ss-guide-entry span:first-child { display: grid; gap: 4px; }
+.ss-guide-entry strong { font-size: 17px; font-weight: 800; color: var(--accent-text, var(--accent)); }
+.ss-guide-entry small { font-size: 14px; line-height: 1.4; color: var(--ink-2, var(--muted)); }
+.ss-guide-entry > span:last-child { font-size: 24px; color: var(--accent-text, var(--accent)); }
