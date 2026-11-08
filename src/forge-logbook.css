@@ -266,41 +266,55 @@ body { background: var(--bg) !important; }
 
 
 /* ── The page: Forge blue, flowing ─────────────────────────────────────── */
-/* Behind every screen: a wash of the brand blue, and two layers of fine
-   strands that bunch, fold and run like marbled paint. The strands are an
-   original flow-field drawing (tools/make-flow-background.py, seed 3) used as
-   masks, so they are painted in the live accent and follow tone and accent
-   changes. One layer is mid blue; the brighter cores sit on top. Cards stay
-   opaque, so text never sits on the lines. */
+/* Behind every screen: a wash of the brand blue with a faint electric-violet
+   glow low on the page, and two layers of fine strands that fold and run like
+   marbled paint (tools/make-flow-background.py, seed 3), painted through masks
+   in the live accent. The strands are softened with a blur and kept low so
+   they read as texture, not as a picture competing with the cards. */
 .app-frame {
   isolation: isolate;
   background:
-    radial-gradient(120% 55% at 10% -8%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%),
-    radial-gradient(100% 50% at 100% 100%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, var(--bg)), var(--bg) 65%) !important;
+    radial-gradient(120% 55% at 10% -8%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(90% 45% at 105% 100%, color-mix(in srgb, var(--violet) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--bg)), var(--bg) 65%) !important;
 }
 .app-frame::before, .app-frame::after {
-  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  content: ''; position: fixed; inset: -12px; pointer-events: none; z-index: -1;
   -webkit-mask-size: cover; mask-size: cover; -webkit-mask-position: center; mask-position: center;
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
 }
 .app-frame::before {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 70%, var(--ink)), var(--accent) 50%, color-mix(in srgb, var(--accent) 80%, var(--ink)));
+  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--violet)) 85%);
   -webkit-mask-image: url('./assets/forge-flow-mid.svg'); mask-image: url('./assets/forge-flow-mid.svg');
-  opacity: .2;
+  filter: blur(2px); opacity: .12;
 }
 .app-frame::after {
-  background: linear-gradient(200deg, var(--accent-text), var(--accent));
+  background: linear-gradient(200deg, var(--accent-text), var(--accent) 55%, var(--violet));
   -webkit-mask-image: url('./assets/forge-flow-bright.svg'); mask-image: url('./assets/forge-flow-bright.svg');
-  opacity: .26;
+  filter: blur(.8px); opacity: .16;
 }
-:root[data-theme="dark"] .app-frame::before { opacity: .34; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 65%, var(--bg)), var(--accent) 50%, color-mix(in srgb, var(--accent) 75%, var(--bg))); }
-:root[data-theme="dark"] .app-frame::after { opacity: .48; background: linear-gradient(200deg, color-mix(in srgb, var(--accent) 50%, var(--ink)), color-mix(in srgb, var(--accent) 75%, var(--ink))); }
+:root[data-theme="dark"] .app-frame::before { opacity: .22; }
+:root[data-theme="dark"] .app-frame::after { opacity: .3; }
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] .app-frame::before { opacity: .34; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 65%, var(--bg)), var(--accent) 50%, color-mix(in srgb, var(--accent) 75%, var(--bg))); }
-  :root[data-theme="system"] .app-frame::after { opacity: .48; background: linear-gradient(200deg, color-mix(in srgb, var(--accent) 50%, var(--ink)), color-mix(in srgb, var(--accent) 75%, var(--ink))); }
+  :root[data-theme="system"] .app-frame::before { opacity: .22; }
+  :root[data-theme="system"] .app-frame::after { opacity: .3; }
 }
 @media print { .app-frame::before, .app-frame::after { display: none; } }
+
+/* ── Electric violet, sparingly: a finished session ────────────────────── */
+.app-frame .pv-check { background: var(--violet) !important; color: var(--on-brand) !important; }
+.app-frame .td-chip.done { color: var(--violet) !important; }
+.app-frame .pv-row.done .pv-row-state { color: var(--violet) !important; }
+
+/* ── Tab switches: a native crossfade ──────────────────────────────────── */
+/* The header and the tab bar are their own layers in the transition, so they
+   hold still while only the screen between them blends. */
+.app-frame .topbar { view-transition-name: forge-topbar; }
+.app-frame .tab-bar { view-transition-name: forge-tabbar; }
+.app-frame .coach-bubble-shell { view-transition-name: forge-coach; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+::view-transition-group(forge-topbar), ::view-transition-group(forge-tabbar), ::view-transition-group(forge-coach) { animation: none; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
 
 /* ── Header actions: one piece ─────────────────────────────────────────── */
 /* Readiness, Progress and Log were three separate chips. They are one
