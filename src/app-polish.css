@@ -631,3 +631,5 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .ss-create-note { margin: 0; font-size: 15px; color: var(--ink-2, var(--muted)); }
 .ss-create-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .ss-create-actions .button:last-child { min-width: 150px; }
+.ss-settings .ss-settings-actions { display: flex; flex-wrap: wrap; gap: 16px; }
+.cardio-add-row { width: 100%; min-height: 54px; border: 1px dashed var(--line); background: transparent; color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }

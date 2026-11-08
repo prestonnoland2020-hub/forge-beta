@@ -36,7 +36,7 @@ import { raceMiles } from '../lib/goalFeasibility';
    lift/race pick when the goal is a body weight, and running when the split
    has no cardio. Everything the builder offers beyond the common case —
    custom events, pace metrics, other lifts — is one tap away on Goals. */
-type StepId = 'name' | 'focus' | 'days' | 'goal' | 'target' | 'running' | 'numbers' | 'week';
+type StepId = 'agree' | 'name' | 'focus' | 'days' | 'goal' | 'target' | 'running' | 'numbers' | 'week';
 
 const blank: AthleteSetup = {
   displayName: '', username: '', birthDate: '', units: 'Imperial', height: '', startingWeight: '', currentWeight: '',
@@ -100,11 +100,13 @@ export function starterSplit(focus: AthleteSetup['primaryFocus'], count: number)
     { name: 'Lower Body', type: 'Strength' as const, muscles: ['Quads', 'Hamstrings', 'Glutes'] },
   ];
   const endurance = [
-    { name: 'Quality Cardio', type: 'Cardio' as const, muscles: [] },
-    { name: 'Easy Cardio', type: 'Cardio' as const, muscles: [] },
-    { name: 'Long Cardio', type: 'Cardio' as const, muscles: [] },
+    { name: 'Speed Run', type: 'Cardio' as const, muscles: [] },
+    { name: 'Easy Run', type: 'Cardio' as const, muscles: [] },
+    { name: 'Long Run', type: 'Cardio' as const, muscles: [] },
   ];
-  const source = focus === 'Strength' ? strength : focus === 'Endurance' ? endurance : [strength[0], endurance[0], strength[1], strength[2]];
+  /* Plain names. "Quality Cardio" meant nothing to a new runner; a hybrid's
+     one running day is just "Run" because Forge decides what kind each week. */
+  const source = focus === 'Strength' ? strength : focus === 'Endurance' ? endurance : [strength[0], { name: 'Run', type: 'Cardio' as const, muscles: [] }, strength[1], strength[2]];
   /* EVERY DAY GETS ITS OWN NAME. The plan matches days by name, so a 4-day
      strength split with "Chest & Back" twice was one day to the plan and two
      to the cursor. A repeat is numbered: Chest & Back, …, Chest & Back 2. */
@@ -115,26 +117,77 @@ export function starterSplit(focus: AthleteSetup['primaryFocus'], count: number)
   });
 }
 
-/* ONE LIFT PER LIFTING DAY, CHOSEN FOR THEM. The goal lift lands on the first
-   day whose muscles it trains; every other day gets its first core lift.
-   Nothing is asked that a starter split can answer itself. */
+/* A REAL DAY, NOT ONE LIFT. A starter day used to get a single lift, so a
+   new athlete's "Lower Body" was a deadlift and nothing else and their first
+   job was building their own program. Now each day gets one staple lift per
+   muscle it trains, up to three: Chest & Back is a bench and a row, Shoulders
+   & Arms a press, a curl and a pushdown, Lower Body a squat and an RDL.
+
+   The goal lift goes first, on the day it overlaps most (a deadlift goal goes
+   to Lower Body, not Chest & Back for its one back muscle), and covers the
+   muscles it trains. A repeat day ("Chest & Back 2") takes the second staple
+   for each muscle so the week is not the same day twice. Names missing from
+   the athlete's library are skipped. */
+const STAPLES: Record<string, string[]> = {
+  Chest: ['Bench Press', 'Incline Dumbbell Press'],
+  Back: ['Barbell Row', 'Pull Ups', 'Lat Pulldown'],
+  Shoulders: ['Overhead Press', 'Lateral Raise'],
+  Biceps: ['Barbell Curl', 'Hammer Curl'],
+  Triceps: ['Triceps Pushdown'],
+  Quads: ['Back Squat', 'Hack Squat'],
+  Hamstrings: ['Romanian Deadlift', 'Deadlift'],
+};
+const DAY_LIFT_CAP = 3;
+
 export function defaultLifts(days: AthleteSetup['splitDays'], library: LibraryExercise[], goalLifts: string[]): Record<number, string[]> {
   const out: Record<number, string[]> = {};
-  const goalKeys = new Set(goalLifts.map(canonicalLiftKey));
-  const placedGoals = new Set<string>();
+  const byKey = new Map(library.map(exercise => [canonicalLiftKey(exercise.name), exercise]));
+  const overlap = (exercise: LibraryExercise, muscles: string[]) => exercise.muscles.filter(muscle => muscles.includes(muscle)).length;
+  /* Each goal lift's day: the lifting day it overlaps most, first on a tie. */
+  const goalDay = new Map<number, LibraryExercise[]>();
+  for (const name of goalLifts) {
+    const exercise = byKey.get(canonicalLiftKey(name));
+    if (!exercise) continue;
+    let best = -1, bestScore = 0;
+    days.forEach((day, index) => {
+      if ((day.type !== 'Strength' && day.type !== 'Mixed') || day.exercises?.length) return;
+      const score = (day.muscles || []).length ? overlap(exercise, day.muscles || []) : 0.5;
+      if (score > bestScore) { best = index; bestScore = score; }
+    });
+    if (best >= 0 && !(goalDay.get(best) || []).some(item => item.name === exercise.name)) goalDay.set(best, [...(goalDay.get(best) || []), exercise]);
+  }
+  const seenName = new Map<string, number>();
   days.forEach((day, index) => {
     if (day.type !== 'Strength' && day.type !== 'Mixed') return;
     if (day.exercises?.length) { out[index] = [...day.exercises]; return; }
     const muscles = day.muscles || [];
-    const fits = library.filter(exercise => !muscles.length || exercise.muscles.some(muscle => muscles.includes(muscle)));
-    const goal = fits.find(exercise => goalKeys.has(canonicalLiftKey(exercise.name)) && !placedGoals.has(canonicalLiftKey(exercise.name)));
-    if (goal) { out[index] = [goal.name]; placedGoals.add(canonicalLiftKey(goal.name)); return; }
-    /* A repeat day takes the next core lift, so Chest & Back 2 gets a row
-       rather than a second bench day. */
-    const used = new Set(Object.values(out).flat().map(canonicalLiftKey));
-    const ordered = coreFirst(fits.map(exercise => exercise.name));
-    const first = ordered.find(name => !used.has(canonicalLiftKey(name))) || ordered[0];
-    out[index] = first ? [first] : [];
+    const base = day.name.replace(/\s+\d+$/, '');
+    const repeat = seenName.get(base) || 0;
+    seenName.set(base, repeat + 1);
+    const chosen: LibraryExercise[] = [...(goalDay.get(index) || [])];
+    const covered = new Set(chosen.flatMap(exercise => exercise.muscles));
+    for (const muscle of muscles) {
+      if (chosen.length >= DAY_LIFT_CAP) break;
+      if (covered.has(muscle)) continue;
+      const options = (STAPLES[muscle] || []).map(name => byKey.get(canonicalLiftKey(name))).filter((item): item is LibraryExercise => Boolean(item) && !chosen.includes(item!));
+      const pick = options[repeat % Math.max(1, options.length)];
+      if (!pick) continue;
+      chosen.push(pick);
+      /* A staple covers the muscle it was picked for, not everything it
+         touches — a squat lists hamstrings, and Lower Body still gets its RDL. */
+      covered.add(muscle);
+    }
+    /* Nothing matched (custom muscles, a trimmed library): the first core lift
+       that fits, as before. */
+    if (!chosen.length) {
+      const fits = library.filter(exercise => !muscles.length || exercise.muscles.some(muscle => muscles.includes(muscle)));
+      const used = new Set(Object.values(out).flat().map(canonicalLiftKey));
+      const ordered = coreFirst(fits.map(exercise => exercise.name));
+      const first = ordered.find(name => !used.has(canonicalLiftKey(name))) || ordered[0];
+      out[index] = first ? [first] : [];
+      return;
+    }
+    out[index] = chosen.map(exercise => exercise.name);
   });
   return out;
 }
@@ -218,13 +271,14 @@ function OnboardingForm() {
   const goalMetric = goalKind === 'race' ? 'Finish time' : goalKind === 'weight' ? 'Body weight' : 'Real 1RM';
 
   const steps = useMemo<StepId[]>(() => [
+    ...(isEditing ? [] : ['agree'] as StepId[]),
     'name', 'focus', 'days',
     ...(askGoal ? (weightGoal ? ['target'] : ['goal', 'target']) as StepId[] : []),
     ...(runningPlanned ? ['running'] as StepId[] : []),
     ...(isEditing ? [] : ['numbers'] as StepId[]),
     'week',
   ], [askGoal, weightGoal, runningPlanned, isEditing]);
-  const [stepId, setStepId] = useState<StepId>(needsExercises ? 'week' : needsGoal && askGoal ? (weightGoal ? 'target' : 'goal') : 'name');
+  const [stepId, setStepId] = useState<StepId>(needsExercises ? 'week' : needsGoal && askGoal ? (weightGoal ? 'target' : 'goal') : isEditing ? 'name' : 'agree');
   const stepIndex = Math.max(0, steps.indexOf(stepId));
   /* Forward slides in from the right, Back from the left — the direction a
      navigation stack moves, so the screen goes where the finger expects. */
@@ -254,6 +308,7 @@ function OnboardingForm() {
     setDayExercises(defaultLifts(plannedDays, strengthLibrary, [...goals.filter(goal => goal.type === 'Strength' && goal.exercise).map(goal => String(goal.exercise)), ...pendingGoalLift]));
   }
   const [openDay, setOpenDay] = useState(-1);
+  const [allLiftsFor, setAllLiftsFor] = useState(-1);
   const toggleDayExercise = (index: number, name: string) => {
     setError('');
     setDayExercises(current => {
@@ -366,13 +421,13 @@ function OnboardingForm() {
   };
 
   const finish = async () => {
-    if (!isEditing && !agreedTerms) return fail('Confirm you are 18 or older and agree to the Terms to finish.');
-    if (!isEditing && !healthConsent) return fail('Forge needs your consent to use health data to build your plan.');
-    if (!isEditing && !data.acceptedSafety) return fail('Tick the safety box to finish.');
+    /* Agreements live on the first screen; anyone who reached the end
+       without them (a deep link into the week) is sent back to tick them. */
+    if (!isEditing && (!agreedTerms || !healthConsent || !data.acceptedSafety)) { setDirection('back'); setStepId('agree'); return fail('Tick the three boxes to start.'); }
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
     if (!goals.length && !pendingGoal) return fail('Set a goal first. Forge builds the plan around it.');
-    if (unmappedDays.length) return fail(`Select your top sets for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
+    if (unmappedDays.length) return fail(`Pick at least one lift for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
     const weight = Number(data.currentWeight);
     const weightGiven = Boolean(String(data.currentWeight || '').trim()) && Number.isFinite(weight) && weight > 0;
     setSaving(true); setError('');
@@ -454,12 +509,37 @@ function OnboardingForm() {
     box.classList.remove('nudge'); void box.offsetWidth; box.classList.add('nudge');
   };
   const STEP_FORM = 'ob-step-form';
+  const agreements = <>
+          {!isEditing && <label className={agreedTerms ? 'setup-check required done' : 'setup-check required'}><input type="checkbox" checked={agreedTerms} onChange={event => { tap(); setError(''); setAgreedTerms(event.target.checked); }} /><span><strong>I’m 18 or older and I agree to the Terms of Use and Privacy Policy.</strong><small><a className="text-button" href="#/legal/terms" target="_blank" rel="noreferrer">Read the Terms</a> · <a className="text-button" href="#/legal/privacy" target="_blank" rel="noreferrer">Read the Privacy Policy</a></small></span></label>}
+          {!isEditing && <label className={healthConsent ? 'setup-check required done' : 'setup-check required'}><input type="checkbox" checked={healthConsent} onChange={event => { tap(); setError(''); setHealthConsent(event.target.checked); }} /><span><strong>I consent to Forge using the health information I record — body weight, check-ins and injury notes — to build and adjust my training.</strong><small>Never sold, never used for ads. Withdraw any time by deleting it. <a className="text-button" href="#/legal/health" target="_blank" rel="noreferrer">Consumer Health Data Notice</a></small></span></label>}
+          {!isEditing && <label className={data.acceptedSafety ? 'setup-check safety required done' : 'setup-check safety required'}><input type="checkbox" checked={data.acceptedSafety} onChange={event => { tap(); set('acceptedSafety', event.target.checked); }} /><span><strong>I understand Forge is training guidance, not medical advice, and I’ll stop and report any pain.</strong><small><button type="button" className="text-button" onClick={() => setSafetyOpen(value => !value)}>{safetyOpen ? 'Hide details' : 'Read details'}</button></small></span></label>}
+          {safetyOpen && <div className="disclaimer-copy">
+            <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
+            <p>Strength and endurance training carry real risk. Check with a physician before starting or changing a program — especially with a heart condition, injury, chronic illness, or during pregnancy. Stop any exercise that causes pain, dizziness, or unusual shortness of breath.</p>
+            <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue in Ask Forge so training can work around it — and see a professional when something does not resolve.</p>
+          </div>}
+  </>;
 
   /* Each screen is a body and, where something has to be confirmed rather
      than tapped, an action pinned to the bottom — where the thumb already is,
      and above the keyboard while one is open. */
   const screen: { body: ReactElement; action?: ReactElement } = (() => {
     switch (stepId) {
+      /* THE AGREEMENTS COME FIRST, ON THEIR OWN SCREEN. They used to sit
+         under the week on the last screen, below the fold, with Enter Forge
+         greyed out above them — it looked broken. Here they are the whole
+         screen, so there is nothing else to look at. */
+      case 'agree': return {
+        body: <>
+          <h1>Before we start</h1>
+          <p className="ob-lead">Three quick things. Forge needs all three to build your training.</p>
+          {agreements}
+        </>,
+        action: <>
+          {safetyNeeded && !error && <p className="ob-action-hint">{missingAgreements === 1 ? 'Tick 1 more box to continue' : `Tick ${missingAgreements} more boxes to continue`}</p>}
+          <button className={safetyNeeded ? 'button ob-next waiting' : 'button ob-next'} onClick={() => { if (safetyNeeded) { showMissingAgreement(); return; } tap(); go(1); }}>Continue</button>
+        </>,
+      };
       case 'name': return {
         body: <>
           <h1>What should we call you?</h1>
@@ -585,7 +665,7 @@ function OnboardingForm() {
         return {
         body: <>
           <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
-          <p className="ob-lead">Each lifting day has goal lifts and supporting lifts. Forge asks for one top set per lift each workout and writes your next weights from it — the rest of your workout is yours. Tap any day to change it, or just start.</p>
+          <p className="ob-lead">Forge picked lifts for each day. You log one hard set of each, and Forge sets the weight next time. Tap a day to swap lifts, or just start.</p>
           {/* The stored title is the builder's ("5K Run · 24:30 mm:ss") so Goals
               reads it the same; this card says it the way a person would. */}
           {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small>
@@ -597,27 +677,31 @@ function OnboardingForm() {
             return <section className={open ? 'setup-day open' : 'setup-day'} key={`${day.name}-${index}`}>
               <button type="button" className="setup-day-head" onClick={() => { if (!lifting) return; tap(); setOpenDay(open ? -1 : index); }} aria-expanded={lifting ? open : undefined} disabled={!lifting}>
                 <span className="ob-day-number">{index + 1}</span>
-                <span className="ob-day-text"><strong>{day.name}{chosen.some(name => goalLiftKeys.has(canonicalLiftKey(name))) && <em className="ob-day-goal">Goal lift</em>}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Select your top sets') : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
-                {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Change'}</span>}
+                <span className="ob-day-text"><strong>{day.name}{chosen.some(name => goalLiftKeys.has(canonicalLiftKey(name))) && <em className="ob-day-goal">Goal lift</em>}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick lifts') : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
+                {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Edit'}</span>}
               </button>
-              {open && <div className="muscle-picker compact-muscle-picker setup-day-options">
-                {optionsForDay(index).map(exercise => {
-                  const selected = chosen.includes(exercise.name);
-                  return <button type="button" key={exercise.id} aria-pressed={selected} className={selected ? 'muscle-chip active' : 'muscle-chip'} onClick={() => { tap(); toggleDayExercise(index, exercise.name); }}>
-                    {exercise.name}{goalLiftKeys.has(canonicalLiftKey(exercise.name)) ? <i className="setup-goal-flag" title="Goal lift"> <Icon name="star" size={12}/></i> : null}</button>;
-                })}
-              </div>}
+              {/* IN THE DAY, THEN WHAT TO ADD. One grid of chips had no way to
+                  tell picked from not; now the day's lifts are a list with a
+                  tick (tap to take off) and the rest are ＋ chips — the same
+                  shape as the split editor, so it is learned once. */}
+              {open && (() => {
+                const options = optionsForDay(index);
+                const muscles = day.muscles || [];
+                const fits = options.filter(exercise => !chosen.includes(exercise.name) && (!muscles.length || exercise.muscles.some(muscle => muscles.includes(muscle))));
+                const rest = options.filter(exercise => !chosen.includes(exercise.name) && !fits.includes(exercise));
+                const showAll = allLiftsFor === index;
+                const extra = showAll ? [...fits, ...rest] : fits.slice(0, 6);
+                return <div className="ob-day-edit">
+                  {chosen.length > 0 && <div className="ob-day-lifts">{chosen.map(name => <button type="button" key={name} className="ob-day-lift" aria-label={`Remove ${name}`} onClick={() => { tap(); toggleDayExercise(index, name); }}>
+                    <span className="ob-day-tick" aria-hidden="true">{check}</span><span>{name}</span>{goalLiftKeys.has(canonicalLiftKey(name)) && <em className="ob-day-goal">Goal lift</em>}<span className="ob-day-x" aria-hidden="true">×</span>
+                  </button>)}</div>}
+                  {!chosen.length && <p className="ob-day-empty">Pick at least one lift for this day.</p>}
+                  {extra.length > 0 && <><p className="ob-day-add-label">Add a lift</p><div className="ob-day-add">{extra.map(exercise => <button type="button" key={exercise.id} onClick={() => { tap(); toggleDayExercise(index, exercise.name); }}>＋ {exercise.name}</button>)}</div></>}
+                  {(fits.length > 6 || rest.length > 0) && <button type="button" className="text-button ob-day-more" onClick={() => { tap(); setAllLiftsFor(showAll ? -1 : index); }}>{showAll ? 'Show fewer' : 'Show all lifts'}</button>}
+                </div>;
+              })()}
             </section>;
           })}</div>
-          {!isEditing && <p className="ob-check-group">Required to start · {3 - missingAgreements} of 3 ticked</p>}
-          {!isEditing && <label className={agreedTerms ? 'setup-check required done' : 'setup-check required'}><input type="checkbox" checked={agreedTerms} onChange={event => { tap(); setError(''); setAgreedTerms(event.target.checked); }} /><span><strong>I’m 18 or older and I agree to the Terms of Use and Privacy Policy.</strong><small><a className="text-button" href="#/legal/terms" target="_blank" rel="noreferrer">Read the Terms</a> · <a className="text-button" href="#/legal/privacy" target="_blank" rel="noreferrer">Read the Privacy Policy</a></small></span></label>}
-          {!isEditing && <label className={healthConsent ? 'setup-check required done' : 'setup-check required'}><input type="checkbox" checked={healthConsent} onChange={event => { tap(); setError(''); setHealthConsent(event.target.checked); }} /><span><strong>I consent to Forge using the health information I record — body weight, check-ins and injury notes — to build and adjust my training.</strong><small>Never sold, never used for ads. Withdraw any time by deleting it. <a className="text-button" href="#/legal/health" target="_blank" rel="noreferrer">Consumer Health Data Notice</a></small></span></label>}
-          {!isEditing && <label className={data.acceptedSafety ? 'setup-check safety required done' : 'setup-check safety required'}><input type="checkbox" checked={data.acceptedSafety} onChange={event => { tap(); set('acceptedSafety', event.target.checked); }} /><span><strong>I understand Forge is training guidance, not medical advice, and I’ll stop and report any pain.</strong><small><button type="button" className="text-button" onClick={() => setSafetyOpen(value => !value)}>{safetyOpen ? 'Hide details' : 'Read details'}</button></small></span></label>}
-          {safetyOpen && <div className="disclaimer-copy">
-            <p><strong>Forge is a training log and coaching tool, not a medical service.</strong> Its recommendations are generated from the workouts you record; they are general fitness guidance and never medical advice, diagnosis, or treatment.</p>
-            <p>Strength and endurance training carry real risk. Check with a physician before starting or changing a program — especially with a heart condition, injury, chronic illness, or during pregnancy. Stop any exercise that causes pain, dizziness, or unusual shortness of breath.</p>
-            <p>You are responsible for choosing loads, paces, and movements that are safe for you. Tell Forge about pain, injury, or unusual fatigue in Ask Forge so training can work around it — and see a professional when something does not resolve.</p>
-          </div>}
           {/* OPTIONAL, AND SAYS SO. Testers read "tick the boxes" and ticked this
               one too -- it looked exactly like the three required agreements. */}
           <p className="ob-check-group">Optional</p>
@@ -625,10 +709,7 @@ function OnboardingForm() {
           {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
         </>,
         action: <>
-          {safetyNeeded && !error && <p className="ob-action-hint">{missingAgreements === 1 ? 'Tick 1 more required box to continue' : `Tick ${missingAgreements} more required boxes to continue`}</p>}
-          {/* NOT DISABLED. A greyed button gave no reason; testers tapped it over
-              and over. A tap now scrolls to the first unticked agreement. */}
-          <button className={safetyNeeded ? 'button ob-next waiting' : 'button ob-next'} disabled={saving} onClick={() => { if (safetyNeeded) { showMissingAgreement(); return; } void finish(); }}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
+          <button className="button ob-next" disabled={saving} onClick={() => { void finish(); }}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
         </>,
         };
       }

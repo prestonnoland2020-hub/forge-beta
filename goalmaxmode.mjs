@@ -43,7 +43,7 @@ console.log('\nThe page');
 const page = readFileSync('./src/pages/GoalsPage.tsx', 'utf8');
 check('every goal is measured in the chosen mode', /goalProgress\(goal, records, verdicts\[index\], setup, maxMode[,)]/.test(page));
 check('the choice is remembered on the device', /localStorage\.setItem\('forge-goals-max-mode', mode\)/.test(page));
-check('the switch shows when a strength or running goal can use it', /\{\(hasStrength \|\| hasRunTime\) && <div className="gx-mode"/.test(page));
+check('the switch shows when a strength or running goal can use it, once something is logged', /\{\(hasStrength \|\| hasRunTime\) && records\.length > 0 && <div className="gx-mode"/.test(page));
 check('running goals read the same switch', /maxMode === 'tested' \? testedRaceSeconds/.test(page));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
