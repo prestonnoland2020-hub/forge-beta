@@ -240,6 +240,22 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
   return null;
 }
 
+/* WHERE AN APPLIED CHANGE LANDS. "Done — save workout…" told the athlete it
+   happened and not where, so a circuit saved to the library was a thing they
+   had to go and hunt for. Every change names the screen that now shows it, and
+   the coach links straight there. */
+export type ChangePlace = { place: string; to: string };
+export function whereItGoes(action: CoachAction): ChangePlace {
+  switch (action.type) {
+    case 'rest_today': case 'swap_today': case 'shorten_today': return { place: 'Today', to: '/' };
+    case 'log_note': case 'clear_note': return { place: 'Body log', to: '/profile?view=coach' };
+    case 'set_weekly_mileage': case 'set_running_days': case 'set_load_bias': return { place: 'Plan', to: '/plan' };
+    case 'update_goal': return { place: 'Goals', to: '/goals' };
+    case 'create_exercise': return { place: 'Library · Exercises', to: '/exercises' };
+    case 'create_workout': return { place: 'Library · Saved circuits', to: '/exercises?show=circuits' };
+  }
+}
+
 /* A WORKOUT WITH ITS PRESCRIPTION IS SAVED AS A CIRCUIT — the stations,
    their numbers, rounds and rest — so it opens in the circuit builder, shows
    under Saved circuits and logs in a tap. Returns null for a names-only
@@ -250,7 +266,22 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
    calories or minutes is Cardio — a loaded carry or sled included — except
    unloaded metres on a non-cardio move (walking lunges), which is Bodyweight. */
 export function circuitWorkoutFromAction(action: CoachAction, library: Array<{ name: string; kind: string }>) {
-  if (action.type !== 'create_workout' || !action.stations?.length) return null;
+  if (action.type !== 'create_workout') return null;
+  /* A names-only workout (an older coach deploy) still goes to Saved circuits:
+     each movement becomes a station with its number left to fill in, rather
+     than a list that no screen shows. */
+  if (!action.stations?.length) {
+    const stations: WorkoutStation[] = action.items.map(name => {
+      const known = library.find(exercise => exercise.name.toLowerCase() === name.toLowerCase());
+      const cardio = known?.kind === 'Cardio' || /\b(run|row|rowing|ski|skierg|bike|erg|swim|sled)\b/i.test(name);
+      return { name, target: '', unit: cardio ? 'meters' : 'reps', rest: 0 };
+    });
+    const plan: PlannedCardio = {
+      id: Date.now(), activity: action.name, structure: 'Circuit', targetSource: 'Manual plan', rounds: '1', circuitFormat: 'Rounds', roundRest: '0',
+      stationEntries: stations.map((station, index) => ({ id: index + 1, kind: station.unit === 'meters' ? 'Cardio' : 'Bodyweight', name: station.name, target: '', unit: station.unit, rest: '0' })),
+    };
+    return { name: action.name, kind: 'Circuit' as const, source: 'Forge' as const, exercises: action.items, plan, summary: `${action.items.join(' · ')} · open to set the numbers` };
+  }
   const kindOf = (station: WorkoutStation): CircuitStation['kind'] => {
     const known = library.find(exercise => exercise.name.toLowerCase() === station.name.toLowerCase());
     const cardioMove = known?.kind === 'Cardio' || /\b(run|row|rowing|ski|skierg|bike|erg|swim|sled)\b/i.test(station.name);

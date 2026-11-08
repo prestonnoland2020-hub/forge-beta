@@ -8,7 +8,7 @@
    Now the action carries every station with its number, and saves as a real
    circuit that opens in the builder. */
 import { readFileSync } from 'node:fs';
-import { parseActions } from './src/lib/coachActions.ts';
+import { parseActions, whereItGoes, circuitWorkoutFromAction } from './src/lib/coachActions.ts';
 
 let fails = 0;
 const check = (l, c, d = '') => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${c ? '' : d ? ` — ${d}` : ''}`); if (!c) fails++; };
@@ -49,6 +49,18 @@ check('the coach screen saves it through the shared circuit builder', /circuitWo
 const server = readFileSync('supabase/functions/forge-coach/index.ts', 'utf8');
 check('the schema carries stations, rounds, format and rest', /stations: \{ type: \['array', 'null'\]/.test(server) && /'stations', 'rounds', 'format', 'roundRest'\]/.test(server));
 check('and the coach is told never to send a list of names', /Write the WHOLE prescription, never a list of names/.test(server));
+
+console.log('\nAfter Apply, it says where it went and always lands in Saved circuits');
+check('a saved workout goes to Library · Saved circuits', whereItGoes(made).place === 'Library · Saved circuits' && /show=circuits/.test(whereItGoes(made).to));
+check('the other changes name their screen too', whereItGoes({ type: 'shorten_today' }).place === 'Today' && whereItGoes({ type: 'update_goal' }).place === 'Goals' && whereItGoes({ type: 'set_weekly_mileage' }).place === 'Plan');
+const namesOnly = circuitWorkoutFromAction(names, [{ name: 'Run', kind: 'Cardio' }]);
+check('even a names-only workout is saved as a circuit', namesOnly?.kind === 'Circuit' && namesOnly.plan.stationEntries.length === 2, JSON.stringify(namesOnly));
+check('with its numbers left to fill in, and said so', namesOnly.plan.stationEntries.every(entry => entry.target === '') && /open to set the numbers/.test(namesOnly.summary));
+check('the coach screen links to it, on that circuit', /show=circuits&circuit=\$\{saved\.id\}/.test(apply));
+check('no path saves a coach workout anywhere but Saved circuits', !/kind: cardioOnly/.test(apply));
+const coachPage = readFileSync('src/pages/CoachPage.tsx', 'utf8');
+check('the Done message carries a See-it link that closes the coach', /coach-applied-link/.test(coachPage) && /forge:close-coach/.test(coachPage));
+check('and the library scrolls to and marks the circuit', /just-saved/.test(readFileSync('src/components/WorkoutLibrary.tsx', 'utf8')));
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

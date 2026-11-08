@@ -6,7 +6,10 @@ import { useProfileSetup } from '../profile/ProfileSetupProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useAthleteNotes } from './useAthleteNotes';
 import { createNote, extractArea, type AthleteNote } from './athleteNotesService';
-import { parseActions, overrideFromActions, circuitWorkoutFromAction, type ActionContext, type CoachAction } from '../../lib/coachActions';
+import { parseActions, overrideFromActions, circuitWorkoutFromAction, whereItGoes, type ActionContext, type CoachAction } from '../../lib/coachActions';
+
+/* What was done, and the screen that now shows it. */
+export type AppliedChange = { label: string; place: string; to: string };
 import { readTodayOverride, writeTodayOverride, appendAppliedActions } from './coachOverrides';
 import { localDayIso } from '../../lib/time';
 
@@ -37,10 +40,10 @@ export function useCoachActions() {
     metric: setup?.units === 'Metric',
   }), [setup, goals, notes, exercises, profile.weeklyMileage, profile.runningDays, strategy.loadBiasPercent]);
 
-  /* Applies every action and returns the labels of what was done. */
-  const apply = useCallback((actions: CoachAction[], reason: string): string[] => {
+  /* Applies every action and returns what was done and where it landed. */
+  const apply = useCallback((actions: CoachAction[], reason: string): AppliedChange[] => {
     const todayIso = localDayIso();
-    const applied: string[] = [];
+    const applied: AppliedChange[] = [];
     for (const action of actions) {
       if (action.type === 'set_weekly_mileage') { updateProfile({ weeklyMileage: action.miles }); if (setup) { const ceiling = Number(setup.maxWeeklyMileage) || 0; saveSetup({ ...setup, weeklyMileage: action.miles, maxWeeklyMileage: ceiling && action.miles > ceiling ? Math.ceil(action.miles * 1.1) : setup.maxWeeklyMileage }); } }
       if (action.type === 'set_running_days') { updateProfile({ runningDays: action.days }); if (setup) saveSetup({ ...setup, runningDays: action.days }); }
@@ -55,12 +58,14 @@ export function useCoachActions() {
          their numbers, rounds and rest — so it opens in the circuit builder,
          shows under Saved circuits and logs in a tap. A names-only workout
          (an older coach deploy) is saved the way it always was. */
-      if (action.type === 'create_workout' && action.stations?.length) {
+      /* Every coach-made workout goes to Saved circuits, and the link opens
+         the library on that circuit. */
+      if (action.type === 'create_workout') {
         const workout = circuitWorkoutFromAction(action, exercises);
-        if (workout) { addWorkout(workout); applied.push(action.label); continue; }
+        if (workout) { const saved = addWorkout(workout); applied.push({ label: action.label, place: 'Library · Saved circuits', to: `/exercises?show=circuits&circuit=${saved.id}` }); }
+        continue;
       }
-      if (action.type === 'create_workout') { const cardioOnly = action.items.every(item => exercises.find(exercise => exercise.name.toLowerCase() === item.toLowerCase())?.kind === 'Cardio'); addWorkout({ name: action.name, kind: cardioOnly ? 'Cardio' : 'Strength', source: 'User', summary: action.items.join(' · '), exercises: action.items }); }
-      applied.push(action.label);
+      applied.push({ label: action.label, ...whereItGoes(action) });
     }
     const override = overrideFromActions(actions, todayIso, readTodayOverride(todayIso));
     if (override !== readTodayOverride(todayIso)) writeTodayOverride(override);
