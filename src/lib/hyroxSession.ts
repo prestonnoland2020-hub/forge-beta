@@ -348,3 +348,17 @@ export const weeksUntil=(iso:string|undefined,today:string):number|null=>{
   if(!Number.isFinite(target)||!Number.isFinite(now))return null;
   return Math.round((target-now)/(7*86400000)*10)/10;
 };
+
+/* WHAT THE NEXT FEW HYROX SESSIONS WILL BE, for the coach. Asked "what's a
+   good HYROX workout for the coming weeks", the coach had nothing but the
+   station list and wrote all eight into one session — a full simulation as a
+   routine workout, for an athlete short on base. Forge already rotates: four
+   stations one day, the other four as compromised running the next, a half
+   then a full simulation only once a cycle. Handing the coach that rotation
+   means it describes the sessions Forge will actually write. */
+export function upcomingHyroxSessions(input:Omit<HyroxInput,'sessionIndex'|'shape'>&{sessionsDone:number},count=4){
+  return Array.from({length:count},(_,offset)=>{
+    const written=hyroxSession({...input,sessionIndex:input.sessionsDone+offset});
+    return{session:offset+1,shape:written.shape,title:written.title,summary:written.summary};
+  });
+}
