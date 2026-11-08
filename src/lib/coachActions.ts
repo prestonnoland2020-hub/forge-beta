@@ -25,6 +25,7 @@ export const ACTION_TYPES = [
   'log_note', 'clear_note',
   'set_weekly_mileage', 'set_running_days', 'set_load_bias',
   'update_goal', 'create_exercise', 'create_workout',
+  'open_split_guide',
 ] as const;
 export type ActionType = typeof ACTION_TYPES[number];
 
@@ -77,7 +78,8 @@ export type CoachAction =
   | { type: 'set_load_bias'; percent: number; label: string }
   | { type: 'update_goal'; goalTitle: string; target?: string; date?: string; label: string }
   | { type: 'create_exercise'; name: string; muscles: string[]; label: string }
-  | { type: 'create_workout'; name: string; items: string[]; stations?: WorkoutStation[]; rounds?: number; format?: WorkoutFormat; roundRest?: number; label: string };
+  | { type: 'create_workout'; name: string; items: string[]; stations?: WorkoutStation[]; rounds?: number; format?: WorkoutFormat; roundRest?: number; label: string }
+  | { type: 'open_split_guide'; label: string };
 
 export type ActionContext = {
   splitDays: Array<{ position: number; name: string; type?: string }>;
@@ -211,6 +213,10 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
       if (!muscles.length) return null;
       return { type, name, muscles, label: `Add ${name} to your library (${muscles.join(', ')})` };
     }
+    /* THE COACH CAN SHOW THE WAY, not only answer. "How do I build my split?"
+       opens the step-by-step guide on the screen itself. */
+    case 'open_split_guide':
+      return { type, label: 'Open the split guide — build your split step by step' };
     case 'create_workout': {
       const name = str(entry.name).slice(0, 60);
       /* THE PRESCRIPTION, NOT A LIST OF NAMES. A station needs a name and a
@@ -253,6 +259,7 @@ export function whereItGoes(action: CoachAction): ChangePlace {
     case 'update_goal': return { place: 'Goals', to: '/goals' };
     case 'create_exercise': return { place: 'Library · Exercises', to: '/exercises' };
     case 'create_workout': return { place: 'Library · Saved circuits', to: '/exercises?show=circuits' };
+    case 'open_split_guide': return { place: 'the split guide', to: '/split?guide=1' };
   }
 }
 
@@ -435,6 +442,9 @@ export function localActions(question: string, ctx: ActionContext): CoachAction[
   const text = question.trim();
   if (!text) return [];
   const lower = plainText(text);
+  /* "Help me build my split", "walk me through my split" — the guide. Read
+     before the report check, since it is usually asked as a question. */
+  if (/\bsplit\b/.test(lower) && /\b(build|make|set ?up|create|start|redo|change|new|walk (?:me )?through|walkthrough|help|how do i|guide|show me)\b/.test(lower)) return parseActions([{ type: 'open_split_guide' }], ctx);
   /* "Should I train if I'm sick?" is a question, not a report — unless it
      also says they are ("I'm sick, should I run?"). */
   const asks = /\?\s*$/.test(text);

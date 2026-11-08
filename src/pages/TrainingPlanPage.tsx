@@ -1,5 +1,7 @@
 import { useEffect,useMemo,useRef,useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { SplitGuide, type GuideResult } from '../components/SplitGuide';
+import { SPLIT_GUIDE_KEY, SPLIT_GUIDE_FRESH_KEY } from '../features/splits/splitGuideState';
 import { CardioPlanBuilder,cardioPlanSummary,type PlannedCardio } from '../components/CardioPlanBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
@@ -22,37 +24,8 @@ import { canonicalLiftKey } from '../lib/liftAliases';
 import { tap } from '../lib/haptics';
 import { Icon } from '../components/Icon';
 import { SearchField } from '../components/SearchField';
+import { TEMPLATES, DAY_TYPES, cardioPresets, SPLIT_MUSCLES as muscles, durationForDay, type DayType, type TrainingDay } from '../features/splits/splitModel';
 
-/* STARTING POINTS. Building a split from a blank day means naming days,
-   picking a type, picking muscles and picking lifts, seven times over. Most
-   people want one of four shapes; each is a tap, and every day stays
-   editable after. */
-const TEMPLATES:Array<{id:string;label:string;copy:string;days:Array<[string,DayType,string[]]>}>=[
-  {id:'full',label:'Full body',copy:'3 days · every muscle each day',days:[['Full Body A','strength',['Quads','Chest','Back']],['Full Body B','strength',['Hamstrings','Shoulders','Back']],['Full Body C','strength',['Glutes','Chest','Biceps','Triceps']]]},
-  {id:'upper-lower',label:'Upper / Lower',copy:'4 days · upper and lower twice',days:[['Upper A','strength',['Chest','Back','Shoulders']],['Lower A','strength',['Quads','Hamstrings','Glutes']],['Upper B','strength',['Back','Chest','Biceps','Triceps']],['Lower B','strength',['Hamstrings','Quads','Glutes']]]},
-  {id:'ppl',label:'Push / Pull / Legs',copy:'3 days · push, pull, legs',days:[['Push','strength',['Chest','Shoulders','Triceps']],['Pull','strength',['Back','Biceps']],['Legs','strength',['Quads','Hamstrings','Glutes']]]},
-  {id:'hybrid',label:'Hybrid',copy:'4 days · lifting and running',days:[['Upper','strength',['Chest','Back','Shoulders']],['Quality Run','cardio',[]],['Lower','strength',['Quads','Hamstrings','Glutes']],['Long Run','cardio',[]]]},
-];
-const DAY_TYPES:Array<[DayType,string]>=[['strength','Lift'],['cardio','Run'],['mixed','Both'],['rest','Rest'],['hyrox','HYROX']];
-/* CARDIO IS A TAP, NOT A FORM. Choosing your own session meant a policy
-   switch, a builder over the sheet, four session shapes, seven activities and
-   a dial for every number — to say "easy run". Most planned sessions are one
-   of these; tapping one puts it on the day as it stands, and Edit opens the
-   full builder on it for anyone who wants to change a number. Distances
-   follow the athlete's units. */
-const cardioPresets=(metric:boolean):Array<{label:string;plan:Omit<PlannedCardio,'id'>}>=>{const unit=metric?'kilometers':'miles';return[
-  {label:'Easy 30 min run',plan:{activity:'Run',structure:'Steady',targetSource:'Goal generated',duration:'30',distanceUnit:unit,pace:'Easy'}},
-  {label:metric?'Tempo 6 km':'Tempo 4 mi',plan:{activity:'Run',structure:'Steady',targetSource:'Goal generated',distance:metric?'6':'4',distanceUnit:unit,pace:'Tempo'}},
-  {label:'6 × 400 m',plan:{activity:'Run',structure:'Intervals',targetSource:'Goal generated',repeats:'6',intervalBasis:'Distance',workDistance:'400',workUnit:'meters',pace:'5K pace',rest:'90',recoveryType:'Jog',warmup:metric?'1.5 km':'1 mile',cooldown:metric?'1.5 km':'1 mile'}},
-  {label:metric?'Long run 12 km':'Long run 8 mi',plan:{activity:'Run',structure:'Steady',targetSource:'Goal generated',distance:metric?'12':'8',distanceUnit:unit,pace:'Easy'}},
-  {label:'Easy 45 min bike',plan:{activity:'Bike',structure:'Steady',targetSource:'Goal generated',duration:'45',distanceUnit:unit,pace:'Zone 2'}},
-  {label:'20 min row',plan:{activity:'Rowing',structure:'Steady',targetSource:'Goal generated',duration:'20',distanceUnit:'meters',pace:'Steady'}},
-]};
-
-const muscles=['Chest','Back','Shoulders','Quads','Hamstrings','Glutes','Biceps','Triceps','Forearms','Abs'];
-type CardioPolicy='none'|'forge'|'planned';
-type DayType='strength'|'cardio'|'mixed'|'rest'|'hyrox';
-type TrainingDay={name:string;weekday:string;dayType:DayType;muscles:string[];exercises:string[];cardioPolicy:CardioPolicy;cardio:PlannedCardio[];recoveryStyle:'Full rest'|'Mobility'|'Active recovery';maxDuration:string;strengthDuration:string};
 /* SAVED SPLITS ride inside the plan record, so they reach the account through
    the same athlete_settings write as the split itself and need no table of
    their own. The live split is the one the plan trains from; the library is
@@ -61,8 +34,6 @@ type SavedSplit={id:string;name:string;rhythm:'rolling'|'weekly';days:TrainingDa
 type SavedPlan={name:string;rhythm:'rolling'|'weekly';days:TrainingDay[];minWeeklyMileage?:number;maxWeeklyMileage?:number;activeId?:string|null;library?:SavedSplit[]};
 const planStorageKey='forge-training-plan-v1';
 const loadSavedPlan=():SavedPlan|null=>{try{return JSON.parse(localStorage.getItem(planStorageKey)||'null')}catch{return null}};
-const plannedCardioMinutes=(plan:PlannedCardio)=>{if(plan.structure==='Steady'||plan.structure==='Custom')return Math.max(0,Number(plan.duration)||0);if(plan.structure==='Intervals'){const work=/seconds?/i.test(plan.workUnit||'')?Number(plan.workDistance||0)/60:/minutes?/i.test(plan.workUnit||'')?Number(plan.workDistance||0):0;return Math.ceil(Math.max(0,Number(plan.repeats)||0)*work+Math.max(0,(Number(plan.repeats)||0)-1)*(Number(plan.rest)||0)/60)}if(plan.structure==='Circuit'){if(plan.circuitFormat==='For time'&&Number(plan.duration)>0)return Number(plan.duration);if(plan.circuitFormat==='AMRAP'||plan.circuitFormat==='EMOM')return Math.max(0,Number(plan.rounds)||0);const rounds=Math.max(0,Number(plan.rounds)||0);return Math.ceil(rounds*8+Math.max(0,rounds-1)*(Number(plan.roundRest)||0)/60)}return 0};
-const durationForDay=(day:TrainingDay,cardio=day.cardio)=>{const cardioMinutes=cardio.reduce((total,plan)=>total+plannedCardioMinutes(plan),0);if(day.dayType==='strength')return day.strengthDuration;if(day.dayType==='cardio')return cardioMinutes?String(cardioMinutes):'';if(day.dayType==='hyrox')return '';if(day.dayType==='mixed')return String((Number(day.strengthDuration)||0)+cardioMinutes);return ''};
 
 /* /plan is the program; /split is the split editor, reached from Profile.
    They were two tabs on one page — Preston's call: Plan opens on the plan,
@@ -111,8 +82,13 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const persistSignature=JSON.stringify({splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage,activeId,library});
   const openedWith=useRef(persistSignature);
   const edited=persistSignature!==openedWith.current;
-  useEffect(()=>{if(!edited)return;const min=Math.max(0,minWeeklyMileage);const max=Math.max(min,maxWeeklyMileage);const savedPlanState={name:splitName,rhythm,days,minWeeklyMileage:min,maxWeeklyMileage:max,activeId,library} satisfies SavedPlan;localStorage.setItem(planStorageKey,JSON.stringify(savedPlanState));if(setup)saveSetup({...setup,minWeeklyMileage:min,maxWeeklyMileage:max,scheduleStyle:rhythm==='weekly'?'Weekly schedule':'Rolling cycle',splitSource:'Custom',trainingDays:days.filter(day=>day.dayType!=='rest').length,splitDays:days.map(day=>({name:day.name,type:(day.dayType[0].toUpperCase()+day.dayType.slice(1)) as 'Strength'|'Cardio'|'Mixed'|'Rest',muscles:day.muscles,exercises:day.exercises}))});const settingsTimer=window.setTimeout(()=>saveAthleteSettings({plan:savedPlanState}),1500);return()=>window.clearTimeout(settingsTimer)},[edited,splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage,activeId,library]);
-  useEffect(()=>{if(isDemoMode||!user){setSyncState('local');return}if(!edited){setSyncState('saved');return}setSyncState('saving');const timer=window.setTimeout(()=>{void saveTrainingSplit(splitName,days.map((day,index)=>({position:index+1,name:day.name,muscleGroups:day.dayType==='strength'||day.dayType==='mixed'?day.muscles:[],goalLifts:day.dayType==='strength'||day.dayType==='mixed'?day.exercises:[],cardioTypes:day.dayType==='hyrox'?['HYROX']:day.dayType==='cardio'||day.dayType==='mixed'?(day.cardioPolicy==='planned'?(day.cardio.length?day.cardio.map(cardioPlanSummary):['Planned']):['Forge']):[]}))).then(()=>{setSyncState('saved');window.dispatchEvent(new Event('forge-training-cycle-changed'))}).catch(()=>setSyncState('error'))},1200);return()=>window.clearTimeout(timer)},[edited,user,splitName,days]);
+  /* THE SPLIT'S WRITES, as functions. The two effects below run them on a
+     delay while the athlete edits; the guide's Done runs them at once, because
+     it leaves for Home straight after and an unmounted page cancels a timer. */
+  const writeSplitLocally=(next:{name:string;rhythm:'rolling'|'weekly';days:TrainingDay[];activeId:string|null;library:SavedSplit[]})=>{const min=Math.max(0,minWeeklyMileage);const max=Math.max(min,maxWeeklyMileage);const savedPlanState={name:next.name,rhythm:next.rhythm,days:next.days,minWeeklyMileage:min,maxWeeklyMileage:max,activeId:next.activeId,library:next.library} satisfies SavedPlan;localStorage.setItem(planStorageKey,JSON.stringify(savedPlanState));if(setup)saveSetup({...setup,minWeeklyMileage:min,maxWeeklyMileage:max,scheduleStyle:next.rhythm==='weekly'?'Weekly schedule':'Rolling cycle',splitSource:'Custom',trainingDays:next.days.filter(day=>day.dayType!=='rest').length,splitDays:next.days.map(day=>({name:day.name,type:(day.dayType[0].toUpperCase()+day.dayType.slice(1)) as 'Strength'|'Cardio'|'Mixed'|'Rest',muscles:day.muscles,exercises:day.exercises}))});return savedPlanState};
+  const writeSplitToServer=(name:string,splitDays:TrainingDay[])=>saveTrainingSplit(name,splitDays.map((day,index)=>({position:index+1,name:day.name,muscleGroups:day.dayType==='strength'||day.dayType==='mixed'?day.muscles:[],goalLifts:day.dayType==='strength'||day.dayType==='mixed'?day.exercises:[],cardioTypes:day.dayType==='hyrox'?['HYROX']:day.dayType==='cardio'||day.dayType==='mixed'?(day.cardioPolicy==='planned'?(day.cardio.length?day.cardio.map(cardioPlanSummary):['Planned']):['Forge']):[]}))).then(()=>{window.dispatchEvent(new Event('forge-training-cycle-changed'))});
+  useEffect(()=>{if(!edited)return;const savedPlanState=writeSplitLocally({name:splitName,rhythm,days,activeId,library});const settingsTimer=window.setTimeout(()=>saveAthleteSettings({plan:savedPlanState}),1500);return()=>window.clearTimeout(settingsTimer)},[edited,splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage,activeId,library]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(isDemoMode||!user){setSyncState('local');return}if(!edited){setSyncState('saved');return}setSyncState('saving');const timer=window.setTimeout(()=>{void writeSplitToServer(splitName,days).then(()=>setSyncState('saved')).catch(()=>setSyncState('error'))},1200);return()=>window.clearTimeout(timer)},[edited,user,splitName,days]); // eslint-disable-line react-hooks/exhaustive-deps
   const updateDay=(change:Partial<TrainingDay>)=>setDays(items=>items.map((day,index)=>{if(index!==selectedDay)return day;const next={...day,...change};next.maxDuration=durationForDay(next);return next}));
   /* Functional update — two fast taps must both land, never overwrite each
      other through a stale closure. */
@@ -201,6 +177,33 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const [editMuscles,setEditMuscles]=useState(false);
   const [browseLifts,setBrowseLifts]=useState(false);
   const [showTemplates,setShowTemplates]=useState(()=>days.length<=1&&!days[0]?.exercises.length);
+  /* THE GUIDE (components/SplitGuide) opens over this page at ?guide=1 — from
+     Home's first-run prompt, from the button here, or from the coach. */
+  const navigate=useNavigate();
+  const [params,setParams]=useSearchParams();
+  const guideOpen=tab==='split'&&params.get('guide')==='1';
+  const openGuide=()=>{tap();setParams(current=>{const next=new URLSearchParams(current);next.set('guide','1');return next})};
+  const closeGuide=()=>{try{if(!localStorage.getItem(SPLIT_GUIDE_KEY))localStorage.setItem(SPLIT_GUIDE_KEY,'later')}catch{/* best effort */}if(params.get('from')==='home'){navigate('/');return}setParams(current=>{const next=new URLSearchParams(current);next.delete('guide');next.delete('from');return next},{replace:true})};
+  const finishGuide=async(result:GuideResult)=>{
+    /* What they had is kept in their saved splits — unless it was only the
+       starter split Forge made at sign-up — and the new one becomes live. */
+    const keepOld=setup?.splitSource==='Custom'&&days.some(day=>day.exercises.length||day.dayType!=='strength');
+    const kept=keepOld?keepCurrent().items:library;
+    const id=`split-${Date.now().toString(36)}`;
+    const nextLibrary=[...kept,{id,name:result.name,rhythm:result.rhythm,days:result.days,savedAt:new Date().toISOString()}];
+    setLibrary(nextLibrary);setActiveId(id);setSplitName(result.name);setRhythm(result.rhythm);setDays(result.days);setSelectedDay(0);setShowTemplates(false);
+    const planState=writeSplitLocally({name:result.name,rhythm:result.rhythm,days:result.days,activeId:id,library:nextLibrary});
+    saveAthleteSettings({plan:planState});
+    if(!isDemoMode&&user){try{await writeSplitToServer(result.name,result.days)}catch{/* the page's own save retries on the next edit */}}
+    else window.dispatchEvent(new Event('forge-training-cycle-changed'));
+    try{localStorage.setItem(SPLIT_GUIDE_KEY,'done');localStorage.setItem(SPLIT_GUIDE_FRESH_KEY,result.name)}catch{/* best effort */}
+    navigate('/');
+  };
+  const DAY_REVEAL=92;
+  const [swipedDay,setSwipedDay]=useState<number|null>(null);
+  const [swipeOffset,setSwipeOffset]=useState(0);
+  const daySwipe=useRef<{index:number;x:number;y:number}|null>(null);
+  const deleteDayAt=(index:number)=>{if(days.length<=1)return;tap();setDays(items=>items.filter((_,at)=>at!==index));setSelectedDay(current=>Math.max(0,current>=index?current-1:current));setSwipedDay(null);setSwipeOffset(0);setSheetDay(null)};
   const openDay=(index:number)=>{tap();setSelectedDay(index);setEditMuscles(false);setBrowseLifts(false);setExerciseQuery('');setSheetDay(index)};
   const closeSheet=()=>setSheetDay(null);
   /* Two core lifts per day from the muscles it trains, so a template arrives
@@ -222,6 +225,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const daySummary=(day:TrainingDay)=>day.dayType==='rest'?(day.recoveryStyle==='Full rest'?'Rest':day.recoveryStyle):day.dayType==='hyrox'?'HYROX · Forge writes it':day.dayType==='cardio'?(day.cardioPolicy==='planned'&&day.cardio.length?cardioPlanSummary(day.cardio[0]):'Run · Forge plans it'):[day.exercises.slice(0,3).join(' · ')||'No top sets yet',day.dayType==='mixed'?'+ run':''].filter(Boolean).join(' ');
   const hasRunning=days.some(day=>day.dayType==='cardio'||day.dayType==='mixed'||day.dayType==='hyrox')||goals.some(goal=>goal.type==='Endurance');
   return <div className="stack-xl training-plan-page plan-studio">
+    {guideOpen&&<SplitGuide initialName={splitName} metric={setup?.units==='Metric'} onCancel={closeGuide} onFinish={finishGuide}/>}
     {cardioEditor&&<CardioPlanBuilder initial={cardioEditor.cardioIndex===null?undefined:days[cardioEditor.dayIndex].cardio[cardioEditor.cardioIndex]} onClose={()=>setCardioEditor(null)} onSave={saveCardio}/>}
     {tab==='split'&&strategy.updatedAt&&<section className="coach-plan-banner"><div><span>AI coach adjustment active</span><strong>{profile.weeklyMileage} mi/week · {strategy.loadBiasPercent>0?'+':''}{strategy.loadBiasPercent}% generated load · {strategy.splitEmphasis} emphasis</strong><small>{strategy.lastAdjustment||'Your confirmed coaching preferences now shape future Forge workouts.'}</small></div><button className="button ghost" onClick={openSplitReview}>Review split</button></section>}
     {tab==='split'&&reviewOpen&&<section className="card split-review-panel" id="splitReviewPanel"><header><div><span className="eyebrow">Forge split review</span><h2>{reviewFindings.length?`${reviewFindings.length} item${reviewFindings.length===1?'':'s'} to review`:'Split structure looks complete'}</h2><p>Forge reviews the saved structure without rewriting completed history or applying changes automatically.</p></div><button className="text-button" onClick={()=>setReviewOpen(false)}>Close</button></header><div className="split-review-summary"><div><strong>{days.length}</strong><span>cycle days</span></div><div><strong>{days.filter(day=>day.dayType==='strength'||day.dayType==='mixed').length}</strong><span>strength days</span></div><div><strong>{days.filter(day=>day.cardioPolicy!=='none').length}</strong><span>cardio windows</span></div><div><strong>{days.reduce((sum,day)=>sum+day.cardio.length,0)}</strong><span>attached options</span></div></div><div className="split-review-findings">{reviewFindings.length?reviewFindings.map((finding,index)=><div key={finding}><span>{index+1}</span><p>{finding}</p></div>):<div className="clear"><span><Icon name="check"/></span><p>Every strength day has its top sets, every cardio day has a source, and the cycle includes recovery.</p></div>}</div><div className="split-review-coach"><div><span className="eyebrow">Ask Forge about this split</span><p>Ask about balance, recovery, exercise order, cardio scheduling, or a specific day.</p></div><div><textarea rows={2} value={reviewQuestion} onChange={event=>setReviewQuestion(event.target.value)} placeholder="Example: Is my lower-body work too close to the long run?"/><button className="button" disabled={reviewLoading||!reviewQuestion.trim()} onClick={askSplitCoach}>{reviewLoading?'Reviewing…':'Ask Forge'}</button></div>{reviewAnswer&&<article><span>Forge review</span><p>{reviewAnswer}</p></article>}</div></section>}
@@ -254,13 +258,25 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
       {showTemplates?<section className="ss-templates"><div className="ss-templates-head"><strong>Start from a template</strong>{days.some(day=>day.exercises.length)&&<button type="button" className="text-button" onClick={()=>setShowTemplates(false)}>Cancel</button>}</div>
         {TEMPLATES.map(template=><button type="button" key={template.id} onClick={()=>applyTemplate(template.id)}><strong>{template.label}</strong><small>{template.copy}</small></button>)}
       </section>:null}
-      <ol className="ss-days">{days.map((day,index)=><li key={`${day.name}-${index}`} className={`ss-day ss-${day.dayType}`}>
-        <button type="button" onClick={()=>openDay(index)}>
+      {/* THE WAY IN FOR ANYONE WHO HAS NOT BUILT ONE: the guide asks one thing at a time. */}
+      <button type="button" className="ss-guide-entry" onClick={openGuide}><span><strong>Build your split step by step</strong><small>A short guide: how many days, what each day is, and who plans the cardio.</small></span><span aria-hidden="true">›</span></button>
+      {/* SWIPE A DAY LEFT TO DELETE IT. Delete used to live three taps deep,
+          under More options inside the day's sheet. A row dragged left shows
+          Delete; the delete itself is a second, deliberate tap. A split keeps
+          at least one day — one day on its own is a fine split. */}
+      <ol className="ss-days">{days.map((day,index)=>{const offset=swipedDay===index?swipeOffset:0;const deletable=days.length>1;return <li key={`${day.name}-${index}`} className={`ss-day ss-${day.dayType}${offset?' swiped':''}`}>
+        {deletable&&<button type="button" className="ss-day-delete" tabIndex={offset?0:-1} aria-hidden={offset?undefined:true} onClick={()=>deleteDayAt(index)}>Delete</button>}
+        <button type="button" className="ss-day-row" style={{transform:`translateX(${offset}px)`}}
+          onTouchStart={event=>{if(deletable)daySwipe.current={index,x:event.touches[0].clientX,y:event.touches[0].clientY}}}
+          onTouchMove={event=>{const start=daySwipe.current;if(!start||start.index!==index)return;const dx=event.touches[0].clientX-start.x;const dy=event.touches[0].clientY-start.y;if(Math.abs(dy)>Math.abs(dx)){daySwipe.current=null;return}setSwipedDay(index);setSwipeOffset(Math.max(-DAY_REVEAL,Math.min(0,dx)))}}
+          onTouchEnd={()=>{if(!daySwipe.current)return;daySwipe.current=null;setSwipeOffset(current=>current< -DAY_REVEAL/2?-DAY_REVEAL:0)}}
+          onClick={()=>{if(offset){setSwipedDay(null);setSwipeOffset(0);return}openDay(index)}}>
           <span className="ss-num">{rhythm==='weekly'?day.weekday.slice(0,2):index+1}</span>
           <span className="ss-text"><strong>{day.name}</strong><small>{daySummary(day)}</small></span>
           <span className="ss-chev" aria-hidden="true">›</span>
         </button>
-      </li>)}</ol>
+      </li>})}</ol>
+      {days.length>1&&<p className="ss-swipe-hint">Swipe a day left to delete it.</p>}
       <div className="ss-actions"><button type="button" className="ss-add" onClick={()=>{tap();addDay();setSheetDay(days.length)}}>＋ Add a day</button></div>
     </div>}
     {tab==='split'&&sheetDay!==null&&active&&<div className="ss-backdrop" onClick={event=>{if(event.target===event.currentTarget)closeSheet()}}>
