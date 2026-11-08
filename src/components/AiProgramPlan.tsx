@@ -742,7 +742,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     /> : null}
     {/* Today belongs to today. Looking at week six, there is no "today" in it,
         and a card headed TODAY over a week in October would be a lie. */}
-    <WeekList sessions={weekSessions} unit={unit} records={records} todayHref={weekIndex === currentIndex ? workoutHref : undefined}
+    <WeekList sessions={weekSessions} unit={unit} records={records} splitDays={splitDays} todayHref={weekIndex === currentIndex ? workoutHref : undefined}
       title={weekIndex === currentIndex && !blockDone ? 'This week' : `Week ${weekIndex + 1} · ${weekRange(weekSessions)}`}
       note={weekIndex > currentIndex ? projection : undefined} />
     {liveAdjusted ? <p className="pv-footnote">Loads follow your latest logged bests.</p> : null}
