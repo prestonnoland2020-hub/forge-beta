@@ -63,8 +63,9 @@ function NavGlyph({ name }: { name: NavGlyphName }) {
 /* THE TAB BAR. Five destinations, each owning the screens that are steps into
    it, so the tab you came from stays lit while you are inside it. */
 const tabs = [
-  { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' || path === '/insights' },
-  { to: '/plan', label: 'Plan', icon: 'calendar', owns: (path: string) => path === '/plan' },
+  /* Four tabs. Plan was a fifth whose top row repeated Today; it now opens
+     from "See your week" on Today, and Today stays lit while it is open. */
+  { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' || path === '/insights' || path === '/plan' },
   { to: '/goals', label: 'Goals', icon: 'target', owns: (path: string) => path === '/goals' },
   { to: '/history', label: 'Activities', icon: 'history', owns: (path: string) => path === '/history' },
   { to: '/profile', label: 'Profile', icon: 'you', owns: (path: string) => path === '/profile' || path === '/split' || path.startsWith('/partners') || path === '/exercises' },
@@ -275,7 +276,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     }
     switch (location.pathname) {
       case '/': return { title: 'Today' };
-      case '/plan': return { title: 'Plan' };
+      case '/plan': return { title: 'Your week', back: '/' };
       case '/goals': return { title: 'Goals' };
       case '/history': return { title: 'Activities' };
       case '/workout': return { title: params.get('edit') ? 'Edit day' : params.get('date') ? 'Add a day' : 'Log workout', back: '/' };
@@ -338,8 +339,10 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     return () => { active = false; };
   }, [user, historyLoading, stravaRecords]);
 
+  const [coachNamed, setCoachNamed] = useState(() => { try { return localStorage.getItem('forge-coach-opened') !== '1'; } catch { return true; } });
+  const markCoachSeen = () => { setCoachNamed(false); try { localStorage.setItem('forge-coach-opened', '1'); } catch { /* per-device */ } };
   useEffect(() => {
-    const open = () => setCoachOpen(true);
+    const open = () => { setCoachOpen(true); setCoachNamed(false); };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (coachExpanded) setCoachExpanded(false);
@@ -379,8 +382,8 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         <div className="top-actions">
           {!isDemoMode && (historyLoading || syncing) && <span className="data-sync-state">{historyLoading ? 'Loading data…' : 'Saving…'}</span>}
           {hasRecoveryData && <NavLink className="top-readiness" to="/profile?view=connections"><span>{recovery.readiness}</span><small>Ready</small></NavLink>}
-          <NavLink className="top-insights" to="/insights" aria-label="Progress"><NavGlyph name="chart"/></NavLink>
-          {location.pathname !== '/workout' && <NavLink className="top-log" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></NavLink>}
+          <NavLink className="top-insights labeled" to="/insights" aria-label="Progress"><NavGlyph name="chart"/><span>Progress</span></NavLink>
+          {location.pathname !== '/workout' && <NavLink className="top-log labeled" to="/workout" aria-label="Log a workout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg><span>Log</span></NavLink>}
           {/* Settings has one door, the first row of Profile. A gear on every
               screen was a second way into the same list. */}
         </div>
@@ -470,10 +473,13 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         <header><div><span>AI coach</span><strong>Ask Forge</strong></div><div className="coach-window-actions"><button type="button" onClick={() => setCoachExpanded(value => !value)} aria-label={coachExpanded ? 'Restore Forge coach' : 'Expand Forge coach'} title={coachExpanded ? 'Restore' : 'Expand'}>{coachExpanded ? <Icon name="collapse"/> : <Icon name="expand"/>}</button><button type="button" onClick={() => { setCoachOpen(false); setCoachExpanded(false); }} aria-label="Close Forge coach">×</button></div></header>
         <div className="coach-bubble-content">{coach}</div>
       </section>
-      <button type="button" className={coachOpen ? 'coach-bubble-toggle active' : 'coach-bubble-toggle'} onClick={() => { tap(); setCoachOpen(open => !open); if (coachOpen) setCoachExpanded(false); }} aria-expanded={coachOpen} aria-label={coachOpen ? 'Close Forge coach' : 'Open Forge coach'}>
+      {/* NAMED UNTIL IT HAS BEEN TRIED. A round logo meant nothing to a new
+          athlete, and the coach is the reason Forge exists; the button says
+          "Ask coach" until the first time it is opened. */}
+      <button type="button" className={`${coachOpen ? 'coach-bubble-toggle active' : 'coach-bubble-toggle'}${coachNamed && !coachOpen ? ' named' : ''}`} onClick={() => { tap(); markCoachSeen(); setCoachOpen(open => !open); if (coachOpen) setCoachExpanded(false); }} aria-expanded={coachOpen} aria-label={coachOpen ? 'Close Forge coach' : 'Open Forge coach'}>
         {/* The coach is Forge, so its button carries Forge's mark — not the
             sparkle every AI feature in every app wears. */}
-        <span>{coachOpen ? '×' : <i className="coach-mark" aria-hidden="true" />}</span><b>{coachOpen ? 'Close' : 'Ask Forge'}</b>
+        <span>{coachOpen ? '×' : <i className="coach-mark" aria-hidden="true" />}</span><b>{coachOpen ? 'Close' : 'Ask coach'}</b>
       </button>
     </div>
   </div>;

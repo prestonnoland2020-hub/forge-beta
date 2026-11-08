@@ -12,6 +12,7 @@ import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvid
 import { ConnectionsView } from '../components/ConnectionsView';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
+import { runLines } from '../lib/stats';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useAppearance } from '../features/preferences/AppearanceProvider';
 import { beginStravaConnection, disconnectStrava, finishStravaConnection, getActivityConnection, syncStravaActivities, type ActivityConnectionStatus } from '../features/training/activityConnectionService';
@@ -27,7 +28,11 @@ export function ProfilePage(){
      the address — a local state the header could not see left it saying
      "Profile" over the appearance settings. */
   const [params,setParams]=useSearchParams();const requested=params.get('view');const view:View=requested==='devices'?'connections':requested==='appearance'?'settings':isView(requested)?requested:'profile';const setView=(next:View)=>setParams(next==='profile'?{}:{view:next});const {notes,upsert}=useAthleteNotes();const {isPro}=useBilling();const wrappedYear=useWrappedYear();
-  const [activity,setActivity]=useState<ActivityConnectionStatus|null>(null);const [connectionMessage,setConnectionMessage]=useState('');const [connectionBusy,setConnectionBusy]=useState(false);const latest=health[health.length-1];const name=setup?.displayName||'Athlete';const initials=name.split(' ').map(part=>part[0]).join('').slice(0,2).toUpperCase();const metric=setup?.units==='Metric';const distanceUnit=metric?'km':'mi';const distanceValue=(miles:number)=>Number((metric?miles*1.609344:miles).toFixed(1));const weeklyDistance=distanceValue(profile.weeklyMileage);const longestDistance=distanceValue(profile.longestRunMiles);const runsShown=setup?.primaryFocus!=='Strength'||Number(longestDistance)>0;
+  const [activity,setActivity]=useState<ActivityConnectionStatus|null>(null);const [connectionMessage,setConnectionMessage]=useState('');const [connectionBusy,setConnectionBusy]=useState(false);const latest=health[health.length-1];const name=setup?.displayName||'Athlete';const initials=name.split(' ').map(part=>part[0]).join('').slice(0,2).toUpperCase();const metric=setup?.units==='Metric';const distanceUnit=metric?'km':'mi';const distanceValue=(miles:number)=>Number((metric?miles*1.609344:miles).toFixed(1));/* LOGGED RUNS, NOT THE SETUP GUESS. This read the weekly mileage answered in
+     setup, so a brand-new athlete saw "5 mi in the last 7 days" beside a
+     longest run of 0. */
+  const weekAgo=(()=>{const day=new Date();day.setDate(day.getDate()-6);return `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`})();
+  const weeklyDistance=distanceValue(Math.round(runLines(records).filter(line=>line.date>=weekAgo).reduce((sum,line)=>sum+line.miles,0)*10)/10);const longestDistance=distanceValue(profile.longestRunMiles);const runsShown=setup?.primaryFocus!=='Strength'||Number(longestDistance)>0;
   const loadConnection=async()=>{/* A status check that cannot reach the server is not news: it printed "Failed to send a request to the Edge Function" under Sign out. Connections already reads as not connected, and acting on it reports a real error. */try{setActivity(await getActivityConnection())}catch{setActivity(null)}};
   /* GARMIN, DIRECT. Data arrives by push, so after connecting or syncing the
      screen reads what has landed and hands the health days to the recovery
