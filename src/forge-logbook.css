@@ -270,7 +270,7 @@ body { background: var(--bg) !important; }
    off a gym floor. --week-glow (0..1) is how much of this week's training is
    logged: faint on day one, fullest when the week is done. It breathes on an
    8-second cycle (about a resting breath) and flares once on a new record. */
-.app-frame { background: var(--bg) !important; isolation: isolate !important; position: relative; }
+.app-frame { background: var(--bg) !important; isolation: isolate !important; }
 .app-frame::before {
   content: ''; position: fixed; inset: auto -30% -6% -30%; height: 70%;
   pointer-events: none; z-index: -1;
