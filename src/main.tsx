@@ -93,6 +93,7 @@ import './brand.css';
 import './today-hero.css';
 /* The logbook layer decides the look, so it loads after everything else. */
 import './forge-logbook.css';
+import './wrapped.css';
 import { startNativeChrome } from './features/shell/nativeChrome';
 
 // OAuth providers return to the public app URL before the hash route. Send the

@@ -15,6 +15,7 @@ import { sessionLength } from '../lib/time';
 import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate';
 import { TodayNudges } from '../components/TodayNudges';
 import { RunningBehindNudge } from '../components/RunningBehindCard';
+import { WrappedEntry } from '../components/WrappedEntry';
 
 const todayIso = () => {
   const now = new Date();
@@ -78,6 +79,9 @@ export function HomePage() {
       <span><small>{bufferedNotes.some(isSickNote) ? 'Rest mode' : 'Coach adjusted'}</small>{bufferedNotes.some(isSickNote) ? 'Resting while you’re sick — tell Forge when you feel better' : `Training around ${Array.from(new Set(bufferedNotes.map(note => note.area || limitationIn(note.note || '') || (note.kind === 'fatigue' ? 'tiredness' : 'a limitation')))).join(', ')}`}</span>
       <Icon name="chevron" size={16} className="buffer-banner-go" />
     </Link>}
+
+    {/* January only: last year's Wrapped, above the day's work for one month. */}
+    <WrappedEntry />
 
     {/* ONE CARD, ONE ACTION. The guide's Today: a status chip, the day's name
         as the headline, each lift as one line with its load on the right, and

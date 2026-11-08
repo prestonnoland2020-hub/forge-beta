@@ -19,6 +19,7 @@ import { CoachPage } from '../pages/CoachPage';
 import { ExerciseLibraryPage } from '../pages/ExerciseLibraryPage';
 import { PartnersPage } from '../pages/PartnersPage';
 import { PartnerDetailPage } from '../pages/PartnerDetailPage';
+import { WrappedPage } from '../pages/WrappedPage';
 
 export function App() {
   return (
@@ -49,6 +50,9 @@ export function App() {
           <Route path="/partners" element={<PartnersPage />} />
           <Route path="/partners/:id" element={<PartnerDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          {/* Forge Wrapped: full screen over the app. Pro only (the page shows
+              free athletes their headline and the lock). */}
+          <Route path="/wrapped" element={<WrappedPage />} />
           {/* Not in any navigation. The server decides who sees anything here —
               forge_account_overview returns nothing to anyone but the owner, so
               the route existing gives nothing away. */}
