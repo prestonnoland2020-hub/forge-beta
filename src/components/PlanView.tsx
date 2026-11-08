@@ -9,6 +9,8 @@ import { localDayIso } from '../lib/time';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import type { DailyRecommendation } from '../lib/dailyRecommendationEngine';
 import { Icon } from './Icon';
+import { canonicalLiftKey, splitDayKey } from '../lib/liftAliases';
+import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 
 /* THE PLAN TAB, AS SOMEONE WHO JUST WANTS TO TRAIN READS IT.
 
@@ -103,15 +105,19 @@ export function RunLine({ run }: { run: PlanRun }) {
    week below changes; the tab always opens on the week you are actually in.
    A week is a real tab stop, keyboard arrows included, because that is what it
    looks like. */
-export function PlanProgress({ weekIndex, current, total, waveIndexFor, onPick }: {
+export function PlanProgress({ weekIndex, current, total, waveIndexFor, onPick, adjustOpen, onAdjust }: {
   weekIndex: number; current: number; total: number;
   waveIndexFor: (index: number) => number; sentence: ReactNode; onPick: (index: number) => void;
+  adjustOpen?: boolean; onAdjust?: () => void;
 }) {
   const away = weekIndex - current;
   return <section className="pv-progress">
     <div className="pv-progress-head">
       <span className="pv-progress-week">Week {weekIndex + 1} <small>of {total}</small></span>
       <span className="pv-progress-name">{waveLabel(waveIndexFor(weekIndex))}</span>
+      {/* CONTROLS ON TOP. Save and Regenerate sat under the whole week, where
+          nobody looking for them scrolled. One button in the header opens them. */}
+      {onAdjust && <button type="button" className={`adjust-pill${adjustOpen ? ' open' : ''}`} aria-expanded={Boolean(adjustOpen)} onClick={onAdjust}>Adjust</button>}
     </div>
     <div className="pv-dots" role="tablist" aria-label="Week">
       {Array.from({ length: total }, (_, index) => {
@@ -240,9 +246,12 @@ export function useWeekSwipe(onSwipe: { current: (direction: 1 | -1) => void }) 
   };
 }
 
-export function WeekList({ sessions, unit, records, title = 'This week', note, todayHref }: {
+export function WeekList({ sessions, unit, records, title = 'This week', note, todayHref, splitDays }: {
   sessions: PlanSession[]; unit: string; records: WorkoutRecord[]; title?: string;
   note?: ReactNode;
+  /* The split's own days, for the lifts the plan does not prescribe a weight
+     for. Falls back to the profile's copy. */
+  splitDays?: Array<{ name: string; exercises?: string[] }>;
   /* TODAY IS A ROW, NOT A SECOND CARD. The page drew today twice — a big
      card over the week, then the same day in it. Today's row is the green
      one, opens on its own, and carries the Start button. */
@@ -250,6 +259,16 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
 }) {
   const todayIso = localDayIso();
   const [open, setOpen] = useState<string | null>(todayIso);
+  /* EVERY LIFT ON THE DAY. The block prescribes weights for the goal and
+     main lifts only, so the week showed "Bench Press" for a day Today opens
+     as Bench and Row. The rest of the day's lifts are listed too — collapsed
+     as "+1 more", and in the open row with their weight set on the day. */
+  const { setup } = useProfileSetup();
+  const dayLifts = new Map((splitDays || setup?.splitDays || []).map(day => [splitDayKey(day.name), day.exercises || []]));
+  const supportingFor = (session: PlanSession) => {
+    const planned = new Set(session.lifts.map(lift => canonicalLiftKey(lift.exercise)));
+    return (dayLifts.get(splitDayKey(session.title)) || []).filter(name => !planned.has(canonicalLiftKey(name)));
+  };
   /* Being sick reaches the week, not just Today: the days inside it read as
      rest, and the days after it as the same session, lighter. */
   const { notes } = useAthleteNotes();
@@ -276,8 +295,9 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
         if (heldLifts.length || runSwapped) session = { ...session, lifts: session.lifts.filter(lift => !heldLifts.includes(lift)), run: runSwapped && session.run ? { ...session.run, kind: 'Easy run', text: 'Bike or row, easy' } : session.run };
         const adjustedFor = heldLifts.length || runSwapped ? bodyLogReason(limits!) : '';
         if (health === 'easing') session = { ...session, lifts: session.lifts.map(lift => lift.weight ? { ...lift, weight: eased(lift.weight) } : lift), run: session.run ? { ...session.run, kind: 'Easy run' } : undefined };
-        const isRest = session.empty === 'rest' && !session.lifts.length && !session.run;
-        const isOpenDay = session.empty === 'open' && !session.lifts.length && !session.run;
+        const supporting = !past && !logged && health !== 'sick' && session.empty !== 'rest' ? supportingFor(session).filter(name => !limits || !exerciseBlocked({ name, muscles: musclesOf(name) }, limits)) : [];
+        const isRest = session.empty === 'rest' && !session.lifts.length && !session.run && !supporting.length;
+        const isOpenDay = session.empty === 'open' && !session.lifts.length && !session.run && !supporting.length;
         /* THE PAST IS HISTORY, NOT A PROJECTION. A rolling split rotates around
            where the athlete's cursor is TODAY, so the days behind today are
            drawn by winding that rotation backwards — which is fiction the
@@ -306,7 +326,10 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
           : isRest ? 'Nothing scheduled'
           : isOpenDay ? 'Optional — train if you want'
           : [
-              ...session.lifts.slice(0, 2).map(lift => lift.weight ? `${lift.exercise} ${lift.weight}×${lift.reps}` : lift.exercise),
+              /* Closed, a day is its first lift and a count; open, every lift. */
+              ...(session.lifts.length ? [session.lifts[0]] : []).map(lift => lift.weight ? `${lift.exercise} ${lift.weight}×${lift.reps}` : lift.exercise),
+              ...(!session.lifts.length && supporting.length ? [supporting[0]] : []),
+              (() => { const more = session.lifts.length + supporting.length - 1; return more > 0 ? `+${more} more` : ''; })(),
               session.run ? (() => { const text = session.run.text.split(/ @ | · /)[0]; return /\beasy\b/i.test(text) && session.run.kind === 'Easy run' ? text : `${session.run.kind} ${text}`; })() : '',
             /* NEVER THE DAY'S OWN NAME AGAIN. The last resort used to be
                session.title, so a split day the block prescribes nothing for
@@ -320,7 +343,7 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
         const loggedLifts = (logged?.topSets || []).filter(set => set.completed !== false);
         const canExpand = logged
           ? loggedLifts.length + (logged.cardioSessions || []).length > 0
-          : !past && !isRest && !isOpenDay && (session.lifts.length + (session.run ? 1 : 0) > 0 || Boolean(session.summary));
+          : !past && !isRest && !isOpenDay && (session.lifts.length + supporting.length + (session.run ? 1 : 0) > 0 || Boolean(session.summary));
         return <div className={`pv-row${isToday ? ' today' : ''}${logged ? ' done' : ''}${missed ? ' missed' : ''}${isRest ? ' rest' : ''}${expanded ? ' open' : ''}`} key={iso}>
           <div className="pv-row-line"><button type="button" className="pv-row-main" onClick={() => canExpand && setOpen(current => current === iso ? null : iso)} aria-expanded={canExpand ? expanded : undefined} disabled={!canExpand}>
             <span className="pv-row-date"><b>{weekdayShort(session.date)}</b><small>{dayNumber(session.date)}</small></span>
@@ -344,8 +367,9 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
                 </>
               : <>
                   {session.lifts.map((lift, index) => <LiftLine key={`${lift.exercise}-${index}`} lift={lift} unit={unit} />)}
+                  {supporting.map(name => <div className="pv-line pv-line-support" key={name}><span className="pv-line-name">{name}</span><span className="pv-line-value">Set on the day</span></div>)}
                   {session.run && <RunLine run={session.run} />}
-                  {!session.lifts.length && !session.run && session.summary && <p>{session.summary}</p>}
+                  {!session.lifts.length && !supporting.length && !session.run && session.summary && <p>{session.summary}</p>}
                 </>}
           </div>}
         </div>;
