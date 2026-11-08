@@ -619,3 +619,15 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .running-behind-nudge { display: grid; gap: 8px; }
 .running-behind-nudge p { margin: 0; line-height: 1.5; }
 .running-behind-nudge .button { justify-self: start; }
+
+/* MAKE AN EXERCISE FROM THE SPLIT DAY (TrainingPlanPage): the way in is an
+   accent text row under the lifts; the form is a small sunken panel. */
+.ss-create-open { justify-self: stretch; min-height: 48px; padding: 0 16px; border: 0; border-radius: 14px; text-align: left; font-size: 16px; font-weight: 800; color: var(--accent-text, var(--accent)); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ss-every-lift { justify-self: start; min-height: 44px; font-weight: 800; }
+.ss-create { display: grid; gap: 14px; padding: 16px; border-radius: 16px; background: var(--surface-sunken); border: 1px solid var(--hairline, var(--line)); }
+.ss-create label { display: grid; gap: 6px; margin: 0; }
+.ss-create label > span, .ss-create-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; color: var(--ink-3, var(--muted)); }
+.ss-create input { min-height: 48px; font-size: 17px; }
+.ss-create-note { margin: 0; font-size: 15px; color: var(--ink-2, var(--muted)); }
+.ss-create-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.ss-create-actions .button:last-child { min-width: 150px; }
