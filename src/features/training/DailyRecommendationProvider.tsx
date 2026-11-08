@@ -20,7 +20,7 @@ import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 import { useAthleteNotes } from './useAthleteNotes';
-import { bodyLogState,bodyLogReason,exerciseBlocked } from '../../lib/bodyLog';
+import { bodyLogState,bodyLogReason,exerciseBlocked,easyRunWeeks } from '../../lib/bodyLog';
 import { useTodayOverride } from './coachOverrides';
 import { shortenRecommendation,easeRecommendation,moderateRecommendation,EASE_PERCENT } from '../../lib/coachActions';
 
@@ -166,7 +166,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
   const recoveryStamp=recovery.confidence==='Low'?'':`${recovery.readiness}:${recovery.strengthFatigue}`;
   /* THE BODY LOG IS AN INPUT TO TODAY. A note is part of the fingerprint, so
      the saved row from before "my knee hurts" is not reused all day. */
-  const bodyLogStamp=`${bodyLog.areas.join('+')}|${bodyLog.restrictions.join('+')}${bodyLog.sick?':sick':''}${bodyLog.easing?':easing':''}`;
+  const bodyLogStamp=`${bodyLog.areas.join('+')}|${bodyLog.restrictions.join('+')}${bodyLog.sick?':sick':''}${bodyLog.easing?':easing':''}${bodyLog.easeRunning?':ease-run':''}${bodyLog.easeLifting?':ease-lift':''}|${(bodyLog.easeMuscles||[]).join('+')}|${(bodyLog.easeLifts||[]).join('+')}`;
   /* Starting numbers are an input too: giving them must replace the saved "Find your weight" row. */
   const startStamp=(setup?.startingNumbers||[]).map(item=>`${item.lift}:${item.weight}x${item.reps}`).join('+');
   const planInputsStamp=useMemo(()=>[days.map(day=>day.name).join('|'),setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp,startStamp].join('::'),[days,setup?.runningDays,setup?.minWeeklyMileage,setup?.maxWeeklyMileage,recoveryStamp,bodyLogStamp,coachStamp,startStamp]);
@@ -209,7 +209,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        called 3.5. One window, one answer. */
     const planRhythm=(()=>{try{return (JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null')?.rhythm==='weekly'?'weekly':'rolling') as 'weekly'|'rolling'}catch{return 'rolling' as const}})();
     const windowDays=weekCycleDays(storedPlan.startDate,currentWeekIndex(storedPlan),days,planRhythm,{position:generatedBase.splitDay.position});
-    const week=resolveWeekRunning(rawWeek,windowDays,{runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage,/* The profile's readiness, as the Plan tab resolves with: a low-confidence guess counts as ready, so a hard run is never dropped here and kept there. */readiness:profile?.readiness,goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile,goalMiles:enduranceTarget(goals)?.miles,paces:paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[])},planBlockFor(storedPlan,goals));
+    const week=resolveWeekRunning(rawWeek,windowDays,{easyRunWeeks:easyRunWeeks(athleteNotes,isoToday()),runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage,/* The profile's readiness, as the Plan tab resolves with: a low-confidence guess counts as ready, so a hard run is never dropped here and kept there. */readiness:profile?.readiness,goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile,goalMiles:enduranceTarget(goals)?.miles,paces:paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[])},planBlockFor(storedPlan,goals));
     /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
        second opinion that could contradict the block — 4 × 200 m on a leg
        day the plan had given an easy run. With a stored plan, today's cardio
@@ -418,17 +418,25 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     if(!built)return built;
     /* Sick: the day is rest (coachRest above), and the card says why and
        how it ends. Easing back: the same session, lighter. */
-    const lighter=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric'):built;
+    /* A fatigue note that names one part of training eases that part only —
+       "keep the running easy" does not take ten percent off the squat. */
+    const easeMuscles=bodyLog.easeMuscles||[];const easeLifts=bodyLog.easeLifts||[];
+    const partial=!bodyLog.easing&&!bodyLog.sick&&!coachRest&&(bodyLog.easeRunning||bodyLog.easeLifting||easeMuscles.length>0||easeLifts.length>0);
+    const partialScope={cardio:Boolean(bodyLog.easeRunning),set:(set:{exercise:string;muscle:string})=>Boolean(bodyLog.easeLifting)||easeMuscles.includes(set.muscle)||easeLifts.some(lift=>sameLift(lift,set.exercise))};
+    const lighter=bodyLog.easing&&!bodyLog.sick&&!coachRest?easeRecommendation(built,setup?.units==='Metric')
+      :partial?easeRecommendation(built,setup?.units==='Metric',partialScope):built;
+    const partialNote=partial&&lighter!==built?[bodyLog.easeRunning&&built.cardio?'Easy running while you rebuild — lifting as planned':'',built.topSets.some(set=>set.weight>0&&partialScope.set(set))?`${EASE_PERCENT}% lighter on ${bodyLog.easeLifting?'your lifts':[...easeMuscles.length?['the '+easeMuscles.join(', ').toLowerCase()+' work']:[],...easeLifts].join(' and ')}`:''].filter(Boolean).join(' · '):'';
     const eased=bodyLog.pregnant&&lighter!==built?moderateRecommendation(lighter,setup?.units==='Metric'):lighter;
     /* Pregnancy and postpartum say what changed and whose word comes first. */
     const bodyNote=bodyLog.sick&&!pinnedPosition?'You’re sick, so today is a rest day. Tell Forge when you feel better and it will ease you back in.'
       :bodyLog.pregnant&&eased!==built?'Pregnancy · moderate loads, no max attempts, easy cardio. Your clinician’s advice comes first.'
       :bodyLog.postpartum&&eased!==built?'Postpartum · lighter loads, no running or impact until you’re cleared. Tell Forge when you are.'
+      :partialNote?partialNote
       :eased!==built?`Easing back in · ${EASE_PERCENT}% lighter today`:undefined;
     if(!coachOverride)return bodyNote?{...eased,coachNote:bodyNote}:eased;
     const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(eased,coachOverride.minutes):eased;
     return{...fitted,coachNote:bodyNote||coachOverride.note||undefined};
-  },[buildFor,splitDay,coachOverride,coachRest,bodyLog.sick,bodyLog.easing,bodyLog.pregnant,bodyLog.postpartum,pinnedPosition,setup?.units]);
+  },[buildFor,splitDay,coachOverride,coachRest,bodyLog,pinnedPosition,setup?.units]);
   /* NAME FIRST, POSITION SECOND. The logger numbers the days from the local
      copy of the split; this list comes from the server's. They normally agree,
      but they are two lists, and one omitted rest day shifts every index after

@@ -24,7 +24,7 @@ import { Link } from 'react-router-dom';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { applyCheckIn, isBufferActive, needsFollowUp, notesForCoachContext, type AthleteNote, type NoteFollowUp } from '../features/training/athleteNotesService';
 import { localActions, type CoachAction } from '../lib/coachActions';
-import { isSickNote } from '../lib/bodyLog';
+import { isSickNote, easyRunWeeks } from '../lib/bodyLog';
 import { readAppliedActions } from '../features/training/coachOverrides';
 import { useCoachActions } from '../features/training/useCoachActions';
 import { Icon } from '../components/Icon';
@@ -47,6 +47,7 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
      Plan tab renders. Reading the raw stored block is how a coach ends up
      quoting "45 min easy" and "11.1 miles" against a screen showing distances
      and a corrected total. */
+  const {notes,upsert}=useAthleteNotes();
   const resolvedWeek=useMemo(()=>{
     const stored=readLocalAiPlan();
     /* Past the block's last day there is no current week to quote; the
@@ -69,8 +70,8 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     const cycleDays=splitDays.map(day=>({name:day.name,dayType:day.dayType,exercises:day.exercises||[]}));
     const planRhythm=(savedPlan as {rhythm?:string}|null)?.rhythm==='weekly'?'weekly':'rolling';
     const windowDays=weekCycleDays(stored.startDate,index,cycleDays,planRhythm,recommendation?{position:recommendation.splitDay.position,dateIso:anchorDate}:undefined);
-    return resolvePlanWeek(raw,cycleDays,{runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles,recentWeeklyMileage:medianWeeklyMiles(records),recentLongestRun:longestContinuousRun(records), readiness: profile.readiness, goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile, goalMiles:enduranceTarget(goals)?.miles, paces:paceModel(records,enduranceTarget(goals),localDayIso(),medianWeeklyMiles(records),setup?.excludedEfforts||[])},planBlockFor(stored,goals,index),{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric',anchors:history.anchors,sessions:history.sessions,misses:history.misses,lastAt:history.lastAt},windowDays);
-  },[records,goals,setup,profile,splitDays.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    return resolvePlanWeek(raw,cycleDays,{easyRunWeeks:easyRunWeeks(notes,localDayIso()),runningDays:Number(setup?.runningDays)||profile.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile.weeklyMileage,longestRunMiles:profile.longestRunMiles,recentWeeklyMileage:medianWeeklyMiles(records),recentLongestRun:longestContinuousRun(records), readiness: profile.readiness, goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile, goalMiles:enduranceTarget(goals)?.miles, paces:paceModel(records,enduranceTarget(goals),localDayIso(),medianWeeklyMiles(records),setup?.excludedEfforts||[])},planBlockFor(stored,goals,index),{bests,singles,goalLifts:goalLiftNames(goals),metric:setup?.units==='Metric',anchors:history.anchors,sessions:history.sessions,misses:history.misses,lastAt:history.lastAt},windowDays);
+  },[records,goals,setup,profile,splitDays.length,notes]); // eslint-disable-line react-hooks/exhaustive-deps
   const dynamicAnswers:Record<string,string>={
     'What should I train today?':recommendation?`${recommendation.splitDay.name} is next because completed workout history placed the split at position ${recommendation.splitDay.position}. ${recommendation.topSets.filter(set=>set.selected).map(set=>set.source==='history'?`${set.exercise}: ${set.weight} ${weightUnit} × ${set.reps}`:`${set.exercise}: establish a baseline`).join(' · ')}${recommendation.cardio?.selected?` · ${recommendation.cardio.summary}`:''}`:`${dueDay?.name||fallbackDay?.name||'Your next split day'} is due. ${intelligence.reason}`,
     'Weekly recap':`You logged ${intelligence.activeDays7} active days in the last seven. Your workload is ${intelligence.workloadTrend.toLowerCase()}. ${intelligence.reason}`,
@@ -83,7 +84,6 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     'What should I focus on?':`Keep the ${target.exercise} set technically clean and stop before grinding. Your recent workload is ${intelligence.workloadTrend.toLowerCase()} with ${intelligence.activeDays7} active days in the last seven.`,
   };
   type CoachTurn={role:'user'|'forge';text:string};
-  const {notes,upsert}=useAthleteNotes();
   const kindLabel:Record<AthleteNote['kind'],string>={injury:'injury',fatigue:'fatigue',other:'limitation'};
   const formatNoteDate=(iso:string)=>new Date(`${iso}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const activeNotes=notes.filter(note=>note.status==='active');

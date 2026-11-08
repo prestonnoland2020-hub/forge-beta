@@ -1,5 +1,5 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
-import { SICK_AREA, EASE_BACK_DAYS, PREGNANCY_AREA, POSTPARTUM_AREA, PREGNANCY_DAYS, POSTPARTUM_DAYS, limitationIn, plainText } from './bodyLog';
+import { SICK_AREA, EASE_BACK_DAYS, PREGNANCY_AREA, POSTPARTUM_AREA, PREGNANCY_DAYS, POSTPARTUM_DAYS, limitationIn, plainText, fatigueScope } from './bodyLog';
 import { weightForReps } from './strength';
 
 /* THE COACH CAN ACT.
@@ -137,9 +137,22 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
       if (kindText === 'postpartum') return { type, noteKind: 'other', text, area: POSTPARTUM_AREA, bufferDays: POSTPARTUM_DAYS, label: 'Postpartum — lighter loads, no running or impact until you’re cleared' };
       const noteKind: 'injury' | 'fatigue' | 'other' = kindText === 'injury' || kindText === 'fatigue' ? kindText : 'other';
       const area = str(entry.area).slice(0, 40) || undefined;
-      const what = area || (noteKind === 'fatigue' ? 'fatigue' : 'a note');
-      const avoid = noteKind !== 'fatigue' ? limitationIn(text) : null;
-      return { type, noteKind, text, area, bufferDays, label: avoid ? `Plan change: ${avoid}${area ? `, ${area} protected` : ''}` : noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? `Lighter training for ${bufferDays ? `${bufferDays} day${bufferDays === 1 ? '' : 's'}` : 'the next few days'}` : `Body log: ${what}` };
+      /* Fatigue names what it eases (lib/bodyLog fatigueScope), and the card
+         says so — "Lighter training" over a running-only change read as if
+         the lifting would come down too. */
+      if (noteKind === 'fatigue') {
+        const span = bufferDays ? `${bufferDays} day${bufferDays === 1 ? '' : 's'}` : 'the next few days';
+        const scope = fatigueScope(area);
+        const label = scope.kind === 'running' ? `Easier running for ${span} — lifting unchanged`
+          : scope.kind === 'lifting' ? `Lighter lifting for ${span} — running unchanged`
+          : scope.kind === 'muscles' ? `Lighter ${area} work for ${span} — everything else unchanged`
+          : scope.kind === 'lift' ? `Lighter ${area} for ${span} — everything else unchanged`
+          : `Lighter training for ${span}`;
+        return { type, noteKind, text, area, bufferDays, label };
+      }
+      const what = area || 'a note';
+      const avoid = limitationIn(text);
+      return { type, noteKind, text, area, bufferDays, label: avoid ? `Plan change: ${avoid}${area ? `, ${area} protected` : ''}` : noteKind === 'injury' ? `Body log: ${what} — train around it` : `Body log: ${what}` };
     }
     case 'clear_note': {
       const wanted = norm(str(entry.area));
@@ -244,15 +257,19 @@ export function shortenRecommendation(rec: DailyRecommendation, minutes: number)
    bar can hold, and the cardio a quarter shorter and steady — no intervals
    the morning after a fever. */
 export const EASE_PERCENT = 10;
-export function easeRecommendation(rec: DailyRecommendation, metric = false): DailyRecommendation {
+/* `only` narrows it: a fatigue note about the running eases the cardio and
+   leaves every lift as written; one about a lift eases that lift alone. */
+export type EaseScope = { cardio: boolean; set: (set: DailyRecommendation['topSets'][number]) => boolean };
+export function easeRecommendation(rec: DailyRecommendation, metric = false, only?: EaseScope): DailyRecommendation {
   const step = metric ? 2.5 : 5;
   const topSets = rec.topSets.map(set => {
     if (!(set.weight > 0)) return set;
+    if (only && !only.set(set)) return set;
     const weight = Math.max(step, Math.floor((set.weight * (1 - EASE_PERCENT / 100)) / step) * step);
     return { ...set, weight, calculatedMax: set.calculatedMax ? Math.round(set.calculatedMax * weight / set.weight) : set.calculatedMax, rationale: `Easing back in — ${EASE_PERCENT}% lighter today. ${set.rationale || ''}`.trim() };
   });
   let cardio = rec.cardio;
-  if (cardio) {
+  if (cardio && (!only || only.cardio)) {
     const minutes = cardioMinutesOf(cardio);
     const fit = Math.max(15, Math.round(minutes * 0.75));
     const plan: Record<string, unknown> = { ...(cardio.session.plan as Record<string, unknown>), duration: String(fit), structure: 'Steady' };
@@ -346,6 +363,10 @@ export function localActions(question: string, ctx: ActionContext): CoachAction[
   const limitation = limitationIn(lower);
   if (/\b(hurt|hurts|pain|painful|sore|tweak|tweaked|injur\w*|strain\w*|sprain\w*|tight|pulled|aching|sharp)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'injury', text, area });
   else if (limitation) raw.push({ type: 'log_note', noteKind: 'other', text, area, days: statedDays(lower) ?? 14 });
+  /* ONE PART OF TRAINING, NOT THE WHOLE PLAN. "Keep the running easier while
+     I rebuild my base" eases the runs and leaves the lifting alone. */
+  else if (/\b(rebuild(?:ing)? (?:my |the )?(?:aerobic )?base|base back)\b/.test(lower) || (/\b(run|runs|running|cardio|mileage)\b/.test(lower) && /\b(easier|easy|lighter|back off|ease off|dial back|tone down)\b/.test(lower) && !/\b(lift|lifts|lifting|squat|bench|deadlift)\b/.test(lower))) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: 'running', days: statedDays(lower) ?? 14 });
+  else if (/\b(lift|lifts|lifting|weights|loads)\b/.test(lower) && /\b(lighter|easier|back off|ease off|dial back|heavy|too heavy)\b/.test(lower) && !/\b(run|runs|running|cardio)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: 'lifting', days: statedDays(lower) ?? 7 });
   else if (/\b(fatigued?|exhausted|drained|burn(?:ed|t) out|run down|no energy|wiped|overtrained|so tired|really tired|barely slept|didn'?t sleep|no sleep|slept \d hours?)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: null, days: statedDays(lower) ?? 2 });
   if (area && /\b(better|fine|gone|cleared|healed|good now|no longer)\b/.test(lower) && ctx.activeNoteAreas.length) raw.push({ type: 'clear_note', area });
   if (/\b(rest day|day off|need a rest|take today off|skip today|not training today)\b/.test(lower)) raw.push({ type: 'rest_today' });
