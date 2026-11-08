@@ -368,7 +368,6 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
     setEditor({ kind: 'lines', id: entry.id });
   };
   const removeEntry = (id: string) => { setSavedEntries(items => items.filter(item => item.id !== id)); if (describing === id) setDescribing(null); if (editor?.id === id) closeEditor(); };
-  const confirmSynced = (entry: CardioLogDraft) => replaceEntry({ ...entry, prescription: { ...entry.prescription, confirmed: true } });
   const describeSynced = (entry: CardioLogDraft) => { setEditor(null); setDescribing(entry.id); setAiReflection(''); aiInput.current?.focus(); };
 
   /* A typed session that is the watch's session over again. Same sport, same
@@ -594,14 +593,15 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
       return <article className={`cardio-synced${confirmed ? ' confirmed' : ''}${describing === entry.id ? ' describing' : ''}${justLogged === entry.id ? ' just-logged' : ''}`} key={entry.id}>
         <header>
           <span className="cardio-synced-badge"><WatchIcon />From {provider.toUpperCase()}</span>
-          {confirmed ? <span className="cardio-synced-state">✓ On today</span> : <span className="cardio-synced-state pending">Synced · check it</span>}
+          {/* A synced session is already on the day — saying "check it" with a
+              "Looks right" button beside it read as if it was not saved yet. */}
+          <span className="cardio-synced-state">✓ Saved to this day</span>
         </header>
         <div className="cardio-synced-title"><strong>{entry.activity}</strong>{watchName && <small>{watchName}</small>}</div>
         {editor?.id !== entry.id && <EntryBreakdown entry={entry} />}
         {ownNote && editor?.id !== entry.id && <p className="cardio-entry-note">{ownNote}</p>}
         {editorFor(entry) || <footer>
-          {!confirmed && <button type="button" className="button small-button" onClick={() => confirmSynced(entry)}>Looks right</button>}
-          <button type="button" className={`button small-button${confirmed ? '' : ' ghost'}`} onClick={() => describeSynced(entry)}>{entry.prescription.description ? 'Describe again' : 'Describe it'}</button>
+          <button type="button" className="button small-button ghost" onClick={() => describeSynced(entry)}>{entry.prescription.description ? 'Describe again' : 'Describe it'}</button>
           {entryActions(entry)}
         </footer>}
       </article>;

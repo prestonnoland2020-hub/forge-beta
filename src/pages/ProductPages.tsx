@@ -365,7 +365,7 @@ function WorkoutEditor() {
     if(target){
       const {id,...saved}=target;
       const muscles=Array.from(new Set([...(saved.muscles||[]).filter(muscle=>muscle!=='Cardio'),...(withWatch.length?['Cardio']:[])]));
-      updateRecord(id,{...saved,muscles,cardioSessions:withWatch,hasCardio:withWatch.length>0});
+      updateRecord(id,{...saved,muscles,cardioSessions:withWatch,hasCardio:withWatch.length>0},{removedCardioIds:[...removedCardioIds.current]});
       return;
     }
     if(!withWatch.length)return;
@@ -444,7 +444,7 @@ function WorkoutEditor() {
          a workout in Activities and a session in Insights that never
          happened. What stays is what the athlete said: the muscles ticked on
          a blank day, or the list of a day assigned to a split day. */
-      const result=updateRecord(id,{...savedDay,muscles:muscles.length?muscles:savedDay.splitPosition?savedDay.muscles:[],topSets:remaining.length?remaining:undefined,lift:first?.lift,weight:first?.weight,reps:first?.reps,calculatedMax:first?.calculatedMax});
+      const result=updateRecord(id,{...savedDay,muscles:muscles.length?muscles:savedDay.splitPosition?savedDay.muscles:[],topSets:remaining.length?remaining:undefined,lift:first?.lift,weight:first?.weight,reps:first?.reps,calculatedMax:first?.calculatedMax},{removedCardioIds:[...removedCardioIds.current]});
       if(!result.ok){setQuickLogMessage('That set could not be deleted. Refresh and try again.');return}
     }
     setTopSets(current=>current.filter((_,setIndex)=>setIndex!==index));
@@ -457,7 +457,7 @@ function WorkoutEditor() {
     const nextSets=(sameDay.topSets||[]).map(savedSet=>{const matches=Boolean((original.recommendationTopSetId&&savedSet.recommendationTopSetId===original.recommendationTopSetId)||(original.id&&savedSet.id===original.id)||`${savedSet.muscle}|${savedSet.lift}|${savedSet.weight}|${savedSet.reps}`===originalSignature);if(!matches||replaced)return savedSet;replaced=true;return{...savedSet,...corrected,id:savedSet.id,recommendationTopSetId:savedSet.recommendationTopSetId||corrected.recommendationTopSetId,completed:true,calculatedMax:calculateEstimatedOneRepMax(corrected.weight,corrected.reps)??undefined}});
     if(!replaced){setQuickLogMessage('That completed top set could not be found. Refresh and try again.');return false}
     const firstSet=nextSets[0];const musclesForDay=Array.from(new Set([...nextSets.map(set=>set.muscle),...(sameDay.hasCardio?['Cardio']:[])]));const {id,...savedDay}=sameDay;
-    const result=updateRecord(id,{...savedDay,muscles:musclesForDay,topSets:nextSets,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax});if(!result.ok){setQuickLogMessage('The correction could not be saved. Refresh and try again.');return false}
+    const result=updateRecord(id,{...savedDay,muscles:musclesForDay,topSets:nextSets,lift:firstSet?.lift,weight:firstSet?.weight,reps:firstSet?.reps,calculatedMax:firstSet?.calculatedMax},{removedCardioIds:[...removedCardioIds.current]});if(!result.ok){setQuickLogMessage('The correction could not be saved. Refresh and try again.');return false}
     const localCorrected={...original,...corrected,completed:true,calculatedMax:calculateEstimatedOneRepMax(corrected.weight,corrected.reps)??undefined};setTopSets(current=>current.map((set,setIndex)=>setIndex===index?localCorrected:set));const oldKey=topSetKey(original);const newKey=topSetKey(localCorrected);setQuickLoggedKeys(current=>[...current.filter(key=>key!==oldKey),newKey]);setQuickLogMessage(`${corrected.lift} corrected to ${corrected.weight} ${weightUnit} ×${corrected.reps}.`);return true;
   };
   const choosePlanDay=(index:number)=>{setSelectedPlanDay(index);setTopSets(keepingTodaysWork(prescribeSplitDay(index)))};
@@ -564,7 +564,7 @@ function WorkoutEditor() {
         }
       }
     }
-    let result=editingRecord?updateRecord(editingRecord.id,draft):addRecord(draft);
+    let result=editingRecord?updateRecord(editingRecord.id,draft,{removedCardioIds:[...removedCardioIds.current]}):addRecord(draft);
     /* FINISHING A DAY WHOSE SETS WERE ALREADY SAVED IS NOT A DUPLICATE. Every
        set is saved the moment it is logged, so by Finish Day the record
        already holds them — and addRecord, seeing nothing new, refused with
@@ -572,7 +572,7 @@ function WorkoutEditor() {
        (effort, notes, body weight) go onto the existing record instead. */
     if(!result.ok&&'duplicate' in result&&result.duplicate&&!editingRecord){
       const day=result.duplicate;
-      result=updateRecord(day.id,{...day,effort:effort||day.effort,notes:notes.trim()||day.notes,bodyWeight:bodyWeightToSave||day.bodyWeight,muscles:draft.muscles.length?Array.from(new Set([...day.muscles,...draft.muscles])):day.muscles});
+      result=updateRecord(day.id,{...day,effort:effort||day.effort,notes:notes.trim()||day.notes,bodyWeight:bodyWeightToSave||day.bodyWeight,muscles:draft.muscles.length?Array.from(new Set([...day.muscles,...draft.muscles])):day.muscles},{removedCardioIds:[...removedCardioIds.current]});
     }
     if(!result.ok){setSaveMessage(editingRecord?'This workout could not be found. Return to History and try again.':'This exact workout is already in your history. Nothing was saved twice.');return}
     // Only real training closes out the day's recommendation. A body-weight
