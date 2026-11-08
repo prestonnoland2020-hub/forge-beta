@@ -17,6 +17,7 @@ import { TodayNudges } from '../components/TodayNudges';
 import { RunningBehindNudge } from '../components/RunningBehindCard';
 import { WrappedEntry } from '../components/WrappedEntry';
 import { SplitGuidePrompt, SplitReadyNote } from '../components/SplitGuidePrompt';
+import { openCoachBubble } from '../features/training/coachService';
 
 const todayIso = () => {
   const now = new Date();
@@ -53,6 +54,8 @@ export function HomePage() {
   const runner = Boolean(setup && (Number(setup.runningDays) > 0 || setup.primaryFocus === 'Endurance' || setup.primaryFocus === 'Hybrid'));
   const ranLogged = records.some(record => record.hasCardio || (record.cardioSessions || []).length > 0);
   const [firstWeekHidden, setFirstWeekHidden] = useState(() => { try { return localStorage.getItem('forge-first-week-hidden') === '1'; } catch { return false; } });
+  const [coachTried, setCoachTried] = useState(() => { try { return localStorage.getItem('forge-coach-opened') === '1'; } catch { return false; } });
+  const markCoachTried = () => { setCoachTried(true); try { localStorage.setItem('forge-coach-opened', '1'); } catch { /* per-device */ } };
   const hideFirstWeek = () => { setFirstWeekHidden(true); try { localStorage.setItem('forge-first-week-hidden', '1'); } catch { /* per-device convenience */ } };
 
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">Today</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
@@ -137,17 +140,24 @@ export function HomePage() {
       <Link className="button wide" to={startUrl}>{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
     </section>}
 
+    {/* THE PLAN LIVES ONE TAP UNDER TODAY. It was its own tab whose first row
+        repeated this card with a second Start button; now Today says what to
+        do and this row opens the rest of the week. */}
+    <Link className="td-week-link" to="/plan"><span><b>See your week</b><small>Every session, week by week</small></span><Icon name="right" size={16} /></Link>
+
     {!firstWeekHidden && trainedDays < 3 && (() => {
       const steps = [
         { label: 'Log your first workout', detail: 'One top set per lift is enough.', done: trainedDays > 0, to: startUrl },
         ...(runner ? [{ label: 'Bring in your runs', detail: 'Connect your watch, or log a run.', done: ranLogged, to: '/profile?view=connections' }] : []),
+        { label: 'Ask your coach', detail: 'Tap Ask coach at the bottom. Ask why a weight was picked, or to change your week.', done: coachTried, to: '', action: () => { markCoachTried(); openCoachBubble(); } },
         { label: 'Train three times', detail: 'Then Forge starts spotting patterns and projecting your goals.', done: trainedDays >= 3, to: '' },
       ];
       return <section className="fw-card" aria-label="Your first week">
         <header><small>Your first week</small><span>{steps.filter(step => step.done).length} of {steps.length}</span><button type="button" aria-label="Hide your first week" onClick={hideFirstWeek}><Icon name="close" size={14} /></button></header>
         <ol>{steps.map((step, index) => {
-          const body = <><i aria-hidden="true">{step.done ? <Icon name="check" size={12} stroke={3} /> : index + 1}</i><span><b>{step.label}</b><small>{step.detail}</small></span>{step.to && !step.done && <Icon name="right" size={14} className="fw-go" />}</>;
-          return <li key={step.label} className={step.done ? 'done' : ''}>{step.to && !step.done ? <Link to={step.to}>{body}</Link> : <div>{body}</div>}</li>;
+          const body = <><i aria-hidden="true">{step.done ? <Icon name="check" size={12} stroke={3} /> : index + 1}</i><span><b>{step.label}</b><small>{step.detail}</small></span>{(step.to || (step as { action?: () => void }).action) && !step.done && <Icon name="right" size={14} className="fw-go" />}</>;
+          const act = (step as { action?: () => void }).action;
+          return <li key={step.label} className={step.done ? 'done' : ''}>{act && !step.done ? <button type="button" onClick={act}>{body}</button> : step.to && !step.done ? <Link to={step.to}>{body}</Link> : <div>{body}</div>}</li>;
         })}</ol>
       </section>;
     })()}

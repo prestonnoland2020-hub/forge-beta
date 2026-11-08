@@ -51,7 +51,8 @@ export function waveLabel(waveIndex: number): string {
   const reps = WAVE_REPS[slot];
   if (slot === WAVE_LENGTH - 1) return 'Max week';
   if (reps === 2) return 'Heavy doubles';
-  return `${reps}-rep week`;
+  /* "8-rep week" read as jargon to a new lifter; this says what they do. */
+  return `Sets of ${reps}`;
 }
 /* What the week means for the lifts, in one plain clause. */
 export function waveSentence(waveIndex: number): string {
@@ -303,7 +304,7 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
           : past ? (isRest ? 'Rest day' : 'No training on this day')
           : health === 'sick' ? 'Training waits until you feel better'
           : isRest ? 'Nothing scheduled'
-          : isOpenDay ? 'Open — nothing required'
+          : isOpenDay ? 'Optional — train if you want'
           : [
               ...session.lifts.slice(0, 2).map(lift => lift.weight ? `${lift.exercise} ${lift.weight}×${lift.reps}` : lift.exercise),
               session.run ? (() => { const text = session.run.text.split(/ @ | · /)[0]; return /\beasy\b/i.test(text) && session.run.kind === 'Easy run' ? text : `${session.run.kind} ${text}`; })() : '',

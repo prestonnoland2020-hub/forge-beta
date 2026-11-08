@@ -238,18 +238,20 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
           sheet that shows only what its type needs. */}
       {/* YOUR SPLITS, AT THE TOP. Tap one to train from it, ＋ New to start
           another from a template; the live split is always the highlighted one. */}
-      <section className="ss-library" aria-label="Your splits">
-        <div className="ss-library-row">
-          {library.map(item=><button type="button" key={item.id} className={item.id===activeId?'active':''} aria-pressed={item.id===activeId} onClick={()=>switchSplit(item.id)}>{item.id===activeId?(splitName.trim()||item.name):item.name}</button>)}
-          {!savedEntry&&<button type="button" className="active" aria-pressed="true">{splitName.trim()||'My training split'}</button>}
-          <button type="button" className="ss-library-new" onClick={newSplit}>＋ New</button>
-        </div>
-        <button type="button" className="ss-library-save" disabled={!unsaved} onClick={saveSplit}>{!savedEntry?'Add to my splits':unsaved?'Update':'In my splits'}</button>
-      </section>
+      {/* ONLY WHEN THERE IS A CHOICE. A new athlete has one split; a row of
+          split pills with "＋ N" and "Add to my splits" over it read as three
+          things to do before they had seen their days. One split: the row
+          hides, and ＋ New split lives under Name & schedule. */}
+      {(library.length>1||(library.length>0&&!savedEntry))&&      <section className="ss-library" aria-label="Your splits">
+          <div className="ss-library-row">
+            {library.map(item=><button type="button" key={item.id} className={item.id===activeId?'active':''} aria-pressed={item.id===activeId} onClick={()=>switchSplit(item.id)}>{item.id===activeId?(splitName.trim()||item.name):item.name}</button>)}
+            {!savedEntry&&<button type="button" className="active" aria-pressed="true">{splitName.trim()||'My training split'}</button>}
+            <button type="button" className="ss-library-new" onClick={newSplit}>＋ New</button>
+          </div>
+          <button type="button" className="ss-library-save" disabled={!unsaved} onClick={saveSplit}>{!savedEntry?'Add to my splits':unsaved?'Update':'In my splits'}</button>
+        </section>}
       <header className="ss-head"><div><h2>{splitName}</h2><small>{days.length} {days.length===1?'day':'days'} · {rhythm==='weekly'?'by weekday':'repeats in order'}</small></div><small className={`split-autosave ${syncState}`}>{syncState==='saving'?'Saving…':syncState==='error'?'Saved here · will retry':'Saved'}</small></header>
-      {/* Only for someone who runs: a lifter's split opened on two empty mileage boxes.
-          It leads the split: the week's running is the frame the days sit in. */}
-      {hasRunning&&<section className="card ss-mileage"><div><strong>Weekly running</strong><small>Forge keeps your running between these, in miles a week.</small></div><div className="ss-mileage-fields"><label>From<NumberInput min="0" allowDecimal={false} value={minWeeklyMileage} onChange={next=>setMinWeeklyMileage(next ?? 0)}/></label><label>To<NumberInput min={minWeeklyMileage} allowDecimal={false} value={maxWeeklyMileage} onChange={next=>setMaxWeeklyMileage(next ?? 0)}/></label></div></section>}
+
       {showTemplates?<section className="ss-templates"><div className="ss-templates-head"><strong>Start from a template</strong>{days.some(day=>day.exercises.length)&&<button type="button" className="text-button" onClick={()=>setShowTemplates(false)}>Cancel</button>}</div>
         {TEMPLATES.map(template=><button type="button" key={template.id} onClick={()=>applyTemplate(template.id)}><strong>{template.label}</strong><small>{template.copy}</small></button>)}
       </section>:null}
@@ -273,7 +275,10 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
       </li>})}</ol>
       {days.length>1&&<p className="ss-swipe-hint">Swipe a day left to delete it.</p>}
       <div className="ss-actions"><button type="button" className="ss-add" onClick={()=>{tap();addDay();setSheetDay(days.length)}}>＋ Add a day</button>{!showTemplates&&<button type="button" className="text-button" onClick={()=>setShowTemplates(true)}>Use a template</button>}</div>
-      <details className="card ss-settings"><summary><span><strong>Name &amp; schedule</strong><small>{splitName} · {rhythm==='weekly'?'Weekly':'Rolling'}</small></span></summary><div><label>Split name<input value={splitName} onChange={event=>setSplitName(event.target.value)}/></label><label>Schedule<select value={rhythm} onChange={event=>setRhythm(event.target.value as 'rolling'|'weekly')}><option value="rolling">Repeat in order (rolling)</option><option value="weekly">Fixed weekdays</option></select></label><small>Rolling means the next day is whatever comes after the last one you trained. Fixed weekdays ties each day to a day of the week.</small>{savedEntry&&<button type="button" className="text-button ss-forget" onClick={forgetSplit}>Remove from saved splits</button>}</div></details>
+      {/* Only for someone who runs: a lifter's split opened on two empty mileage boxes.
+          After the days: the days are what a new athlete came here to see. */}
+      {hasRunning&&<section className="card ss-mileage"><div><strong>Weekly running</strong><small>Forge keeps your running between these, in miles a week.</small></div><div className="ss-mileage-fields"><label>From<NumberInput min="0" allowDecimal={false} value={minWeeklyMileage} onChange={next=>setMinWeeklyMileage(next ?? 0)}/></label><label>To<NumberInput min={minWeeklyMileage} allowDecimal={false} value={maxWeeklyMileage} onChange={next=>setMaxWeeklyMileage(next ?? 0)}/></label></div></section>}
+      <details className="card ss-settings"><summary><span><strong>Name &amp; schedule</strong><small>{splitName} · {rhythm==='weekly'?'Weekly':'Rolling'}</small></span></summary><div><label>Split name<input value={splitName} onChange={event=>setSplitName(event.target.value)}/></label><label>Schedule<select value={rhythm} onChange={event=>setRhythm(event.target.value as 'rolling'|'weekly')}><option value="rolling">Repeat in order (rolling)</option><option value="weekly">Fixed weekdays</option></select></label><small>Rolling means the next day is whatever comes after the last one you trained. Fixed weekdays ties each day to a day of the week.</small>{!(library.length>1||(library.length>0&&!savedEntry))&&<div className="ss-settings-actions"><button type="button" className="text-button" onClick={newSplit}>＋ Start a new split</button>{unsaved&&<button type="button" className="text-button" onClick={saveSplit}>{savedEntry?'Update saved split':'Save this split'}</button>}</div>}{savedEntry&&<button type="button" className="text-button ss-forget" onClick={forgetSplit}>Remove from saved splits</button>}</div></details>
     </div>}
     {tab==='split'&&sheetDay!==null&&active&&<div className="ss-backdrop" onClick={event=>{if(event.target===event.currentTarget)closeSheet()}}>
       <section className="ss-sheet" role="dialog" aria-modal="true" aria-label={`Edit ${active.name}`}>
@@ -284,12 +289,12 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
           <div className="ss-segment" role="radiogroup" aria-label="Day type">{DAY_TYPES.map(([type,label])=><button type="button" role="radio" aria-checked={active.dayType===type} key={type} className={active.dayType===type?'active':''} onClick={()=>{tap();setDayType(type)}}>{label}</button>)}</div>
           {rhythm==='weekly'&&<div className="ss-chips" aria-label="Weekday">{['MON','TUE','WED','THU','FRI','SAT','SUN'].map(weekday=><button type="button" key={weekday} className={active.weekday===weekday?'active':''} onClick={()=>{tap();updateDay({weekday})}}>{weekday[0]+weekday.slice(1).toLowerCase()}</button>)}</div>}
           {(active.dayType==='strength'||active.dayType==='mixed')&&<section className="ss-block">
-            <div className="ss-block-head"><strong>Select your top sets</strong><small>{active.exercises.length?[goalCount?`${goalCount} goal`:'',active.exercises.length-goalCount?`${active.exercises.length-goalCount} supporting`:''].filter(Boolean).join(' · '):'Pick at least one'}</small></div>
+            <div className="ss-block-head"><strong>Lifts</strong><small>{active.exercises.length?`${active.exercises.length} on this day`:'Pick at least one'}</small></div>
             {/* GOAL LIFTS AND SUPPORTING LIFTS. Forge asks for one top set per
                 lift per workout and writes its weight; everything else the
                 athlete does that day is theirs. Said once, here, where the
                 lifts are chosen. */}
-            <p className="ss-topset-why">One top set per lift, each workout — Forge tracks it and sets the weight. <b>Goal lifts</b> move your goals; <b>supporting lifts</b> build them. The rest of your workout is yours.</p>
+            <p className="ss-topset-why">You log one hard set of each lift. Forge sets the weight next time. Tap a lift to take it off.</p>
             {/* Lifts first; the muscles follow from them. The muscle list is one
                 line under the lifts, editable but rarely needed. */}
             <p className="ss-trains">Trains {active.muscles.length?active.muscles.join(' · '):'—'} <button type="button" className="text-button" onClick={()=>setEditMuscles(open=>!open)}>{editMuscles?'Done':'Edit'}</button></p>

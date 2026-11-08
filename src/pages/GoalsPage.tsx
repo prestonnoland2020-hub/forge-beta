@@ -138,11 +138,13 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
        near the top of a phone; on a wide screen they sit side by side. */}
     <div className="gx-head">
     {/* A switch should look like one: a label saying what it switches, a thumb that slides, and a line saying what the chosen side counts. */}
-    {(hasStrength || hasRunTime) && <div className="gx-mode" data-mode={maxMode}>
+    {/* Not before there is anything to count: the switch meant nothing to an
+        athlete with no logged sets, and it was the first thing on the page. */}
+    {(hasStrength || hasRunTime) && records.length > 0 && <div className="gx-mode" data-mode={maxMode}>
       <span className="gx-mode-label" id="gx-mode-label">{hasStrength && hasRunTime ? 'Strength and running goals use' : hasStrength ? 'Strength goals use' : 'Running goals use'}</span>
       <div className="gx-mode-track" role="radiogroup" aria-labelledby="gx-mode-label">
         <i className="gx-mode-thumb" aria-hidden="true" />
-        {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Estimated max' : 'Tested max'}</button>)}
+        {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Estimated' : 'Actual'}</button>)}
       </div>
       <p className="gx-mode-hint">{maxMode === 'calculated'
         ? (hasStrength && hasRunTime ? 'Estimated from your best sets and runs.' : hasStrength ? 'Estimated from your best rep sets.' : 'Predicted from your best runs.')
@@ -195,7 +197,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
             <button className="gx-face" onClick={() => { tap(); toggleGoal(index); }} aria-expanded={isOpen}>
               <span className="gx-top"><strong className="gx-title">{goal.title}</strong><span className={`gx-pill tone-${item.tone}`}>{item.label}</span></span>
               <span className="gx-numbers">
-                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'est. max') : goal.type === 'Endurance' && item.current !== null && item.currentText.includes(':') ? (maxMode === 'tested' ? 'tested' : 'est.') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
+                <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'estimated') : goal.type === 'Endurance' && item.current !== null && item.currentText.includes(':') ? (maxMode === 'tested' ? 'tested' : 'est.') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
                 <span className="gx-arrow" aria-hidden="true"><Icon name="arrow" size={14}/></span>
                 <span className="gx-target">{item.targetText}<small>goal</small></span>
               </span>
