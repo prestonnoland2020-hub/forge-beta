@@ -241,7 +241,7 @@ function EntryBreakdown({ entry }: { entry: CardioLogDraft }) {
   </div>;
 }
 
-export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEntries = [], plannedSummary, plannedCircuit }: {
+export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEntries = [], plannedSummary, plannedCircuit, tucked = false }: {
   onEntriesChange?: (hasEntries: boolean, entries: CardioLogDraft[]) => void;
   initialOpen?: boolean;
   initialEntries?: CardioLogDraft[];
@@ -249,11 +249,15 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
   /* A circuit Forge prescribed for today (a HYROX day): its segments are
      listed with their paces and loads, and one tap logs it as done. */
   plannedCircuit?: { name: string; plan: PlannedCardio };
+  /* A lifting day with no cardio planned: the box starts as one
+     "＋ Add cardio" row instead of a text box nobody asked for. */
+  tucked?: boolean;
 } = {}) {
   const { setup: athleteSetup } = useProfileSetup();
   preferMetric = athleteSetup?.units === 'Metric';
   const { exercises, workouts } = useTrainingLibrary();
   const [savedEntries, setSavedEntries] = useState<CardioLogDraft[]>(initialEntries);
+  const [shown, setShown] = useState(initialOpen);
   /* Circuits and saved cardio workouts log in one tap: the library template
      becomes a completed entry (stations preserved), editable like any other. */
   const savedTemplates = useMemo(() => workouts.filter(workout => workout.kind === 'Circuit' || (workout.kind === 'Cardio' && workout.plan)), [workouts]);
@@ -572,6 +576,7 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
 
   const editorFor = (entry: CardioLogDraft) => editor?.id === entry.id ? (editor.kind === 'circuit' ? circuitEditor : linesEditor) : null;
 
+  if (tucked && !shown && !savedEntries.length && !plannedSummary && !plannedCircuit) return <button type="button" className="card cardio-add-row" onClick={() => setShown(true)}>＋ Add cardio</button>;
   return <section className="card form-card cardio-log">
     <div className="section-title compact-title">
       <div><h3>Cardio</h3></div>

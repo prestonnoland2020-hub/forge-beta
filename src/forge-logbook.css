@@ -364,3 +364,19 @@ body { background: var(--bg) !important; }
 /* The page has a drawing behind it now, so the dashed "add" rows are filled:
    their label sits on the card colour, not on the strands. */
 .app-frame :is(.gx-add, .top-set-add, .top-set-card-stack > .top-set-add) { background: var(--surface-1) !important; }
+
+/* ── Named header actions ─────────────────────────────────────────────── */
+/* Two bare glyphs (a chart and a plus) told a new athlete nothing. Each now
+   carries its word: Progress, Log. */
+.app-frame .top-actions > :is(.top-insights, .top-log).labeled {
+  display: inline-flex !important; align-items: center; gap: 6px;
+  width: auto !important; min-width: 0 !important; padding: 0 12px 0 10px !important;
+}
+.app-frame .top-actions > :is(.top-insights, .top-log).labeled svg { width: 18px; height: 18px; flex: none; }
+.app-frame .top-actions > :is(.top-insights, .top-log).labeled span { font-size: 14px; font-weight: 700; line-height: 1; }
+
+/* ── "Ask coach", until it has been tried ─────────────────────────────── */
+.app-frame .coach-bubble-toggle.named {
+  width: auto !important; min-width: 0 !important; padding: 0 18px 0 14px !important; gap: 8px !important;
+}
+.app-frame .coach-bubble-toggle.named b { display: inline !important; font-size: 15px; font-weight: 800; }

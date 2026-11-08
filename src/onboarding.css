@@ -236,3 +236,16 @@ textarea.ob-input{min-height:96px;resize:vertical}
 /* The last agreement must be able to scroll clear of the sticky action bar. */
 .ob-screen{scroll-padding-bottom:160px}
 .ob-screen:has(.setup-check.required){padding-bottom:140px}
+
+/* The day editor in setup: the day's lifts as a ticked list, then ＋ chips. */
+.ob-day-edit{display:grid;gap:10px;padding:2px 14px 14px}
+.ob-day-lifts{display:grid;gap:6px}
+.ob-day-lift{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 12px;border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:14px;background:color-mix(in srgb,var(--accent) 9%,transparent);color:var(--ink);font:inherit;font-weight:700;text-align:left}
+.ob-day-lift>span:nth-child(2){flex:1}
+.ob-day-tick{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff}
+.ob-day-x{font-size:20px;line-height:1;color:var(--ink-3);font-weight:500}
+.ob-day-empty{margin:0;font-size:14px;color:var(--ink-3)}
+.ob-day-add-label{margin:4px 0 0;font-size:13px;font-weight:700;color:var(--ink-3)}
+.ob-day-add{display:flex;flex-wrap:wrap;gap:8px}
+.ob-day-add button{min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:700}
+.ob-day-more{justify-self:start;font-size:14px}
