@@ -54,3 +54,15 @@
   .history-log-what em{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 .history-log-more{width:100%;justify-self:stretch}
+
+/* THE MONTH'S FIGURES (HistoryPage): an open row, no frame and no rules.
+   Figure above, label below, both left-aligned so the four read as a line of
+   numbers. The Lifts and Cardio labels wear the calendar's dot and ring. */
+.month-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:4px 0 18px;padding:0}
+.month-stats>div{display:flex;flex-direction:column-reverse;gap:4px;min-width:0}
+.month-stats dt{display:flex;align-items:center;gap:6px;margin:0;font-size:13px;font-weight:600;color:var(--ink-3,var(--muted));white-space:nowrap}
+.month-stats dd{margin:0;font-family:var(--num,inherit);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;font-size:26px;font-weight:700;line-height:1.05;letter-spacing:-.02em;color:var(--ink,var(--text))}
+.month-stats dt i{flex:none;display:block;width:8px;height:8px;border-radius:50%;box-sizing:border-box}
+.month-stats dt i.strength{background:var(--accent)}
+.month-stats dt i.cardio{border:2px solid var(--chart-2)}
+@media(max-width:380px){.month-stats dd{font-size:22px}}
