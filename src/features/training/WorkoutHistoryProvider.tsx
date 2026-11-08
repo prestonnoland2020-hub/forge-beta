@@ -17,7 +17,7 @@ export type WorkoutRecord = { id:string; date:string; title:string; muscles:stri
 const seedRecords:WorkoutRecord[]=[];
 type AddResult={ok:true;record:WorkoutRecord}|{ok:false;duplicate:WorkoutRecord};
 type UpdateResult={ok:true;record:WorkoutRecord}|{ok:false;missing:true};
-type HistoryValue={records:WorkoutRecord[];loading:boolean;syncing:boolean;syncError:string|null;retrySync:()=>void;addRecord:(record:Omit<WorkoutRecord,'id'>)=>AddResult;updateRecord:(id:string,record:Omit<WorkoutRecord,'id'>)=>UpdateResult;deleteRecord:(id:string)=>Promise<boolean>};
+type HistoryValue={records:WorkoutRecord[];loading:boolean;syncing:boolean;syncError:string|null;retrySync:()=>void;addRecord:(record:Omit<WorkoutRecord,'id'>)=>AddResult;updateRecord:(id:string,record:Omit<WorkoutRecord,'id'>,options?:{removedCardioIds?:string[]})=>UpdateResult;deleteRecord:(id:string)=>Promise<boolean>};
 const HistoryContext=createContext<HistoryValue|null>(null);
 const storageKey='forge-workout-history-v1';
 /* THE OUTBOX. Ids of days whose save has not been confirmed by the server —
@@ -33,6 +33,7 @@ const isUuid=(value:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[
 const cardioSignature=(sessions:CardioLogDraft[]|undefined)=>JSON.stringify(sessions||[],(key,value)=>key==='id'?undefined:value);
 const normalizedTopSets=(record:Partial<WorkoutRecord>):LoggedTopSet[]=>Array.isArray(record.topSets)&&record.topSets.length?record.topSets.filter(set=>set&&set.lift).map(set=>({...set,muscle:set.muscle||record.muscles?.[0]||'Primary',weight:Number(set.weight),reps:Number(set.reps),completed:set.completed!==false})):(record.lift&&record.weight&&record.reps?[{muscle:record.muscles?.[0]||'Primary',lift:record.lift,weight:Number(record.weight),reps:Number(record.reps),calculatedMax:record.calculatedMax,completed:true}]:[]);
 const normalizeRecord=<T extends Partial<WorkoutRecord>>(record:T)=>{const topSets=normalizedTopSets(record);const first=topSets[0];return{...record,topSets:topSets.length?topSets:undefined,lift:first?.lift??record.lift,weight:first?.weight??record.weight,reps:first?.reps??record.reps,calculatedMax:first?.calculatedMax??record.calculatedMax}};
+import { SYNCED_SESSION, keepSyncedSessions } from './syncedCardio';
 const setSignature=(set:LoggedTopSet)=>`${set.muscle}|${set.lift}|${set.weight}|${set.reps}`;
 const mergeDay=(existing:WorkoutRecord,incoming:Partial<WorkoutRecord>):WorkoutRecord=>{const incomingSets=normalizedTopSets(incoming);const combinedSets=[...normalizedTopSets(existing)];incomingSets.forEach(set=>{if(!combinedSets.some(saved=>setSignature(saved)===setSignature(set)))combinedSets.push(set)});let cardio=[...(existing.cardioSessions||[])];(incoming.cardioSessions||[]).forEach(session=>{if(cardio.some(saved=>saved.id===session.id&&cardioSignature([saved])===cardioSignature([session])))return;/* A typed run that the watch already synced replaces the watch's copy — see lib/sameEffort. */cardio=mergeSession(cardio,session).sessions});const first=combinedSets[0];/* A DAY THAT ALREADY HAS A NAME KEEPS IT. Merging used to hand the title to
    whatever arrived last, so importing a Strava run onto a logged Legs day
@@ -51,10 +52,12 @@ export function WorkoutHistoryProvider({children}:{children:ReactNode}){
      set logged later on one of the missing dates rebuilt that day from
      nothing and deleted the run on the server. Every write goes through here. */
   const recordsRef=useRef(records);
+  /* Synced sessions the athlete deleted on purpose, per day, sent with that day's next save so the server lets them go. */
+  const removedSyncedIds=useRef(new Map<string,Set<string>>());
   const commit=(next:WorkoutRecord[])=>{recordsRef.current=next;setRecords(next);try{localStorage.setItem(storageKey,JSON.stringify(next))}catch{/* full */}};
   const pendingIds=useRef<Set<string>>(new Set(readPending()));
   const markPending=(id:string,pending:boolean)=>{if(pending)pendingIds.current.add(id);else pendingIds.current.delete(id);writePending([...pendingIds.current]);if(!pendingIds.current.size)setSyncing(false)};
-  const persist=(record:WorkoutRecord)=>{if(isDemoMode||!user)return;markPending(record.id,true);setSyncing(true);setSyncError(null);const operation=syncQueue.current.catch(()=>undefined).then(()=>saveWorkoutDay(record)).then(()=>{markPending(record.id,false);setSyncError(null);window.dispatchEvent(new Event('forge-training-cycle-changed'))});syncQueue.current=operation.then(()=>undefined,()=>undefined);void operation.catch(error=>{setSyncError(error instanceof Error?error.message:'Could not sync this training day.');setSyncing(false)})};
+  const persist=(record:WorkoutRecord)=>{if(isDemoMode||!user)return;markPending(record.id,true);setSyncing(true);setSyncError(null);const operation=syncQueue.current.catch(()=>undefined).then(()=>saveWorkoutDay(record,[...(removedSyncedIds.current.get(record.id)||[])])).then(()=>{removedSyncedIds.current.delete(record.id);markPending(record.id,false);setSyncError(null);window.dispatchEvent(new Event('forge-training-cycle-changed'))});syncQueue.current=operation.then(()=>undefined,()=>undefined);void operation.catch(error=>{setSyncError(error instanceof Error?error.message:'Could not sync this training day.');setSyncing(false)})};
   /* WHAT WAS LOGGED WHILE THE FIRST LOAD WAS STILL IN FLIGHT.
 
      Loading merged the server's list with the outbox and then replaced local
@@ -91,9 +94,23 @@ export function WorkoutHistoryProvider({children}:{children:ReactNode}){
     const current=recordsRef.current;const normalized=normalizeRecord(draft);const sameDay=current.find(item=>item.date===draft.date);const incomingSets=normalizedTopSets(normalized);const duplicate=sameDay&&incomingSets.length>0&&incomingSets.every(set=>normalizedTopSets(sameDay).some(saved=>setSignature(saved)===setSignature(set)))&&!draft.cardioSessions?.length?sameDay:undefined;
     if(duplicate)return {ok:false,duplicate};
     const record=sameDay?mergeDay(sameDay,normalized):({...normalized,id:`day-${draft.date}-${Date.now()}`} as WorkoutRecord);const next=(sameDay?current.map(item=>item.id===sameDay.id?record:item):[record,...current]).sort((a,b)=>b.date.localeCompare(a.date));commit(next);persist(record);return {ok:true,record};
-  },updateRecord:(id,draft)=>{
-    const current=recordsRef.current;if(!current.some(item=>item.id===id))return {ok:false,missing:true};
-    const record={...normalizeRecord(draft),id} as WorkoutRecord;
+  },updateRecord:(id,draft,options)=>{
+    const current=recordsRef.current;const stored=current.find(item=>item.id===id);if(!stored)return {ok:false,missing:true};
+    /* A WATCH RUN IS NEVER LOST TO A SAVE THAT DID NOT KNOW ABOUT IT.
+
+       A day is saved whole, and the server replaces the day's cardio with
+       whatever list arrives. Any screen holding a copy of the day from before
+       a Garmin run synced — the logger, a set edit, the synced-day card —
+       wrote that copy back and deleted the run, and because the run was
+       already marked imported nothing ever brought it back (Nov 7 and Nov 8:
+       a 2.01 mi run gone minutes after it arrived). #94 patched two of those
+       screens; this is the one place every save passes through. A synced
+       session the stored day has stays, unless this save says it was
+       deleted on purpose. */
+    const guarded=keepSyncedSessions(stored,draft,options?.removedCardioIds);
+    const removedSynced=(options?.removedCardioIds||[]).map(String).filter(value=>SYNCED_SESSION.test(value));
+    if(removedSynced.length)removedSyncedIds.current.set(id,new Set([...(removedSyncedIds.current.get(id)||[]),...removedSynced]));
+    const record={...normalizeRecord(guarded),id} as WorkoutRecord;
     const next=current.map(item=>item.id===id?record:item).sort((a,b)=>b.date.localeCompare(a.date));
     commit(next);persist(record);return {ok:true,record};
   },deleteRecord:async(id)=>{const current=recordsRef.current;const target=current.find(item=>item.id===id);if(!target)return false;try{

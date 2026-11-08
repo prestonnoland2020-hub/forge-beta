@@ -27,7 +27,15 @@ import { Icon } from './Icon';
    workout it was (a split day, or custom), the muscle groups, and the top
    sets — so a watch that synced before anything was typed walks the athlete
    through logging the day rather than a shorter form of it. A run is asked
-   only what it actually was. "Looks right" is always there. */
+   only what it actually was.
+
+   ONE BUTTON. It had two — "Looks right" and "Save this day" — and the first
+   only closed the card while the second was greyed out until something was
+   filled in, so "Looks right" read as saving and saved nothing. Now there is
+   one: Save to <day>. With nothing added it saves the day exactly as synced
+   (re-sending it, so a run that has not reached the account yet does);
+   with details added it saves those too. The × still closes without
+   changing anything. */
 type PlanDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[] };
 type DraftSet = { lift: string; weight: number; reps: number };
 /* The log page's muscle list, without Cardio — a cardio session marks itself. */
@@ -174,6 +182,8 @@ export function StravaReviewModal() {
      workout it was. Neither is asked for something it does not have. */
   const hasAnswer = cardioOnly ? Boolean(text.trim()) : (Boolean(chosenDay) || custom || allSets.length > 0 || Boolean(text.trim()));
   const source = stravaReviewSource(date);
+  /* "Save to today", "Save to Saturday" — the day it lands on, by name. */
+  const saveDayLabel = date === todayIso ? 'today' : new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
   /* How long the watch says the lifting took — the one number it adds. */
   const watchLength = record.durationMinutes ? `Strength · ${sessionLength(record.durationMinutes)}` : '';
 
@@ -187,7 +197,14 @@ export function StravaReviewModal() {
   };
 
   const save = async () => {
-    if (!hasAnswer || busy) return;
+    if (busy) return;
+    /* Nothing added: the day as synced is the answer — save it as it is. */
+    if (!hasAnswer) {
+      const { id, ...asSynced } = record;
+      const result = updateRecord(id, asSynced);
+      if (!result.ok) { setReflection('That could not be saved. Try again.'); return; }
+      close(); return;
+    }
     setBusy(true); setReflection('');
     const { id, ...day } = record;
     let next = { ...day } as Omit<typeof record, 'id'>;
@@ -268,7 +285,7 @@ export function StravaReviewModal() {
         <button type="button" className="strava-review-close" onClick={close} aria-label="Close">×</button>
       </header>
       <p className="strava-review-lede">{cardioOnly
-        ? `${source} recorded the totals. Tell Forge what the session actually was — intervals, rests, warmup — or leave it as recorded.`
+        ? `${source} recorded this. Save it as it is, or first tell Forge what the session actually was — intervals, rests, warmup.`
         : `${source} knows you were in the gym. Tell Forge what you trained, the same way you log any day.`}</p>
 
       {/* A RUN IS NOT A SPLIT DAY. It has no position in the cycle and no top
@@ -312,15 +329,14 @@ export function StravaReviewModal() {
         {hasTopSet && <button type="button" className="button ghost" onClick={addSet}>＋ Add another lift</button>}
       </section>}
 
-      <label>Describe it
+      <label>{cardioOnly ? 'Add details (optional)' : 'Anything else? (optional)'}
         <textarea value={text} onChange={event => setText(event.target.value)} rows={3} disabled={busy}
           placeholder={cardio ? 'e.g. 6×300 at :37 with walking rests, plus warmup and cooldown' : 'e.g. heavy squats, felt strong, 3 back-off sets after'} />
       </label>
       {reflection && <small className="strava-review-reflection">{reflection}</small>}
 
       <footer>
-        <button type="button" className="button ghost" disabled={busy} onClick={close}>Looks right <Icon name="check"/></button>
-        <button type="button" className="button" disabled={busy || !hasAnswer} onClick={() => void save()}>{busy ? 'Reading it…' : <>Save this day <Icon name="arrow"/></>}</button>
+        <button type="button" className="button strava-review-save" disabled={busy} onClick={() => void save()}>{busy ? 'Reading it…' : <>Save to {saveDayLabel} <Icon name="check"/></>}</button>
       </footer>
     </div>
   </div>;

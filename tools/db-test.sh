@@ -51,3 +51,5 @@ echo
 $PSQL -d $DB -q -f tools/rls-test.sql
 echo
 $PSQL -d $DB -q -f tools/quota-test.sql
+echo
+$PSQL -d $DB -q -f tools/synced-cardio-test.sql
