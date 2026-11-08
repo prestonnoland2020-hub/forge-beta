@@ -11,7 +11,9 @@ import { runLines } from './stats';
    shown — a lifter who never ran does not get a running slide of zeros. */
 
 export type WrappedLift = { name: string; start: number; best: number; gain: number; bestDate: string; sets: number };
-export type WrappedPr = { lift: string; max: number; date: string };
+/* A record is weight actually on the bar — the heaviest the athlete has ever
+   lifted on that lift, with the reps it went for — not an estimated max. */
+export type WrappedPr = { lift: string; max: number; reps: number; date: string };
 export type Persona = { name: string; line: string };
 
 export type Wrapped = {
@@ -133,6 +135,7 @@ export function buildWrapped(records: WorkoutRecord[], year: number, metric = fa
   /* Lifts: start of year vs best of year, PRs against all time. */
   const lifts = new Map<string, WrappedLift & { first?: number }>();
   const bestBefore = new Map<string, number>();
+  const heaviestBefore = new Map<string, number>();
   const prs: WrappedPr[] = [];
   for (const { date, set } of allSets) {
     const max = Number(set.calculatedMax) || calculateEstimatedOneRepMax(Number(set.weight), Number(set.reps));
@@ -144,10 +147,16 @@ export function buildWrapped(records: WorkoutRecord[], year: number, metric = fa
       entry.sets += 1;
       if (max > entry.best) { entry.best = max; entry.bestDate = date; }
       lifts.set(key, entry);
-      /* A first-ever set is a starting point, not a record. */
-      if (prior !== undefined && max > prior) prs.push({ lift: set.lift, max, date });
     }
     if (prior === undefined || max > prior) bestBefore.set(key, max);
+    /* Records count real weight: more on the bar than ever before for that
+       lift. A first-ever set is a starting point, not a record. */
+    const weight = Number(set.weight) || 0;
+    const heaviest = heaviestBefore.get(key);
+    if (weight > 0) {
+      if (date.startsWith(prefix) && heaviest !== undefined && weight > heaviest) prs.push({ lift: set.lift, max: weight, reps: Number(set.reps) || 1, date });
+      if (heaviest === undefined || weight > heaviest) heaviestBefore.set(key, weight);
+    }
   }
   const liftList = [...lifts.values()].map(lift => ({ ...lift, gain: lift.best - lift.start }));
   const strongest = liftList.length ? liftList.reduce((a, b) => (b.best > a.best ? b : a)) : null;
