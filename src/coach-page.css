@@ -42,3 +42,29 @@
 .coach-applied-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .coach-applied-link{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:999px;font-weight:800;font-size:15px;text-decoration:none;color:var(--accent-text,var(--accent));background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .coach-applied-link svg{width:16px;height:16px}
+
+/* THE COACH'S INTRODUCTION (CoachPage empty state): who it is, then a few
+   questions to start with as full-width rows. Left-aligned throughout. */
+.coach-intro{display:grid;gap:14px;padding:4px 0 8px;text-align:left}
+.coach-intro header{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px}
+.coach-intro-mark{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:var(--accent)}
+.coach-intro-mark i{display:block;width:22px;height:19px;background:var(--accent-contrast,#fff);-webkit-mask:var(--forge-mark) center/contain no-repeat;mask:var(--forge-mark) center/contain no-repeat}
+.coach-intro header div{display:grid;gap:2px}
+.coach-intro header strong{font-size:19px;font-weight:800;color:var(--ink,var(--text))}
+.coach-intro header small{font-size:14px;line-height:1.4;color:var(--ink-3,var(--muted))}
+.coach-intro-label{margin-top:4px;font-size:13px;font-weight:700;color:var(--ink-3,var(--muted))}
+.coach-intro-asks{display:grid;gap:8px}
+.coach-intro-asks button,.coach-intro-start{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;min-height:54px;padding:12px 16px;border-radius:14px;border:1px solid var(--hairline,var(--line));background:var(--surface-1);color:var(--ink,var(--text));font-size:16px;font-weight:700;text-align:left;text-decoration:none}
+.coach-intro-asks button svg,.coach-intro-start svg{width:16px;height:16px;color:var(--accent-text,var(--accent))}
+.coach-intro-asks button:active,.coach-intro-start:active{transform:scale(.99)}
+.coach-intro-start{margin-top:4px;border-color:transparent;background:color-mix(in srgb,var(--accent) 12%,var(--surface-1))}
+.coach-intro-start span{display:grid;gap:2px}
+.coach-intro-start strong{font-size:16px;color:var(--accent-text,var(--accent))}
+.coach-intro-start small{font-size:14px;font-weight:500;color:var(--ink-2,var(--muted))}
+
+/* "Training around Injury until Nov 14" — a sentence, not a label and a chip. */
+.coach-learnings-strip .strip-label{font-size:14px!important;font-weight:600!important;letter-spacing:0!important;text-transform:none!important;color:var(--ink-2,var(--muted))!important}
+.coach-learnings-strip .learning-chip{text-transform:none!important;letter-spacing:0!important;font-size:14px!important;font-weight:600!important}
+.coach-learnings-strip .learning-chip b{font-weight:800}
+.coach-learnings-strip .strip-manage{text-transform:none!important;letter-spacing:0!important;font-size:14px!important;font-weight:800!important}
+.coach-plan-line{text-align:center;font-size:13px!important;color:var(--ink-3,var(--muted))!important}
