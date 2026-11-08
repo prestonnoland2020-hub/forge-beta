@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useToday } from '../lib/dayClock';
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
@@ -200,6 +200,16 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const { failures: syncFailures, retryAll } = useSyncStatus();
   const { user } = useAuth();
   const { loading: historyLoading, syncing, syncError, retrySync, records: stravaRecords, addRecord: stravaAddRecord, updateRecord: stravaUpdateRecord } = useWorkoutHistory();
+  /* THE FLOOR GLOW FOLLOWS THE WEEK. Days trained since Monday over the days
+     the athlete trains: faint on the first session, fullest when the week is
+     done. forge-logbook.css reads it as --week-glow. */
+  const weekGlow = useMemo(() => {
+    const now = new Date(`${today}T12:00:00`);
+    const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const from = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    const days = new Set(stravaRecords.filter(record => record.date >= from && record.date <= today && (record.topSets?.length || record.hasCardio)).map(record => record.date));
+    return Math.min(1, days.size / Math.max(1, setup?.trainingDays || 4));
+  }, [stravaRecords, today, setup?.trainingDays]);
   /* STRAVA SYNC RUNS WHEN THE ATHLETE LOOKS. A six-hour throttle meant a run
      recorded on the watch could sit unseen for most of a day: post it, open
      Forge, and it is not there — which reads as a broken integration, not a
@@ -349,7 +359,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     };
   }, [coachExpanded]);
 
-  return <div className="app-frame">
+  return <div className="app-frame" style={{ '--week-glow': weekGlow.toFixed(2) } as CSSProperties}>
     {updateReady&&<button type="button" className="update-ready-pill" onClick={()=>window.location.reload()}>Forge updated · tap to refresh</button>}
     <aside className="sidebar">
       <NavLink className="brand" to="/" aria-label="Forge home"><ForgeMark /></NavLink>
