@@ -131,12 +131,15 @@ body { background: var(--bg) !important; }
 .app-frame .gx-mode-track button.active { color: var(--ink) !important; }
 .app-frame .gx-mode-track button:not(.active) { color: var(--ink-3) !important; }
 
-/* ── Goals: the goal first, the setting after it ───────────────────────── */
-/* "Strength goals use" was the first thing on the Goals screen — a setting
-   above the thing it sets. The head unwraps so the setting can drop to the
-   foot of the page as a quiet row. */
+/* ── Goals: the switch on top, small ────────────────────────────────────── */
+/* CONTROLS ON TOP. Est. max / 1-rep max is a compact switch at the top right
+   of the page — seen first, but one small control, not a full row. Its label
+   and the line explaining each side stay for screen readers. */
 .app-frame .goals-workspace .gx-head { display: contents; }
-.app-frame .goals-workspace .gx-mode { order: 20; padding: 4px 4px 0; }
+.app-frame .goals-workspace .gx-mode { order: 0; display: flex !important; justify-content: flex-end; align-items: center; padding: 0 !important; margin: 0 !important; background: none !important; border: 0 !important; }
+.app-frame .goals-workspace .gx-mode :is(.gx-mode-label, .gx-mode-hint) { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.app-frame .goals-workspace .gx-mode .gx-mode-track { width: auto !important; min-width: 0; max-width: 230px; flex: 0 0 auto; }
+.app-frame .goals-workspace .gx-mode .gx-mode-track button { min-height: 32px !important; padding: 4px 12px !important; font-size: 13px !important; }
 .app-frame .goals-workspace .gx-add { order: 10; }
 .app-frame .goals-workspace .gx-hero { order: 1; }
 .app-frame .goals-workspace .gx-group { order: 2; }
@@ -233,7 +236,7 @@ body { background: var(--bg) !important; }
 .app-frame :is(.ic-toggle, .ic-range) { padding: 3px !important; border-radius: 12px !important; min-height: 0 !important; }
 .app-frame :is(.ic-toggle, .ic-range) button { min-height: 34px !important; padding: 6px 10px !important; font-size: 14px !important; font-weight: 600 !important; border-radius: 9px !important; }
 .app-frame .gx-mode-track { border-radius: 12px !important; }
-.app-frame .gx-mode-track button { min-height: 38px !important; font-size: 14px !important; font-weight: 600 !important; }
+.app-frame .gx-mode-track button { font-weight: 600 !important; }
 .app-frame .gx-group-head small { font-family: var(--num); font-size: 13px; color: var(--ink-3); }
 .app-frame .kpi-tile b { color: var(--ink) !important; }
 .app-frame .simple-profile-head .avatar { background: var(--surface-2) !important; color: var(--ink) !important; border: 1px solid var(--hairline-strong) !important; }
@@ -364,3 +367,24 @@ body { background: var(--bg) !important; }
 /* The page has a drawing behind it now, so the dashed "add" rows are filled:
    their label sits on the card colour, not on the strands. */
 .app-frame :is(.gx-add, .top-set-add, .top-set-card-stack > .top-set-add) { background: var(--surface-1) !important; }
+
+/* ── Controls on top ─────────────────────────────────────────────────────
+   Exercises opens on Lifts · Cardio · Circuits tabs; Plan and Split keep
+   their settings behind one Adjust pill in the header instead of under
+   the whole page. */
+.app-frame .lib-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface-sunken); border: 1px solid var(--hairline); }
+.app-frame .lib-tabs button { min-height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-3); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .18s ease, color .18s ease; }
+.app-frame .lib-tabs button.active { background: var(--surface-3); color: var(--ink); }
+.app-frame .exercise-circuit-actions.top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 4px; }
+.app-frame .exercise-circuit-actions.top .button { min-height: 44px; padding: 0 12px; font-size: 15px; white-space: nowrap; }
+.app-frame .pv-progress-head { align-items: center; }
+.app-frame .pv-progress-head .pv-progress-name { margin-left: auto; }
+.app-frame .ss-head { align-items: center; }
+.app-frame .ss-head-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.app-frame .adjust-pill { flex: none; min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hairline-strong, var(--hairline)); background: var(--surface-1); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.app-frame .adjust-pill.open { background: var(--surface-3); border-color: transparent; }
+.app-frame .adjust-panel { display: grid; gap: 14px; animation: adjust-in .2s ease both; }
+.app-frame .adjust-panel .pv-actions { margin: 0; }
+.app-frame .adjust-panel .ss-mileage { padding-top: 12px; border-top: 1px solid var(--hairline); }
+@keyframes adjust-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .app-frame .adjust-panel { animation: none; } }

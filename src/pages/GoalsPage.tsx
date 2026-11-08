@@ -142,7 +142,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
       <span className="gx-mode-label" id="gx-mode-label">{hasStrength && hasRunTime ? 'Strength and running goals use' : hasStrength ? 'Strength goals use' : 'Running goals use'}</span>
       <div className="gx-mode-track" role="radiogroup" aria-labelledby="gx-mode-label">
         <i className="gx-mode-thumb" aria-hidden="true" />
-        {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Estimated max' : 'Tested max'}</button>)}
+        {(['calculated', 'tested'] as const).map(mode => <button type="button" role="radio" aria-checked={maxMode === mode} key={mode} className={maxMode === mode ? 'active' : ''} onClick={() => chooseMode(mode)}>{mode === 'calculated' ? 'Est. max' : '1-rep max'}</button>)}
       </div>
       <p className="gx-mode-hint">{maxMode === 'calculated'
         ? (hasStrength && hasRunTime ? 'Estimated from your best sets and runs.' : hasStrength ? 'Estimated from your best rep sets.' : 'Predicted from your best runs.')

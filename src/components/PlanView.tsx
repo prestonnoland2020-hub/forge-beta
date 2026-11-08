@@ -102,15 +102,19 @@ export function RunLine({ run }: { run: PlanRun }) {
    week below changes; the tab always opens on the week you are actually in.
    A week is a real tab stop, keyboard arrows included, because that is what it
    looks like. */
-export function PlanProgress({ weekIndex, current, total, waveIndexFor, onPick }: {
+export function PlanProgress({ weekIndex, current, total, waveIndexFor, onPick, adjustOpen, onAdjust }: {
   weekIndex: number; current: number; total: number;
   waveIndexFor: (index: number) => number; sentence: ReactNode; onPick: (index: number) => void;
+  adjustOpen?: boolean; onAdjust?: () => void;
 }) {
   const away = weekIndex - current;
   return <section className="pv-progress">
     <div className="pv-progress-head">
       <span className="pv-progress-week">Week {weekIndex + 1} <small>of {total}</small></span>
       <span className="pv-progress-name">{waveLabel(waveIndexFor(weekIndex))}</span>
+      {/* CONTROLS ON TOP. Save and Regenerate sat under the whole week, where
+          nobody looking for them scrolled. One button in the header opens them. */}
+      {onAdjust && <button type="button" className={`adjust-pill${adjustOpen ? ' open' : ''}`} aria-expanded={Boolean(adjustOpen)} onClick={onAdjust}>Adjust</button>}
     </div>
     <div className="pv-dots" role="tablist" aria-label="Week">
       {Array.from({ length: total }, (_, index) => {

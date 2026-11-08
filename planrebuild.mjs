@@ -104,6 +104,9 @@ const open = async plan => {
      for the plan again once the app is up. */
   if (!p.url().includes('/plan')) { await p.evaluate(() => { window.location.hash = '#/plan'; }); }
   await p.waitForTimeout(3200);
+  /* Save and Regenerate live behind the Adjust pill at the top of the plan. */
+  await p.evaluate(() => document.querySelector('.pv-progress-head .adjust-pill')?.click());
+  await p.waitForTimeout(300);
   return p;
 };
 const click = (p, re) => p.evaluate(src => { const rx = new RegExp(src, 'i'); const el = [...document.querySelectorAll('button')].find(x => rx.test(x.textContent || '')); if (!el || el.disabled) return false; el.click(); return true; }, re);
