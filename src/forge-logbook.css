@@ -265,41 +265,16 @@ body { background: var(--bg) !important; }
 .app-frame .pr-celebration-eyebrow { letter-spacing: .12em !important; }
 
 
-/* ── The page: Forge blue, flowing ─────────────────────────────────────── */
-/* Behind every screen: a wash of the brand blue with a faint electric-violet
-   glow low on the page, and two layers of fine strands that fold and run like
-   marbled paint (tools/make-flow-background.py, seed 3), painted through masks
-   in the live accent. The strands are softened with a blur and kept low so
-   they read as texture, not as a picture competing with the cards. */
+/* ── The page: a violet hue ─────────────────────────────────────────────── */
+/* Behind every screen, a soft electric-violet glow: strongest at the top
+   corner, a second one low on the opposite side, fading into the ground. No
+   drawing — just colour, so nothing competes with the cards. */
 .app-frame {
-  isolation: isolate;
   background:
-    radial-gradient(120% 55% at 10% -8%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
-    radial-gradient(90% 45% at 105% 100%, color-mix(in srgb, var(--violet) 12%, transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--bg)), var(--bg) 65%) !important;
+    radial-gradient(120% 55% at 0% -5%, color-mix(in srgb, var(--violet) 16%, transparent), transparent 70%),
+    radial-gradient(100% 50% at 105% 105%, color-mix(in srgb, var(--violet) 11%, transparent), transparent 70%),
+    var(--bg) !important;
 }
-.app-frame::before, .app-frame::after {
-  content: ''; position: fixed; inset: -12px; pointer-events: none; z-index: -1;
-  -webkit-mask-size: cover; mask-size: cover; -webkit-mask-position: center; mask-position: center;
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-}
-.app-frame::before {
-  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 70%, var(--violet)) 85%);
-  -webkit-mask-image: url('./assets/forge-flow-mid.svg'); mask-image: url('./assets/forge-flow-mid.svg');
-  filter: blur(2px); opacity: .12;
-}
-.app-frame::after {
-  background: linear-gradient(200deg, var(--accent-text), var(--accent) 55%, var(--violet));
-  -webkit-mask-image: url('./assets/forge-flow-bright.svg'); mask-image: url('./assets/forge-flow-bright.svg');
-  filter: blur(.8px); opacity: .16;
-}
-:root[data-theme="dark"] .app-frame::before { opacity: .22; }
-:root[data-theme="dark"] .app-frame::after { opacity: .3; }
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] .app-frame::before { opacity: .22; }
-  :root[data-theme="system"] .app-frame::after { opacity: .3; }
-}
-@media print { .app-frame::before, .app-frame::after { display: none; } }
 
 /* ── Electric violet, sparingly: a finished session ────────────────────── */
 .app-frame .pv-check { background: var(--violet) !important; color: var(--on-brand) !important; }
