@@ -74,7 +74,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const {user}=useAuth();
   const {goals}=useGoals();const goalLiftKeys=useMemo(()=>new Set(goals.filter(goal=>goal.type==='Strength'&&goal.exercise).map(goal=>canonicalLiftKey(String(goal.exercise)))),[goals]);const {records}=useWorkoutHistory();const {profile}=useAdaptiveTraining();
   const {strategy}=useCoachingStrategy();
-  const {exercises:libraryExercises,workouts:libraryWorkouts}=useTrainingLibrary();const strengthExercises=libraryExercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));const exercises=strengthExercises.map(exercise=>exercise.name);const cardioWorkouts=libraryWorkouts.filter(workout=>Boolean(workout.plan));
+  const {exercises:libraryExercises,workouts:libraryWorkouts,addExercise:addLibraryExercise}=useTrainingLibrary();const strengthExercises=libraryExercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));const exercises=strengthExercises.map(exercise=>exercise.name);const cardioWorkouts=libraryWorkouts.filter(workout=>Boolean(workout.plan));
   const {setup,saveSetup}=useProfileSetup();
   const savedPlan=useMemo(loadSavedPlan,[]);
   const tab:'split'|'program'=mode==='split'?'split':'program';
@@ -126,10 +126,13 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
      nothing else. An exercise already on the day always stays visible, so
      removing a muscle can never hide something you picked. */
   const dayMuscles=active.muscles.filter(muscle=>muscles.includes(muscle));
+  /* The muscle filter keeps a long library tidy; on a short one it hides
+     most of it. One tap shows every lift. */
+  const [showEveryLift,setShowEveryLift]=useState(false);
   const libraryMatches=strengthExercises.filter(exercise=>{
     if(!exercise.name.toLowerCase().includes(exerciseQuery.trim().toLowerCase()))return false;
     if(active.exercises.includes(exercise.name))return true;
-    return !dayMuscles.length||exercise.muscles.some(muscle=>dayMuscles.includes(muscle));
+    return !dayMuscles.length||showEveryLift||exercise.muscles.some(muscle=>dayMuscles.includes(muscle));
   }).map(exercise=>exercise.name);
   /* A day can hold an exercise the library no longer lists — renamed, disabled,
      or carried in from a legacy import. The removed chip panel used to be the
@@ -143,6 +146,29 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   const addExercise=(exercise:string)=>{if(!exercise||active.exercises.includes(exercise))return;const next=[...active.exercises,exercise];updateDay({exercises:next,muscles:Array.from(new Set([...active.muscles,...musclesForExercises(next)]))})};
   const removeExercise=(exercise:string)=>{const next=active.exercises.filter(item=>item!==exercise);const remaining=musclesForExercises(next);const removedMuscles=strengthExercises.find(item=>item.name===exercise)?.muscles||[];updateDay({exercises:next,muscles:active.muscles.filter(muscle=>remaining.includes(muscle)||!removedMuscles.includes(muscle))})};
   const toggleExercise=(exercise:string)=>active.exercises.includes(exercise)?removeExercise(exercise):addExercise(exercise);
+  /* MAKE THE EXERCISE RIGHT HERE. A split day could only pick from the
+     library, filtered to the day's muscles — so an athlete whose library was
+     thin (a starter set built around one person's training) had a handful of
+     lifts to choose from and no way to add the one she actually does without
+     leaving the split, finding the Library, and coming back. Typing a name
+     that is not there offers to create it: name, the muscles it trains, and
+     it goes into the library and onto this day in one tap. */
+  const [creatingLift,setCreatingLift]=useState(false);const [newLiftName,setNewLiftName]=useState('');const [newLiftMuscles,setNewLiftMuscles]=useState<string[]>([]);
+  const typedLift=exerciseQuery.trim();
+  const typedExists=Boolean(typedLift)&&libraryExercises.some(exercise=>canonicalLiftKey(exercise.name)===canonicalLiftKey(typedLift));
+  const startCreatingLift=(name:string)=>{setNewLiftName(name);setNewLiftMuscles(active.muscles.filter(muscle=>muscles.includes(muscle)));setCreatingLift(true)};
+  const newLiftDuplicate=libraryExercises.find(exercise=>canonicalLiftKey(exercise.name)===canonicalLiftKey(newLiftName.trim()));
+  const saveNewLift=()=>{
+    const name=newLiftName.trim();
+    if(!name)return;
+    /* Already in the library (perhaps disabled, or filtered off this day): use it rather than making a second copy. */
+    if(newLiftDuplicate){addExercise(newLiftDuplicate.name);setCreatingLift(false);setExerciseQuery('');return}
+    if(!newLiftMuscles.length)return;
+    addLibraryExercise({name,kind:'Strength',muscles:newLiftMuscles,detail:'Custom · Weight + reps',enabled:true,custom:true,categories:['Strength']});
+    /* The library lookup that names a lift's muscles has not caught up yet, so the day takes them from the form. */
+    if(!active.exercises.includes(name))updateDay({exercises:[...active.exercises,name],muscles:Array.from(new Set([...active.muscles,...newLiftMuscles]))});
+    setCreatingLift(false);setNewLiftName('');setNewLiftMuscles([]);setExerciseQuery('');
+  };
   const setDayType=(dayType:DayType)=>updateDay({dayType,...(dayType==='strength'?{cardioPolicy:active.cardioPolicy==='planned'?'planned' as const:'forge' as const} : dayType==='cardio'?{muscles:[],exercises:[],cardioPolicy:'forge' as const}:dayType==='hyrox'?{muscles:[],exercises:[],cardioPolicy:'forge' as const,cardio:[]}:dayType==='mixed'?{cardioPolicy:active.cardioPolicy==='none'?'forge' as const:active.cardioPolicy}:{muscles:[],exercises:[],cardioPolicy:'none' as const,cardio:[]})});
   const saveCardio=(plan:PlannedCardio)=>{if(!cardioEditor)return;setDays(items=>items.map((day,index)=>{if(index!==cardioEditor.dayIndex)return day;const cardio=cardioEditor.cardioIndex===null?[...day.cardio,plan]:day.cardio.map((entry,entryIndex)=>entryIndex===cardioEditor.cardioIndex?plan:entry);return{...day,cardio,maxDuration:durationForDay(day,cardio)}}));setCardioEditor(null)};
   /* Removing the last session hands the day back to Forge, so a day can never
@@ -256,12 +282,23 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
               {active.exercises.length>0&&<div className="ss-lifts">{active.exercises.map(exercise=><button type="button" key={exercise} aria-pressed="true" className="selected" onClick={()=>{tap();removeExercise(exercise)}}><span className="ss-check" aria-hidden="true"><Icon name="check" size={14} stroke={3}/></span>{exercise}{goalLiftKeys.has(canonicalLiftKey(exercise))&&<em className="ss-goal-tag">Goal lift</em>}</button>)}</div>}
               {suggestedLifts.length>0&&<div className="ss-suggest"><small>{active.exercises.length?'Add another':'Suggested for this day'}</small><div className="ss-chips">{suggestedLifts.map(exercise=><button type="button" key={exercise} onClick={()=>{tap();addExercise(exercise)}}>＋ {exercise}</button>)}</div></div>}
               <button type="button" className="ss-browse" onClick={()=>{tap();setBrowseLifts(true)}}>Browse all lifts <span aria-hidden="true">›</span></button>
+              {!creatingLift&&<button type="button" className="ss-create-open" onClick={()=>{tap();startCreatingLift('')}}>＋ Create a new exercise</button>}
             </>}
             {browseLifts&&<>
               <SearchField className="ss-search" value={exerciseQuery} onChange={setExerciseQuery} placeholder="Search lifts" aria-label="Search lifts"/>
-              <div className="ss-lifts all">{visibleExercises.length?visibleExercises.map(exercise=>{const selected=active.exercises.includes(exercise);return <button type="button" key={exercise} aria-pressed={selected} className={selected?'selected':''} onClick={()=>{tap();toggleExercise(exercise)}}><span className="ss-check" aria-hidden="true">{selected?<Icon name="check" size={14} stroke={3}/>:''}</span>{exercise}{goalLiftKeys.has(canonicalLiftKey(exercise))&&<em className="ss-goal-tag">Goal lift</em>}</button>}):<p className="ss-empty">{exerciseQuery.trim()?'No lifts match that search.':'No lifts in your library for these muscles yet.'}</p>}</div>
+              <div className="ss-lifts all">{visibleExercises.length?visibleExercises.map(exercise=>{const selected=active.exercises.includes(exercise);return <button type="button" key={exercise} aria-pressed={selected} className={selected?'selected':''} onClick={()=>{tap();toggleExercise(exercise)}}><span className="ss-check" aria-hidden="true">{selected?<Icon name="check" size={14} stroke={3}/>:''}</span>{exercise}{goalLiftKeys.has(canonicalLiftKey(exercise))&&<em className="ss-goal-tag">Goal lift</em>}</button>}):<p className="ss-empty">{typedLift&&!typedExists?'Not in your library yet — create it below.':exerciseQuery.trim()?'No lifts match that search.':'No lifts in your library for these muscles yet — create one below, or show every lift.'}</p>}</div>
+              {dayMuscles.length>0&&<button type="button" className="text-button ss-every-lift" onClick={()=>{tap();setShowEveryLift(value=>!value)}}>{showEveryLift?`Only ${dayMuscles.join(' · ')} lifts`:'Show every lift'}</button>}
+              {typedLift&&!typedExists&&!creatingLift&&<button type="button" className="ss-create-open" onClick={()=>{tap();startCreatingLift(typedLift)}}>＋ Create “{typedLift}”</button>}
+              {!typedLift&&!creatingLift&&<button type="button" className="ss-create-open" onClick={()=>{tap();startCreatingLift('')}}>＋ Create a new exercise</button>}
               <button type="button" className="ss-browse" onClick={()=>{tap();setBrowseLifts(false);setExerciseQuery('')}}>Done browsing</button>
             </>}
+            {creatingLift&&<div className="ss-create" role="group" aria-label="Create an exercise">
+              <label><span>Exercise name</span><input autoFocus value={newLiftName} onChange={event=>setNewLiftName(event.target.value)} placeholder="e.g. Cable kickback"/></label>
+              {newLiftDuplicate
+                ?<p className="ss-create-note">“{newLiftDuplicate.name}” is already in your library — it will be added to this day.</p>
+                :<div><span className="ss-create-label">What does it train?</span><div className="ss-chips">{muscles.map(muscle=><button type="button" key={muscle} aria-pressed={newLiftMuscles.includes(muscle)} className={newLiftMuscles.includes(muscle)?'active':''} onClick={()=>{tap();setNewLiftMuscles(current=>current.includes(muscle)?current.filter(item=>item!==muscle):[...current,muscle])}}>{muscle}</button>)}</div></div>}
+              <div className="ss-create-actions"><button type="button" className="button ghost" onClick={()=>setCreatingLift(false)}>Cancel</button><button type="button" className="button" disabled={!newLiftName.trim()||(!newLiftDuplicate&&!newLiftMuscles.length)} onClick={()=>{tap();saveNewLift()}}>{newLiftDuplicate?'Add to this day':'Create & add'}</button></div>
+            </div>}
           </section>}
           {/* A lifting day takes cardio without the athlete first learning that
               "Both" is a day type: one button turns it into one. */}
