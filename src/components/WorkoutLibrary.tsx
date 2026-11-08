@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { cardioPlanSummary } from './CardioPlanBuilder';
 import { CircuitWorkoutBuilder } from './CircuitWorkoutBuilder';
 import { useTrainingLibrary, type LibraryWorkout } from '../features/training/TrainingLibraryProvider';
@@ -12,6 +13,22 @@ export function WorkoutLibrary() {
   const [editing, setEditing] = useState<LibraryWorkout | null>(null);
   const { workouts, exercises, addWorkout, updateWorkout, removeWorkout } = useTrainingLibrary();
   const saved = workouts.filter(workout => workout.kind === 'Cardio' || workout.kind === 'Circuit');
+  /* ARRIVING FROM THE COACH. "See it in Saved circuits" lands here with
+     ?show=circuits (and the circuit's id): the list is scrolled into view and
+     the one just saved is marked, so the athlete sees exactly where it went
+     instead of hunting below the exercise list for it. */
+  const [params] = useSearchParams();
+  const showCircuits = params.get('show') === 'circuits';
+  const justSaved = Number(params.get('circuit')) || 0;
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!showCircuits) return;
+    const timer = window.setTimeout(() => {
+      const row = justSaved ? document.getElementById(`circuit-${justSaved}`) : null;
+      (row || sectionRef.current)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [showCircuits, justSaved]);
 
   const openBuilder = (mode: BuilderMode, workout: LibraryWorkout | null = null) => {
     setEditing(workout);
@@ -39,10 +56,10 @@ export function WorkoutLibrary() {
     closeBuilder();
   };
 
-  return <section className="exercise-group">
+  return <section className="exercise-group" id="saved-circuits" ref={sectionRef}>
     {builderMode && <CircuitWorkoutBuilder mode={builderMode} initial={editing?.plan} exercises={exercises} onClose={closeBuilder} onSave={saveCircuit} onDelete={editing ? () => remove(editing) : undefined} />}
     <span className="eyebrow">Saved circuits</span>
-    {saved.length ? <div className="simple-settings-list">{saved.map(workout => <button type="button" onClick={() => openBuilder(workout.source === 'Forge' ? 'forge' : 'manual', workout)} key={workout.id}><div><strong>{workout.name}</strong><span>{workout.summary}</span></div><b>›</b></button>)}</div>
+    {saved.length ? <div className="simple-settings-list">{saved.map(workout => <button type="button" id={`circuit-${workout.id}`} className={workout.id === justSaved ? 'just-saved' : undefined} onClick={() => openBuilder(workout.source === 'Forge' ? 'forge' : 'manual', workout)} key={workout.id}><div><strong>{workout.name}{workout.id === justSaved && <em className="just-saved-tag">Just saved</em>}</strong><span>{workout.summary}</span></div><b>›</b></button>)}</div>
       : <p className="library-table-empty">No saved circuits yet. Save one here and it logs in a tap from any workout.</p>}
     <div className="exercise-circuit-actions"><button className="button ghost" onClick={() => openBuilder('manual')}>New circuit</button><button className="text-button" onClick={() => openBuilder('forge')}>or let Forge build one</button></div>
   </section>;

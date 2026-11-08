@@ -33,6 +33,8 @@ import {
   calendarEmptyState, provenMax,
 } from '../features/training/aiPlanService';
 import { liftPositions, rungFor } from '../lib/liftProgression';
+import { easyRunWeeks } from '../lib/bodyLog';
+import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
 import { progressionLevels } from '../lib/progressionLevels';
 import { sessionVerdicts } from '../features/training/sessionVerdicts';
@@ -185,6 +187,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const { user } = useAuth();
   const { recommendation, anchorDate, anchorPosition } = useDailyRecommendation();
   const { setup } = useProfileSetup();
+  const { notes: athleteNotes } = useAthleteNotes();
   /* Only for an athlete whose watch records heart rate: a target nobody can
      see on their wrist is just a number in the way. */
   const hrTargets = useMemo(() => heartRateRuns(records).length ? heartRateTargets(estimateMaxHr(records, setup?.birthDate)) : null, [records, setup?.birthDate]);
@@ -641,7 +644,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     weeks: storedPlanData.weeks.map((rawItem, index) => {
       /* One shared resolver — the Coach reads the identical week, so no
          surface can quote a number another surface does not show. */
-      const item = resolvePlanWeek(rawItem, splitDays, { runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces, levels: levels.levels}, planBlockFor(stored, goals, index), { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
+      const item = resolvePlanWeek(rawItem, splitDays, { easyRunWeeks: easyRunWeeks(athleteNotes, localDayIso()), runningDays: Number(setup?.runningDays) || profile.runningDays, minWeeklyMileage, maxWeeklyMileage, weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage, longestRunMiles: profile.longestRunMiles, recentWeeklyMileage: actualWeekly, recentLongestRun: actualLongest , readiness: profile.readiness, goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile, goalMiles: runGoal?.miles, paces, levels: levels.levels}, planBlockFor(stored, goals, index), { bests, singles: bestSingles, goalLifts, metric, anchors: liftAnchors, sessions: history.sessions, misses: history.misses, lastAt: history.lastAt, rungOf, exposuresPerWeek }, weekCycleDays(stored.startDate, index, splitDays, rhythm, anchor));
       if (item.adjusted) liveAdjusted = true;
       return item;
     }),

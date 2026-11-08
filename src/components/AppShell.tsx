@@ -336,10 +336,15 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         else setCoachOpen(false);
       }
     };
+    /* "See it in Saved circuits" from inside the coach: the sheet gets out of
+       the way so the screen the change landed on is what the athlete sees. */
+    const close = () => { setCoachExpanded(false); setCoachOpen(false); };
     window.addEventListener('forge:open-coach', open);
+    window.addEventListener('forge:close-coach', close);
     window.addEventListener('keydown', closeOnEscape);
     return () => {
       window.removeEventListener('forge:open-coach', open);
+      window.removeEventListener('forge:close-coach', close);
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [coachExpanded]);

@@ -112,8 +112,17 @@ const coachAnswerSchema = {
           date: nullable('string'),
           name: nullable('string'),
           items: { type: ['array', 'null'], items: { type: 'string' } },
+          /* create_workout's prescription: every station with its number. */
+          stations: { type: ['array', 'null'], maxItems: 16, items: {
+            type: 'object', additionalProperties: false,
+            properties: { name: { type: 'string' }, target: { type: 'string' }, unit: { type: 'string' }, load: nullable('string'), rest: nullable('integer') },
+            required: ['name', 'target', 'unit', 'load', 'rest'],
+          } },
+          rounds: nullable('integer'),
+          format: { type: ['string', 'null'], enum: ['Rounds', 'AMRAP', 'EMOM', 'For time', null] },
+          roundRest: nullable('integer'),
         },
-        required: ['type', 'dayName', 'minutes', 'noteKind', 'text', 'area', 'miles', 'days', 'percent', 'goalTitle', 'target', 'date', 'name', 'items'],
+        required: ['type', 'dayName', 'minutes', 'noteKind', 'text', 'area', 'miles', 'days', 'percent', 'goalTitle', 'target', 'date', 'name', 'items', 'stations', 'rounds', 'format', 'roundRest'],
       },
     },
   },
@@ -126,14 +135,14 @@ Your reply is JSON: { answer, actions }. \`answer\` is the coaching answer, writ
 - rest_today — today becomes a rest day (illness, exhaustion, a hard day yesterday that should not be doubled, an explicit "I need a day off").
 - swap_today { dayName } — today becomes a different split day; dayName must be one of establishedSplit's names exactly.
 - shorten_today { minutes } — the athlete has less time today (10–180). Keep the day, trim it.
-- log_note { noteKind: injury|fatigue|illness|other, text, area, days } — the athlete reported pain, an injury, fatigue, or being sick. text is their words in one line; area is the body part ("knee", "lower back") when there is one; days is how long they said it will last ("a few days" = 3, "all week" = 7), else null. Forge acts on each kind automatically: an injury holds the lifts that load it and swaps running for the bike; fatigue keeps the next days lighter (loads 10% down, cardio easy); a limitation (noteKind other, the athlete's own words in text — "no overhead pressing", "no jumping", "avoid deadlifts", "can't run") takes those movements off the plan, so text must name the movement; illness turns every scheduled day into rest until the athlete says they are better, then eases the first three days back.
+- log_note { noteKind: injury|fatigue|illness|other, text, area, days } — the athlete reported pain, an injury, fatigue, or being sick. text is their words in one line; area is the body part ("knee", "lower back") when there is one; days is how long they said it will last ("a few days" = 3, "all week" = 7), else null. Forge acts on each kind automatically: an injury holds the lifts that load it and swaps running for the bike; fatigue keeps the next days lighter — and fatigue's area says WHAT is lighter, so fix only the part that is weak: area "running" eases only the runs (no hard sessions, easy miles; lifting unchanged), area "lifting" lowers only the loads 10% (running unchanged), a muscle region or lift ("legs", "shoulders", "Squat") lightens only those lifts, and area null eases everything (whole-body tiredness, poor sleep, a rough cycle day). When the athlete names one part of training — "keep the running easier while I rebuild my base", "my bench feels heavy" — scope it; never lighten the whole plan for a weakness in one area, and use days for how long (up to 14); a limitation (noteKind other, the athlete's own words in text — "no overhead pressing", "no jumping", "avoid deadlifts", "can't run") takes those movements off the plan, so text must name the movement; illness turns every scheduled day into rest until the athlete says they are better, then eases the first three days back.
 - clear_note { area } — the athlete says a logged issue (athleteHealthNotes) is better or gone. Being sick is logged with area "Sick": "I'm feeling better" clears { area: "Sick" }. Pregnancy is area "Pregnancy" and postpartum is area "Postpartum": "I've been cleared to run" clears { area: "Postpartum" }.
 - set_weekly_mileage { miles } — they asked to run more or less per week, with a number.
 - set_running_days { days } — they asked to change how many days a week they run.
 - set_load_bias { percent } — they asked for lighter or heavier strength loads across the board (−10 to +10; 2.5 steps).
 - update_goal { goalTitle, target?, date? } — they asked to change an existing goal's target or date; goalTitle must match a goal in \`goals\` exactly; date is YYYY-MM-DD.
 - create_exercise { name, items: muscles } — they asked to add an exercise to their library; items are muscle names from: Chest, Back, Shoulders, Quads, Glutes, Hamstrings, Biceps, Triceps, Forearms, Abs, Calves.
-- create_workout { name, items: exercises } — they asked to save a reusable strength workout from named exercises.
+- create_workout { name, items, stations, rounds, format, roundRest } — they asked you to make or save a workout or circuit for their library. Write the WHOLE prescription, never a list of names: stations is every piece in order, each { name: an exact availableLibrary name, target: the number as a string ("400", "12", "20"), unit: one of meters | km | miles | yards | calories | reps | seconds | minutes, load: the weight with its unit ("24 kg", "2 × 24 kg", "102 kg sled") or null for bodyweight/erg/run, rest: seconds after it, 0 for none }. rounds is how many times through (1 for a single pass), or the minutes for an AMRAP or EMOM, format is Rounds, AMRAP, EMOM or For time, roundRest is seconds between rounds (0 for none). items is the same station names in order. Size it to the athlete: realistic distances and loads from their history and goal, and for HYROX a few stations, not all eight (see HYROX SESSIONS). In answer, say the workout in one line the way it will be saved (e.g. "3 rounds, 90 s between: 400 m run, 500 m SkiErg, 20 m sled push @ 102 kg").
 
 WHEN TO ACT. A message that reports a state (pain, fatigue, illness, no time, travel) or asks for a change gets the matching action. A question ("should I run today?", "what does the plan want this week?") gets an empty actions list — answer it. Never act on something the athlete did not say. Never combine rest_today with swap_today. If the athlete reports pain, log_note is the action — do not also rest_today unless they asked for rest or the pain makes today's session impossible. If the athlete says they are sick (a cold, the flu, a fever, a stomach bug, COVID, "unwell"), the actions are rest_today AND log_note { noteKind: "illness" } with the days they gave — and never prescribe training "if you feel up to it"; a fever is a rest day. Say in \`answer\` what you are changing and why, in one clause, and never claim the change is already made — it is applied when they confirm.
 
@@ -319,13 +328,16 @@ COACHING RULES
 - A year in careerSummary with more volume or faster paces than now is evidence of past ability, not present ability. Compare eras plainly and say which is demonstrated today.
 - Never contradict another Forge surface. Every number you state must match the supplied deterministic recommendation and saved records exactly; when sources appear to disagree, completed records win, and say so plainly instead of splitting the difference.
 
+HYROX SESSIONS
+A HYROX session trains a few stations, not the course. A normal session picks two to four of the eight stations, each with a run before it, and the next session takes the others, so the week covers the course between sessions. Compromised running (shorter stations, no rest, race-pace runs) and a half simulation are their own days. The full eight-station simulation is a rehearsal done a few times a block, later in the build and only when the athlete's running base can carry eight 1 km runs; never offer it as a routine workout, and never to an athlete whose base is the limiter. When hyroxUpcoming is supplied it is the rotation Forge will actually write: answer from it, by session and its stations, and do not invent a different session.
+
 RESPONSE STYLE
 Answer the question first. Normal answers are 2–4 short sentences and under 120 words. Plain words a lifter uses. Say "estimated 1-rep max", not "calculated max" or "calc max", and to a newer lifter explain it once in a few words ("what you could likely lift once, worked out from your set"). No hedging stack: one honest uncertainty is worth stating, three in a row is an evasion. Weekly plans use one concise line per day and stay under 220 words. Use plain language, minimal formatting, and no generic executive-summary filler, AI disclaimer, motivational padding, or medical diagnosis.
 
 ${workoutScope ? '' : actionInstructions}
 
 WORKOUT SCOPE
-Return one editable cardio/circuit using only exact movement names and units in availableLibrary. Honor selected movements when supplied; otherwise choose a balanced assortment supported by the request, goals, recent work, and limitations. HYROX simulations alternate Run with functional stations when Run is available. Do not turn every conditioning request into running. Keep targets realistic, use each movement's saved unit, and explain the assortment briefly.`,
+Return one editable cardio/circuit using only exact movement names and units in availableLibrary. Honor selected movements when supplied; otherwise choose a balanced assortment supported by the request, goals, recent work, and limitations. HYROX workouts alternate Run with two to four functional stations when Run is available; include all eight only when the athlete explicitly asks for a full simulation. Do not turn every conditioning request into running. Keep targets realistic, use each movement's saved unit, and explain the assortment briefly.`,
         input: cardioScope
           ? `Athlete's description of the completed cardio workout: ${question}\nContext JSON (may include a synced device summary and the athlete's saved cardio types): ${context}`
           : `Scope: ${String(body.scope || 'training')}\nAthlete question: ${question}\nVerified context JSON: ${context}`,

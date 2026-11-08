@@ -537,7 +537,12 @@ export type RunningAthlete = { runningDays?: number; minWeeklyMileage?: number; 
   /* WHERE THE ATHLETE IS ON EACH LADDER. The dose of a hard session is what
      their last sessions earned, not a function of the week number — see
      progressionLevels. Absent, the sizing falls back to the old ramp. */
-  levels?: Levels };
+  levels?: Levels;
+  /* EASY RUNNING FOR A WHILE, and only the running. How many weeks from the
+     current one (counting it) a running-scoped fatigue note covers — "keep
+     the runs easy while I rebuild my base". Those weeks' hard run becomes
+     easy miles; the lifting is not touched. */
+  easyRunWeeks?: number };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
@@ -579,7 +584,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   week: T,
   splitDays: SplitDayRef[],
   athlete: RunningAthlete,
-  block?: { weekIndex?: number; blockWeeks?: number; waveIndex?: number; liftingMaxWeek?: boolean; weeksToRace?: number; weeksToLiftGoal?: number },
+  block?: { weekIndex?: number; currentWeekIndex?: number; blockWeeks?: number; waveIndex?: number; liftingMaxWeek?: boolean; weeksToRace?: number; weeksToLiftGoal?: number },
 ): T {
   const runningDays = Math.max(0, Math.min(7, Math.round(Number(athlete.runningDays) || 0)));
   const floorMiles = Number(athlete.minWeeklyMileage) || 0;
@@ -904,6 +909,8 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      easy running — the week keeps its volume, it just stops asking for
      something the athlete has already said they do not have. */
   const cooked = typeof athlete.readiness === 'number' && athlete.readiness < 55;
+  const weeksIn = (block?.weekIndex ?? 0) - (block?.currentWeekIndex ?? block?.weekIndex ?? 0);
+  const rebuilding = !cooked && Boolean(athlete.easyRunWeeks) && weeksIn >= 0 && weeksIn < (athlete.easyRunWeeks || 0);
   /* ONE FUNCTION DECIDES WHAT THE HARD RUN IS, on both paths. The roadmap has
      called qualitySession since it was written; the stored block never did, so
      threshold work existed in the preview and nowhere the athlete trains. */
@@ -918,7 +925,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   })?.owner === 'lifting' && !raceWeek;
   /* The race itself never yields: it is a fixed date, not a session that can
      move. The max week takes the attempts and the race stays the race. */
-  const written = goalPace && hasQuality && !yielding
+  const written = goalPace && hasQuality && !yielding && (!rebuilding || raceWeek)
     ? qualitySession({
         phase,
         weekIndex,
@@ -933,12 +940,13 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
     : null;
   const qualityText = written ? written.text
     : yielding ? 'Easy — your max attempt is this week and owns it'
+    : rebuilding ? 'Easy — the hard run waits while you rebuild your base'
     : cooked ? 'Easy only — the hard run moves to when you have recovered' : String(week.quality);
   /* Race week keeps its miles whatever the check-in said: the session IS the
      event, qualitySession has already changed what it says about it, and a
      week that silently drops the race from its own total is lying about the
      one day it exists for. */
-  const qualityMiles = hasQuality && (raceWeek || (!cooked && !yielding)) ? (written ? written.miles : qualitySessionMiles(String(week.quality), pace)) : 0;
+  const qualityMiles = hasQuality && (raceWeek || (!cooked && !yielding && !rebuilding)) ? (written ? written.miles : qualitySessionMiles(String(week.quality), pace)) : 0;
 
   /* THE WEEK HITS ITS NUMBER EVEN WHEN THERE IS NOWHERE TO PUT THE DIFFERENCE.
      On two running days there are no easy runs to absorb anything, so the

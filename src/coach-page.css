@@ -37,3 +37,8 @@
 @keyframes coach-dot{50%{transform:translateY(-4px);opacity:.5}}
 @media (prefers-reduced-motion:reduce){.coach-dots b{animation:none}}
 .coach-queued{opacity:.7}
+
+/* Where an applied change landed: one link per screen it touched. */
+.coach-applied-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.coach-applied-link{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:999px;font-weight:800;font-size:15px;text-decoration:none;color:var(--accent-text,var(--accent));background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.coach-applied-link svg{width:16px;height:16px}

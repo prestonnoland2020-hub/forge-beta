@@ -8,6 +8,12 @@
 export type BodyLogNote = { area?: string; kind: 'injury' | 'fatigue' | 'other'; status: 'active' | 'cleared'; bufferUntil?: string; note?: string };
 
 export type BodyLogState = {
+  /* A fatigue note that names WHAT is struggling eases only that (see
+     fatigueScope). `easing` above stays the whole-body switch. */
+  easeRunning?: boolean;
+  easeLifting?: boolean;
+  easeMuscles?: string[];
+  easeLifts?: string[];
   /* Areas with an active buffer today. */
   areas: string[];
   /* Primary muscles no prescription should load. */
@@ -103,6 +109,35 @@ export const musclesForArea = (area: string): string[] => {
   return [];
 };
 
+/* WHAT A FATIGUE NOTE IS ABOUT. "Let's keep the running easier while I
+   rebuild my base" was logged as plain fatigue, and plain fatigue eases the
+   whole day — so a runner short on aerobic base also lost ten percent off
+   every lift. The note's area now says what is weak:
+     no area            → the whole body (tired, a rough cycle day, no sleep)
+     running / cardio   → runs go easy; lifting is untouched
+     lifting / strength → loads come down; running is untouched
+     a muscle or region → only the lifts that train it ("legs", "shoulders")
+     anything else      → read as a lift name ("Squat", "Bench")            */
+export type FatigueScope =
+  | { kind: 'all' } | { kind: 'running' } | { kind: 'lifting' }
+  | { kind: 'muscles'; muscles: string[] } | { kind: 'lift'; lift: string };
+const FATIGUE_REGIONS: Array<[RegExp, string[]]> = [
+  [/\blegs?\b|lower body|lower half/, LOWER],
+  [/upper body|upper half/, ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps']],
+  [/\barms?\b/, ['Biceps', 'Triceps', 'Forearms']],
+  [/\bcore\b|\babs?\b/, ['Abs']],
+];
+export function fatigueScope(area?: string | null): FatigueScope {
+  const text = plainText(String(area || '')).trim();
+  if (!text || /^(fatigue|tired|tiredness|whole body|everything|general|overall|recovery|sleep)$/.test(text)) return { kind: 'all' };
+  if (/\b(run|runs|running|cardio|mileage|aerobic|endurance|conditioning|base|easy runs?)\b/.test(text)) return { kind: 'running' };
+  if (/\b(lift|lifts|lifting|strength|weights?|gym|loads?|resistance)\b/.test(text)) return { kind: 'lifting' };
+  for (const [pattern, muscles] of FATIGUE_REGIONS) if (pattern.test(text)) return { kind: 'muscles', muscles };
+  const muscles = musclesForArea(text);
+  if (muscles.length) return { kind: 'muscles', muscles };
+  return { kind: 'lift', lift: text };
+}
+
 export function bodyLogState(notes: BodyLogNote[], todayIso: string): BodyLogState {
   const current = (note: BodyLogNote) => note.status === 'active' && (!note.bufferUntil || note.bufferUntil >= todayIso);
   const active = notes.filter(note => current(note) && note.kind === 'injury' && note.area);
@@ -135,8 +170,15 @@ export function bodyLogState(notes: BodyLogNote[], todayIso: string): BodyLogSta
     const ended = note.status === 'cleared' ? note.bufferUntil <= todayIso : note.bufferUntil < todayIso;
     return ended && plusDays(note.bufferUntil, EASE_BACK_DAYS) >= todayIso;
   });
-  const tired = notes.some(note => note.kind === 'fatigue' && !isSickNote(note) && note.status === 'active' && Boolean(note.bufferUntil) && note.bufferUntil! >= todayIso);
-  return { areas, blockedMuscles, blocksRunning: runningSaid || areas.some(area => RUN_BLOCKING.test(area.toLowerCase())), blockedMovements, restrictions, sick, easing: recovering || tired || pregnant || postpartum, pregnant, postpartum };
+  const fatigueScopes = notes
+    .filter(note => note.kind === 'fatigue' && !isSickNote(note) && note.status === 'active' && Boolean(note.bufferUntil) && note.bufferUntil! >= todayIso)
+    .map(note => fatigueScope(note.area));
+  const tired = fatigueScopes.some(scope => scope.kind === 'all');
+  const easeRunning = fatigueScopes.some(scope => scope.kind === 'running');
+  const easeLifting = fatigueScopes.some(scope => scope.kind === 'lifting');
+  const easeMuscles = Array.from(new Set(fatigueScopes.flatMap(scope => scope.kind === 'muscles' ? scope.muscles : [])));
+  const easeLifts = Array.from(new Set(fatigueScopes.flatMap(scope => scope.kind === 'lift' ? [scope.lift] : [])));
+  return { easeRunning, easeLifting, easeMuscles, easeLifts, areas, blockedMuscles, blocksRunning: runningSaid || areas.some(area => RUN_BLOCKING.test(area.toLowerCase())), blockedMovements, restrictions, sick, easing: recovering || tired || pregnant || postpartum, pregnant, postpartum };
 }
 
 /* An exercise is blocked when the muscle it is FOR is one the note protects.
@@ -169,4 +211,18 @@ export function sickDayStatus(notes: BodyLogNote[], iso: string): 'sick' | 'easi
     if (iso >= easeFrom && iso <= plusDays(end, EASE_BACK_DAYS)) easing = true;
   }
   return easing ? 'easing' : null;
+}
+
+/* HOW MANY PLAN WEEKS THE EASY-RUNNING WINDOW TOUCHES, counting the current
+   one: the Plan tab, Today and the coach pass it to resolveWeekRunning so all
+   three show the same easy weeks. Zero when no running-scoped fatigue note is
+   live. */
+export function easyRunWeeks(notes: BodyLogNote[], todayIso: string): number {
+  const today = new Date(`${todayIso}T12:00:00`).getTime();
+  return notes
+    .filter(note => note.kind === 'fatigue' && !isSickNote(note) && note.status === 'active' && note.bufferUntil && note.bufferUntil >= todayIso && fatigueScope(note.area).kind === 'running')
+    .reduce((weeks, note) => {
+      const daysLeft = Math.round((new Date(`${note.bufferUntil}T12:00:00`).getTime() - today) / 86400000) + 1;
+      return Math.max(weeks, Math.ceil(daysLeft / 7));
+    }, 0);
 }

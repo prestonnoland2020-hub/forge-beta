@@ -1,6 +1,7 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
-import { SICK_AREA, EASE_BACK_DAYS, PREGNANCY_AREA, POSTPARTUM_AREA, PREGNANCY_DAYS, POSTPARTUM_DAYS, limitationIn, plainText } from './bodyLog';
+import { SICK_AREA, EASE_BACK_DAYS, PREGNANCY_AREA, POSTPARTUM_AREA, PREGNANCY_DAYS, POSTPARTUM_DAYS, limitationIn, plainText, fatigueScope } from './bodyLog';
 import { weightForReps } from './strength';
+import type { CircuitStation, PlannedCardio } from '../components/CardioPlanBuilder';
 
 /* THE COACH CAN ACT.
 
@@ -44,7 +45,26 @@ export type RawAction = {
   date?: string | null;
   name?: string | null;
   items?: string[] | null;
+  stations?: Array<{ name?: string | null; target?: string | number | null; unit?: string | null; load?: string | null; rest?: number | null }> | null;
+  rounds?: number | null;
+  format?: string | null;
+  roundRest?: number | null;
 };
+
+/* ONE PIECE OF A SAVED WORKOUT, WITH ITS NUMBER. A workout the coach makes is
+   only useful with the prescription in it — "SkiErg" is a station, "500 m
+   SkiErg" is a workout. */
+export type WorkoutStation = { name: string; target: string; unit: string; load?: string; rest: number };
+export type WorkoutFormat = 'Rounds' | 'AMRAP' | 'EMOM' | 'For time';
+const STATION_UNITS = ['meters', 'km', 'kilometers', 'miles', 'yards', 'calories', 'reps', 'seconds', 'minutes'];
+const UNIT_SHORT: Record<string, string> = { meters: 'm', km: 'km', kilometers: 'km', miles: 'mi', yards: 'yd', calories: 'cal', reps: 'reps', seconds: 's', minutes: 'min' };
+export const stationText = (station: WorkoutStation) => {
+  const amount = station.unit === 'reps' ? `${station.target} ${station.name}` : `${station.target} ${UNIT_SHORT[station.unit] || station.unit} ${station.name}`;
+  return `${amount}${station.load ? ` @ ${station.load}` : ''}`;
+};
+export const workoutShapeText = (rounds: number, format: WorkoutFormat, roundRest: number) =>
+  format === 'AMRAP' ? `${rounds}-min AMRAP` : format === 'EMOM' ? `${rounds}-min EMOM` : format === 'For time' ? (rounds > 1 ? `${rounds} rounds for time` : 'For time')
+    : `${rounds} round${rounds === 1 ? '' : 's'}${rounds > 1 && roundRest ? `, ${roundRest >= 60 && roundRest % 60 === 0 ? `${roundRest / 60} min` : `${roundRest} s`} between` : ''}`;
 
 export type CoachAction =
   | { type: 'rest_today'; label: string }
@@ -57,7 +77,7 @@ export type CoachAction =
   | { type: 'set_load_bias'; percent: number; label: string }
   | { type: 'update_goal'; goalTitle: string; target?: string; date?: string; label: string }
   | { type: 'create_exercise'; name: string; muscles: string[]; label: string }
-  | { type: 'create_workout'; name: string; items: string[]; label: string };
+  | { type: 'create_workout'; name: string; items: string[]; stations?: WorkoutStation[]; rounds?: number; format?: WorkoutFormat; roundRest?: number; label: string };
 
 export type ActionContext = {
   splitDays: Array<{ position: number; name: string; type?: string }>;
@@ -137,9 +157,22 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
       if (kindText === 'postpartum') return { type, noteKind: 'other', text, area: POSTPARTUM_AREA, bufferDays: POSTPARTUM_DAYS, label: 'Postpartum — lighter loads, no running or impact until you’re cleared' };
       const noteKind: 'injury' | 'fatigue' | 'other' = kindText === 'injury' || kindText === 'fatigue' ? kindText : 'other';
       const area = str(entry.area).slice(0, 40) || undefined;
-      const what = area || (noteKind === 'fatigue' ? 'fatigue' : 'a note');
-      const avoid = noteKind !== 'fatigue' ? limitationIn(text) : null;
-      return { type, noteKind, text, area, bufferDays, label: avoid ? `Plan change: ${avoid}${area ? `, ${area} protected` : ''}` : noteKind === 'injury' ? `Body log: ${what} — train around it` : noteKind === 'fatigue' ? `Lighter training for ${bufferDays ? `${bufferDays} day${bufferDays === 1 ? '' : 's'}` : 'the next few days'}` : `Body log: ${what}` };
+      /* Fatigue names what it eases (lib/bodyLog fatigueScope), and the card
+         says so — "Lighter training" over a running-only change read as if
+         the lifting would come down too. */
+      if (noteKind === 'fatigue') {
+        const span = bufferDays ? `${bufferDays} day${bufferDays === 1 ? '' : 's'}` : 'the next few days';
+        const scope = fatigueScope(area);
+        const label = scope.kind === 'running' ? `Easier running for ${span} — lifting unchanged`
+          : scope.kind === 'lifting' ? `Lighter lifting for ${span} — running unchanged`
+          : scope.kind === 'muscles' ? `Lighter ${area} work for ${span} — everything else unchanged`
+          : scope.kind === 'lift' ? `Lighter ${area} for ${span} — everything else unchanged`
+          : `Lighter training for ${span}`;
+        return { type, noteKind, text, area, bufferDays, label };
+      }
+      const what = area || 'a note';
+      const avoid = limitationIn(text);
+      return { type, noteKind, text, area, bufferDays, label: avoid ? `Plan change: ${avoid}${area ? `, ${area} protected` : ''}` : noteKind === 'injury' ? `Body log: ${what} — train around it` : `Body log: ${what}` };
     }
     case 'clear_note': {
       const wanted = norm(str(entry.area));
@@ -180,12 +213,93 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
     }
     case 'create_workout': {
       const name = str(entry.name).slice(0, 60);
-      const items = (entry.items || []).map(str).filter(Boolean).slice(0, 12);
+      /* THE PRESCRIPTION, NOT A LIST OF NAMES. A station needs a name and a
+         number in a unit Forge can log; anything vaguer is dropped. */
+      const stations: WorkoutStation[] = (entry.stations || []).slice(0, 16).flatMap(raw => {
+        const stationName = str(raw?.name).slice(0, 60);
+        const unitText = str(raw?.unit).toLowerCase();
+        const unit = STATION_UNITS.find(item => item === unitText || item === `${unitText}s` || UNIT_SHORT[item] === unitText);
+        const amount = num(raw?.target);
+        if (!stationName || !unit || !(amount > 0)) return [];
+        const load = str(raw?.load).slice(0, 24) || undefined;
+        const rest = clamp(Math.round(num(raw?.rest) || 0), 0, 600);
+        return [{ name: stationName, target: String(Math.round(amount * 100) / 100), unit: unit === 'km' ? 'kilometers' : unit, load, rest }];
+      });
+      const items = stations.length ? stations.map(station => station.name) : (entry.items || []).map(str).filter(Boolean).slice(0, 12);
       if (!name || items.length < 2) return null;
-      return { type, name, items, label: `Save workout "${name}": ${items.join(' · ')}` };
+      if (!stations.length) return { type, name, items, label: `Save workout "${name}": ${items.join(' · ')}` };
+      const formatText = str(entry.format);
+      const format: WorkoutFormat = (['Rounds', 'AMRAP', 'EMOM', 'For time'] as const).find(item => item.toLowerCase() === formatText.toLowerCase()) || 'Rounds';
+      /* Rounds, or minutes for an AMRAP or EMOM — as the circuit builder reads them. */
+      const rounds = clamp(Math.round(num(entry.rounds) || 1), 1, format === 'AMRAP' || format === 'EMOM' ? 60 : 20);
+      const roundRest = clamp(Math.round(num(entry.roundRest) || 0), 0, 900);
+      return { type, name, items, stations, rounds, format, roundRest,
+        label: `Save "${name}" — ${workoutShapeText(rounds, format, roundRest)}: ${stations.map(stationText).join(' · ')}` };
     }
   }
   return null;
+}
+
+/* WHERE AN APPLIED CHANGE LANDS. "Done — save workout…" told the athlete it
+   happened and not where, so a circuit saved to the library was a thing they
+   had to go and hunt for. Every change names the screen that now shows it, and
+   the coach links straight there. */
+export type ChangePlace = { place: string; to: string };
+export function whereItGoes(action: CoachAction): ChangePlace {
+  switch (action.type) {
+    case 'rest_today': case 'swap_today': case 'shorten_today': return { place: 'Today', to: '/' };
+    case 'log_note': case 'clear_note': return { place: 'Body log', to: '/profile?view=coach' };
+    case 'set_weekly_mileage': case 'set_running_days': case 'set_load_bias': return { place: 'Plan', to: '/plan' };
+    case 'update_goal': return { place: 'Goals', to: '/goals' };
+    case 'create_exercise': return { place: 'Library · Exercises', to: '/exercises' };
+    case 'create_workout': return { place: 'Library · Saved circuits', to: '/exercises?show=circuits' };
+  }
+}
+
+/* A WORKOUT WITH ITS PRESCRIPTION IS SAVED AS A CIRCUIT — the stations,
+   their numbers, rounds and rest — so it opens in the circuit builder, shows
+   under Saved circuits and logs in a tap. Returns null for a names-only
+   workout (an older coach deploy), which is saved the way it always was.
+
+   A station's type follows its UNIT, because the circuit builder offers units
+   by type: reps are Strength when loaded and Bodyweight when not; a distance,
+   calories or minutes is Cardio — a loaded carry or sled included — except
+   unloaded metres on a non-cardio move (walking lunges), which is Bodyweight. */
+export function circuitWorkoutFromAction(action: CoachAction, library: Array<{ name: string; kind: string }>) {
+  if (action.type !== 'create_workout') return null;
+  /* A names-only workout (an older coach deploy) still goes to Saved circuits:
+     each movement becomes a station with its number left to fill in, rather
+     than a list that no screen shows. */
+  if (!action.stations?.length) {
+    const stations: WorkoutStation[] = action.items.map(name => {
+      const known = library.find(exercise => exercise.name.toLowerCase() === name.toLowerCase());
+      const cardio = known?.kind === 'Cardio' || /\b(run|row|rowing|ski|skierg|bike|erg|swim|sled)\b/i.test(name);
+      return { name, target: '', unit: cardio ? 'meters' : 'reps', rest: 0 };
+    });
+    const plan: PlannedCardio = {
+      id: Date.now(), activity: action.name, structure: 'Circuit', targetSource: 'Manual plan', rounds: '1', circuitFormat: 'Rounds', roundRest: '0',
+      stationEntries: stations.map((station, index) => ({ id: index + 1, kind: station.unit === 'meters' ? 'Cardio' : 'Bodyweight', name: station.name, target: '', unit: station.unit, rest: '0' })),
+    };
+    return { name: action.name, kind: 'Circuit' as const, source: 'Forge' as const, exercises: action.items, plan, summary: `${action.items.join(' · ')} · open to set the numbers` };
+  }
+  const kindOf = (station: WorkoutStation): CircuitStation['kind'] => {
+    const known = library.find(exercise => exercise.name.toLowerCase() === station.name.toLowerCase());
+    const cardioMove = known?.kind === 'Cardio' || /\b(run|row|rowing|ski|skierg|bike|erg|swim|sled)\b/i.test(station.name);
+    if (station.unit === 'reps') return station.load ? 'Strength' : 'Bodyweight';
+    if (station.unit === 'seconds') return cardioMove ? 'Cardio' : station.load ? 'Strength' : 'Bodyweight';
+    if (station.unit === 'meters' && !station.load && !cardioMove) return 'Bodyweight';
+    return 'Cardio';
+  };
+  const rounds = action.rounds || 1;
+  const format = action.format || 'Rounds';
+  const roundRest = action.roundRest || 0;
+  const plan: PlannedCardio = {
+    id: Date.now(), activity: action.name, structure: 'Circuit', targetSource: 'Manual plan',
+    rounds: String(rounds), circuitFormat: format, roundRest: String(roundRest),
+    stationEntries: action.stations.map((station, index) => ({ id: index + 1, kind: kindOf(station), name: station.name, target: station.target, unit: station.unit, load: station.load, rest: String(station.rest) })),
+  };
+  return { name: action.name, kind: 'Circuit' as const, source: 'Forge' as const, exercises: action.items, plan,
+    summary: `${workoutShapeText(rounds, format, roundRest)} · ${action.stations.map(stationText).join(' · ')}` };
 }
 
 /* WHAT THE TODAY CARD READS. A coach override is one day's worth of change,
@@ -244,15 +358,19 @@ export function shortenRecommendation(rec: DailyRecommendation, minutes: number)
    bar can hold, and the cardio a quarter shorter and steady — no intervals
    the morning after a fever. */
 export const EASE_PERCENT = 10;
-export function easeRecommendation(rec: DailyRecommendation, metric = false): DailyRecommendation {
+/* `only` narrows it: a fatigue note about the running eases the cardio and
+   leaves every lift as written; one about a lift eases that lift alone. */
+export type EaseScope = { cardio: boolean; set: (set: DailyRecommendation['topSets'][number]) => boolean };
+export function easeRecommendation(rec: DailyRecommendation, metric = false, only?: EaseScope): DailyRecommendation {
   const step = metric ? 2.5 : 5;
   const topSets = rec.topSets.map(set => {
     if (!(set.weight > 0)) return set;
+    if (only && !only.set(set)) return set;
     const weight = Math.max(step, Math.floor((set.weight * (1 - EASE_PERCENT / 100)) / step) * step);
     return { ...set, weight, calculatedMax: set.calculatedMax ? Math.round(set.calculatedMax * weight / set.weight) : set.calculatedMax, rationale: `Easing back in — ${EASE_PERCENT}% lighter today. ${set.rationale || ''}`.trim() };
   });
   let cardio = rec.cardio;
-  if (cardio) {
+  if (cardio && (!only || only.cardio)) {
     const minutes = cardioMinutesOf(cardio);
     const fit = Math.max(15, Math.round(minutes * 0.75));
     const plan: Record<string, unknown> = { ...(cardio.session.plan as Record<string, unknown>), duration: String(fit), structure: 'Steady' };
@@ -346,6 +464,10 @@ export function localActions(question: string, ctx: ActionContext): CoachAction[
   const limitation = limitationIn(lower);
   if (/\b(hurt|hurts|pain|painful|sore|tweak|tweaked|injur\w*|strain\w*|sprain\w*|tight|pulled|aching|sharp)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'injury', text, area });
   else if (limitation) raw.push({ type: 'log_note', noteKind: 'other', text, area, days: statedDays(lower) ?? 14 });
+  /* ONE PART OF TRAINING, NOT THE WHOLE PLAN. "Keep the running easier while
+     I rebuild my base" eases the runs and leaves the lifting alone. */
+  else if (/\b(rebuild(?:ing)? (?:my |the )?(?:aerobic )?base|base back)\b/.test(lower) || (/\b(run|runs|running|cardio|mileage)\b/.test(lower) && /\b(easier|easy|lighter|back off|ease off|dial back|tone down)\b/.test(lower) && !/\b(lift|lifts|lifting|squat|bench|deadlift)\b/.test(lower))) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: 'running', days: statedDays(lower) ?? 14 });
+  else if (/\b(lift|lifts|lifting|weights|loads)\b/.test(lower) && /\b(lighter|easier|back off|ease off|dial back|heavy|too heavy)\b/.test(lower) && !/\b(run|runs|running|cardio)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: 'lifting', days: statedDays(lower) ?? 7 });
   else if (/\b(fatigued?|exhausted|drained|burn(?:ed|t) out|run down|no energy|wiped|overtrained|so tired|really tired|barely slept|didn'?t sleep|no sleep|slept \d hours?)\b/.test(lower)) raw.push({ type: 'log_note', noteKind: 'fatigue', text, area: null, days: statedDays(lower) ?? 2 });
   if (area && /\b(better|fine|gone|cleared|healed|good now|no longer)\b/.test(lower) && ctx.activeNoteAreas.length) raw.push({ type: 'clear_note', area });
   if (/\b(rest day|day off|need a rest|take today off|skip today|not training today)\b/.test(lower)) raw.push({ type: 'rest_today' });
