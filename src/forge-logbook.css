@@ -265,16 +265,33 @@ body { background: var(--bg) !important; }
 .app-frame .pr-celebration-eyebrow { letter-spacing: .12em !important; }
 
 
-/* ── The page: a violet hue ─────────────────────────────────────────────── */
-/* Behind every screen, a soft electric-violet glow: strongest at the top
-   corner, a second one low on the opposite side, fading into the ground. No
-   drawing — just colour, so nothing competes with the cards. */
-.app-frame {
-  background:
-    radial-gradient(120% 55% at 0% -5%, color-mix(in srgb, var(--violet) 16%, transparent), transparent 70%),
-    radial-gradient(100% 50% at 105% 105%, color-mix(in srgb, var(--violet) 11%, transparent), transparent 70%),
-    var(--bg) !important;
+/* ── The page: one violet light, rising from the floor ──────────────────── */
+/* A single glow low on the screen, behind the tab bar, like light coming up
+   off a gym floor. --week-glow (0..1) is how much of this week's training is
+   logged: faint on day one, fullest when the week is done. It breathes on an
+   8-second cycle (about a resting breath) and flares once on a new record. */
+.app-frame { background: var(--bg) !important; isolation: isolate !important; position: relative; }
+.app-frame::before {
+  content: ''; position: fixed; inset: auto -30% -6% -30%; height: 70%;
+  pointer-events: none; z-index: -1;
+  background: radial-gradient(55% 75% at 50% 92%,
+    color-mix(in srgb, var(--violet) calc(18% + 32% * var(--week-glow, 0)), transparent),
+    color-mix(in srgb, var(--violet) calc(6% + 12% * var(--week-glow, 0)), transparent) 42%,
+    transparent 80%);
+  animation: forge-breathe 8s ease-in-out infinite;
+  transform-origin: 50% 100%;
 }
+@keyframes forge-breathe {
+  0%, 100% { opacity: .82; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+.app-frame.record-flare::before { animation: forge-flare 1.6s cubic-bezier(.2, .8, .2, 1) 1, forge-breathe 8s ease-in-out 1.6s infinite; }
+@keyframes forge-flare {
+  0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+  25% { opacity: 1; transform: scale(1.35); filter: brightness(2.4) saturate(1.2); }
+  100% { opacity: .82; transform: scale(1); filter: brightness(1); }
+}
+@media (prefers-reduced-motion: reduce) { .app-frame::before { animation: none; opacity: .9; } }
 
 /* ── Electric violet, sparingly: a finished session ────────────────────── */
 .app-frame .pv-check { background: var(--violet) !important; color: var(--on-brand) !important; }

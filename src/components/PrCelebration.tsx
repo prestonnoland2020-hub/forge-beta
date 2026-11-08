@@ -27,6 +27,15 @@ export function PrCelebration({ lift, weight, previous, unit, onDone }: { lift: 
     color: COLORS[index % COLORS.length],
   })), []);
 
+  /* A new record flares the floor glow once (forge-logbook.css). */
+  useEffect(() => {
+    const frame = document.querySelector('.app-frame');
+    if (!frame) return;
+    frame.classList.remove('record-flare'); void (frame as HTMLElement).offsetWidth; frame.classList.add('record-flare');
+    const done = window.setTimeout(() => frame.classList.remove('record-flare'), 1700);
+    return () => window.clearTimeout(done);
+  }, []);
+
   const gain = previous !== null ? Math.round((weight - previous) * 10) / 10 : null;
 
   return createPortal(<div className="pr-celebration" role="status" aria-live="assertive" onClick={onDone}>
