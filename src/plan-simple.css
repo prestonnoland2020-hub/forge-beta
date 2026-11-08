@@ -221,3 +221,4 @@
 /* One line saying why the week is shaped the way it is. Quiet by design: it is
    an explanation, not an alert, and it sits above the week it explains. */
 .pv-collision{margin:0 0 12px;padding:12px 12px;border-left:2px solid var(--accent,#2f6fd0);background:var(--surface-2,rgba(127,127,127,.06));border-radius:0 10px 10px 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.pv-line-support .pv-line-value{font:600 14px var(--body, inherit);color:var(--ink-3)}
