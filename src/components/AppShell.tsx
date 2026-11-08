@@ -6,6 +6,7 @@ import { CoachCheckIn } from './CoachCheckIn';
 import { GarminConnectPrompt } from './GarminConnectPrompt';
 import { ForgeNoticed } from './ForgeNoticed';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { flushSync } from 'react-dom';
 import { syncKeyboardState } from '../features/shell/nativeChrome';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -110,6 +111,16 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
 
   const location = useLocation();
   const navigate = useNavigate();
+  /* TAB SWITCHES CROSSFADE. The browser holds a picture of the current
+     screen, React draws the next one synchronously inside the transition,
+     and the two blend; header, tab bar and coach button are their own
+     layers and hold still (forge-logbook.css). Without view transitions, or
+     with reduced motion, it is a plain navigation and the CSS fade runs. */
+  const goTab = useCallback((to: string, options?: { replace?: boolean }) => {
+    const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+    if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { navigate(to, options); return; }
+    doc.startViewTransition(() => { crossfading.current = true; flushSync(() => navigate(to, options)); });
+  }, [navigate]);
   /* A TAB ANSWERS THE FIRST TAP. On iOS a tap that lands while the page is
      still coasting from a scroll only stops the scroll — the click never
      comes, so the bar felt stuck until it was tapped again. Touch events do
@@ -158,9 +169,17 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      has to carry the right direction, or it starts sliding the wrong way and
      corrects itself a frame later. */
   const motion = useRef<'push' | 'pop' | 'fade' | 'none'>('none');
+  /* Set by goTab while the browser is crossfading: that screen change needs no
+     CSS motion of its own. */
+  const crossfading = useRef(false);
   if (lastScreen.current.key !== screenKey) {
     const depth = screenDepth(location.pathname, location.search);
-    motion.current = depth > lastScreen.current.depth ? 'push' : depth < lastScreen.current.depth ? 'pop' : 'fade';
+    /* A tab switch is a native crossfade where the browser has view
+       transitions (goTab): the old screen stays up until the new one has
+       drawn, then they blend. The CSS fade started the new screen from empty,
+       which read as a blink. */
+    motion.current = crossfading.current ? 'none' : depth > lastScreen.current.depth ? 'push' : depth < lastScreen.current.depth ? 'pop' : 'fade';
+    crossfading.current = false;
     lastScreen.current = { key: screenKey, depth };
   }
   /* A new screen starts at its top. Without this, switching tabs kept the
@@ -385,21 +404,30 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
         if (index < 0 || index === state.index) return;
         state.index = index;
         tick();
-        navigate(tabs[index].to, { replace: state.moved });
+        goTab(tabs[index].to, { replace: state.moved });
         state.moved = true;
       }}
       onTouchEnd={() => { if (scrub.current?.active) setScrubbing(false); scrub.current = null; }}
       onTouchCancel={() => { if (scrub.current?.active) setScrubbing(false); scrub.current = null; }}>
       {activeTab >= 0 && <span className="tab-indicator" aria-hidden="true" />}
       {tabs.map((tab, index) => <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className={index === activeTab ? 'tab active' : 'tab'} aria-current={index === activeTab ? 'page' : undefined}
-        onClick={() => { if (index !== activeTab) tap(); }}
+        onPointerDown={event => {
+          /* The tab answers the finger, not the render. The indicator and the
+             lit tab move on touch-down; the new screen follows when it has
+             drawn. React sets the same values on its next render. */
+          const nav = event.currentTarget.closest('.tab-bar') as HTMLElement | null;
+          if (!nav || index === activeTab) return;
+          nav.style.setProperty('--tab-index', String(index));
+          nav.querySelectorAll('.tab').forEach((item, i) => item.classList.toggle('active', i === index));
+        }}
+        onClick={event => { if (index === activeTab) return; event.preventDefault(); tap(); goTab(tab.to); }}
         onTouchStart={event => { const point = event.touches[0]; tabTouch.current = point ? { x: point.clientX, y: point.clientY } : null; }}
         onTouchEnd={event => {
           const start = tabTouch.current; tabTouch.current = null;
           const point = event.changedTouches[0];
           if (!start || !point || Math.hypot(point.clientX - start.x, point.clientY - start.y) > 10) return;
           event.preventDefault();
-          if (index !== activeTab) { tap(); navigate(tab.to); }
+          if (index !== activeTab) { tap(); goTab(tab.to); }
         }}><NavGlyph name={tab.icon}/><small>{tab.label}</small></NavLink>)}
     </nav>
     {/* THE COACH SPEAKS FIRST WHEN IT HAS SOMETHING THAT MATTERS. An athlete

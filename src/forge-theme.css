@@ -223,6 +223,7 @@
   --num: var(--display);
   /* The ink on a brand-blue fill when it is a mark, not text: the coach's F. */
   --on-brand: #ffffff;
+  --violet: #9274ff;
   --title-weight: 700;
   --title-stretch: 100%;
   --title-tracking: -.02em;
@@ -254,21 +255,22 @@
     --tint: var(--a-tint-d);
     --chart-1: var(--a-chart-d);
 
-    --bg: #131819;
-    --surface-1: #1b2223;
-    --surface-2: #252e2f;
-    --surface-3: #3f4849;
-    --surface-sunken: #0d1213;
-    --surface-0: #1b2223;
+    --bg: #101e25;
+    --surface-1: #16262f;
+    --surface-2: #1d313b;
+    --surface-3: #2c4553;
+    --surface-sunken: #0b161b;
+    --surface-0: #16262f;
 
-    --hairline: #2c3435;
-    --hairline-strong: #4a5556;
+    --hairline: #233740;
+    --hairline-strong: #3a5464;
 
     --ink: #edf1f1;
     --ink-2: #b9c1c0;
     --ink-3: #939997;
 
     --on-brand: #ffffff;
+    --violet: #9274ff;
     --good: #6cc3a0;
     --warn: #dcb46a;
     --bad: #e3897e;
@@ -311,21 +313,22 @@
   --tint: var(--a-tint-d);
   --chart-1: var(--a-chart-d);
 
-  --bg: #131819;
-  --surface-1: #1b2223;
-  --surface-2: #252e2f;
-  --surface-3: #3f4849;
-  --surface-sunken: #0d1213;
-  --surface-0: #1b2223;
+  --bg: #101e25;
+  --surface-1: #16262f;
+  --surface-2: #1d313b;
+  --surface-3: #2c4553;
+  --surface-sunken: #0b161b;
+  --surface-0: #16262f;
 
-  --hairline: #2c3435;
-  --hairline-strong: #4a5556;
+  --hairline: #233740;
+  --hairline-strong: #3a5464;
 
   --ink: #edf1f1;
   --ink-2: #b9c1c0;
   --ink-3: #939997;
 
   --on-brand: #ffffff;
+  --violet: #9274ff;
   --good: #6cc3a0;
   --warn: #dcb46a;
   --bad: #e3897e;
@@ -401,13 +404,14 @@
    is why it is declared on bare :root as well as on its own attribute. */
 :root,
 [data-accent="signal"] {
-  --a-fill: #259de2;   --a-fill-d: #259de2;
-  --a-strong: #0078bb; --a-strong-d: #259de2;
-  --a-ink: #ffffff;    --a-ink-d: #1a2c3a;
-  --a-text: #006bad;   --a-text-d: #29a0e5;
-  --a-dim: #a4daff;    --a-dim-d: #086b9f;
-  --a-tint: #0084c7;   --a-tint-d: #259de2;
-  --a-chart: #006bad;  --a-chart-d: #29a0e5;
+  /* Electric blue #168fd1 — the primary. Deep navy is the dark ground. */
+  --a-fill: #168fd1;   --a-fill-d: #168fd1;
+  --a-strong: #0f74ad; --a-strong-d: #1f9ae0;
+  --a-ink: #ffffff;    --a-ink-d: #0b1a22;
+  --a-text: #006bad;   --a-text-d: #3aa8ea;
+  --a-dim: #a4daff;    --a-dim-d: #0b6799;
+  --a-tint: #168fd1;   --a-tint-d: #168fd1;
+  --a-chart: #006bad;  --a-chart-d: #3aa8ea;
 }
 
 /* FLARE — the hot red. */

@@ -27,7 +27,7 @@ import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvid
 import { recoveryTrend } from '../lib/recoveryEngine';
 import { estimateMaxHr, heartRateRuns, heartRateTargets, type HeartRateTargets } from '../lib/heartRate';
 import {
-  generateAiPlan, loadStoredAiPlan, saveStoredAiPlan, planFingerprint,
+  generateAiPlan, loadStoredAiPlan, readLocalAiPlan, saveStoredAiPlan, planFingerprint,
   weeksRemaining, currentWeekIndex, planBlockFor, rememberPlannedMiles, goalLiftNames, waveSlot, testsOneRepMax, resolvePlanWeek, weekCycleDays,
   bestsFromHistory, chooseMaxAttempts, loggedSinglesByLift, waveOffsetFromHistory, waveIndexOf, WAVE_REPS, WAVE_LENGTH, type AiPlanWeek, type AiPlanTopSet, type SplitDayRef, type StoredAiPlan,
   calendarEmptyState, provenMax,
@@ -205,8 +205,12 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      Tuesday, rest pushed to Wednesday, and every day after it a day late.
      anchorPosition is the cursor's own answer for anchorDate. */
   const anchor = anchorPosition ? { position: anchorPosition, dateIso: anchorDate } : undefined;
-  const [stored, setStored] = useState<StoredAiPlan | null>(null);
-  const [storeLoading, setStoreLoading] = useState(true);
+  /* OPENS ON THE SAVED COPY. The tab used to wait on the network for the plan
+     every time it opened, so it flashed "Loading your plan…" and then popped
+     in. The copy on the phone draws at once; the account's copy replaces it
+     quietly when it arrives. Only a phone with no copy at all shows loading. */
+  const [stored, setStored] = useState<StoredAiPlan | null>(() => readLocalAiPlan());
+  const [storeLoading, setStoreLoading] = useState(() => !readLocalAiPlan());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [refreshAsk, setRefreshAsk] = useState(false);
@@ -593,7 +597,9 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
 
   /* A stored block renders even offline/demo; only GENERATION needs a user. */
   const canGenerate = !isDemoMode && Boolean(user);
-  if (storeLoading) return <div className="pv"><section className="card pv-state"><span className="eyebrow">Your plan</span><h3>Loading your plan…</h3></section></div>;
+  /* Waiting on the account's copy (a phone with none saved): hold the space
+     quietly rather than flash a "Loading" card the plan replaces a beat later. */
+  if (storeLoading) return <div className="pv" aria-busy="true" aria-label="Loading your plan" />;
   if (!stored && !canGenerate) return <LongRangeTrainingPlan goals={goals} profile={profile} splitDays={splitDays} rhythm={rhythm} />;
   /* Before the block exists the tab is still useful: it says the one thing
      that is missing, in the athlete's terms, and shows the pre-program plan
