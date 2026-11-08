@@ -9,6 +9,7 @@
    circuit that opens in the builder. */
 import { readFileSync } from 'node:fs';
 import { parseActions, whereItGoes, circuitWorkoutFromAction } from './src/lib/coachActions.ts';
+import { stationLine, formatLine } from './src/components/CircuitWorkoutBuilder.tsx';
 
 let fails = 0;
 const check = (l, c, d = '') => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${c ? '' : d ? ` — ${d}` : ''}`); if (!c) fails++; };
@@ -61,6 +62,14 @@ check('no path saves a coach workout anywhere but Saved circuits', !/kind: cardi
 const coachPage = readFileSync('src/pages/CoachPage.tsx', 'utf8');
 check('the Done message carries a See-it link that closes the coach', /coach-applied-link/.test(coachPage) && /forge:close-coach/.test(coachPage));
 check('and the library scrolls to and marks the circuit', /just-saved/.test(readFileSync('src/components/WorkoutLibrary.tsx', 'utf8')));
+
+console.log('\nThe builder reads like a workout');
+check('a station is one plain line', stationLine({ name: 'Sled Push', target: '20', unit: 'meters', load: '102 kg' }) === '20 m Sled Push @ 102 kg');
+check('reps read as a count', stationLine({ name: 'Wall Balls', target: '15', unit: 'reps' }) === '15 Wall Balls');
+check('a station with no amount still names the movement', stationLine({ name: 'Burpee Broad Jumps', target: '', unit: 'meters' }) === 'Burpee Broad Jumps');
+check('the format is one line', formatLine('Rounds', '3', '60') === '3 rounds · 1 min between' && formatLine('AMRAP', '20', '0') === '20-min AMRAP');
+const builder = readFileSync('src/components/CircuitWorkoutBuilder.tsx', 'utf8');
+check('no movement from Forge is dropped for being outside a filtered list', /name: exercise\?\.name \|\| station\.name/.test(builder));
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);
