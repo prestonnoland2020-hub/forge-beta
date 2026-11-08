@@ -217,6 +217,7 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [refreshAsk, setRefreshAsk] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   /* What the coach wants the rebuild to be told, when the athlete accepts a
      reshape. It prefills the request box so they can edit or add to it — the
      coach proposes, the athlete still signs. */
@@ -722,7 +723,14 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {onMileageBounds && <RunningBehindCard startDate={stored.startDate} plannedMiles={plannedMiles} onBounds={onMileageBounds} onRebuild={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />}
     <PlanProgress weekIndex={weekIndex} current={currentIndex} total={plan.weeks.length}
       waveIndexFor={index => waveIndexOf(stored, index)} sentence={sentence}
-      onPick={index => setViewWeek(index === currentIndex ? null : index)} />
+      onPick={index => setViewWeek(index === currentIndex ? null : index)}
+      adjustOpen={adjustOpen} onAdjust={() => setAdjustOpen(open => !open)} />
+    {adjustOpen ? <div className="adjust-panel"><PlanActions
+      saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
+      onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}
+      request={stored.adjustments} requestNote={plan.adjustmentNote} generatedAt={stored.generatedAt}
+      error={error && !refreshAsk ? `${error} — showing the stored block.` : undefined} /></div>
+      : error && !refreshAsk ? <small className="pv-error">{error} — showing the stored block.</small> : null}
     {refreshAsk ? <PlanRebuildModal
       saved={Boolean(stored.saved)}
       standing={coachInstruction || stored.adjustments}
@@ -758,10 +766,5 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
     {/* "This block is asking too much — reshape it" about a block that has
         already ended; the card above offers the next one instead. */}
     {!blockDone && <PlanPressureCard onReshape={instruction => { setCoachInstruction(instruction); setRefreshAsk(true); }} />}
-    <PlanActions
-      saved={Boolean(stored.saved)} savedAt={stored.savedAt} generating={generating} canGenerate={canGenerate}
-      onSave={() => void savePlan()} onRegenerate={() => setRefreshAsk(true)}
-      request={stored.adjustments} requestNote={plan.adjustmentNote} generatedAt={stored.generatedAt}
-      error={error && !refreshAsk ? `${error} — showing the stored block.` : undefined} />
   </div>;
 }

@@ -7,7 +7,7 @@ import { SearchField } from './SearchField';
 const groups: ExerciseCategory[] = ['Strength', 'HYROX', 'CrossFit', 'Cardio'];
 const muscles = ['Chest', 'Back', 'Shoulders', 'Quads', 'Glutes', 'Hamstrings', 'Calves', 'Biceps', 'Triceps', 'Forearms', 'Abs', 'Cardio'];
 
-export function ExerciseLibrary() {
+export function ExerciseLibrary({ tab = 'lifts' }: { tab?: 'lifts' | 'cardio' } = {}) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [name, setName] = useState('');
@@ -22,8 +22,10 @@ export function ExerciseLibrary() {
   const shown = useMemo(() => {
     const term = query.trim().toLowerCase();
     const matches = exercises.filter(item => !term || `${item.name} ${exerciseCategory(item)} ${item.muscles.join(' ')}`.toLowerCase().includes(term));
-    return groups.map(group => ({ group, items: matches.filter(item => exerciseCategory(item) === group).sort((a, b) => a.name.localeCompare(b.name)) })).filter(({ items }) => items.length);
-  }, [exercises, query]);
+    /* The Lifts tab holds every lifting category; Cardio holds cardio. */
+    const inTab = (group: ExerciseCategory) => tab === 'cardio' ? group === 'Cardio' : group !== 'Cardio';
+    return groups.filter(inTab).map(group => ({ group, items: matches.filter(item => exerciseCategory(item) === group).sort((a, b) => a.name.localeCompare(b.name)) })).filter(({ items }) => items.length);
+  }, [exercises, query, tab]);
   const editingExercise = editing ? exercises.find(item => item.id === editing) : undefined;
   const isCardio = category === 'Cardio' || editingExercise?.kind === 'Cardio' || /\b(run|jog|row|rowing|bike|cycling|ski\s*erg|skierg|swim|double unders?)\b/i.test(name);
 
@@ -54,7 +56,7 @@ export function ExerciseLibrary() {
   };
 
   return <div className="exercise-library stack-lg">
-    <div className="exercise-library-head"><SearchField value={query} onChange={setQuery} placeholder="Search exercises" aria-label="Search exercises" /><button className="button" onClick={() => open()}>＋ Add exercise</button></div>
+    <div className="exercise-library-head"><SearchField value={query} onChange={setQuery} placeholder={tab === 'cardio' ? 'Search cardio' : 'Search lifts'} aria-label="Search exercises" /><button className="button" onClick={() => open()}>＋ Add</button></div>
     {editing !== null && <div className="mobile-editor-backdrop" role="presentation">
       <section className="card custom-exercise" role="dialog" aria-modal="true" aria-label={editing ? 'Edit exercise' : 'Add exercise'}>
         <div className="card-head"><div><span className="eyebrow">{editing ? 'EDIT EXERCISE' : 'NEW EXERCISE'}</span><h3>{editing ? editingExercise?.name : 'Add an exercise'}</h3></div><button className="text-button" onClick={close}>Close</button></div>

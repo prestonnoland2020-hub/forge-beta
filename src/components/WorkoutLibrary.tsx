@@ -58,9 +58,10 @@ export function WorkoutLibrary() {
 
   return <section className="exercise-group" id="saved-circuits" ref={sectionRef}>
     {builderMode && <CircuitWorkoutBuilder mode={builderMode} initial={editing?.plan} exercises={exercises} onClose={closeBuilder} onSave={saveCircuit} onDelete={editing ? () => remove(editing) : undefined} />}
+    {/* Making one comes first: the actions sit at the top of the tab. */}
+    <div className="exercise-circuit-actions top"><button className="button" onClick={() => openBuilder('manual')}>＋ New circuit</button><button className="button secondary" onClick={() => openBuilder('forge')}>Let Forge build one</button></div>
     <span className="eyebrow">Saved circuits</span>
     {saved.length ? <div className="simple-settings-list">{saved.map(workout => <button type="button" id={`circuit-${workout.id}`} className={workout.id === justSaved ? 'just-saved' : undefined} onClick={() => openBuilder(workout.source === 'Forge' ? 'forge' : 'manual', workout)} key={workout.id}><div><strong>{workout.name}{workout.id === justSaved && <em className="just-saved-tag">Just saved</em>}</strong><span>{workout.summary}</span></div><b>›</b></button>)}</div>
       : <p className="library-table-empty">No saved circuits yet. Save one here and it logs in a tap from any workout.</p>}
-    <div className="exercise-circuit-actions"><button className="button ghost" onClick={() => openBuilder('manual')}>New circuit</button><button className="text-button" onClick={() => openBuilder('forge')}>or let Forge build one</button></div>
   </section>;
 }

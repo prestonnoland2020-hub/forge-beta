@@ -80,6 +80,9 @@ const run = async (hist, rows, fingerprint) => {
   await page.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => { location.hash = '#/plan'; });
   await page.waitForTimeout(3600);
+  /* Save and Regenerate live behind the Adjust pill at the top of the plan. */
+  await page.evaluate(() => document.querySelector('.pv-progress-head .adjust-pill')?.click());
+  await page.waitForTimeout(300);
   const actions = await page.evaluate(() => {
     const row = document.querySelector('.pv-actions-row');
     return [...(row?.querySelectorAll('button') || [])].map(x => ({ text: x.textContent.trim(), disabled: x.disabled }));
