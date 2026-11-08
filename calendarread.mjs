@@ -41,7 +41,8 @@ check('a lift is a filled dot', /\.calendar-legend \.strength,\.calendar-markers
 check('a run is a ring, not another filled dot',
   /\.calendar-markers \.cardio\{background:transparent;border:2px solid var\(--chart-2\)\}/.test(history));
 check('and the ring keeps the dot’s footprint', /\.calendar-markers i\{[^}]*box-sizing:border-box\}/.test(history));
-check('the legend still states the convention once', /calendar-legend/.test(page));
+/* The month's figures now carry the marks, so the row IS the legend. */
+check('the legend still states the convention once', /<dt><i className="strength"[^>]*\/>Lifts<\/dt>/.test(page) && /<dt><i className="cardio"[^>]*\/>Cardio<\/dt>/.test(page) && !/calendar-legend/.test(page));
 
 console.log('\nThe screen says each thing once');
 /* The sentence survives in the comment explaining why it went; what must not
@@ -51,7 +52,7 @@ check('the duplicated tap instruction is gone',
 check('the one beside the control stays', /Tap a day · swipe to change month/.test(page));
 check('the month heading carries no CALENDAR eyebrow',
   !/<span className="eyebrow">CALENDAR<\/span>/.test(page));
-check('the average weight names its unit', /<span>Avg \{weightUnit\}<\/span>/.test(page));
+check('the average weight names its unit', /<dt>Avg \{weightUnit\}<\/dt>/.test(page));
 check('the lineage line is in words, not record fields',
   /Forge planned this day/.test(page) && !/split position \{selected\.splitPosition/.test(page));
 
