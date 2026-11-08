@@ -103,7 +103,7 @@
 .wr-bar-row { display: grid; grid-template-columns: 1fr; gap: 6px; }
 .wr-bar-row span { font-size: .85rem; opacity: .75; }
 .wr-bar-row > div { height: 18px; border-radius: 10px; background: rgba(255,255,255,.1); overflow: hidden; }
-.wr-bar-row i { display: block; height: 100%; width: var(--w); border-radius: inherit; animation: wr-grow 1.2s cubic-bezier(.2,.8,.2,1) both; }
+.wr-bar-row i { display: block; height: 100%; width: var(--w, 0%); border-radius: inherit; animation: wr-grow 1.2s cubic-bezier(.2,.8,.2,1) both; }
 .wr-bar-row i.from { background: rgba(255,255,255,.45); animation-delay: .5s; }
 .wr-bar-row i.to { background: linear-gradient(90deg, var(--wr-electric), var(--wr-lilac)); animation-delay: .9s; }
 .wr-bar-row b { font-size: 1.6rem; font-weight: 900; font-variant-numeric: tabular-nums; }
@@ -131,7 +131,7 @@
 /* Weekday bars */
 .wr-week { width: 100%; height: 190px; margin-top: 26px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; }
 .wr-week > div { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
-.wr-week i { position: relative; width: 100%; height: var(--h); border-radius: 8px 8px 4px 4px; background: rgba(255,255,255,.28); transform-origin: bottom; animation: wr-rise .8s cubic-bezier(.3,1.4,.5,1) both; }
+.wr-week i { position: relative; width: 100%; height: var(--h, 0%); border-radius: 8px 8px 4px 4px; background: rgba(255,255,255,.28); transform-origin: bottom; animation: wr-rise .8s cubic-bezier(.2,.8,.2,1) both; }
 .wr-week .fav i { background: linear-gradient(180deg, #fff, var(--wr-lilac)); }
 .wr-week em { position: absolute; top: -20px; left: 0; right: 0; text-align: center; font-style: normal; font-size: .75rem; font-weight: 700; opacity: .8; }
 .wr-week span { font-size: .8rem; font-weight: 700; opacity: .7; }
