@@ -221,6 +221,8 @@
   /* Every number an athlete reads — a load, a rep count, a max — uses the
      app's own font with tabular figures, so a column of top sets lines up. */
   --num: var(--display);
+  /* The ink on a brand-blue fill when it is a mark, not text: the coach's F. */
+  --on-brand: #ffffff;
   --title-weight: 700;
   --title-stretch: 100%;
   --title-tracking: -.02em;
@@ -266,6 +268,7 @@
     --ink-2: #b9c1c0;
     --ink-3: #939997;
 
+    --on-brand: #ffffff;
     --good: #6cc3a0;
     --warn: #dcb46a;
     --bad: #e3897e;
@@ -322,6 +325,7 @@
   --ink-2: #b9c1c0;
   --ink-3: #939997;
 
+  --on-brand: #ffffff;
   --good: #6cc3a0;
   --warn: #dcb46a;
   --bad: #e3897e;

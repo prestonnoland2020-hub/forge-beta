@@ -22,7 +22,8 @@
    where an older layer already used it. */
 
 /* ── Ground ─────────────────────────────────────────────────────────────── */
-body, .app-frame, .app-frame .app-main { background: var(--bg) !important; }
+body, .app-frame { background: var(--bg) !important; }
+.app-frame .app-main { background: transparent !important; }
 
 /* ── Type: one voice ────────────────────────────────────────────────────── */
 .app-frame :is(h1, h2, h3, h4, strong, b, span, small, p, label, a, button, i, div, li) { font-style: normal !important; }
@@ -187,11 +188,12 @@ body, .app-frame, .app-frame .app-main { background: var(--bg) !important; }
   .app-frame .tab-bar .tab.active { color: var(--ink) !important; }
   .app-frame .tab-bar .tab small { font-weight: 600 !important; font-size: 11px !important; letter-spacing: 0 !important; }
 
-  /* The coach: a quiet disc with the brand mark in it. It is always there, so
-     it does not need to be the loudest thing on screen. */
+  /* The coach is Forge: a disc in Forge blue with the mark knocked out in
+     white. --accent-strong is the brand fill that carries white text at AA in
+     both tones. */
   .app-frame .coach-bubble-toggle:not(.active) {
-    background: var(--surface-1) !important; color: var(--accent-text) !important;
-    border: 1px solid var(--hairline-strong) !important; box-shadow: none !important;
+    background: var(--accent-strong) !important; color: var(--on-brand) !important;
+    border: 0 !important; box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-strong) 35%, transparent) !important;
   }
   .app-frame .coach-bubble-toggle:active { transform: translateY(1px) scale(.985) !important; }
 }
@@ -262,3 +264,84 @@ body, .app-frame, .app-frame .app-main { background: var(--bg) !important; }
 /* The record badge is a celebration, not a label: it keeps its tracked capitals. */
 .app-frame .pr-celebration-eyebrow { letter-spacing: .12em !important; }
 
+
+/* ── The page: a light blue hue with swells and lines ──────────────────── */
+/* A fixed layer behind every screen: a wash of the brand blue that is
+   strongest at the top, and a drawing of long swells and fine contour lines
+   painted in the brand colour through a mask, so it follows the accent and
+   the tone. Cards stay opaque; the drawing shows in the gaps between them. */
+.app-frame { isolation: isolate; }
+.app-frame::before, .app-frame::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+}
+.app-frame::before {
+  background:
+    radial-gradient(120% 60% at 15% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(90% 50% at 110% 105%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, var(--bg)), var(--bg) 60%);
+}
+.app-frame::after {
+  background: var(--accent);
+  opacity: .16;
+  -webkit-mask: var(--forge-swells) top center / 100% auto no-repeat;
+          mask: var(--forge-swells) top center / 100% auto no-repeat;
+}
+:root[data-theme="dark"] .app-frame::after { opacity: .22; }
+@media (prefers-color-scheme: dark) { :root[data-theme="system"] .app-frame::after { opacity: .22; } }
+:root {
+  --forge-swells: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 900' fill='none'%3E%3Cpath d='M0 120 C70 70 130 170 210 120 S340 60 400 105 V0 H0Z' fill='%23000' fill-opacity='.35'/%3E%3Cpath d='M0 175 C90 120 150 215 240 165 S350 120 400 150' stroke='%23000' stroke-width='1.2'/%3E%3Cpath d='M0 200 C90 145 150 240 240 190 S350 145 400 175' stroke='%23000' stroke-width='1' stroke-opacity='.8'/%3E%3Cpath d='M0 225 C90 170 150 265 240 215 S350 170 400 200' stroke='%23000' stroke-width='.8' stroke-opacity='.6'/%3E%3Cpath d='M0 250 C90 195 150 290 240 240 S350 195 400 225' stroke='%23000' stroke-width='.7' stroke-opacity='.45'/%3E%3Cpath d='M0 275 C90 220 150 315 240 265 S350 220 400 250' stroke='%23000' stroke-width='.6' stroke-opacity='.3'/%3E%3Cpath d='M0 640 C80 600 160 690 250 645 S360 600 400 625' stroke='%23000' stroke-width='.7' stroke-opacity='.35'/%3E%3Cpath d='M0 668 C80 628 160 718 250 673 S360 628 400 653' stroke='%23000' stroke-width='.8' stroke-opacity='.55'/%3E%3Cpath d='M0 696 C80 656 160 746 250 701 S360 656 400 681' stroke='%23000' stroke-width='1' stroke-opacity='.75'/%3E%3Cpath d='M0 760 C100 715 170 815 270 765 S370 730 400 750 V900 H0Z' fill='%23000' fill-opacity='.3'/%3E%3C/svg%3E");
+}
+@media print { .app-frame::before, .app-frame::after { display: none; } }
+
+/* ── Header actions: one piece ─────────────────────────────────────────── */
+/* Readiness, Progress and Log were three separate chips. They are one
+   capsule now, split by hairlines, so the corner reads as a single control. */
+.app-frame .top-actions:has(> :is(.top-readiness, .top-insights, .top-log)) {
+  gap: 0 !important; padding: 3px !important;
+  background: var(--surface-1) !important; border: 1px solid var(--hairline) !important; border-radius: 999px !important;
+}
+.app-frame .top-actions > :is(.top-readiness, .top-insights, .top-log) {
+  background: transparent !important; border: 0 !important; box-shadow: none !important;
+  border-radius: 999px !important; min-height: 38px; min-width: 40px; height: 38px !important;
+}
+.app-frame .top-actions > :is(.top-readiness, .top-insights, .top-log) + :is(.top-readiness, .top-insights, .top-log) {
+  position: relative;
+}
+.app-frame .top-actions > :is(.top-readiness, .top-insights, .top-log) + :is(.top-readiness, .top-insights, .top-log)::before {
+  content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 1px; background: var(--hairline);
+}
+.app-frame .top-actions > .top-log { background: var(--accent-strong) !important; color: var(--accent-ink) !important; width: 38px; min-width: 38px; }
+.app-frame .top-actions > .top-log::before { display: none; }
+.app-frame .top-actions > .top-readiness { padding-inline: 10px 8px !important; }
+.app-frame .top-actions .data-sync-state { margin-right: 6px; }
+
+/* ── Goal prediction: what matters ─────────────────────────────────────── */
+.app-frame .goal-prediction.compact {
+  margin: var(--s3) 0 0; padding: 14px 16px; border-radius: 14px;
+  background: var(--surface-2); border: 0; display: grid; gap: 8px;
+}
+.goal-prediction.compact .gpc-head { display: flex; justify-content: space-between; align-items: center; }
+.goal-prediction.compact .gpc-head span { font-size: 13px; font-weight: 500; color: var(--ink-3); }
+.goal-prediction.compact .gpc-head em { font-style: normal; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+.goal-prediction.compact.tone-good .gpc-head em { color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface-2)); }
+.goal-prediction.compact.tone-stretch .gpc-head em { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--surface-2)); }
+.goal-prediction.compact.tone-hard .gpc-head em { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, var(--surface-2)); }
+.goal-prediction.compact .gpc-num { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.goal-prediction.compact .gpc-num > b { font-family: var(--num); font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.goal-prediction.compact .gpc-num > span { font-size: 15px; color: var(--ink-2); }
+.goal-prediction.compact .gpc-num > span b { color: var(--ink); font-weight: 700; }
+.goal-prediction.compact .gpc-bar { position: relative; height: 6px; border-radius: 999px; background: var(--surface-sunken); }
+.goal-prediction.compact .gpc-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; }
+.goal-prediction.compact.tone-good .gpc-bar i { background: var(--good); }
+.goal-prediction.compact.tone-stretch .gpc-bar i { background: var(--warn); }
+.goal-prediction.compact.tone-hard .gpc-bar i { background: var(--bad); }
+.goal-prediction.compact .gpc-bar s { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.goal-prediction.compact .gpc-meta { display: flex; justify-content: space-between; margin: 0; font-size: 13px; color: var(--ink-3); }
+.goal-prediction.compact .goal-fix { margin: 4px 0 0; }
+
+.app-frame .coach-bubble-toggle:not(.active) .coach-mark { background: var(--on-brand) !important; }
+
+/* The tab bar stays on the workout now, so Finish rides just above it. */
+@media (max-width: 900px) {
+  .app-frame .workout-finish-bar { bottom: calc(var(--tab-clear) - var(--safe-b, env(safe-area-inset-bottom)) - 14px) !important; padding-bottom: 26px !important; }
+}
