@@ -1,6 +1,7 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
 import { SICK_AREA, EASE_BACK_DAYS, PREGNANCY_AREA, POSTPARTUM_AREA, PREGNANCY_DAYS, POSTPARTUM_DAYS, limitationIn, plainText, fatigueScope } from './bodyLog';
 import { weightForReps } from './strength';
+import type { CircuitStation, PlannedCardio } from '../components/CardioPlanBuilder';
 
 /* THE COACH CAN ACT.
 
@@ -44,7 +45,26 @@ export type RawAction = {
   date?: string | null;
   name?: string | null;
   items?: string[] | null;
+  stations?: Array<{ name?: string | null; target?: string | number | null; unit?: string | null; load?: string | null; rest?: number | null }> | null;
+  rounds?: number | null;
+  format?: string | null;
+  roundRest?: number | null;
 };
+
+/* ONE PIECE OF A SAVED WORKOUT, WITH ITS NUMBER. A workout the coach makes is
+   only useful with the prescription in it — "SkiErg" is a station, "500 m
+   SkiErg" is a workout. */
+export type WorkoutStation = { name: string; target: string; unit: string; load?: string; rest: number };
+export type WorkoutFormat = 'Rounds' | 'AMRAP' | 'EMOM' | 'For time';
+const STATION_UNITS = ['meters', 'km', 'kilometers', 'miles', 'yards', 'calories', 'reps', 'seconds', 'minutes'];
+const UNIT_SHORT: Record<string, string> = { meters: 'm', km: 'km', kilometers: 'km', miles: 'mi', yards: 'yd', calories: 'cal', reps: 'reps', seconds: 's', minutes: 'min' };
+export const stationText = (station: WorkoutStation) => {
+  const amount = station.unit === 'reps' ? `${station.target} ${station.name}` : `${station.target} ${UNIT_SHORT[station.unit] || station.unit} ${station.name}`;
+  return `${amount}${station.load ? ` @ ${station.load}` : ''}`;
+};
+export const workoutShapeText = (rounds: number, format: WorkoutFormat, roundRest: number) =>
+  format === 'AMRAP' ? `${rounds}-min AMRAP` : format === 'EMOM' ? `${rounds}-min EMOM` : format === 'For time' ? (rounds > 1 ? `${rounds} rounds for time` : 'For time')
+    : `${rounds} round${rounds === 1 ? '' : 's'}${rounds > 1 && roundRest ? `, ${roundRest >= 60 && roundRest % 60 === 0 ? `${roundRest / 60} min` : `${roundRest} s`} between` : ''}`;
 
 export type CoachAction =
   | { type: 'rest_today'; label: string }
@@ -57,7 +77,7 @@ export type CoachAction =
   | { type: 'set_load_bias'; percent: number; label: string }
   | { type: 'update_goal'; goalTitle: string; target?: string; date?: string; label: string }
   | { type: 'create_exercise'; name: string; muscles: string[]; label: string }
-  | { type: 'create_workout'; name: string; items: string[]; label: string };
+  | { type: 'create_workout'; name: string; items: string[]; stations?: WorkoutStation[]; rounds?: number; format?: WorkoutFormat; roundRest?: number; label: string };
 
 export type ActionContext = {
   splitDays: Array<{ position: number; name: string; type?: string }>;
@@ -193,12 +213,62 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
     }
     case 'create_workout': {
       const name = str(entry.name).slice(0, 60);
-      const items = (entry.items || []).map(str).filter(Boolean).slice(0, 12);
+      /* THE PRESCRIPTION, NOT A LIST OF NAMES. A station needs a name and a
+         number in a unit Forge can log; anything vaguer is dropped. */
+      const stations: WorkoutStation[] = (entry.stations || []).slice(0, 16).flatMap(raw => {
+        const stationName = str(raw?.name).slice(0, 60);
+        const unitText = str(raw?.unit).toLowerCase();
+        const unit = STATION_UNITS.find(item => item === unitText || item === `${unitText}s` || UNIT_SHORT[item] === unitText);
+        const amount = num(raw?.target);
+        if (!stationName || !unit || !(amount > 0)) return [];
+        const load = str(raw?.load).slice(0, 24) || undefined;
+        const rest = clamp(Math.round(num(raw?.rest) || 0), 0, 600);
+        return [{ name: stationName, target: String(Math.round(amount * 100) / 100), unit: unit === 'km' ? 'kilometers' : unit, load, rest }];
+      });
+      const items = stations.length ? stations.map(station => station.name) : (entry.items || []).map(str).filter(Boolean).slice(0, 12);
       if (!name || items.length < 2) return null;
-      return { type, name, items, label: `Save workout "${name}": ${items.join(' · ')}` };
+      if (!stations.length) return { type, name, items, label: `Save workout "${name}": ${items.join(' · ')}` };
+      const formatText = str(entry.format);
+      const format: WorkoutFormat = (['Rounds', 'AMRAP', 'EMOM', 'For time'] as const).find(item => item.toLowerCase() === formatText.toLowerCase()) || 'Rounds';
+      /* Rounds, or minutes for an AMRAP or EMOM — as the circuit builder reads them. */
+      const rounds = clamp(Math.round(num(entry.rounds) || 1), 1, format === 'AMRAP' || format === 'EMOM' ? 60 : 20);
+      const roundRest = clamp(Math.round(num(entry.roundRest) || 0), 0, 900);
+      return { type, name, items, stations, rounds, format, roundRest,
+        label: `Save "${name}" — ${workoutShapeText(rounds, format, roundRest)}: ${stations.map(stationText).join(' · ')}` };
     }
   }
   return null;
+}
+
+/* A WORKOUT WITH ITS PRESCRIPTION IS SAVED AS A CIRCUIT — the stations,
+   their numbers, rounds and rest — so it opens in the circuit builder, shows
+   under Saved circuits and logs in a tap. Returns null for a names-only
+   workout (an older coach deploy), which is saved the way it always was.
+
+   A station's type follows its UNIT, because the circuit builder offers units
+   by type: reps are Strength when loaded and Bodyweight when not; a distance,
+   calories or minutes is Cardio — a loaded carry or sled included — except
+   unloaded metres on a non-cardio move (walking lunges), which is Bodyweight. */
+export function circuitWorkoutFromAction(action: CoachAction, library: Array<{ name: string; kind: string }>) {
+  if (action.type !== 'create_workout' || !action.stations?.length) return null;
+  const kindOf = (station: WorkoutStation): CircuitStation['kind'] => {
+    const known = library.find(exercise => exercise.name.toLowerCase() === station.name.toLowerCase());
+    const cardioMove = known?.kind === 'Cardio' || /\b(run|row|rowing|ski|skierg|bike|erg|swim|sled)\b/i.test(station.name);
+    if (station.unit === 'reps') return station.load ? 'Strength' : 'Bodyweight';
+    if (station.unit === 'seconds') return cardioMove ? 'Cardio' : station.load ? 'Strength' : 'Bodyweight';
+    if (station.unit === 'meters' && !station.load && !cardioMove) return 'Bodyweight';
+    return 'Cardio';
+  };
+  const rounds = action.rounds || 1;
+  const format = action.format || 'Rounds';
+  const roundRest = action.roundRest || 0;
+  const plan: PlannedCardio = {
+    id: Date.now(), activity: action.name, structure: 'Circuit', targetSource: 'Manual plan',
+    rounds: String(rounds), circuitFormat: format, roundRest: String(roundRest),
+    stationEntries: action.stations.map((station, index) => ({ id: index + 1, kind: kindOf(station), name: station.name, target: station.target, unit: station.unit, load: station.load, rest: String(station.rest) })),
+  };
+  return { name: action.name, kind: 'Circuit' as const, source: 'Forge' as const, exercises: action.items, plan,
+    summary: `${workoutShapeText(rounds, format, roundRest)} · ${action.stations.map(stationText).join(' · ')}` };
 }
 
 /* WHAT THE TODAY CARD READS. A coach override is one day's worth of change,

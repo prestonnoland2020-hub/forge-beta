@@ -112,8 +112,17 @@ const coachAnswerSchema = {
           date: nullable('string'),
           name: nullable('string'),
           items: { type: ['array', 'null'], items: { type: 'string' } },
+          /* create_workout's prescription: every station with its number. */
+          stations: { type: ['array', 'null'], maxItems: 16, items: {
+            type: 'object', additionalProperties: false,
+            properties: { name: { type: 'string' }, target: { type: 'string' }, unit: { type: 'string' }, load: nullable('string'), rest: nullable('integer') },
+            required: ['name', 'target', 'unit', 'load', 'rest'],
+          } },
+          rounds: nullable('integer'),
+          format: { type: ['string', 'null'], enum: ['Rounds', 'AMRAP', 'EMOM', 'For time', null] },
+          roundRest: nullable('integer'),
         },
-        required: ['type', 'dayName', 'minutes', 'noteKind', 'text', 'area', 'miles', 'days', 'percent', 'goalTitle', 'target', 'date', 'name', 'items'],
+        required: ['type', 'dayName', 'minutes', 'noteKind', 'text', 'area', 'miles', 'days', 'percent', 'goalTitle', 'target', 'date', 'name', 'items', 'stations', 'rounds', 'format', 'roundRest'],
       },
     },
   },
@@ -133,7 +142,7 @@ Your reply is JSON: { answer, actions }. \`answer\` is the coaching answer, writ
 - set_load_bias { percent } — they asked for lighter or heavier strength loads across the board (−10 to +10; 2.5 steps).
 - update_goal { goalTitle, target?, date? } — they asked to change an existing goal's target or date; goalTitle must match a goal in \`goals\` exactly; date is YYYY-MM-DD.
 - create_exercise { name, items: muscles } — they asked to add an exercise to their library; items are muscle names from: Chest, Back, Shoulders, Quads, Glutes, Hamstrings, Biceps, Triceps, Forearms, Abs, Calves.
-- create_workout { name, items: exercises } — they asked to save a reusable strength workout from named exercises.
+- create_workout { name, items, stations, rounds, format, roundRest } — they asked you to make or save a workout or circuit for their library. Write the WHOLE prescription, never a list of names: stations is every piece in order, each { name: an exact availableLibrary name, target: the number as a string ("400", "12", "20"), unit: one of meters | km | miles | yards | calories | reps | seconds | minutes, load: the weight with its unit ("24 kg", "2 × 24 kg", "102 kg sled") or null for bodyweight/erg/run, rest: seconds after it, 0 for none }. rounds is how many times through (1 for a single pass), or the minutes for an AMRAP or EMOM, format is Rounds, AMRAP, EMOM or For time, roundRest is seconds between rounds (0 for none). items is the same station names in order. Size it to the athlete: realistic distances and loads from their history and goal, and for HYROX a few stations, not all eight (see HYROX SESSIONS). In answer, say the workout in one line the way it will be saved (e.g. "3 rounds, 90 s between: 400 m run, 500 m SkiErg, 20 m sled push @ 102 kg").
 
 WHEN TO ACT. A message that reports a state (pain, fatigue, illness, no time, travel) or asks for a change gets the matching action. A question ("should I run today?", "what does the plan want this week?") gets an empty actions list — answer it. Never act on something the athlete did not say. Never combine rest_today with swap_today. If the athlete reports pain, log_note is the action — do not also rest_today unless they asked for rest or the pain makes today's session impossible. If the athlete says they are sick (a cold, the flu, a fever, a stomach bug, COVID, "unwell"), the actions are rest_today AND log_note { noteKind: "illness" } with the days they gave — and never prescribe training "if you feel up to it"; a fever is a rest day. Say in \`answer\` what you are changing and why, in one clause, and never claim the change is already made — it is applied when they confirm.
 

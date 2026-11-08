@@ -6,7 +6,7 @@ import { useProfileSetup } from '../profile/ProfileSetupProvider';
 import { useTrainingLibrary } from './TrainingLibraryProvider';
 import { useAthleteNotes } from './useAthleteNotes';
 import { createNote, extractArea, type AthleteNote } from './athleteNotesService';
-import { parseActions, overrideFromActions, type ActionContext, type CoachAction } from '../../lib/coachActions';
+import { parseActions, overrideFromActions, circuitWorkoutFromAction, type ActionContext, type CoachAction } from '../../lib/coachActions';
 import { readTodayOverride, writeTodayOverride, appendAppliedActions } from './coachOverrides';
 import { localDayIso } from '../../lib/time';
 
@@ -51,6 +51,14 @@ export function useCoachActions() {
       if (action.type === 'clear_note') { const note = notes.find(item => item.status === 'active' && (item.area || kindLabel[item.kind]) === action.area); if (note) upsert({ ...note, status: 'cleared', bufferUntil: todayIso }); }
       if (action.type === 'update_goal') { const index = goals.findIndex(goal => goal.title === action.goalTitle); if (index >= 0) saveGoal({ ...goals[index], ...(action.target ? { target: action.target } : {}), ...(action.date ? { date: action.date } : {}) }, index); }
       if (action.type === 'create_exercise') addExercise({ name: action.name, kind: action.muscles.includes('Cardio') ? 'Cardio' : 'Strength', muscles: action.muscles, detail: 'Coach-created · User confirmed', enabled: true, custom: true });
+      /* A WORKOUT WITH ITS PRESCRIPTION IS SAVED AS A CIRCUIT — the stations,
+         their numbers, rounds and rest — so it opens in the circuit builder,
+         shows under Saved circuits and logs in a tap. A names-only workout
+         (an older coach deploy) is saved the way it always was. */
+      if (action.type === 'create_workout' && action.stations?.length) {
+        const workout = circuitWorkoutFromAction(action, exercises);
+        if (workout) { addWorkout(workout); applied.push(action.label); continue; }
+      }
       if (action.type === 'create_workout') { const cardioOnly = action.items.every(item => exercises.find(exercise => exercise.name.toLowerCase() === item.toLowerCase())?.kind === 'Cardio'); addWorkout({ name: action.name, kind: cardioOnly ? 'Cardio' : 'Strength', source: 'User', summary: action.items.join(' · '), exercises: action.items }); }
       applied.push(action.label);
     }

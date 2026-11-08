@@ -201,9 +201,11 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
         {stations.length === 0 && <div className="empty-stations">{mode === 'forge' ? 'Ask Forge to build the circuit, or choose required movements above.' : 'Choose movements above or add a station.'}</div>}
         {stations.map((station, index) => <article key={station.id}>
           <div className="station-order"><b>{index + 1}</b><button onClick={() => moveStation(index, -1)} disabled={index === 0} aria-label="Move up"><Icon name="up"/></button><button onClick={() => moveStation(index, 1)} disabled={index === stations.length - 1} aria-label="Move down"><Icon name="down"/></button></div>
-          <label>Station<select value={station.name} onChange={event => changeMovement(station.id, event.target.value)}>{options.map(exercise => <option key={exercise.name}>{exercise.name}</option>)}</select></label>
+          <label>Station<select value={station.name} onChange={event => changeMovement(station.id, event.target.value)}>{/* A station the list does not carry — the coach's "Run" — is still offered as itself, never shown as the first option in the list. */}{!options.some(exercise => exercise.name === station.name) && <option key={`own-${station.name}`}>{station.name}</option>}{options.map(exercise => <option key={exercise.name}>{exercise.name}</option>)}</select></label>
           <label>Unit<span className="station-unit-readout">{station.unit}</span></label>
           <label>Distance / target<input value={station.target} onChange={event => updateStation(station.id, { target: event.target.value })} placeholder="Enter target" /></label>
+          {/* THE LOAD IS PART OF THE PRESCRIPTION — a 20 m sled push is a different workout at 102 kg than at 50. */}
+          <label>Load<input value={station.load || ''} onChange={event => updateStation(station.id, { load: event.target.value || undefined })} placeholder="Bodyweight" /></label>
           <label>Rest after (sec)<input inputMode="numeric" value={station.rest || ''} onChange={event => updateStation(station.id, { rest: event.target.value })} /></label>
           <button className="remove-station" onClick={() => setStations(items => items.filter(item => item.id !== station.id))}>Remove</button>
         </article>)}
