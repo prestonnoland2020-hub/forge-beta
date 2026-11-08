@@ -113,7 +113,7 @@ function Prs({ w, unit }: { w: Wrapped; unit: string }) {
     <h2 className="wr-huge"><Count to={w.prCount} /></h2>
     <p className="wr-lead wr-in" style={{ animationDelay: '.6s' }}>personal record{w.prCount === 1 ? '' : 's'}</p>
     <ul className="wr-list">
-      {w.prs.map((pr, index) => <li key={pr.lift} className="wr-slide-in" style={{ animationDelay: `${1.2 + index * 0.35}s` }}><Icon name="trophy" size={20} /><span>{pr.lift}<small>{shortDate(pr.date)}</small></span><b>{fmt(pr.max)} {unit}</b></li>)}
+      {w.prs.map((pr, index) => <li key={pr.lift} className="wr-slide-in" style={{ animationDelay: `${1.2 + index * 0.35}s` }}><Icon name="trophy" size={20} /><span>{pr.lift}<small>{shortDate(pr.date)}</small></span><b>{fmt(pr.max)} {unit}{pr.reps > 1 ? ` × ${pr.reps}` : ''}</b></li>)}
     </ul>
   </div>;
 }

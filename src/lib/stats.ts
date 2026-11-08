@@ -39,7 +39,11 @@ export type RunLine = {
 const NON_RUNNING = /row|bike|cycl|ski|elliptical|erg|wall ball|sled|burpee|circuit|swim|assault|stair|jump rope/i;
 const WALK = /\bwalk/i;
 const HYROX = /hyrox/i;
-const RUNNING = /run|jog|hyrox/i;
+/* Older imports name runs by their kind — "Base", "Easy", "Tempo", "Long" —
+   with no "run" in them (a 13-mile "Base" was missing from the totals). Those
+   names count as running when they lead the label; anything that names
+   another machine or sport is still excluded by NON_RUNNING. */
+const RUNNING = /run|jog|hyrox|^\s*(base|easy|tempo|long|recovery|threshold|fartlek|progression|strides?)\b/i;
 
 const toMiles = (distance: number, unit: string) => {
   const normalized = unit.trim().toLowerCase();

@@ -32,7 +32,9 @@ check('best month is January', w.bestMonth === 'January', w.bestMonth);
 check('strongest is the squat', w.strongest?.name === 'Back Squat');
 check('a lift starts from its first set of the year', w.strongest?.start < w.strongest?.best);
 check('PRs must beat all-time, not just this year', w.prs.some(pr => pr.lift === 'Bench Press'));
-check('first-ever sets are not PRs; a tie is not a PR', w.prCount === 4, String(w.prCount));
+// Records are real weight: bench 230 over last year's 225; squat 245, then 275.
+check('first-ever sets are not PRs; a tie is not a PR', w.prCount === 3, String(w.prCount));
+check('a record shows the weight on the bar and its reps', w.prs.some(pr => pr.lift === 'Bench Press' && pr.max === 230 && pr.reps === 3));
 check('calendar codes lift=1 run=2', w.calendar[4] === 1 && w.calendar[6] === 2);
 check('miles land in their month', w.milesByMonth[0] === 15);
 check('a zero-weight day is not a training week', w.longestWeekStreak === 2, String(w.longestWeekStreak));
