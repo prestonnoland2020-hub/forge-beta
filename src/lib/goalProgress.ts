@@ -5,6 +5,7 @@ import type { Feasibility } from './goalFeasibility';
 import { calculateEstimatedOneRepMax } from './strength';
 import { sameLift } from './liftAliases';
 import { clockToSeconds } from './time';
+import { predictionFromNow, predictionTone } from './predictionFromNow';
 
 /* HOW FAR ALONG A GOAL IS, AS ONE NUMBER AND ONE COLOUR.
 
@@ -124,11 +125,18 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
   }
 
   const reached = share !== null && share >= 1;
-  const tone: GoalTone = reached ? 'reached'
+  let tone: GoalTone = reached ? 'reached'
     : !verdict || share === null ? (share === null ? 'unknown' : 'needs-work')
     : verdict.verdict === 'reachable' ? 'on-track'
     : verdict.verdict === 'out-of-reach' ? 'off-track'
     : 'needs-work';
+  /* The pill agrees with the projection under it: both start from the
+     number on the card, and the worse of the two readings wins. */
+  if (!reached && current && verdict?.prediction && (tone === 'on-track' || tone === 'needs-work')) {
+    const fromNow = predictionTone(predictionFromNow(verdict.prediction, current));
+    if (fromNow === 'off-track') tone = 'off-track';
+    else if (fromNow === 'needs-work') tone = 'needs-work';
+  }
   const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? 'No tested time yet' : 'No tested max yet') : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
   return { share, current, currentText: current ? show(current) : '—', targetText: target ? show(target) : String(goal.target || ''), tone, label };
 }

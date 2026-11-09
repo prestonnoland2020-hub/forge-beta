@@ -5,6 +5,7 @@ import { useGoals } from '../features/goals/GoalsProvider';
 import { nudgeUpgrade } from './UpgradeSheet';
 import type { Feasibility } from '../lib/goalFeasibility';
 import { secondsToClock } from '../lib/goalInput';
+import { predictionFromNow } from '../lib/predictionFromNow';
 
 /* THE SAME PREDICTION SETUP SHOWED, ON THE GOAL ITSELF. Setup drew a path
    from where the athlete is to the goal and called it realistic, ambitious or
@@ -52,9 +53,11 @@ function GoalFix({ verdict }: { verdict: Feasibility }) {
   </div>;
 }
 
-export function GoalPredictionCard({ verdict, date, unit, hoursFirst }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean }) {
-  const p = verdict.prediction;
-  if (!p) return null;
+export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean; now?: number | null }) {
+  const model = verdict.prediction;
+  if (!model) return null;
+  /* Carried from the number the card above shows, so the two always agree. */
+  const p = predictionFromNow(model, now);
   const race = p.better === 'lower';
   const show = (value: number) => race ? secondsToClock(value, hoursFirst || value >= 3600) : `${Math.round(value)} ${unit}`;
   /* Progress reads left to right whichever way the number goes. */
@@ -81,6 +84,10 @@ export function GoalPredictionCard({ verdict, date, unit, hoursFirst }: { verdic
     <div className="gpc-num"><b>{show(p.typical)}</b><span>{line}</span></div>
     <div className="gpc-bar" aria-hidden="true"><i style={{ width: `${at(p.typical)}%` }} /><s style={{ left: `${at(p.target)}%` }} /></div>
     <p className="gpc-meta"><span>Best case {show(p.ceiling)}</span><span>Goal {show(p.target)}</span></p>
-    <GoalFix verdict={verdict} />
+    {/* The estimate already clears the goal but the time actually run does
+       not: the advice is to go and prove it, not "hold it". */}
+    {reach(model.start) && !reach(p.start)
+      ? <p className="goal-fix"><b>What to change</b>Your other {race ? 'runs' : 'sets'} put you at about {show(model.start)}. {race ? 'Race the distance' : 'Test a heavy single'} to prove it.</p>
+      : <GoalFix verdict={verdict} />}
   </section>;
 }
