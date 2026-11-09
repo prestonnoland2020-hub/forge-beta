@@ -1,0 +1,175 @@
+import { MOVES, MOVE, type Move, type Pattern, type Style, type Equip } from './catalog';
+
+/* FORGE GUIDED — THE WORKOUT BUILDER.
+
+   Rules, not a model, so every workout is safe and the same answers give the
+   same workout. Four answers from setup, the time she has today and a focus
+   become a warm-up, the main moves and a cool-down, each with sets, reps (or
+   seconds), a starting weight and a rest. The AI coach can sit on top of this
+   later; it should never be the thing deciding a beginner's load. */
+
+export type Place = 'Gym' | 'Home' | 'Anywhere';
+export type Level = 'New to this' | 'A little' | 'Comfortable';
+export type Focus = 'Glutes & core' | 'Full body' | 'Upper body' | 'Lower body' | 'Stretch it out';
+export type GuidedPrefs = { styles: Style[]; vibe: string[]; place: Place; gear: string[]; level: Level };
+export type Feel = 'easy' | 'right' | 'hard';
+
+export type Step = {
+  move: Move;
+  sets: number;
+  reps: number;          // reps, or seconds when move.timed
+  weight: number | null; // in the athlete's unit; null = no weight / pick your own
+  weightNote?: string;   // "Start light" on a machine she has never used
+  rest: number;          // seconds after each set
+  part: 'warmup' | 'main' | 'cooldown';
+};
+export type Workout = { title: string; focus: Focus; minutes: number; steps: Step[] };
+
+export const FOCUSES: Focus[] = ['Glutes & core', 'Full body', 'Upper body', 'Lower body', 'Stretch it out'];
+
+/* What each focus is made of, in order. A slot that finds no move for her
+   equipment is skipped rather than filled with something wrong. */
+const SHAPES: Record<Focus, Pattern[]> = {
+  'Glutes & core': ['glute', 'squat', 'hinge', 'lunge', 'core', 'core', 'glute'],
+  'Full body': ['squat', 'push', 'hinge', 'pull', 'core', 'lunge', 'shoulder'],
+  'Upper body': ['push', 'pull', 'shoulder', 'arms', 'core', 'push', 'pull'],
+  'Lower body': ['squat', 'hinge', 'lunge', 'glute', 'calf', 'glute', 'core'],
+  'Stretch it out': ['warmup', 'warmup', 'stretch', 'core', 'stretch', 'stretch'],
+};
+const MAIN_COUNT: Record<number, number> = { 20: 3, 30: 5, 45: 6, 60: 7 };
+
+/* What she owns. The gym has everything; "Anywhere" has nothing. */
+export function owned(prefs: Pick<GuidedPrefs, 'place' | 'gear'>): Set<Equip> {
+  if (prefs.place === 'Gym') return new Set<Equip>(['none', 'mat', 'dumbbell', 'kettlebell', 'bench', 'gym']);
+  const have = new Set<Equip>(['none']);
+  if (prefs.place === 'Home') for (const item of prefs.gear) {
+    const key = ({ Dumbbells: 'dumbbell', Kettlebell: 'kettlebell', Mat: 'mat', Bench: 'bench' } as Record<string, Equip>)[item];
+    if (key) have.add(key);
+  }
+  return have;
+}
+export const canDo = (move: Move, have: Set<Equip>) => move.equip.every(item => have.has(item));
+
+/* The day's main style: the first she picked that the focus suits. */
+function leadStyle(prefs: GuidedPrefs): Style {
+  return prefs.styles[0] || 'Strength';
+}
+
+/* Sets, reps and rest by style and level. Beginners get fewer sets; Pilates
+   and bodyweight work is slower and higher-rep with short rests; building
+   muscle sits at 10–12; HIIT is time on, short rest. */
+export function dose(move: Move, style: Style, level: Level, part: Step['part']): Pick<Step, 'sets' | 'reps' | 'rest'> {
+  const lvl = level === 'New to this' ? 0 : level === 'A little' ? 1 : 2;
+  if (part !== 'main') return { sets: 1, reps: move.perSide ? 60 : 45, rest: 10 };
+  const hiit = style === 'HIIT / CrossFit-style';
+  if (move.timed) return { sets: [2, 3, 3][lvl], reps: hiit ? [30, 40, 45][lvl] : [20, 30, 40][lvl], rest: hiit ? 20 : 30 };
+  if (hiit) return { sets: [2, 3, 3][lvl], reps: [10, 12, 15][lvl], rest: 30 };
+  if (style === 'Pilates' || style === 'Bodyweight') return { sets: [2, 3, 3][lvl], reps: [10, 12, 15][lvl], rest: 40 };
+  if (style === 'Build muscle') return { sets: [2, 3, 4][lvl], reps: [12, 10, 10][lvl], rest: [60, 75, 90][lvl] };
+  /* Strength */
+  return { sets: [2, 3, 4][lvl], reps: [10, 8, 6][lvl], rest: [75, 90, 120][lvl] };
+}
+
+/* A first weight she can do. Dumbbells start light by level; a machine or a
+   barbell gets "start light" instead of a number we cannot know. After one
+   set the weight is hers (see nextWeight). Pounds; metric converts. */
+const START_DB: Record<Level, number> = { 'New to this': 10, 'A little': 15, 'Comfortable': 20 };
+const LIGHTER_DB = new Set(['lateral-raise', 'curl']);
+export function startWeight(move: Move, level: Level, remembered: Record<string, number>, metric: boolean): Pick<Step, 'weight' | 'weightNote'> {
+  if (move.load === 'none') return { weight: null };
+  if (remembered[move.id] !== undefined) return { weight: remembered[move.id] };
+  if (move.load === 'dumbbell' || move.load === 'kettlebell') {
+    let pounds = START_DB[level] - (LIGHTER_DB.has(move.id) ? 5 : 0);
+    if (move.load === 'kettlebell') pounds = Math.max(15, pounds + 5);
+    return { weight: metric ? Math.round(pounds / 2.2046 / 2) * 2 : pounds };
+  }
+  return { weight: null, weightNote: 'Start light. Pick a weight you could do 15 times.' };
+}
+
+/* One tap after a set moves the next one. A step is one dumbbell jump. */
+export function nextWeight(weight: number | null, feel: Feel, load: Move['load'], metric: boolean): number | null {
+  if (weight === null) return null;
+  const step = metric ? (load === 'barbell' || load === 'machine' ? 5 : 2) : (load === 'barbell' || load === 'machine' ? 10 : 5);
+  if (feel === 'easy') return weight + step;
+  if (feel === 'hard') return Math.max(step, weight - step);
+  return weight;
+}
+
+/* A seeded shuffle, so tomorrow's glutes day is not today's. */
+function seeded(seed: number) { let s = seed || 1; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+
+export function buildWorkout(prefs: GuidedPrefs, minutes: number, focus: Focus, options: { seed?: number; recent?: string[]; remembered?: Record<string, number>; metric?: boolean } = {}): Workout {
+  const have = owned(prefs);
+  const style = focus === 'Stretch it out' ? 'Stretch & mobility' : leadStyle(prefs);
+  const rand = seeded(options.seed ?? Date.now() % 100000);
+  const recent = new Set(options.recent || []);
+  const used = new Set<string>();
+  const pick = (pattern: Pattern) => {
+    const pool = MOVES.filter(move => move.pattern === pattern && canDo(move, have) && !used.has(move.id));
+    if (!pool.length) return undefined;
+    /* Her styles first, then moves she did not do last time, then the rest. */
+    const score = (move: Move) => (prefs.styles.some(item => move.styles.includes(item)) ? 2 : 0) + (move.styles.includes(style) ? 2 : 0) + (recent.has(move.id) ? -1.5 : 0)
+      + (prefs.vibe.includes('Low impact') && pattern === 'cardio' ? -3 : 0) + rand() * 1.2;
+    return pool.sort((a, b) => score(b) - score(a))[0];
+  };
+  const steps: Step[] = [];
+  const add = (move: Move | undefined, part: Step['part']) => {
+    if (!move) return;
+    used.add(move.id);
+    const base = dose(move, style, prefs.level, part);
+    const load = part === 'main' ? startWeight(move, prefs.level, options.remembered || {}, Boolean(options.metric)) : { weight: null };
+    steps.push({ move, part, ...base, ...load });
+  };
+  if (focus !== 'Stretch it out') add(pick('warmup'), 'warmup');
+  const count = MAIN_COUNT[minutes] ?? (minutes <= 20 ? 3 : minutes <= 30 ? 5 : minutes <= 45 ? 6 : 7);
+  let shape = SHAPES[focus];
+  if (prefs.vibe.includes('Core focus') && focus !== 'Stretch it out') shape = [...shape.slice(0, count - 2), 'core', 'core'];
+  if (style === 'HIIT / CrossFit-style' && focus !== 'Stretch it out') shape = shape.map((pattern, index) => index % 3 === 2 ? 'cardio' : pattern);
+  for (const pattern of shape) {
+    if (steps.filter(step => step.part === 'main').length >= count) break;
+    add(pick(pattern), focus === 'Stretch it out' ? 'cooldown' : 'main');
+  }
+  /* Short of moves for her gear: fill from anything she can do in the focus's patterns. */
+  for (const pattern of shape) {
+    if (steps.filter(step => step.part !== 'warmup').length >= count) break;
+    add(pick(pattern), focus === 'Stretch it out' ? 'cooldown' : 'main');
+  }
+  if (focus !== 'Stretch it out') add(pick('stretch'), 'cooldown');
+  const workout = { title: focus, focus, minutes, steps };
+  /* FILL THE TIME SHE GAVE. Two sets of five moves is about 20 minutes; if
+     she has 30, add a set to the main moves, one at a time, up to four. */
+  const cap = prefs.level === 'New to this' ? 3 : 4;
+  for (let round = 0; round < 12 && estimateMinutes(workout) < minutes * 0.85; round += 1) {
+    const mains = steps.filter(step => step.part === 'main' && step.sets < cap);
+    if (!mains.length) break;
+    mains.sort((a, b) => a.sets - b.sets)[0].sets += 1;
+  }
+  return workout;
+}
+
+/* The coach rotates the focus so muscles rest: the next one after the last. */
+export function suggestFocus(lastFocus: Focus | undefined, prefs: GuidedPrefs): Focus {
+  if (prefs.styles.length === 1 && prefs.styles[0] === 'Stretch & mobility') return 'Stretch it out';
+  const order: Focus[] = prefs.vibe.includes('Upper body') ? ['Upper body', 'Lower body', 'Full body'] : prefs.vibe.includes('Glutes & legs') ? ['Glutes & core', 'Upper body', 'Lower body', 'Full body'] : ['Full body', 'Glutes & core', 'Upper body'];
+  if (!lastFocus) return order[0];
+  const index = order.indexOf(lastFocus);
+  return order[(index + 1) % order.length];
+}
+
+/* Rough minutes, so the preview can say "about 30 min" honestly. */
+export function estimateMinutes(workout: Workout): number {
+  const seconds = workout.steps.reduce((sum, step) => sum + step.sets * ((step.move.timed ? step.reps : step.reps * 4) * (step.move.perSide && !step.move.timed ? 2 : 1) + step.rest), 0);
+  return Math.max(5, Math.round(seconds / 60));
+}
+
+/* What the card says for the amount: "10 reps", "8 each side", "30 sec". */
+export function amountText(step: Step): string {
+  if (step.move.timed) return `${step.reps} sec${step.move.perSide && step.part === 'main' ? ' each side' : ''}`;
+  return `${step.reps}${step.move.perSide ? ' each side' : ' reps'}`;
+}
+
+export const swapFor = (step: Step, way: 'easier' | 'harder', have: Set<Equip>): Move | undefined => {
+  const id = way === 'easier' ? step.move.easier : step.move.harder;
+  const move = id ? MOVE(id) : undefined;
+  return move && canDo(move, have) ? move : undefined;
+};
