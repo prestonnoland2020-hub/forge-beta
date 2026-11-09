@@ -1,7 +1,7 @@
 /* FORGE GUIDED: the builder makes safe, fitting workouts; the coach hears
    short commands; the weights follow how each set felt. */
 import { buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
-import { parseCommand } from './src/lib/guided/voice.ts';
+import { parseCommand, matchCommand, normalizePhrase } from './src/lib/guided/voice.ts';
 import { MOVES } from './src/lib/guided/catalog.ts';
 import { existsSync } from 'node:fs';
 
@@ -51,6 +51,17 @@ for (const [text, want] of [['coach, why is it 15 pounds', 'ask'], ['hey coach i
 check('the coach question is asked before command words', parseCommand('coach, is this too hard for me') === 'ask');
 const coachPage = (await import('node:fs')).readFileSync('src/pages/CoachPage.tsx', 'utf8');
 check('the Ask Forge coach is told about Guided', /guided:guidedCoachContext\(\)/.test(coachPage));
+/* Learning her voice */
+check('common mishear: "dawn" is done', matchCommand('dawn', ['done', 'how'])?.command === 'done');
+check('common mishear: "two easy" is too easy', matchCommand('two easy', ['easy', 'right', 'hard'])?.command === 'easy');
+check('common mishear: "radio" is ready in rest', matchCommand('radio', ['ready', 'more'])?.command === 'ready');
+check('near miss: "redy" is ready', matchCommand('redy', ['ready', 'more'])?.command === 'ready');
+check('near miss: "jist right" is just right', matchCommand('jist right', ['easy', 'right', 'hard'])?.command === 'right');
+check('a taught phrase works next time', matchCommand('dumbbell', ['done'], { dumbbell: 'done' })?.how === 'learned');
+check('taught phrases respect the moment', matchCommand('dumbbell', ['easy', 'right', 'hard'], { dumbbell: 'done' }) === null);
+check('a sentence is not a near miss', matchCommand('my neighbor is really noisy today honestly', ['ready', 'more']) === null);
+check('chatter is not a command', matchCommand('what time is it', ['done', 'how', 'skip']) === null);
+check('phrases are stored plainly', normalizePhrase("I'm  DONE!") === 'im done');
 check('feel step only hears feel words', parseCommand("I'm done", ['easy', 'right', 'hard']) === null);
 check('rest: "ready" while only ready/more allowed', parseCommand('okay ready', ['ready', 'more']) === 'ready');
 

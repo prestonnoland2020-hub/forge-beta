@@ -7,7 +7,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { photoUrl, type Move, type Style } from '../lib/guided/catalog';
 import { amountText, buildWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
-import { canListen, canSpeak, cheer, Coach, type Command } from '../lib/guided/voice';
+import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, teachPhrase, type Command } from '../lib/guided/voice';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
@@ -134,6 +134,14 @@ export function GuidedPage() {
   const [askText, setAskText] = useState('');
   const [askBusy, setAskBusy] = useState(false);
   const [askAnswer, setAskAnswer] = useState<{ q: string; a: string } | null>(null);
+  /* LEARNING HER VOICE. Something heard that matched nothing offers the
+     commands that make sense right now; the one she taps is remembered for
+     that phrase. Two misses in a row and the coach says what it listens for. */
+  const [unknown, setUnknown] = useState<string | null>(null);
+  const misses = useRef(0);
+  const [learnedCount, setLearnedCount] = useState(() => Object.keys(loadVoiceMemory()).length);
+  /* The voice check: three words, once. */
+  const [check, setCheck] = useState<{ index: number; results: Array<'ok' | 'learned' | 'skipped'> } | null>(null);
   const coach = useRef<Coach | null>(null);
   const lastLine = useRef<{ text: string; listen?: Command[] }>({ text: '' });
 
@@ -142,6 +150,10 @@ export function GuidedPage() {
     const c = coach.current!;
     c.onState = setVoiceState;
     c.onHeard = text => setHeard(text);
+    c.onUnknown = text => {
+      setUnknown(text); misses.current += 1;
+      if (misses.current === 2) { const hint = lastLine.current.listen?.includes('easy') ? 'Say too easy, just right, or too hard. Or tap one.' : lastLine.current.listen?.includes('more') ? 'Say ready when you want to go, or more rest.' : 'Say done when you finish the set. Or tap the button.'; c.say(hint, lastLine.current.listen); }
+    };
     const html = document.documentElement; const before = html.style.overflow; html.style.overflow = 'hidden';
     return () => { c.stop(); html.style.overflow = before; };
   }, []);
@@ -217,6 +229,71 @@ export function GuidedPage() {
       <button type="button" className="gd-secondary" onClick={() => { setAskOpen(false); if (coach.current) coach.current.freeText = false; }}>Back to workout</button>
     </section>
   </div> : null;
+
+  const LABELS: Partial<Record<Command, string>> = { done: 'Done', ready: 'Ready', easy: 'Too easy', right: 'Just right', hard: 'Too hard', more: 'More rest', how: 'How do I do this?', skip: 'Skip', repeat: 'Repeat' };
+  const meanOptions: Command[] = phase === 'feel' ? ['easy', 'right', 'hard'] : phase === 'rest' ? ['ready', 'more'] : step?.move.timed && !running ? ['ready', 'how', 'skip'] : ['done', 'how', 'skip'];
+  const didYouMean = unknown && handsFree ? <div className="gd-mean">
+    <p>Heard “{unknown}”. Did you mean:</p>
+    <div>{meanOptions.map(command => <button type="button" key={command} onClick={() => { teachPhrase(unknown, command); coach.current?.reloadMemory(); setLearnedCount(Object.keys(loadVoiceMemory()).length); const said = unknown; setUnknown(null); commandRef.current(command, said); }}>{LABELS[command]}</button>)}</div>
+    <small>Your choice is remembered for next time.</small>
+  </div> : null;
+
+  const CHECK_WORDS: Array<[Command, string]> = [['done', 'Done'], ['ready', 'Ready'], ['easy', 'Too easy']];
+  const runCheck = (index: number, results: Array<'ok' | 'learned' | 'skipped'> = []) => {
+    const c = coach.current; if (!c) return;
+    if (index >= CHECK_WORDS.length) {
+      setCheck({ index, results }); setLearnedCount(Object.keys(loadVoiceMemory()).length);
+      c.say('Got it. Your coach knows your voice now.');
+      return;
+    }
+    setCheck({ index, results });
+    const [command, label] = CHECK_WORDS[index];
+    let answered = false;
+    const timeout = window.setTimeout(() => { if (answered) return; answered = true; c.capture = null; runCheck(index + 1, [...results, 'skipped']); }, 9000);
+    c.capture = heardList => {
+      if (answered) return; answered = true; window.clearTimeout(timeout);
+      const hit = heardList.some(text => matchCommand(text, [command], c.memory));
+      if (!hit) { teachPhrase(heardList[0], command); c.reloadMemory(); }
+      window.setTimeout(() => runCheck(index + 1, [...results, hit ? 'ok' : 'learned']), 400);
+    };
+    c.say(index === 0 ? `Quick voice check. Say: ${label}.` : `Now say: ${label}.`, [command]);
+  };
+  const checkView = check ? <div className="gd-check-list">
+    {CHECK_WORDS.map(([, label], i) => <div key={label} className={i === check.index ? 'now' : i < check.index ? 'past' : ''}>
+      <span>“{label}”</span>
+      <b>{i < check.index ? (check.results[i] === 'ok' ? 'Heard it' : check.results[i] === 'learned' ? 'Learned' : 'Skipped') : i === check.index ? 'Say it now' : ''}</b>
+    </div>)}
+  </div> : null;
+
+  const micSheet = micAsk ? <div className="gd-sheet-back" onClick={event => { if (event.target === event.currentTarget) setMicAsk(false); }}>
+      <section className="gd-sheet" role="dialog" aria-modal="true" aria-labelledby="gd-mic-title">
+        <span className="gd-mic-ic"><Svg d={MIC} size={30} stroke={2.2} /></span>
+        <h2 id="gd-mic-title">{check ? (check.index >= CHECK_WORDS.length ? 'Your coach knows your voice' : 'Quick voice check') : mic === 'denied' ? 'Your microphone is off' : 'Let your coach hear you'}</h2>
+        {check ? <>
+          <p className="gd-lead">{check.index >= CHECK_WORDS.length ? 'It keeps learning as you go. If it ever mishears you, tap what you meant and it remembers.' : 'Say each word the way you would mid-workout. Forge learns how your phone hears you.'}</p>
+          {checkView}
+          {check.index >= CHECK_WORDS.length
+            ? <button type="button" className="gd-cta" onClick={() => { setCheck(null); setMicAsk(false); if (workout && phase === 'preview') start(); }}>{phase === 'preview' ? 'Start workout' : 'Done'}</button>
+            : <button type="button" className="gd-secondary" onClick={() => { if (coach.current) coach.current.capture = null; setCheck(null); setMicAsk(false); if (phase === 'preview') start(); }}>Skip the check</button>}
+        </> : mic === 'denied'
+          ? <p className="gd-lead">Your phone is blocking the microphone for Forge. To turn it on, go to Settings, then Safari, then Microphone, and choose Allow. You can still do the workout by tapping.</p>
+          : <>
+              <p className="gd-lead">Say “done”, “too easy” or “ready” instead of tapping. Your phone will ask to use the microphone next.</p>
+              <ul className="gd-mic-list">
+                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Only listens during a workout</li>
+                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Only acts on a few workout words</li>
+                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Forge never saves what it hears</li>
+              </ul>
+            </>}
+        {!check && mic !== 'denied' && <button type="button" className="gd-cta" disabled={micBusy} onClick={async () => {
+          setMicBusy(true);
+          const status = await requestMic();
+          setMicBusy(false); setMic(status); write(MIC_KEY, status);
+          if (status === 'granted') runCheck(0);
+        }}>{micBusy ? 'Waiting for your phone…' : 'Allow microphone'}</button>}
+        {!check && <button type="button" className="gd-secondary" onClick={() => { setHandsFree(false); setMicAsk(false); start(); }}>{mic === 'denied' ? 'Start, I’ll tap' : 'Not now, I’ll tap'}</button>}
+      </section>
+    </div> : null;
 
   /* ---- Flow ---- */
   const build = (chosenFocus = focus, chosenMinutes = minutes) => {
@@ -347,6 +424,7 @@ export function GuidedPage() {
   /* ---- Voice commands, read against the latest state ---- */
   const commandRef = useRef<(command: Command, heard: string) => void>(() => {});
   commandRef.current = (command: Command, heardText: string) => {
+    misses.current = 0; setUnknown(null);
     if (command === 'ask') { const question = heardText.replace(/^\s*(hey |ok |okay )?coach[,:]?\s*/i, '').replace(/^\s*ask (the )?coach\s*/i, '').replace(/^\s*question[,:]?\s*/i, '').trim(); if (question.split(/\s+/).length >= 2) void askCoach(question); else { setAskOpen(true); coach.current!.freeText = true; say('Yes? Ask me anything.', ['end']); } return; }
     if (command === 'end') { finish(); return; }
     if (command === 'repeat') { say(lastLine.current.text, lastLine.current.listen); return; }
@@ -435,6 +513,11 @@ export function GuidedPage() {
       <div className="gd-chips">{FOCUSES.map(item => <button type="button" key={item} className={focus === item ? 'gd-chip on' : 'gd-chip'} aria-pressed={focus === item} onClick={() => setFocus(item)}>{item}</button>)}</div>
     </div>
     {voiceToggles}
+    {handsFree && canListen() && <p className="gd-muted gd-voice-learn">
+      <button type="button" className="gd-link" onClick={() => { setMicAsk(true); if (mic === 'granted') runCheck(0); }}>Voice check</button>
+      {learnedCount > 0 && <> · Knows {learnedCount} way{learnedCount === 1 ? '' : 's'} you say things · <button type="button" className="gd-link" onClick={() => { forgetVoice(); coach.current?.reloadMemory(); setLearnedCount(0); }}>Reset</button></>}
+    </p>}
+    {micSheet}
     {!isPro && <p className="gd-muted center">{freeLeft > 0 ? `${freeLeft} free guided workout${freeLeft === 1 ? '' : 's'} left` : 'Your free workouts are used up'}</p>}
     <button type="button" className="gd-cta" onClick={() => build()}>Build my workout</button>
   </div>);
@@ -450,29 +533,7 @@ export function GuidedPage() {
     <p className="gd-muted">Weights are a starting guess. Tell the coach how each set felt and the next one adjusts.</p>
     <button type="button" className="gd-secondary" onClick={() => build()}>Shuffle moves</button>
     <button type="button" className="gd-cta" onClick={() => { if (handsFree && canListen() && mic !== 'granted') setMicAsk(true); else start(); }}><Svg d="M7 4v16l13-8z" size={18} />Start</button>
-    {micAsk && <div className="gd-sheet-back" onClick={event => { if (event.target === event.currentTarget) setMicAsk(false); }}>
-      <section className="gd-sheet" role="dialog" aria-modal="true" aria-labelledby="gd-mic-title">
-        <span className="gd-mic-ic"><Svg d={MIC} size={30} stroke={2.2} /></span>
-        <h2 id="gd-mic-title">{mic === 'denied' ? 'Your microphone is off' : 'Let your coach hear you'}</h2>
-        {mic === 'denied'
-          ? <p className="gd-lead">Your phone is blocking the microphone for Forge. To turn it on, go to Settings, then Safari, then Microphone, and choose Allow. You can still do the workout by tapping.</p>
-          : <>
-              <p className="gd-lead">Say “done”, “too easy” or “ready” instead of tapping. Your phone will ask to use the microphone next.</p>
-              <ul className="gd-mic-list">
-                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Only listens during a workout</li>
-                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Only acts on a few workout words</li>
-                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Forge never saves what it hears</li>
-              </ul>
-            </>}
-        {mic !== 'denied' && <button type="button" className="gd-cta" disabled={micBusy} onClick={async () => {
-          setMicBusy(true);
-          const status = await requestMic();
-          setMicBusy(false); setMic(status); write(MIC_KEY, status);
-          if (status === 'granted') { setMicAsk(false); start(); }
-        }}>{micBusy ? 'Waiting for your phone…' : 'Allow microphone'}</button>}
-        <button type="button" className="gd-secondary" onClick={() => { setHandsFree(false); setMicAsk(false); start(); }}>{mic === 'denied' ? 'Start, I’ll tap' : 'Not now, I’ll tap'}</button>
-      </section>
-    </div>}
+    {micSheet}
   </div>);
 
   if (phase === 'done' && workout) {
@@ -507,7 +568,7 @@ export function GuidedPage() {
         <div><strong role="timer">{clock(Math.max(0, timer))}</strong><span>{paused ? 'Paused' : 'Rest. Breathe.'}</span></div>
       </div>
       {upNext && <div className="gd-next"><span>UP NEXT</span><strong>{upNext.move.name}{upNext === step ? ` · set ${setIndex + 2} of ${step.sets}` : ''}</strong><small>{amountText(upNext)}{(upNext === step ? weight : upNext.weight) !== null ? ` · ${upNext === step ? weight : upNext.weight} ${unit}` : ''}</small></div>}
-      {heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>}
+      {didYouMean || (heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>)}
       <button type="button" className="gd-ask-pill" onClick={() => setAskOpen(true)}><Svg d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" size={16} />Ask coach</button>
       {askSheet}
       <div className="gd-row">
@@ -526,7 +587,7 @@ export function GuidedPage() {
     <button type="button" className="gd-feel" onClick={() => answer('hard')}><span className="gd-ic warn"><Svg d="M12 5v14M5 12l7 7 7-7" /></span><span><strong>Too hard</strong><small>{weight !== null ? 'Next set gets lighter' : 'Next set gets an easier version'}</small></span></button>
     {handsFree && <p className="gd-muted center">Or just say it: “that was easy”.</p>}
     {askSheet}
-    {heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>}
+    {didYouMean || (heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>)}
   </div>);
 
   /* The flashcard */
@@ -560,7 +621,7 @@ export function GuidedPage() {
       <button type="button" className="gd-small-btn" disabled={!easier} onClick={() => swap('easier')}>Easier</button>
       <button type="button" className="gd-small-btn" disabled={!harder} onClick={() => swap('harder')}>Harder</button>
     </div>
-    {heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>}
+    {didYouMean || (heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>)}
     {timed && !running
       ? <button type="button" className="gd-cta" onClick={startTimed}>Start {step.reps} sec</button>
       : <button type="button" className="gd-cta" onClick={setDone}>{timed ? 'Done early' : 'Done'}</button>}
