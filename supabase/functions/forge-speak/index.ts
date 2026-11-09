@@ -9,7 +9,12 @@ import { consumeQuota, corsFor, errorResponse, HttpError, refundQuota, requireCa
    is slow or down. Metered as 'forge-speak'; nothing is stored here. */
 
 const VOICES = new Set(['coral', 'ash', 'sage', 'onyx', 'nova', 'shimmer', 'alloy', 'echo', 'ballad', 'verse', 'fable']);
-const STYLE = 'You are a warm, upbeat personal trainer talking to one person mid-workout through their headphones. Sound natural, smooth and encouraging, like a real coach standing next to them. Clear, steady, moderate pace. Short natural pauses between sentences. Never shouty, never robotic.';
+const STYLE = [
+  'Voice: a real personal trainer, relaxed and warm, talking to one person through their headphones. Not an announcer, not a narrator, not an assistant.',
+  'Delivery: conversational and human. Natural rises and falls in pitch, light emphasis on the key word, a smile in the voice. Contractions are natural.',
+  'Pacing: unhurried but alive. Small natural pauses at commas and between sentences. Never read it flat or evenly spaced.',
+  'Energy: encouraging and genuine. A little more lift on praise ("Yes! Good set."), calmer and clear on instructions. Never shouty, never cheesy, never robotic.',
+].join(' ');
 
 Deno.serve(async (request: Request) => {
   const cors = corsFor(request);

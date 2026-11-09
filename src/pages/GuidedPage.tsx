@@ -28,7 +28,7 @@ async function speakLine(text: string, voice: CoachVoice): Promise<Blob> {
   return data;
 }
 const VOICE_KEY = 'forge-guided-voice-name';
-const FEEL_LINE = 'How did that feel? Too easy, just right, or too hard?';
+const FEEL_LINE = "How'd that feel? Too easy, just right, or too hard?";
 async function transcribe(blob: Blob, hints: { words: string[]; phrases: string[]; context: string }): Promise<string> {
   const audio = await blobToBase64(blob);
   const { data, error } = await supabase.functions.invoke('forge-voice', { body: { audio, mime: 'audio/wav', ...hints } });
@@ -197,7 +197,7 @@ export function GuidedPage() {
     return () => { c.stop(); html.style.overflow = before; };
   }, []);
   useEffect(() => { if (coach.current) coach.current.muted = !voiceOn; }, [voiceOn]);
-  useEffect(() => { const c = coach.current; if (!c) return; c.voice = coachVoice; if (cloudVoice()) c.useNaturalVoice(speakLine); c.prefetch(FEEL_LINE); }, [coachVoice]);
+  useEffect(() => { const c = coach.current; if (!c) return; c.voice = coachVoice; if (cloudVoice()) c.useNaturalVoice(speakLine); [FEEL_LINE, 'Okay, go!', 'Ten seconds.', 'Three, two, one.', 'Done. Nice.', 'Switch sides.', 'Sure, thirty more seconds.'].forEach(line => c.prefetch(line)); }, [coachVoice]);
   const pickVoice = (voice: CoachVoice) => {
     setCoachVoice(voice); write(VOICE_KEY, voice);
     const c = coach.current; if (!c) return;
@@ -225,12 +225,18 @@ export function GuidedPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- Lines the coach says ---- */
+  /* Written to be heard, the way a trainer next to you talks: the full cue
+     on the first set, short after that, and the voice commands explained
+     only on the first card. */
   const cardLine = (s: Step, setNo: number, w: number | null) => {
-    const lead = s.part === 'warmup' ? 'Warm-up. ' : s.part === 'cooldown' ? 'Cool-down. ' : `Set ${setNo + 1} of ${s.sets}. `;
-    const load = w !== null ? ` with ${w} ${unitWord}` : s.weightNote && setNo === 0 ? `. ${s.weightNote}` : '';
-    const amount = s.move.timed ? `${s.reps} seconds${s.move.perSide && s.part === 'main' ? ' each side' : ''}` : `${s.reps} ${s.move.perSide ? 'each side' : 'reps'}`;
-    const ask = s.move.timed ? ' Say go when you are ready.' : ' Say done when you finish.';
-    return `${s.move.name}. ${lead}${amount}${load}. ${s.move.cue}${ask}`;
+    const first = workout ? workout.steps.indexOf(s) === 0 && setNo === 0 : setNo === 0;
+    const amount = s.move.timed ? `${s.reps} seconds${s.move.perSide && s.part === 'main' ? ' on each side' : ''}` : `${s.reps} ${s.move.perSide ? 'on each side' : 'reps'}`;
+    const load = w !== null ? ` at ${w} ${unitWord}` : s.weightNote && setNo === 0 ? `. ${s.weightNote}` : '';
+    const ask = s.move.timed ? (first ? " Say go when you're ready, and I'll time it." : " Say go when you're set.") : first ? " When you're finished, just say done." : '';
+    if (s.part === 'warmup') return `Let's warm up first. ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
+    if (s.part === 'cooldown') return `Last one. Let's cool down with ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
+    if (setNo === 0) return `Alright, ${s.move.name}. ${s.sets > 1 ? `${s.sets} sets, ` : ''}${amount}${load}. ${s.move.cue}${ask}`;
+    return `${setNo + 1 === s.sets ? 'Last set' : `Set ${setNo + 1}`} of ${s.move.name}. ${amount}${load}. ${setNo + 1 === s.sets ? 'Make it count.' : 'Same as before.'}${ask}`;
   };
   const CARD_CMDS: Command[] = ['ask', 'done', 'ready', 'start', 'how', 'easier', 'harder', 'heavier', 'lighter', 'repeat', 'skip', 'pause', 'resume', 'end'];
   const speakCard = (index: number, setNo: number, w: number | null, plan = workout) => {
@@ -363,7 +369,7 @@ export function GuidedPage() {
     /* The first thing the coach will say, fetched while she reads the list. */
     coach.current?.prefetch(introLine(plan));
   };
-  const introLine = (plan: Workout) => `Let's go. ${plan.steps.length} moves, about ${fromPlan ? plan.minutes : estimateMinutes(plan)} minutes. I'll talk you through every one. ${cardLine(plan.steps[0], 0, plan.steps[0].weight)}`;
+  const introLine = (plan: Workout) => `Alright, let's do this. ${plan.steps.length} moves, about ${fromPlan ? plan.minutes : estimateMinutes(plan)} minutes, and I'll be with you the whole way. ${cardLine(plan.steps[0], 0, plan.steps[0].weight)}`;
   const start = () => {
     if (!workout) return;
     coach.current?.unlockAudio();
@@ -403,11 +409,11 @@ export function GuidedPage() {
     if (lastSet && lastStep) { finish(); return; }
     const restFor = step.rest;
     const upNext = lastSet ? workout.steps[stepIndex + 1] : step;
-    const why = feel === 'easy' && nextW !== null && !lastSet ? ` Going up to ${nextW} ${unitWord}.` : feel === 'hard' && nextW !== null && !lastSet ? ` Dropping to ${nextW} ${unitWord}.` : feel === 'hard' && swapped ? ` Next set: ${swapped.name}, an easier version.` : '';
+    const why = feel === 'easy' && nextW !== null && !lastSet ? ` That looked easy, so let's bump it to ${nextW} ${unitWord}.` : feel === 'hard' && nextW !== null && !lastSet ? ` Let's drop it to ${nextW} ${unitWord}. No shame in that.` : feel === 'hard' && swapped ? ` Next set, we'll switch to ${swapped.name}. It's a little easier.` : '';
     setPhase('rest'); setTimer(restFor); setRunning(true); setPaused(false);
     /* What comes after the rest, fetched during it. */
     { const nextIndex = lastSet ? stepIndex + 1 : stepIndex; const nextSet = lastSet ? 0 : setIndex + 1; const s2 = workout.steps[nextIndex]; if (s2) coach.current?.prefetch(cardLine(s2, nextSet, nextIndex === stepIndex ? (nextW ?? weight) : s2.weight)); }
-    say(`${cheer(logged.length)}${why} Rest ${restFor >= 60 ? `${Math.floor(restFor / 60)} minute${restFor >= 120 ? 's' : ''}${restFor % 60 ? ` ${restFor % 60} seconds` : ''}` : `${restFor} seconds`}. Up next, ${upNext.move.name}. Say ready when you are.`, ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end']);
+    say(`${cheer(logged.length)}${why} Take ${restFor >= 60 ? `${Math.floor(restFor / 60)} minute${restFor >= 120 ? 's' : ''}${restFor % 60 ? ` ${restFor % 60} seconds` : ''}` : `${restFor} seconds`}${restFor >= 60 ? ' to recover' : ''}. ${lastSet ? `Next up is ${upNext.move.name}.` : 'Same move next.'} ${logged.length <= 1 ? "Just say ready when you want to go." : "Tell me when you're ready."}`, ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end']);
   };
   const afterRest = () => {
     if (!step || !workout) return;
@@ -430,12 +436,12 @@ export function GuidedPage() {
     if (!step || weight === null) { say('This one has no weight. Say easier or harder to change it.', CARD_CMDS); return; }
     const w = nextWeight(weight, dir > 0 ? 'easy' : 'hard', step.move.load, metric);
     setWeights(map => ({ ...map, [stepIndex]: w }));
-    say(`Okay, ${w} ${unitWord}.`, CARD_CMDS);
+    say(`Okay, ${w} ${unitWord} it is.`, CARD_CMDS);
   };
   const explain = () => {
     if (!step) return;
     setLearn(true);
-    say(`Here's how. One: ${step.move.steps[0]} Two: ${step.move.steps[1]} Three: ${step.move.steps[2]} You should feel it in ${step.move.feel.replace(/\.$/, '').toLowerCase()}. Watch out: ${step.move.mistake} Say done when you finish the set.`, CARD_CMDS);
+    say(`Here's how you do it. First, ${step.move.steps[0]} Then, ${step.move.steps[1]} And finally, ${step.move.steps[2]} You should feel it in ${step.move.feel.replace(/\.$/, '').toLowerCase()}. One thing to watch: ${step.move.mistake} Say done when you've finished the set.`, CARD_CMDS);
   };
   const finish = () => {
     writeLive(null);
@@ -469,7 +475,7 @@ export function GuidedPage() {
       if (fromPlan) { try { sessionStorage.removeItem(FROM_PLAN_KEY); } catch { /* fine */ } }
     }
     const sets = main.length;
-    coach.current?.say(logged.length ? `That's the workout. ${sets} sets in ${minutesTaken} minutes. Really well done. It's saved to your log.` : 'No problem. Come back when you are ready.');
+    coach.current?.say(logged.length ? `And that's the workout! ${sets} sets in ${minutesTaken} minutes. Seriously, great job today. It's all saved for you.` : "No problem. Come back whenever you're ready.");
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- Timers: rest counts down; a timed move counts down once started ---- */
@@ -492,7 +498,7 @@ export function GuidedPage() {
   }, [timer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* "Go" keeps listening, so "done", "pause" or "end" work mid-plank. */
-  const startTimed = () => { if (!step?.move.timed) return; setTimer(step.reps); setRunning(true); setPaused(false); say('Go!', CARD_CMDS); };
+  const startTimed = () => { if (!step?.move.timed) return; setTimer(step.reps); setRunning(true); setPaused(false); say('Okay, go!', CARD_CMDS); };
 
   /* ---- Voice commands, read against the latest state ---- */
   const commandRef = useRef<(command: Command, heard: string) => void>(() => {});
@@ -501,7 +507,7 @@ export function GuidedPage() {
     if (command === 'ask') { const question = heardText.replace(/^\s*(hey |ok |okay )?coach[,:]?\s*/i, '').replace(/^\s*ask (the )?coach\s*/i, '').replace(/^\s*question[,:]?\s*/i, '').trim(); if (question.split(/\s+/).length >= 2) void askCoach(question); else { setAskOpen(true); coach.current!.freeText = true; say('Yes? Ask me anything.', ['end']); } return; }
     if (command === 'end') { finish(); return; }
     if (command === 'repeat') { say(lastLine.current.text, lastLine.current.listen); return; }
-    if (command === 'pause') { setPaused(true); say('Paused. Say resume when you are ready.', ['resume', 'ready', 'end']); return; }
+    if (command === 'pause') { setPaused(true); say("Paused. Say resume when you're ready.", ['resume', 'ready', 'end']); return; }
     if (command === 'resume') { setPaused(false); say('Back to it.', lastLine.current.listen); return; }
     if (phase === 'card') {
       if (command === 'done') { if (step?.move.timed && running) { setDone(); return; } setDone(); return; }
@@ -520,7 +526,7 @@ export function GuidedPage() {
     }
     if (phase === 'rest') {
       if (command === 'ready' || command === 'skip') { afterRest(); return; }
-      if (command === 'more') { setTimer(t => t + 30); say('Thirty more seconds.', ['ready', 'more', 'skip', 'repeat', 'end']); return; }
+      if (command === 'more') { setTimer(t => t + 30); say('Sure, thirty more seconds.', ['ready', 'more', 'skip', 'repeat', 'end']); return; }
     }
   };
   useEffect(() => { coach.current?.on((command, heardText) => commandRef.current(command, heardText)); }, []);
