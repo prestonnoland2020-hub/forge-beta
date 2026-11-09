@@ -201,3 +201,11 @@ html[data-theme="dark"] .guided { --g-bg: #0F151C; --g-surface: #18212B; --g-ink
 .gd-check-list span { font-size: 17px; font-weight: 800; }
 .gd-check-list b { font-size: 13px; color: var(--g-accent-text); }
 .gd-check-list > div.past b { color: #2F7D4F; }
+
+/* Her setup, on the Guided home screen, each line changeable. */
+.gd-setup { display: grid; background: var(--g-surface); border-radius: 20px; padding: 4px 16px; }
+.gd-setup-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 52px; border-bottom: 1px solid var(--g-line); }
+.gd-setup-row:last-child { border-bottom: 0; }
+.gd-setup-row span { font-size: 13px; font-weight: 700; color: var(--g-ink2); }
+.gd-setup-row b { font-size: 15px; font-weight: 700; color: var(--g-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-setup-row .gd-link { font-size: 14px; padding: 8px 0; }
