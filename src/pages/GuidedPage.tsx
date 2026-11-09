@@ -11,6 +11,21 @@ import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchC
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
+import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
+import { supabase } from '../lib/supabase';
+import { isDemoMode } from '../lib/env';
+
+/* HOW THE COACH HEARS. Signed in, it hears the Wispr Flow way: short clips
+   to forge-voice, a strong cloud speech model told what to expect. In the
+   preview build, or when that service is down, the phone's recognizer. */
+const cloudVoice = () => !isDemoMode && cloudEarsSupported();
+const voiceInput = () => canListen() || cloudVoice();
+async function transcribe(blob: Blob, hints: { words: string[]; phrases: string[]; context: string }): Promise<string> {
+  const audio = await blobToBase64(blob);
+  const { data, error } = await supabase.functions.invoke('forge-voice', { body: { audio, mime: 'audio/wav', ...hints } });
+  if (error) throw error;
+  return String((data as { text?: string } | null)?.text || '');
+}
 
 /* FORGE GUIDED. The coach builds the workout and walks her through it, one
    card at a time, out loud. The only input during a workout is "how did that
@@ -32,7 +47,7 @@ type MicStatus = 'unknown' | 'granted' | 'denied';
    the coach's recognizer opens its own when it listens. */
 async function requestMic(): Promise<MicStatus> {
   try {
-    if (!navigator.mediaDevices?.getUserMedia) return canListen() ? 'granted' : 'denied';
+    if (!navigator.mediaDevices?.getUserMedia) return voiceInput() ? 'granted' : 'denied';
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach(track => track.stop());
     return 'granted';
@@ -115,7 +130,7 @@ export function GuidedPage() {
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
-  const [handsFree, setHandsFree] = useState(canListen());
+  const [handsFree, setHandsFree] = useState(voiceInput());
   const [voiceOn, setVoiceOn] = useState(canSpeak());
   const [voiceState, setVoiceState] = useState({ speaking: false, listening: false });
   const [heard, setHeard] = useState('');
@@ -158,8 +173,10 @@ export function GuidedPage() {
     return () => { c.stop(); html.style.overflow = before; };
   }, []);
   useEffect(() => { if (coach.current) coach.current.muted = !voiceOn; }, [voiceOn]);
-  useEffect(() => { coach.current?.setHandsFree(handsFree && (phase === 'card' || phase === 'feel' || phase === 'rest' || phase === 'preview')); }, [handsFree, phase]);
+  useEffect(() => { coach.current?.setHandsFree(handsFree && (phase === 'card' || phase === 'feel' || phase === 'rest' || phase === 'preview' || Boolean(check))); }, [handsFree, phase, check]);
 
+  /* Opens the cloud ears from a tap (iOS needs one), once per workout. */
+  const openEars = () => { const c = coach.current; if (!c || !handsFree || !cloudVoice() || c.mode === 'cloud') return; void c.useCloud(blob => transcribe(blob, c.hints())); };
   const say = (text: string, listen?: Command[]) => { lastLine.current = { text, listen }; coach.current?.say(text, listen); };
 
   const step: Step | undefined = workout?.steps[stepIndex];
@@ -185,6 +202,7 @@ export function GuidedPage() {
   /* THE WORKOUT IN PROGRESS, where the Ask Forge coach can read it. */
   useEffect(() => {
     if (!workout || !step || !['card', 'feel', 'rest'].includes(phase)) return;
+    if (coach.current) coach.current.context = step.move.name;
     const fmtW = (w: number | null) => w === null ? null : `${w} ${unit}`;
     writeLive({ focus: workout.focus, minutes: workout.minutes, phase, move: step.move.name, set: setIndex + 1, sets: step.sets, amount: amountText(step), weight: fmtW(weight), cue: step.move.cue,
       moves: workout.steps.map((item, i) => ({ name: item.move.name, sets: item.sets, amount: amountText(item), weight: fmtW(weights[i] !== undefined ? weights[i] : item.weight) })),
@@ -221,7 +239,7 @@ export function GuidedPage() {
     <section className="gd-sheet" role="dialog" aria-modal="true" aria-labelledby="gd-ask-title">
       <h2 id="gd-ask-title">Ask your coach</h2>
       {askAnswer && <div className="gd-ask-turn"><p className="gd-ask-q">{askAnswer.q}</p><p className="gd-ask-a">{askBusy ? 'Thinking…' : askAnswer.a}</p></div>}
-      {!askAnswer && <p className="gd-lead">{handsFree && canListen() ? 'Just talk. Or type below.' : 'Type a question. Why this weight, how to do the move, what is next.'}</p>}
+      {!askAnswer && <p className="gd-lead">{handsFree && voiceInput() ? 'Just talk. Or type below.' : 'Type a question. Why this weight, how to do the move, what is next.'}</p>}
       <form className="gd-ask-form" onSubmit={event => { event.preventDefault(); void askCoach(askText); }}>
         <input className="gd-ask-input" value={askText} onChange={event => setAskText(event.target.value)} placeholder="e.g. Why is it 15 pounds?" aria-label="Your question" />
         <button type="submit" className="gd-ask-send" disabled={!askText.trim() || askBusy} aria-label="Ask"><Svg d="M5 12h14M13 6l6 6-6 6" size={20} stroke={2.4} /></button>
@@ -282,14 +300,14 @@ export function GuidedPage() {
               <ul className="gd-mic-list">
                 <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Only listens during a workout</li>
                 <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Only acts on a few workout words</li>
-                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Forge never saves what it hears</li>
+                <li><Svg d="M5 12.5 10 17l9-10" size={16} stroke={2.6} />Clips are turned into words, never saved</li>
               </ul>
             </>}
         {!check && mic !== 'denied' && <button type="button" className="gd-cta" disabled={micBusy} onClick={async () => {
           setMicBusy(true);
           const status = await requestMic();
           setMicBusy(false); setMic(status); write(MIC_KEY, status);
-          if (status === 'granted') runCheck(0);
+          if (status === 'granted') { openEars(); runCheck(0); }
         }}>{micBusy ? 'Waiting for your phone…' : 'Allow microphone'}</button>}
         {!check && <button type="button" className="gd-secondary" onClick={() => { setHandsFree(false); setMicAsk(false); start(); }}>{mic === 'denied' ? 'Start, I’ll tap' : 'Not now, I’ll tap'}</button>}
       </section>
@@ -304,6 +322,7 @@ export function GuidedPage() {
   };
   const start = () => {
     if (!workout) return;
+    openEars();
     setStepIndex(0); setSetIndex(0); setWeights({}); setLogged([]); setStartedAt(Date.now()); setPhase('card'); setTimer(workout.steps[0].reps); setRunning(false);
     say(`Let's go. ${workout.steps.length} moves, about ${estimateMinutes(workout)} minutes. I'll talk you through every one. ${cardLine(workout.steps[0], 0, workout.steps[0].weight)}`, CARD_CMDS);
   };
@@ -463,7 +482,7 @@ export function GuidedPage() {
   </div>;
   const voiceToggles = <div className="gd-voice-row">
     <button type="button" className={voiceOn ? 'gd-pill on' : 'gd-pill'} aria-pressed={voiceOn} onClick={() => setVoiceOn(v => !v)}><Svg d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" size={16} />Coach voice</button>
-    {canListen() && <button type="button" className={handsFree ? 'gd-pill on' : 'gd-pill'} aria-pressed={handsFree} onClick={() => setHandsFree(v => !v)}><Svg d={MIC} size={16} />Hands-free</button>}
+    {voiceInput() && <button type="button" className={handsFree ? 'gd-pill on' : 'gd-pill'} aria-pressed={handsFree} onClick={() => setHandsFree(v => !v)}><Svg d={MIC} size={16} />Hands-free</button>}
   </div>;
 
   if (phase === 'setup') {
@@ -513,8 +532,8 @@ export function GuidedPage() {
       <div className="gd-chips">{FOCUSES.map(item => <button type="button" key={item} className={focus === item ? 'gd-chip on' : 'gd-chip'} aria-pressed={focus === item} onClick={() => setFocus(item)}>{item}</button>)}</div>
     </div>
     {voiceToggles}
-    {handsFree && canListen() && <p className="gd-muted gd-voice-learn">
-      <button type="button" className="gd-link" onClick={() => { setMicAsk(true); if (mic === 'granted') runCheck(0); }}>Voice check</button>
+    {handsFree && voiceInput() && <p className="gd-muted gd-voice-learn">
+      <button type="button" className="gd-link" onClick={() => { setMicAsk(true); if (mic === 'granted') { openEars(); runCheck(0); } }}>Voice check</button>
       {learnedCount > 0 && <> · Knows {learnedCount} way{learnedCount === 1 ? '' : 's'} you say things · <button type="button" className="gd-link" onClick={() => { forgetVoice(); coach.current?.reloadMemory(); setLearnedCount(0); }}>Reset</button></>}
     </p>}
     {micSheet}
@@ -532,7 +551,7 @@ export function GuidedPage() {
     </div>)}</div>
     <p className="gd-muted">Weights are a starting guess. Tell the coach how each set felt and the next one adjusts.</p>
     <button type="button" className="gd-secondary" onClick={() => build()}>Shuffle moves</button>
-    <button type="button" className="gd-cta" onClick={() => { if (handsFree && canListen() && mic !== 'granted') setMicAsk(true); else start(); }}><Svg d="M7 4v16l13-8z" size={18} />Start</button>
+    <button type="button" className="gd-cta" onClick={() => { if (handsFree && voiceInput() && mic !== 'granted') setMicAsk(true); else start(); }}><Svg d="M7 4v16l13-8z" size={18} />Start</button>
     {micSheet}
   </div>);
 
@@ -556,12 +575,12 @@ export function GuidedPage() {
   if (!workout || !step) return frame(<div className="gd-screen">{top()}<p className="gd-lead">Loading…</p></div>);
 
   const progress = <div className="gd-dots" aria-label={`Move ${stepIndex + 1} of ${workout.steps.length}`}>{workout.steps.map((_, i) => <span key={i} className={i < stepIndex ? 'done' : i === stepIndex ? 'now' : ''} />)}</div>;
-  const listenBadge = handsFree && canListen() ? <span className={voiceState.listening ? 'gd-listen on' : 'gd-listen'}><Svg d={MIC} size={14} stroke={2.4} />{voiceState.speaking ? 'Coach talking' : voiceState.listening ? 'Listening' : 'Mic'}</span> : null;
+  const listenBadge = handsFree && voiceInput() ? <span className={voiceState.listening ? 'gd-listen on' : 'gd-listen'}><Svg d={MIC} size={14} stroke={2.4} />{voiceState.speaking ? 'Coach talking' : voiceState.listening ? 'Listening' : 'Mic'}</span> : null;
 
   if (phase === 'rest') {
     const total = Math.max(1, step.rest);
     const upNext = setIndex + 1 < step.sets ? step : workout.steps[stepIndex + 1];
-    return frame(<div className="gd-screen rest">
+    return frame(<div className="gd-screen gd-restscreen">
       {top(undefined, listenBadge)}
       <div className="gd-ring">
         <svg viewBox="0 0 260 260" aria-hidden="true"><circle cx="130" cy="130" r="110" className="track" /><circle cx="130" cy="130" r="110" className="fill" strokeDasharray="691" strokeDashoffset={691 * (1 - Math.max(0, timer) / total)} /></svg>
@@ -594,7 +613,7 @@ export function GuidedPage() {
   const timed = Boolean(step.move.timed);
   const easier = swapFor(step, 'easier', have);
   const harder = swapFor(step, 'harder', have);
-  return frame(<div className="gd-screen card">
+  return frame(<div className="gd-screen gd-cardscreen">
     {top(undefined, <>{listenBadge}<button type="button" className="gd-link" onClick={() => setAskOpen(true)}>Ask coach</button><button type="button" className="gd-link" onClick={finish}>End</button></>)}
     {askSheet}
     {progress}

@@ -140,7 +140,64 @@ function pickVoice(): SpeechSynthesisVoice | undefined {
   return voices.find(voice => /^en(-|_)US/i.test(voice.lang)) || voices.find(voice => /^en/i.test(voice.lang));
 }
 
+import { CloudEars, cloudEarsSupported, type Transcribe } from './cloudEars';
+
+/* The words the cloud model is told to expect, per command. */
+const SPOKEN: Partial<Record<Command, string[]>> = {
+  done: ['done', "I'm done"], ready: ['ready', "let's go"], easy: ['too easy'], right: ['just right'], hard: ['too hard'],
+  more: ['more rest'], how: ['how do I do this'], easier: ['easier'], harder: ['harder'], heavier: ['heavier'], lighter: ['lighter'],
+  repeat: ['repeat'], skip: ['skip'], pause: ['pause'], resume: ['resume'], end: ['end workout'], ask: ['coach'],
+};
+
 export class Coach {
+  /* 'cloud' hears with forge-voice (the Wispr Flow way); 'phone' with the
+     browser's recognizer. Cloud falls back to phone on its own if the
+     service fails twice in a row. */
+  mode: 'cloud' | 'phone' = 'phone';
+  private ears: CloudEars | null = null;
+  private cloudFailures = 0;
+  context = '';
+  onMode: (mode: 'cloud' | 'phone') => void = () => {};
+
+  async useCloud(transcribe: Transcribe) {
+    if (!cloudEarsSupported()) return false;
+    const ears = new CloudEars(blob => transcribe(blob));
+    ears.onText = text => { this.cloudFailures = 0; this.handleHeard([text]); };
+    ears.onError = () => {
+      this.cloudFailures += 1;
+      if (this.cloudFailures >= 2) { ears.close(); this.ears = null; this.mode = 'phone'; this.onMode('phone'); if (this.wantListen && !this.speaking) this.listen(); }
+    };
+    try { await ears.open(); } catch { return false; }
+    this.ears = ears; this.mode = 'cloud'; this.onMode('cloud');
+    if (this.wantListen && !this.speaking && this.allowed) this.listen();
+    return true;
+  }
+
+  /* What forge-voice is told to listen for right now. */
+  hints() {
+    const words = [...new Set((this.allowed || []).flatMap(command => SPOKEN[command] || []))];
+    return { words, phrases: Object.keys(this.memory).slice(-40), context: this.context };
+  }
+
+  /* One place that turns what was heard into a command, for either ear. */
+  private handleHeard(alternatives: string[]) {
+    if (!alternatives.length) return;
+    if (this.capture) { const take = this.capture; this.capture = null; this.onHeard(alternatives[0]); take(alternatives); return; }
+    let best: { match: Match; heard: string } | null = null;
+    for (const heard of alternatives) {
+      const match = matchCommand(heard, this.allowed, this.memory);
+      if (match && (!best || match.score > best.match.score)) best = { match, heard };
+      if (match?.how === 'rule' || match?.how === 'learned') break;
+    }
+    if (best) {
+      if (best.match.how === 'close' && best.match.score >= 0.85) { teachPhrase(best.heard, best.match.command); this.reloadMemory(); }
+      this.onHeard(best.heard); this.handler(best.match.command, best.heard); return;
+    }
+    this.onHeard(alternatives[0]);
+    if (this.freeText) { this.freeText = false; this.handler('ask', alternatives[0]); return; }
+    this.onUnknown(alternatives[0]);
+  }
+
   private recognition: Recognition | null = null;
   private listening = false;
   private wantListen = false;
@@ -193,7 +250,9 @@ export class Coach {
   get handsFree() { return this.wantListen; }
 
   private listen() {
-    if (!this.wantListen || !canListen() || this.listening) return;
+    if (!this.wantListen || this.listening) return;
+    if (this.mode === 'cloud' && this.ears) { this.ears.paused = false; this.listening = true; this.emit(); return; }
+    if (!canListen()) return;
     const Ctor = ((window as unknown as { SpeechRecognition?: new () => Recognition }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition: new () => Recognition }).webkitSpeechRecognition);
     const recognition = new Ctor();
     /* Her phone's English, so an Australian or British accent is heard by
@@ -203,23 +262,7 @@ export class Coach {
     recognition.onresult = event => {
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const alternatives = Array.from(event.results[i]).map(item => item.transcript).filter(Boolean);
-        if (!alternatives.length) continue;
-        if (this.capture) { const take = this.capture; this.capture = null; this.onHeard(alternatives[0]); take(alternatives); return; }
-        /* Every alternative the engine offers is tried; the best match wins. */
-        let best: { match: Match; heard: string } | null = null;
-        for (const heard of alternatives) {
-          const match = matchCommand(heard, this.allowed, this.memory);
-          if (match && (!best || match.score > best.match.score)) best = { match, heard };
-          if (match?.how === 'rule' || match?.how === 'learned') break;
-        }
-        if (best) {
-          /* A very close call is remembered, so next time it is exact. */
-          if (best.match.how === 'close' && best.match.score >= 0.85) { teachPhrase(best.heard, best.match.command); this.reloadMemory(); }
-          this.onHeard(best.heard); this.handler(best.match.command, best.heard); return;
-        }
-        this.onHeard(alternatives[0]);
-        if (this.freeText) { this.freeText = false; this.handler('ask', alternatives[0]); return; }
-        this.onUnknown(alternatives[0]);
+        if (alternatives.length) { this.handleHeard(alternatives); return; }
       }
     };
     /* Safari ends a session after a pause; while hands-free is on and the
@@ -231,6 +274,7 @@ export class Coach {
   }
 
   private stopListening() {
+    if (this.ears) this.ears.paused = true;
     const recognition = this.recognition;
     this.recognition = null;
     this.listening = false;
@@ -238,7 +282,7 @@ export class Coach {
     this.emit();
   }
 
-  stop() { this.wantListen = false; this.stopListening(); if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
+  stop() { this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
 
   private emit() { this.onState({ speaking: this.speaking, listening: this.listening }); }
 }
