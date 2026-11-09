@@ -143,6 +143,9 @@ export function HomePage() {
     {/* THE PLAN LIVES ONE TAP UNDER TODAY. It was its own tab whose first row
         repeated this card with a second Start button; now Today says what to
         do and this row opens the rest of the week. */}
+    {/* FORGE GUIDED. For anyone who would rather be told what to do: the
+        coach builds a workout and talks them through it, out loud. */}
+    <Link className="gd-entry" to="/guided"><span className="gd-entry-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg></span><span><b>Coach me through a workout</b><small>Pick your time. The coach builds it and talks you through every set.</small></span><Icon name="right" size={16} /></Link>
     <Link className="td-week-link" to="/plan"><span><b>See your week</b><small>Every session, week by week</small></span><Icon name="right" size={16} /></Link>
 
     {!firstWeekHidden && trainedDays < 3 && (() => {
