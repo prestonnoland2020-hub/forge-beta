@@ -47,6 +47,10 @@ check('focus rotates', suggestFocus('Glutes & core', home) !== 'Glutes & core');
 
 const heard = [['I\'m done', 'done'], ['done!', 'done'], ['finished', 'done'], ['that was too easy', 'easy'], ['easy', 'easy'], ['just right', 'right'], ['perfect', 'right'], ['too hard', 'hard'], ['that was heavy', 'hard'], ['ready', 'ready'], ["let's go", 'ready'], ['I need more rest', 'more'], ['not ready', 'more'], ['how do I do this', 'how'], ['show me', 'how'], ['make it easier', 'easier'], ['harder', 'harder'], ['say that again', 'repeat'], ['pause', 'pause'], ['end workout', 'end'], ['go heavier', 'heavier'], ['skip', 'skip'], ['banana', null]];
 for (const [text, want] of heard) check(`"${text}" → ${want}`, parseCommand(text) === want, String(parseCommand(text)));
+for (const [text, want] of [['coach, why is it 15 pounds', 'ask'], ['hey coach is this too hard', 'ask'], ['ask coach what is next', 'ask'], ['coach', 'ask']]) check(`"${text}" → ${want}`, parseCommand(text) === want, String(parseCommand(text)));
+check('the coach question is asked before command words', parseCommand('coach, is this too hard for me') === 'ask');
+const coachPage = (await import('node:fs')).readFileSync('src/pages/CoachPage.tsx', 'utf8');
+check('the Ask Forge coach is told about Guided', /guided:guidedCoachContext\(\)/.test(coachPage));
 check('feel step only hears feel words', parseCommand("I'm done", ['easy', 'right', 'hard']) === null);
 check('rest: "ready" while only ready/more allowed', parseCommand('okay ready', ['ready', 'more']) === 'ready');
 
