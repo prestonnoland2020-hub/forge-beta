@@ -160,7 +160,7 @@ export type CoachVoice = 'coral' | 'ash';
 export const VOICE_LABEL: Record<CoachVoice, string> = { coral: 'Female voice', ash: 'Male voice' };
 export type Speak = (text: string, voice: CoachVoice) => Promise<Blob>;
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-const CACHE_NAME = 'forge-coach-voice-v1';
+const CACHE_NAME = 'forge-coach-voice-v2';
 function hashLine(text: string) { let h = 5381; for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + text.length; }
 
 export class Coach {
@@ -293,16 +293,18 @@ export class Coach {
     const finish = () => { if (token !== this.sayToken) return; this.speaking = false; this.emit(); if (listenFor) this.listen(); };
     this.speaking = true; this.emit();
     if (this.natural && this.audio) {
-      /* The natural voice, with the phone's as the safety net: if the line
-         is not ready in 3.5 s, or fails, the phone says it instead. */
+      /* The natural voice. The phone's robot voice is only the safety net for
+         a real failure: a slow line is waited for (lines are fetched ahead,
+         so this is rare), because switching voices mid-workout sounds worse
+         than a short pause. */
       const audio = this.audio;
       let settled = false;
       const fallback = () => { if (settled || token !== this.sayToken) return; settled = true; this.speakPhone(text, finish); };
-      const timer = window.setTimeout(() => { this.cloudSpeakFailures += 0.5; fallback(); }, 3500);
+      const timer = window.setTimeout(fallback, 10000);
       this.lineUrl(text).then(url => {
         if (settled || token !== this.sayToken) return;
         settled = true; window.clearTimeout(timer); this.cloudSpeakFailures = 0;
-        audio.onended = finish; audio.onerror = () => this.speakPhone(text, finish);
+        audio.onended = finish; audio.onerror = () => { this.cloudSpeakFailures += 1; this.speakPhone(text, finish); };
         audio.src = url;
         void audio.play().catch(() => this.speakPhone(text, finish));
       }).catch(() => { window.clearTimeout(timer); this.cloudSpeakFailures += 1; fallback(); });
@@ -336,7 +338,14 @@ export class Coach {
 
   private listen() {
     if (!this.wantListen || this.listening) return;
-    if (this.mode === 'cloud' && this.ears) { this.ears.paused = false; this.listening = true; this.emit(); return; }
+    if (this.mode === 'cloud' && this.ears) {
+      /* The mic is off while the coach talks (on iPhone an open mic makes
+         playback thin, like a phone call); it comes back to listen. */
+      const ears = this.ears;
+      this.listening = true; this.emit();
+      void ears.takeMic().then(() => { if (this.ears === ears && this.listening) ears.paused = false; }).catch(error => ears.onError(error));
+      return;
+    }
     if (!canListen()) return;
     const Ctor = ((window as unknown as { SpeechRecognition?: new () => Recognition }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition: new () => Recognition }).webkitSpeechRecognition);
     const recognition = new Ctor();
@@ -359,7 +368,7 @@ export class Coach {
   }
 
   private stopListening() {
-    if (this.ears) this.ears.paused = true;
+    if (this.ears) { this.ears.paused = true; this.ears.releaseMic(); }
     const recognition = this.recognition;
     this.recognition = null;
     this.listening = false;
@@ -373,5 +382,5 @@ export class Coach {
 }
 
 /* Encouragement, rotated so it does not say the same thing every set. */
-const CHEERS = ['Nice work.', 'Strong set.', "That's it.", 'Looking good.', 'Great control.', 'Keep that up.', "You've got this."];
+const CHEERS = ['Nice! That looked really solid.', 'Yes! Good set.', 'Love that. Nice and controlled.', "There you go, that's how it's done.", 'Good work. That was smooth.', 'Beautiful. Keep that rhythm going.', "Awesome. You're moving well today."];
 export const cheer = (n: number) => CHEERS[n % CHEERS.length];

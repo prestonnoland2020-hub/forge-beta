@@ -73,10 +73,10 @@ export class CloudEars {
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.ctx = new Ctx();
-    const source = this.ctx.createMediaStreamSource(this.stream);
     this.node = this.ctx.createScriptProcessor(2048, 1, 1);
     this.node.onaudioprocess = event => this.frame(event.inputBuffer.getChannelData(0));
-    source.connect(this.node);
+    this.source = this.ctx.createMediaStreamSource(this.stream);
+    this.source.connect(this.node);
     /* A processor only runs when connected onward; a muted gain keeps it
        silent so her own voice is never played back. */
     const mute = this.ctx.createGain(); mute.gain.value = 0;
@@ -135,9 +135,27 @@ export class CloudEars {
     finally { this.busy = false; }
   }
 
+  /* Let go of the microphone while the coach talks, keeping the audio
+     engine running so taking it back needs no tap. */
+  private source: MediaStreamAudioSourceNode | null = null;
+  releaseMic() {
+    try { this.source?.disconnect(); } catch { /* already */ }
+    this.stream?.getTracks().forEach(track => track.stop());
+    this.source = null; this.stream = null; this.reset();
+  }
+  async takeMic() {
+    if (!this.ctx || !this.node) { await this.open(); return; }
+    if (this.stream && this.stream.getAudioTracks().some(track => track.readyState === 'live')) return;
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => {});
+    this.source = this.ctx.createMediaStreamSource(this.stream);
+    this.source.connect(this.node);
+  }
+
   close() {
     this.paused = true;
-    try { this.node?.disconnect(); } catch { /* already */ }
+    try { this.node?.disconnect(); this.source?.disconnect(); } catch { /* already */ }
+    this.source = null;
     this.stream?.getTracks().forEach(track => track.stop());
     void this.ctx?.close().catch(() => {});
     this.ctx = null; this.node = null; this.stream = null; this.sent = 0;
