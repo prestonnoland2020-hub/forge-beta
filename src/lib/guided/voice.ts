@@ -48,6 +48,80 @@ export function parseCommand(transcript: string, allowed?: Command[]): Command |
   return null;
 }
 
+/* ---------- Learning how the phone hears HER ----------
+
+   A web app cannot retrain the phone's speech engine on one voice. What it
+   can learn is how that engine hears her: if her "done" keeps arriving as
+   "dawn", the coach learns that "dawn" means done. Three ways in:
+   - a voice check: she says three words once and whatever the phone heard
+     is remembered for each;
+   - "Did you mean…?": when nothing matched, one tap teaches the phrase;
+   - close calls: a near-miss of a known phrase ("redy") counts, and a very
+     close one is remembered.
+   Stored on the device, never sent anywhere. */
+const MEMORY_KEY = 'forge-guided-voice-v1';
+export const normalizePhrase = (text: string) => text.toLowerCase().replace(/[^a-z0-9' ]/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ').trim();
+export function loadVoiceMemory(): Record<string, Command> {
+  try { const saved = JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}'); return saved && typeof saved === 'object' ? saved : {}; } catch { return {}; }
+}
+export function teachPhrase(heard: string, command: Command) {
+  const phrase = normalizePhrase(heard);
+  if (!phrase || phrase.split(' ').length > 6 || command === 'ask') return;
+  const memory = loadVoiceMemory();
+  memory[phrase] = command;
+  const keys = Object.keys(memory);
+  if (keys.length > 200) delete memory[keys[0]];
+  try { localStorage.setItem(MEMORY_KEY, JSON.stringify(memory)); } catch { /* full */ }
+}
+export function forgetVoice() { try { localStorage.removeItem(MEMORY_KEY); } catch { /* nothing */ } }
+
+/* What speech engines commonly hand back for these words. */
+const SOUNDS_LIKE: Record<string, Command> = {
+  dun: 'done', dunn: 'done', dawn: 'done', don: 'done', dumb: 'done', dan: 'done', 'im dun': 'done', 'i am done': 'done', 'all done': 'done', nun: 'done',
+  redi: 'ready', reddy: 'ready', redy: 'ready', radio: 'ready', teddy: 'ready', 'im ready': 'ready', freddie: 'ready', ready: 'ready',
+  'to easy': 'easy', 'two easy': 'easy', '2 easy': 'easy', 'too ez': 'easy', 'it was easy': 'easy',
+  'just write': 'right', 'just rite': 'right', 'just ride': 'right', 'jess right': 'right', 'just white': 'right',
+  'to hard': 'hard', 'two hard': 'hard', '2 hard': 'hard', 'too heard': 'hard', 'to heavy': 'hard', 'too hot': 'hard',
+  'more rest': 'more', 'more time': 'more', 'repeat that': 'repeat', 'say again': 'repeat', 'skipped': 'skip', 'escape': 'skip',
+};
+const CANON: Array<[Command, string]> = [
+  ['done', 'done'], ['done', 'im done'], ['done', 'finished'], ['ready', 'ready'], ['ready', 'im ready'], ['ready', 'lets go'],
+  ['easy', 'too easy'], ['right', 'just right'], ['right', 'perfect'], ['hard', 'too hard'], ['how', 'how do i do this'], ['how', 'show me'],
+  ['repeat', 'repeat'], ['more', 'more rest'], ['easier', 'easier'], ['harder', 'harder'], ['heavier', 'heavier'], ['lighter', 'lighter'],
+  ['skip', 'skip'], ['pause', 'pause'], ['resume', 'resume'], ['end', 'end workout'],
+];
+function distance(a: string, b: string) {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    let prev = row[0]; row[0] = i;
+    for (let j = 1; j <= b.length; j += 1) { const keep = row[j]; row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = keep; }
+  }
+  return row[b.length];
+}
+const similarity = (a: string, b: string) => 1 - distance(a, b) / Math.max(a.length, b.length, 1);
+
+export type Match = { command: Command; how: 'rule' | 'learned' | 'sounds-like' | 'close' ; score: number };
+export function matchCommand(transcript: string, allowed?: Command[], memory: Record<string, Command> = {}): Match | null {
+  const ok = (command: Command) => !allowed || allowed.includes(command);
+  const rule = parseCommand(transcript, allowed);
+  if (rule) return { command: rule, how: 'rule', score: 1 };
+  const phrase = normalizePhrase(transcript);
+  if (!phrase) return null;
+  if (memory[phrase] && ok(memory[phrase])) return { command: memory[phrase], how: 'learned', score: 1 };
+  if (SOUNDS_LIKE[phrase] && ok(SOUNDS_LIKE[phrase])) return { command: SOUNDS_LIKE[phrase], how: 'sounds-like', score: 0.9 };
+  /* Close calls, only for short things said (a whole sentence that happens
+     to sound like "ready" is not a command). */
+  if (phrase.split(' ').length > 4) return null;
+  let best: Match | null = null;
+  const candidates: Array<[Command, string]> = [...CANON, ...Object.entries(memory).map(([text, command]) => [command, text] as [Command, string])];
+  for (const [command, text] of candidates) {
+    if (!ok(command)) continue;
+    const score = similarity(phrase, text);
+    if (score >= 0.72 && (!best || score > best.score)) best = { command, how: 'close', score };
+  }
+  return best;
+}
+
 type Recognition = {
   lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> & { length: number }; resultIndex: number }) => void) | null;
@@ -78,9 +152,15 @@ export class Coach {
   muted = false;
   /* After "Coach?" with no question, the next thing said is the question. */
   freeText = false;
+  /* The voice check: the next thing said goes here, every alternative. */
+  capture: ((heard: string[]) => void) | null = null;
+  onUnknown: (heard: string) => void = () => {};
+  memory: Record<string, Command> = {};
+  reloadMemory() { this.memory = typeof localStorage === 'undefined' ? {} : loadVoiceMemory(); }
 
   constructor() {
     if (canSpeak()) window.speechSynthesis.getVoices();
+    this.reloadMemory();
   }
 
   on(handler: (command: Command, heard: string) => void) { this.handler = handler; }
@@ -116,19 +196,30 @@ export class Coach {
     if (!this.wantListen || !canListen() || this.listening) return;
     const Ctor = ((window as unknown as { SpeechRecognition?: new () => Recognition }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition: new () => Recognition }).webkitSpeechRecognition);
     const recognition = new Ctor();
-    recognition.lang = 'en-US'; recognition.continuous = true; recognition.interimResults = false; recognition.maxAlternatives = 3;
+    /* Her phone's English, so an Australian or British accent is heard by
+       the model trained for it. */
+    const lang = typeof navigator !== 'undefined' && /^en/i.test(navigator.language || '') ? navigator.language : 'en-US';
+    recognition.lang = lang; recognition.continuous = true; recognition.interimResults = false; recognition.maxAlternatives = 5;
     recognition.onresult = event => {
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const alternatives = Array.from(event.results[i]);
-        for (const alternative of alternatives) {
-          const heard = alternative.transcript;
-          const command = parseCommand(heard, this.allowed);
-          if (command) { this.onHeard(heard); this.handler(command, heard); return; }
+        const alternatives = Array.from(event.results[i]).map(item => item.transcript).filter(Boolean);
+        if (!alternatives.length) continue;
+        if (this.capture) { const take = this.capture; this.capture = null; this.onHeard(alternatives[0]); take(alternatives); return; }
+        /* Every alternative the engine offers is tried; the best match wins. */
+        let best: { match: Match; heard: string } | null = null;
+        for (const heard of alternatives) {
+          const match = matchCommand(heard, this.allowed, this.memory);
+          if (match && (!best || match.score > best.match.score)) best = { match, heard };
+          if (match?.how === 'rule' || match?.how === 'learned') break;
         }
-        if (alternatives[0]) {
-          this.onHeard(alternatives[0].transcript);
-          if (this.freeText) { this.freeText = false; this.handler('ask', alternatives[0].transcript); return; }
+        if (best) {
+          /* A very close call is remembered, so next time it is exact. */
+          if (best.match.how === 'close' && best.match.score >= 0.85) { teachPhrase(best.heard, best.match.command); this.reloadMemory(); }
+          this.onHeard(best.heard); this.handler(best.match.command, best.heard); return;
         }
+        this.onHeard(alternatives[0]);
+        if (this.freeText) { this.freeText = false; this.handler('ask', alternatives[0]); return; }
+        this.onUnknown(alternatives[0]);
       }
     };
     /* Safari ends a session after a pause; while hands-free is on and the
