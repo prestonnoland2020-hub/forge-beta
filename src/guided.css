@@ -213,3 +213,17 @@ html[data-theme="dark"] .guided { --g-bg: #0F151C; --g-surface: #18212B; --g-ink
 .gd-photos-map .gd-body { width: 62%; }
 .gd-move-map { width: 56px; height: 42px; border-radius: 10px; background: var(--g-soft); display: grid; place-items: center; overflow: hidden; flex: none; }
 .gd-move-map .gd-body { width: 40px; }
+/* Build my own */
+.gd-pick-groups { flex-wrap: nowrap; overflow-x: auto; margin: 0 -20px; padding: 0 20px 2px; scrollbar-width: none; }
+.gd-pick-groups::-webkit-scrollbar { display: none; }
+.gd-pick-groups .gd-chip { flex: none; }
+.gd-pick { width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--g-line); font: inherit; color: var(--g-ink); cursor: pointer; }
+.gd-pick span { flex: 1; min-width: 0; }
+.gd-pick-mark { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid var(--g-line); font-style: normal; font-weight: 800; font-size: 15px; color: var(--g-ink2); }
+.gd-pick.on .gd-pick-mark { background: #1468B0; border-color: #1468B0; color: #fff; }
+.gd-pick-list { margin-bottom: 4px; }
+.gd-pick-clear { align-self: center; }
+.gd-pick-go { position: sticky; bottom: 12px; margin-top: 8px; }
+/* A solid strip under the phone's clock, so content scrolls under it rather
+   than through the time and battery. */
+.guided::before { content: ''; position: sticky; top: 0; display: block; height: env(safe-area-inset-top, 0px); margin-bottom: calc(-1 * env(safe-area-inset-top, 0px)); background: var(--g-bg); z-index: 5; }

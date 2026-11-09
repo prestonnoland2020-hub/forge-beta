@@ -27,14 +27,28 @@ export type Workout = { title: string; focus: Focus; minutes: number; steps: Ste
 
 export const FOCUSES: Focus[] = ['Glutes & core', 'Full body', 'Upper body', 'Lower body', 'Stretch it out'];
 
-/* What each focus is made of, in order. A slot that finds no move for her
-   equipment is skipped rather than filled with something wrong. */
-const SHAPES: Record<Focus, Pattern[]> = {
-  'Glutes & core': ['glute', 'squat', 'hinge', 'lunge', 'core', 'core', 'glute'],
-  'Full body': ['squat', 'push', 'hinge', 'pull', 'core', 'lunge', 'shoulder'],
-  'Upper body': ['push', 'pull', 'shoulder', 'arms', 'core', 'push', 'pull'],
-  'Lower body': ['squat', 'hinge', 'lunge', 'glute', 'calf', 'glute', 'core'],
+/* What each focus is made of, in order. The first REQUIRED slots are the
+   muscle groups the name promises — a full body day trains legs (front and
+   back), chest, back, shoulders and core every time, however short. Later
+   slots are added when there is time. A slot can ask for a muscle (arms:
+   biceps); if no move for her equipment fits, it is skipped when another
+   move already works that muscle. */
+type Slot = Pattern | `${Pattern}:${string}`;
+const SHAPES: Record<Focus, Slot[]> = {
+  'Glutes & core': ['glute', 'hinge:Hamstrings', 'lunge', 'core', 'core', 'glute', 'squat'],
+  'Full body': ['squat', 'hinge:Hamstrings', 'push:Chest', 'pull:Back', 'shoulder:Shoulders', 'core', 'lunge', 'arms:Biceps', 'glute'],
+  'Upper body': ['push:Chest', 'pull:Back', 'shoulder:Shoulders', 'arms:Biceps', 'arms:Triceps', 'push', 'pull', 'core'],
+  'Lower body': ['squat', 'hinge:Hamstrings', 'glute', 'lunge', 'calf', 'glute', 'core'],
   'Stretch it out': ['warmup', 'warmup', 'stretch', 'core', 'stretch', 'stretch'],
+};
+export const REQUIRED: Record<Focus, number> = { 'Glutes & core': 5, 'Full body': 6, 'Upper body': 5, 'Lower body': 5, 'Stretch it out': 0 };
+/* The muscles each focus must hit, checked by the tests. */
+export const MUST_HIT: Record<Focus, string[]> = {
+  'Full body': ['Quads', 'Hamstrings', 'Glutes', 'Chest', 'Back', 'Shoulders', 'Abs'],
+  'Upper body': ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'],
+  'Lower body': ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+  'Glutes & core': ['Glutes', 'Hamstrings', 'Abs'],
+  'Stretch it out': [],
 };
 const MAIN_COUNT: Record<number, number> = { 20: 3, 30: 5, 45: 6, 60: 7 };
 
@@ -104,8 +118,12 @@ export function buildWorkout(prefs: GuidedPrefs, minutes: number, focus: Focus, 
   const rand = seeded(options.seed ?? Date.now() % 100000);
   const recent = new Set(options.recent || []);
   const used = new Set<string>();
-  const pick = (pattern: Pattern) => {
-    const pool = MOVES.filter(move => move.pattern === pattern && canDo(move, have) && !used.has(move.id));
+  const pick = (slot: Slot) => {
+    const [pattern, muscle] = slot.split(':') as [Pattern, string | undefined];
+    let pool = MOVES.filter(move => move.pattern === pattern && canDo(move, have) && !used.has(move.id) && (!muscle || move.muscles.includes(muscle)));
+    /* No move of that kind for her gear: any move that trains the muscle. */
+    if (!pool.length && muscle) pool = MOVES.filter(move => move.muscles.includes(muscle) && canDo(move, have) && !used.has(move.id) && !['warmup', 'stretch'].includes(move.pattern));
+    if (muscle && steps.some(step => step.part === 'main' && step.move.muscles.includes(muscle)) && !pool.some(move => move.pattern === pattern)) return undefined;
     if (!pool.length) return undefined;
     /* Her styles first, then moves she did not do last time, then the rest. */
     const score = (move: Move) => (prefs.styles.some(item => move.styles.includes(item)) ? 2 : 0) + (move.styles.includes(style) ? 2 : 0) + (recent.has(move.id) ? -1.5 : 0)
@@ -121,28 +139,34 @@ export function buildWorkout(prefs: GuidedPrefs, minutes: number, focus: Focus, 
     steps.push({ move, part, ...base, ...load });
   };
   if (focus !== 'Stretch it out') add(pick('warmup'), 'warmup');
-  const count = MAIN_COUNT[minutes] ?? (minutes <= 20 ? 3 : minutes <= 30 ? 5 : minutes <= 45 ? 6 : 7);
+  /* Never fewer moves than the focus promises; more when there is time. */
+  const count = Math.max(REQUIRED[focus], MAIN_COUNT[minutes] ?? (minutes <= 20 ? 3 : minutes <= 30 ? 5 : minutes <= 45 ? 6 : 7));
   let shape = SHAPES[focus];
-  if (prefs.vibe.includes('Core focus') && focus !== 'Stretch it out') shape = [...shape.slice(0, count - 2), 'core', 'core'];
-  if (style === 'HIIT / CrossFit-style' && focus !== 'Stretch it out') shape = shape.map((pattern, index) => index % 3 === 2 ? 'cardio' : pattern);
-  for (const pattern of shape) {
-    if (steps.filter(step => step.part === 'main').length >= count) break;
-    add(pick(pattern), focus === 'Stretch it out' ? 'cooldown' : 'main');
-  }
+  if (prefs.vibe.includes('Core focus') && focus !== 'Stretch it out') shape = [...shape.slice(0, REQUIRED[focus]), 'core', ...shape.slice(REQUIRED[focus])];
+  if (style === 'HIIT / CrossFit-style' && focus !== 'Stretch it out') shape = [...shape.slice(0, REQUIRED[focus]), 'cardio', ...shape.slice(REQUIRED[focus]), 'cardio'];
+  const part: Step['part'] = focus === 'Stretch it out' ? 'cooldown' : 'main';
+  const mains = () => steps.filter(step => step.part !== 'warmup').length;
+  for (const slot of shape) { if (mains() >= count) break; add(pick(slot), part); }
   /* Short of moves for her gear: fill from anything she can do in the focus's patterns. */
-  for (const pattern of shape) {
-    if (steps.filter(step => step.part !== 'warmup').length >= count) break;
-    add(pick(pattern), focus === 'Stretch it out' ? 'cooldown' : 'main');
-  }
+  for (const slot of shape) { if (mains() >= count) break; add(pick(slot.split(':')[0] as Pattern), part); }
   if (focus !== 'Stretch it out') add(pick('stretch'), 'cooldown');
   const workout = { title: focus, focus, minutes, steps };
   /* FILL THE TIME SHE GAVE. Two sets of five moves is about 20 minutes; if
      she has 30, add a set to the main moves, one at a time, up to four. */
   const cap = prefs.level === 'New to this' ? 3 : 4;
   for (let round = 0; round < 12 && estimateMinutes(workout) < minutes * 0.85; round += 1) {
-    const mains = steps.filter(step => step.part === 'main' && step.sets < cap);
-    if (!mains.length) break;
-    mains.sort((a, b) => a.sets - b.sets)[0].sets += 1;
+    const open = steps.filter(step => step.part === 'main' && step.sets < cap);
+    if (!open.length) break;
+    open.sort((a, b) => a.sets - b.sets)[0].sets += 1;
+  }
+  /* A short full body day has more moves than usual: trim to fit, keeping
+     every move — fewer sets first (never below two), then shorter rests. */
+  for (let round = 0; round < 40 && estimateMinutes(workout) > minutes * 1.1; round += 1) {
+    const extra = steps.filter(step => step.part === 'main' && step.sets > 2).sort((a, b) => b.sets - a.sets)[0];
+    if (extra) { extra.sets -= 1; continue; }
+    const slow = steps.filter(step => step.part === 'main' && step.rest > 45).sort((a, b) => b.rest - a.rest)[0];
+    if (slow) { slow.rest = Math.max(45, slow.rest - 15); continue; }
+    break;
   }
   return workout;
 }
@@ -173,3 +197,21 @@ export const swapFor = (step: Step, way: 'easier' | 'harder', have: Set<Equip>):
   const move = id ? MOVE(id) : undefined;
   return move && canDo(move, have) ? move : undefined;
 };
+
+/* BUILD MY OWN. She picks the moves from the Guided list, in her order; the
+   coach still sets the sets, reps, rest and starting weight, and still talks
+   her through it. Warm-up and stretch moves stay warm-up and cool-down. */
+export const CUSTOM_KEY = 'forge-guided-custom-v1';
+export function customWorkout(prefs: GuidedPrefs, ids: string[], style: Style, options: { remembered?: Record<string, number>; metric?: boolean } = {}): Workout {
+  const steps: Step[] = [];
+  for (const id of ids) {
+    const move = MOVES.find(item => item.id === id);
+    if (!move) continue;
+    const part: Step['part'] = move.pattern === 'warmup' ? 'warmup' : move.pattern === 'stretch' ? 'cooldown' : 'main';
+    const load = part === 'main' ? startWeight(move, prefs.level, options.remembered || {}, Boolean(options.metric)) : { weight: null };
+    steps.push({ move, part, ...dose(move, style, prefs.level, part), ...load });
+  }
+  const workout: Workout = { title: 'My workout', focus: 'Full body', minutes: 0, steps };
+  workout.minutes = estimateMinutes(workout);
+  return workout;
+}

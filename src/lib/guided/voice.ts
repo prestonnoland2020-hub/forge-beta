@@ -160,7 +160,7 @@ export type CoachVoice = 'coral' | 'ash';
 export const VOICE_LABEL: Record<CoachVoice, string> = { coral: 'Female voice', ash: 'Male voice' };
 export type Speak = (text: string, voice: CoachVoice) => Promise<Blob>;
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-const CACHE_NAME = 'forge-coach-voice-v2';
+const CACHE_NAME = 'forge-coach-voice-v3';
 function hashLine(text: string) { let h = 5381; for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + text.length; }
 
 export class Coach {

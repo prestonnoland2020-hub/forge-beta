@@ -5,8 +5,8 @@ import Model from 'react-body-highlighter';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
-import { photoUrl, type Move, type Style } from '../lib/guided/catalog';
-import { amountText, buildWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
+import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
+import { amountText, buildWorkout, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
 import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
@@ -28,6 +28,8 @@ async function speakLine(text: string, voice: CoachVoice): Promise<Blob> {
   return data;
 }
 const VOICE_KEY = 'forge-guided-voice-name';
+/* Build my own: the Guided list grouped the way people think about it. */
+const PICK_GROUPS: Array<[string, Pattern[]]> = [['Legs & glutes', ['squat', 'hinge', 'lunge', 'glute', 'calf']], ['Upper body', ['push', 'pull', 'shoulder', 'arms']], ['Core', ['core']], ['Cardio', ['cardio']], ['Warm-up', ['warmup']], ['Stretch', ['stretch']]];
 const FEEL_LINE = "How'd that feel? Too easy, just right, or too hard?";
 async function transcribe(blob: Blob, hints: { words: string[]; phrases: string[]; context: string }): Promise<string> {
   const audio = await blobToBase64(blob);
@@ -82,7 +84,7 @@ const GEAR = ['Dumbbells', 'Kettlebell', 'Mat', 'Bench'];
 const LEVELS: Array<[Level, string]> = [['New to this', 'I have never really lifted. Show me everything.'], ['A little', 'I know a few moves but not a plan.'], ['Comfortable', 'I know my way around. Just tell me what to do.']];
 
 type LoggedSet = { moveId: string; name: string; muscles: string[]; reps: number; weight: number | null; feel: Feel | null; timed: boolean };
-type Phase = 'setup' | 'today' | 'preview' | 'card' | 'feel' | 'rest' | 'done' | 'locked';
+type Phase = 'setup' | 'today' | 'custom' | 'preview' | 'card' | 'feel' | 'rest' | 'done' | 'locked';
 
 function Svg({ d, size = 22, stroke = 2 }: { d: string; size?: number; stroke?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
@@ -213,6 +215,10 @@ export function GuidedPage() {
   const step: Step | undefined = workout?.steps[stepIndex];
   const weight = step ? (weights[stepIndex] !== undefined ? weights[stepIndex] : step.weight) : null;
   const have = useMemo(() => owned(prefs || draft), [prefs, draft]);
+  /* BUILD MY OWN: her picks, in order, remembered for next time. */
+  const [picks, setPicks] = useState<string[]>(() => read<string[]>(CUSTOM_KEY, []).filter(id => MOVES.some(move => move.id === id)));
+  const [pickGroup, setPickGroup] = useState(PICK_GROUPS[0][0]);
+  const [custom, setCustom] = useState(false);
   const freeLeft = Math.max(0, FREE_WORKOUTS - read<number>(COUNT_KEY, 0));
 
   /* "Start with my coach" on Today lands straight on the built workout. */
@@ -369,6 +375,14 @@ export function GuidedPage() {
     /* The first thing the coach will say, fetched while she reads the list. */
     coach.current?.prefetch(introLine(plan));
   };
+  const buildCustom = () => {
+    if (!prefs || !picks.length) return;
+    if (!isPro && freeLeft <= 0) { setPhase('locked'); return; }
+    write(CUSTOM_KEY, picks);
+    const plan = customWorkout(prefs, picks, todayStyle as Style, { remembered: read<Record<string, number>>(WEIGHTS_KEY, {}), metric });
+    setCustom(true); setWorkout(plan); setPhase('preview');
+    coach.current?.prefetch(introLine(plan));
+  };
   const introLine = (plan: Workout) => `Alright, let's do this. ${plan.steps.length} moves, about ${fromPlan ? plan.minutes : estimateMinutes(plan)} minutes, and I'll be with you the whole way. ${cardLine(plan.steps[0], 0, plan.steps[0].weight)}`;
   const start = () => {
     if (!workout) return;
@@ -466,12 +480,12 @@ export function GuidedPage() {
          planned one — so the split advances and progression reads it. */
       const link = fromPlan?.link || {};
       const planSetIds = (link.topSetIds || {}) as Record<string, string>;
-      const result = addRecord({ date: todayIso(), title: fromPlan ? workout.title : `Guided · ${workout.focus}`, muscles, hasCardio: false, notes, durationMinutes: minutesTaken,
+      const result = addRecord({ date: todayIso(), title: fromPlan ? workout.title : custom ? 'Guided · My workout' : `Guided · ${workout.focus}`, muscles, hasCardio: false, notes, durationMinutes: minutesTaken,
         ...(fromPlan ? { recommendationId: link.recommendationId as string | undefined, splitId: link.splitId as string | undefined, splitDayId: link.splitDayId as string | undefined, splitPosition: link.splitPosition as number | undefined, selectedRecommendationTopSetIds: Object.values(planSetIds) } : {}),
         topSets: [...best.values()].map(item => ({ muscle: item.muscles[0] || 'Full body', lift: item.name, weight: item.weight as number, reps: item.reps, completed: true, ...(planSetIds[item.name] ? { recommendationTopSetId: planSetIds[item.name] } : {}) })) });
       setSavedNote(result.ok ? 'Saved to your log.' : 'Already in your log.');
       write(COUNT_KEY, read<number>(COUNT_KEY, 0) + 1);
-      if (!fromPlan) write(LAST_KEY, { focus: workout.focus, moves: workout.steps.map(item => item.move.id) });
+      if (!fromPlan && !custom) write(LAST_KEY, { focus: workout.focus, moves: workout.steps.map(item => item.move.id) });
       if (fromPlan) { try { sessionStorage.removeItem(FROM_PLAN_KEY); } catch { /* fine */ } }
     }
     const sets = main.length;
@@ -612,11 +626,31 @@ export function GuidedPage() {
     </p>}
     {micSheet}
     {!isPro && <p className="gd-muted center">{freeLeft > 0 ? `${freeLeft} free guided workout${freeLeft === 1 ? '' : 's'} left` : 'Your free workouts are used up'}</p>}
-    <button type="button" className="gd-cta" onClick={() => build()}>Build my workout</button>
+    <button type="button" className="gd-cta" onClick={() => { setCustom(false); build(); }}>Build my workout</button>
+    <button type="button" className="gd-secondary" onClick={() => setPhase('custom')}>Build my own</button>
   </div>);
 
+  if (phase === 'custom' && prefs) {
+    const groupPatterns = PICK_GROUPS.find(([name]) => name === pickGroup)?.[1] || [];
+    const list = MOVES.filter(move => groupPatterns.includes(move.pattern) && canDo(move, have));
+    const toggle = (id: string) => setPicks(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+    return frame(<div className="gd-screen">
+      {top(() => setPhase('today'))}
+      <h1>Build my own</h1>
+      <p className="gd-lead">Tap moves in the order you want them. Your coach sets the reps and weight and talks you through it.</p>
+      <div className="gd-chips gd-pick-groups">{PICK_GROUPS.map(([name, patterns]) => { const count = picks.filter(id => patterns.includes(MOVES.find(move => move.id === id)?.pattern as Pattern)).length; return <button type="button" key={name} className={pickGroup === name ? 'gd-chip on' : 'gd-chip'} aria-pressed={pickGroup === name} onClick={() => setPickGroup(name)}>{name}{count ? ` · ${count}` : ''}</button>; })}</div>
+      <div className="gd-moves gd-pick-list">{list.length ? list.map(move => { const order = picks.indexOf(move.id); return <button type="button" key={move.id} className={order >= 0 ? 'gd-move gd-pick on' : 'gd-move gd-pick'} aria-pressed={order >= 0} onClick={() => toggle(move.id)}>
+        <img src={photoUrl(move, 1)} alt="" />
+        <span><strong>{move.name}</strong><small>{move.muscles.join(', ')}</small></span>
+        <i className="gd-pick-mark" aria-hidden="true">{order >= 0 ? order + 1 : '+'}</i>
+      </button>; }) : <p className="gd-muted">No moves here for your equipment. Change it under Where on the last screen.</p>}</div>
+      {picks.length > 0 && <button type="button" className="gd-link gd-pick-clear" onClick={() => setPicks([])}>Clear all</button>}
+      <button type="button" className="gd-cta gd-pick-go" disabled={!picks.length} onClick={buildCustom}>{picks.length ? `Next · ${picks.length} move${picks.length === 1 ? '' : 's'}` : 'Pick at least one move'}</button>
+    </div>);
+  }
+
   if (phase === 'preview' && workout) return frame(<div className="gd-screen">
-    {top(fromPlan ? undefined : () => setPhase('today'))}
+    {top(fromPlan ? undefined : () => setPhase(custom ? 'custom' : 'today'))}
     <h1>{workout.title}</h1>
     <p className="gd-lead strong">About {fromPlan ? workout.minutes : estimateMinutes(workout)} min · {workout.steps.length} moves</p>
     <div className="gd-moves">{workout.steps.map((item, index) => <div className="gd-move" key={`${item.move.id}-${index}`}>
@@ -624,7 +658,7 @@ export function GuidedPage() {
       <span><strong>{item.move.name}</strong><small>{item.part === 'warmup' ? 'Warm-up · ' : item.part === 'cooldown' ? 'Cool-down · ' : (item.sets === 1 ? (fromPlan ? 'Top set · ' : '1 set × ') : `${item.sets} sets × `)}{amountText(item)}{item.weight !== null ? ` · ${item.weight} ${unit}` : ''}</small></span>
     </div>)}</div>
     <p className="gd-muted">Weights are a starting guess. Tell the coach how each set felt and the next one adjusts.</p>
-    {!fromPlan && <button type="button" className="gd-secondary" onClick={() => build()}>Shuffle moves</button>}
+    {!fromPlan && (custom ? <button type="button" className="gd-secondary" onClick={() => setPhase('custom')}>Edit moves</button> : <button type="button" className="gd-secondary" onClick={() => build()}>Shuffle moves</button>)}
     <button type="button" className="gd-cta" onClick={() => { if (handsFree && voiceInput() && mic !== 'granted') setMicAsk(true); else start(); }}><Svg d="M7 4v16l13-8z" size={18} />Start</button>
     {micSheet}
   </div>);
