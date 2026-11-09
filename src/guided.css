@@ -224,3 +224,6 @@ html[data-theme="dark"] .guided { --g-bg: #0F151C; --g-surface: #18212B; --g-ink
 .gd-pick-list { margin-bottom: 4px; }
 .gd-pick-clear { align-self: center; }
 .gd-pick-go { position: sticky; bottom: 12px; margin-top: 8px; }
+/* A solid strip under the phone's clock, so content scrolls under it rather
+   than through the time and battery. */
+.guided::before { content: ''; position: sticky; top: 0; display: block; height: env(safe-area-inset-top, 0px); margin-bottom: calc(-1 * env(safe-area-inset-top, 0px)); background: var(--g-bg); z-index: 5; }

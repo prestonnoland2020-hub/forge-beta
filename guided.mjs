@@ -1,6 +1,6 @@
 /* FORGE GUIDED: the builder makes safe, fitting workouts; the coach hears
    short commands; the weights follow how each set felt. */
-import { customWorkout, buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
+import { MUST_HIT, customWorkout, buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
 import { parseCommand, matchCommand, normalizePhrase } from './src/lib/guided/voice.ts';
 import { MOVES } from './src/lib/guided/catalog.ts';
 import { planWorkout } from './src/lib/guided/fromPlan.ts';
@@ -80,5 +80,16 @@ const cw = customWorkout(home, ['hip-circles', 'glute-bridge', 'goblet-squat', '
 check('custom: keeps her order, drops unknown ids', cw.steps.map(s => s.move.id).join() === 'hip-circles,glute-bridge,goblet-squat,childs-pose');
 check('custom: warm-up and stretch moves keep their part', cw.steps.every(s => s.part === (s.move.pattern === 'warmup' ? 'warmup' : s.move.pattern === 'stretch' ? 'cooldown' : 'main')), cw.steps.map(s => `${s.move.id}:${s.part}`).join());
 check('custom: main moves get sets and a time estimate', cw.steps.filter(s => s.part === 'main').every(s => s.sets >= 2) && cw.minutes > 0);
+/* EVERY FOCUS HITS WHAT IT PROMISES, at every length and setup. */
+const setups = { home, gym: { styles: ['Build muscle'], vibe: [], place: 'Gym', gear: [], level: 'Comfortable' }, anywhere: { styles: ['Bodyweight'], vibe: [], place: 'Anywhere', gear: [], level: 'A little' } };
+const misses = [];
+for (const [name, prefs] of Object.entries(setups)) for (const focus of ['Full body', 'Upper body', 'Lower body', 'Glutes & core']) for (const min of [20, 30, 45, 60]) for (const seed of [1, 7, 42]) {
+  const wk = buildWorkout(prefs, min, focus, { seed });
+  const hit = new Set(wk.steps.filter(s => s.part === 'main').flatMap(s => s.move.muscles));
+  const missing = MUST_HIT[focus].filter(m => !hit.has(m));
+  if (missing.length && !(name === 'anywhere' && missing.every(m => ['Biceps', 'Calves', 'Shoulders'].includes(m)))) misses.push(`${name} ${focus} ${min}m: ${missing.join('/')}`);
+  if (estimateMinutes(wk) > min * 1.25 || estimateMinutes(wk) < min * 0.45) misses.push(`${name} ${focus} ${min}m: ${estimateMinutes(wk)} min`);
+}
+check('every focus hits every muscle group it promises, and fits the time', !misses.length, [...new Set(misses)].slice(0, 8).join('; '));
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

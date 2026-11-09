@@ -8,7 +8,27 @@ import { consumeQuota, corsFor, errorResponse, HttpError, refundQuota, requireCa
    seconds" is fetched once, ever; it falls back to the phone's voice if this
    is slow or down. Metered as 'forge-speak'; nothing is stored here. */
 
-const VOICES = new Set(['coral', 'ash', 'sage', 'onyx', 'nova', 'shimmer', 'alloy', 'echo', 'ballad', 'verse', 'fable']);
+const VOICES = new Set(['coral', 'ash', 'sage', 'onyx', 'nova', 'shimmer', 'alloy', 'echo', 'ballad', 'verse', 'fable', 'marin', 'cedar']);
+/* The app asks for "coral" (female) or "ash" (male). OpenAI's best-quality
+   voices are marin and cedar, so those are what it gets. */
+const BEST: Record<string, string> = { coral: 'marin', ash: 'cedar' };
+const female = (voice: string) => !['ash', 'cedar', 'onyx', 'echo', 'verse', 'ballad', 'fable'].includes(voice);
+
+/* ELEVENLABS, the most human-sounding voices available. Used whenever the
+   ELEVENLABS_API_KEY secret is set; OpenAI is the fallback. Voices can be
+   changed with ELEVENLABS_VOICE_FEMALE / ELEVENLABS_VOICE_MALE (voice IDs). */
+async function elevenLabs(text: string, voice: string): Promise<ArrayBuffer | null> {
+  const key = Deno.env.get('ELEVENLABS_API_KEY');
+  if (!key) return null;
+  const id = female(voice) ? (Deno.env.get('ELEVENLABS_VOICE_FEMALE') || 'EXAVITQu4vr4xnSDxMaL') : (Deno.env.get('ELEVENLABS_VOICE_MALE') || 'nPczCjzI2devNBz1zQrb');
+  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${id}?output_format=mp3_44100_128`, {
+    method: 'POST',
+    headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    body: JSON.stringify({ text, model_id: Deno.env.get('ELEVENLABS_MODEL') || 'eleven_multilingual_v2', voice_settings: { stability: 0.4, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true } }),
+  });
+  if (!response.ok) { console.error('forge-speak-elevenlabs', response.status, (await response.text()).slice(0, 300)); return null; }
+  return await response.arrayBuffer();
+}
 const STYLE = [
   'Voice: a real personal trainer, relaxed and warm, talking to one person through their headphones. Not an announcer, not a narrator, not an assistant.',
   'Delivery: conversational and human. Natural rises and falls in pitch, light emphasis on the key word, a smile in the voice. Contractions are natural.',
@@ -30,10 +50,12 @@ Deno.serve(async (request: Request) => {
     const voice = typeof body.voice === 'string' && VOICES.has(body.voice) ? body.voice : 'coral';
     await consumeQuota(caller, 'forge-speak');
     spent = true;
+    const human = await elevenLabs(text, voice);
+    if (human) return new Response(human, { headers: { ...cors, 'Content-Type': 'application/octet-stream', 'X-Voice-Provider': 'elevenlabs' } });
     const response = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')!}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: Deno.env.get('OPENAI_TTS_MODEL') || 'gpt-4o-mini-tts', voice, input: text, instructions: STYLE, response_format: 'mp3' }),
+      body: JSON.stringify({ model: Deno.env.get('OPENAI_TTS_MODEL') || 'gpt-4o-mini-tts', voice: BEST[voice] || voice, input: text, instructions: STYLE, response_format: 'mp3' }),
     });
     if (!response.ok || !response.body) {
       console.error('forge-speak-provider', response.status, (await response.text()).slice(0, 300));
