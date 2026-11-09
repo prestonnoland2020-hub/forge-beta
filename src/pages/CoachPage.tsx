@@ -1,3 +1,4 @@
+import { guidedCoachContext } from '../lib/guided/session';
 import { isDemoMode } from '../lib/env';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -170,7 +171,8 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
        2021 — while the answer sat in the database. Recent days stay in full
        detail; everything else arrives as per-year totals and lifetime bests,
        labelled as aggregates so no session gets invented. */
-    careerSummary:career,deterministicRecommendation:recommendation||target,trainingSummary:intelligence,recentTrainingHistory:coachingHistory,evidenceRules:{savedRecommendationIsAuthoritative:true,strengthUsesBestRecentComparableSet:true,strengthUsesEpley:true,goalPrioritizesWorkButCannotForceLoad:true,missingWearableDataMustBeIgnored:true,aiCannotRewriteFacts:true,coachMayOnlyUseAvailableLibrary:true,goalIsNotAPrescription:true}}};
+    /* FORGE GUIDED: her guided setup, learned weights and any workout in progress. */
+    guided:guidedCoachContext(),careerSummary:career,deterministicRecommendation:recommendation||target,trainingSummary:intelligence,recentTrainingHistory:coachingHistory,evidenceRules:{savedRecommendationIsAuthoritative:true,strengthUsesBestRecentComparableSet:true,strengthUsesEpley:true,goalPrioritizesWorkButCannotForceLoad:true,missingWearableDataMustBeIgnored:true,aiCannotRewriteFacts:true,coachMayOnlyUseAvailableLibrary:true,goalIsNotAPrescription:true}}};
     if(isDemoMode)(window as unknown as {__forgeCoachContext?:unknown}).__forgeCoachContext=coachRequest.context;
     const response=await requestForgeCoach(coachRequest,fallback);
     /* WHEN THE COACH DID NOT ANSWER, SAY SO. A failed call used to drop the

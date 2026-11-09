@@ -141,3 +141,25 @@
 .gd-entry .gd-entry-ic { width: 44px; height: 44px; border-radius: 14px; background: #1468B0; display: grid; place-items: center; flex: none; }
 
 @media (prefers-reduced-motion: reduce) { .gd-photos img:nth-child(2) { animation: none; opacity: 0; } .gd-ring .fill { transition: none; } }
+
+/* The microphone ask, before the phone's own prompt. */
+.gd-sheet-back { position: fixed; inset: 0; z-index: 9100; background: rgb(14 20 30 / .45); display: flex; align-items: flex-end; justify-content: center; }
+.gd-sheet { box-sizing: border-box; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 12px; padding: 26px 22px calc(env(safe-area-inset-bottom, 0px) + 22px); border-radius: 28px 28px 0 0; background: #F7F5F1; color: #16181D; animation: gd-up .28s cubic-bezier(.2,.8,.2,1) both; }
+.gd-sheet h2 { margin: 4px 0 0; font-size: 24px; line-height: 1.15; }
+.gd-sheet .gd-cta { margin-top: 8px; }
+.gd-mic-ic { width: 64px; height: 64px; border-radius: 20px; background: #1468B0; color: #fff; display: grid; place-items: center; }
+.gd-mic-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gd-mic-list li { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; }
+.gd-mic-list svg { color: #1468B0; flex: none; }
+@keyframes gd-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gd-sheet { animation: none; } }
+
+/* Ask your coach, mid-workout. */
+.gd-ask-pill { align-self: center; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1.5px solid #3D6A96; background: transparent; color: #D6E6F5; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.gd-ask-turn { display: grid; gap: 8px; }
+.gd-ask-q { margin: 0; justify-self: end; max-width: 85%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: #1468B0; color: #fff; font-size: 15px; }
+.gd-ask-a { margin: 0; max-width: 92%; padding: 12px 14px; border-radius: 16px 16px 16px 4px; background: #fff; font-size: 15px; line-height: 1.45; }
+.gd-ask-form { display: flex; gap: 8px; }
+.gd-ask-input { flex: 1; min-height: 50px; padding: 0 14px; border-radius: 16px; border: 1.5px solid #DDD8CF; background: #fff; font: inherit; font-size: 16px; color: #16181D; }
+.gd-ask-send { width: 50px; border: 0; border-radius: 16px; background: #1468B0; color: #fff; display: grid; place-items: center; cursor: pointer; }
+.gd-ask-send:disabled { opacity: .45; }

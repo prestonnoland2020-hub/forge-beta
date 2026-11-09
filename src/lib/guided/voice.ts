@@ -12,10 +12,14 @@
 
 export type Command =
   | 'done' | 'easy' | 'right' | 'hard' | 'ready' | 'repeat' | 'how'
-  | 'easier' | 'harder' | 'pause' | 'resume' | 'skip' | 'more' | 'end' | 'heavier' | 'lighter' | 'start';
+  | 'easier' | 'harder' | 'pause' | 'resume' | 'skip' | 'more' | 'end' | 'heavier' | 'lighter' | 'start' | 'ask';
 
 /* Order matters: "too easy" before "easy", "not ready" never as ready. */
 const RULES: Array<[Command, RegExp]> = [
+  /* "Coach, why is it 15 pounds?" — anything addressed to the coach is a
+     question for the Forge coach, asked whole. Checked first so the words in
+     the question ("too hard?") are not read as commands. */
+  ['ask', /^\s*(hey |ok |okay )?coach\b|\bask (the )?coach\b|^\s*question\b/],
   ['end', /\b(end|finish|stop|quit)( the)? workout\b|\bi'?m finished for today\b/],
   ['easier', /\b(make it )?easier\b|\beasier (one|version)\b/],
   ['harder', /\b(make it )?harder\b|\bharder (one|version)\b/],
@@ -72,6 +76,8 @@ export class Coach {
   onHeard: (text: string) => void = () => {};
   onState: (state: { speaking: boolean; listening: boolean }) => void = () => {};
   muted = false;
+  /* After "Coach?" with no question, the next thing said is the question. */
+  freeText = false;
 
   constructor() {
     if (canSpeak()) window.speechSynthesis.getVoices();
@@ -119,7 +125,10 @@ export class Coach {
           const command = parseCommand(heard, this.allowed);
           if (command) { this.onHeard(heard); this.handler(command, heard); return; }
         }
-        if (alternatives[0]) this.onHeard(alternatives[0].transcript);
+        if (alternatives[0]) {
+          this.onHeard(alternatives[0].transcript);
+          if (this.freeText) { this.freeText = false; this.handler('ask', alternatives[0].transcript); return; }
+        }
       }
     };
     /* Safari ends a session after a pause; while hands-free is on and the
