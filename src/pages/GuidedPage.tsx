@@ -116,8 +116,13 @@ export function GuidedPage() {
   const [prefs, setPrefs] = useState<GuidedPrefs | null>(() => read<GuidedPrefs | null>(PREFS_KEY, null));
   const [draft, setDraft] = useState<GuidedPrefs>(() => prefs || { styles: [], vibe: [], place: 'Home', gear: ['Dumbbells', 'Mat'], level: 'New to this' });
   const [setupStep, setSetupStep] = useState(0);
+  /* Changing one line from the home screen saves straight back. */
+  const [editOne, setEditOne] = useState(false);
   const last = read<{ focus?: Focus; moves?: string[] }>(LAST_KEY, {});
   const [minutes, setMinutes] = useState(30);
+  /* TODAY'S KIND OF WORKOUT. Setup says what she likes; this says what she
+     wants today, defaulting to her first pick. It only changes today. */
+  const [todayStyle, setTodayStyle] = useState<Style>(() => prefs?.styles[0] || 'Strength');
   const [focus, setFocus] = useState<Focus>(() => prefs ? suggestFocus(last.focus, prefs) : 'Full body');
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [phase, setPhase] = useState<Phase>(prefs ? 'today' : 'setup');
@@ -317,7 +322,8 @@ export function GuidedPage() {
   const build = (chosenFocus = focus, chosenMinutes = minutes) => {
     if (!prefs) return;
     if (!isPro && freeLeft <= 0) { setPhase('locked'); return; }
-    const plan = buildWorkout(prefs, chosenMinutes, chosenFocus, { seed: Date.now() % 100000, recent: last.moves || [], remembered: read<Record<string, number>>(WEIGHTS_KEY, {}), metric });
+    const today = { ...prefs, styles: [todayStyle, ...prefs.styles.filter(item => item !== todayStyle)] };
+    const plan = buildWorkout(today, chosenMinutes, chosenFocus, { seed: Date.now() % 100000, recent: last.moves || [], remembered: read<Record<string, number>>(WEIGHTS_KEY, {}), metric });
     setWorkout(plan); setPhase('preview');
   };
   const start = () => {
@@ -487,11 +493,11 @@ export function GuidedPage() {
 
   if (phase === 'setup') {
     const toggle = (key: 'styles' | 'vibe' | 'gear', value: string) => setDraft(d => ({ ...d, [key]: (d[key] as string[]).includes(value) ? (d[key] as string[]).filter(x => x !== value) : [...(d[key] as string[]), value] }));
-    const next = () => { if (setupStep < 2) setSetupStep(s => s + 1); else { write(PREFS_KEY, draft); setPrefs(draft); setFocus(suggestFocus(undefined, draft)); setPhase('today'); } };
+    const next = () => { if (setupStep < 2 && !editOne) setSetupStep(s => s + 1); else { setEditOne(false); write(PREFS_KEY, draft); setPrefs(draft); setTodayStyle(draft.styles[0] || 'Strength'); setFocus(suggestFocus(last.focus, draft)); setPhase('today'); } };
     const ready = setupStep !== 0 || draft.styles.length > 0;
     return frame(<div className="gd-screen">
-      {top(setupStep ? () => setSetupStep(s => s - 1) : undefined, <span className="gd-count">{setupStep + 1}/3</span>)}
-      <div className="gd-bar"><i style={{ width: `${((setupStep + 1) / 3) * 100}%` }} /></div>
+      {top(editOne ? () => { setEditOne(false); setPhase('today'); } : setupStep ? () => setSetupStep(s => s - 1) : prefs ? () => setPhase('today') : undefined, editOne ? undefined : <span className="gd-count">{setupStep + 1}/3</span>)}
+      {!editOne && <div className="gd-bar"><i style={{ width: `${((setupStep + 1) / 3) * 100}%` }} /></div>}
       {setupStep === 0 && <>
         <h1>What do you enjoy?</h1><p className="gd-lead">Pick as many as you like.</p>
         <div className="gd-tiles">{STYLES.map(([label, icon]) => { const on = draft.styles.includes(label); return <button type="button" key={label} className={on ? 'gd-tile on' : 'gd-tile'} aria-pressed={on} onClick={() => toggle('styles', label)}><span className="gd-ic"><Svg d={icon} size={20} /></span><strong>{label}</strong></button>; })}</div>
@@ -507,7 +513,7 @@ export function GuidedPage() {
         <h1>How much have you trained?</h1><p className="gd-lead">No wrong answer. Forge starts easy and learns from how each set feels.</p>
         <div className="gd-list">{LEVELS.map(([label, copy]) => { const on = draft.level === label; return <button type="button" key={label} className={on ? 'gd-opt on' : 'gd-opt'} aria-pressed={on} onClick={() => setDraft(d => ({ ...d, level: label }))}><span><strong>{label}</strong><small>{copy}</small></span></button>; })}</div>
       </>}
-      <button type="button" className="gd-cta" disabled={!ready} onClick={next}>{setupStep < 2 ? 'Continue' : 'Done'}</button>
+      <button type="button" className="gd-cta" disabled={!ready} onClick={next}>{editOne ? 'Save' : setupStep < 2 ? 'Continue' : 'Done'}</button>
     </div>);
   }
 
@@ -520,8 +526,10 @@ export function GuidedPage() {
   </div>);
 
   if (phase === 'today' && prefs) return frame(<div className="gd-screen">
-    {top(undefined, <button type="button" className="gd-link" onClick={() => { setDraft(prefs); setSetupStep(0); setPhase('setup'); }}>Change setup</button>)}
+    {top()}
     <h1>Ready when you are.</h1>
+    <h2>What kind of workout?</h2>
+    <div className="gd-chips">{STYLES.map(([label]) => <button type="button" key={label} className={todayStyle === label ? 'gd-chip on' : 'gd-chip'} aria-pressed={todayStyle === label} onClick={() => { setTodayStyle(label); if (label === 'Stretch & mobility') setFocus('Stretch it out'); else if (focus === 'Stretch it out') setFocus(suggestFocus(last.focus, prefs)); }}>{label}</button>)}</div>
     <h2>How much time do you have?</h2>
     <div className="gd-times">{[20, 30, 45, 60].map(m => <button type="button" key={m} className={minutes === m ? 'gd-time on' : 'gd-time'} aria-pressed={minutes === m} onClick={() => setMinutes(m)}>{m} min</button>)}</div>
     <div className="gd-card">
@@ -530,6 +538,13 @@ export function GuidedPage() {
       {last.focus && <p className="gd-muted">Last time was {last.focus.toLowerCase()}, so today is {focus.toLowerCase()}.</p>}
       <span className="gd-small">Rather do something else?</span>
       <div className="gd-chips">{FOCUSES.map(item => <button type="button" key={item} className={focus === item ? 'gd-chip on' : 'gd-chip'} aria-pressed={focus === item} onClick={() => setFocus(item)}>{item}</button>)}</div>
+    </div>
+    {/* HER SETUP, ALWAYS IN VIEW. It used to be asked once and then hidden
+        behind a small link; now it is a card she can change any time. */}
+    <div className="gd-setup">
+      <div className="gd-setup-row"><span>Where</span><b>{prefs.place === 'Home' ? `Home${prefs.gear.length ? ` · ${prefs.gear.join(', ').toLowerCase()}` : ' · no equipment'}` : prefs.place === 'Gym' ? 'Gym' : 'Anywhere · no equipment'}</b><button type="button" className="gd-link" onClick={() => { setDraft(prefs); setEditOne(true); setSetupStep(1); setPhase('setup'); }}>Change</button></div>
+      <div className="gd-setup-row"><span>Level</span><b>{prefs.level}</b><button type="button" className="gd-link" onClick={() => { setDraft(prefs); setEditOne(true); setSetupStep(2); setPhase('setup'); }}>Change</button></div>
+      <div className="gd-setup-row"><span>Likes</span><b>{[...prefs.styles, ...prefs.vibe].join(', ') || 'Not set'}</b><button type="button" className="gd-link" onClick={() => { setDraft(prefs); setEditOne(true); setSetupStep(0); setPhase('setup'); }}>Change</button></div>
     </div>
     {voiceToggles}
     {handsFree && voiceInput() && <p className="gd-muted gd-voice-learn">
