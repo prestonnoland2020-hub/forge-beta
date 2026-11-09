@@ -1,0 +1,17 @@
+/* TODAY: My plan | Coach me switch, the Coach me card, and the
+   "Coach me through it" button on the plan card. App tokens only, so light
+   and dark both follow the theme. */
+.ct-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 0 0 14px; border-radius: 14px; background: var(--surface-2); }
+.ct-switch button { min-height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--ink-2); font: inherit; font-weight: 650; font-size: 15px; cursor: pointer; transition: background .18s, color .18s; }
+.ct-switch button.on { background: var(--surface-1); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.ct-card { display: flex; flex-direction: column; gap: 10px; }
+.ct-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--accent-strong, var(--accent)); }
+.ct-card .td-title { margin: 0; }
+.ct-lead { margin: 0; color: var(--ink-2); line-height: 1.45; }
+.ct-points { margin: 2px 0 6px; padding: 0 0 0 18px; color: var(--ink); line-height: 1.6; }
+.ct-times { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 6px; }
+.ct-times button { min-height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.ct-times button.on { border-color: var(--accent); background: var(--accent-wash, var(--surface-3)); box-shadow: 0 0 0 1px var(--accent); }
+.ct-more { align-self: center; border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; padding: 6px; cursor: pointer; }
+.td-coach-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin-top: 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; font-weight: 650; font-size: 15px; cursor: pointer; }
+.td-coach-btn svg { color: var(--accent-strong, var(--accent)); }

@@ -133,9 +133,11 @@ export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis'
 export const canListen = () => typeof window !== 'undefined' && Boolean((window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition);
 
 /* A warm, clear English voice where the phone has one. */
-function pickVoice(): SpeechSynthesisVoice | undefined {
+function pickVoice(gender: 'female' | 'male' = 'female'): SpeechSynthesisVoice | undefined {
   const voices = window.speechSynthesis.getVoices();
-  const prefer = ['Samantha', 'Ava', 'Allison', 'Google US English', 'Microsoft Aria', 'Karen', 'Serena'];
+  const prefer = gender === 'male'
+    ? ['Aaron', 'Evan', 'Nathan', 'Tom', 'Daniel', 'Alex', 'Fred', 'Google UK English Male', 'Microsoft Guy', 'Microsoft David']
+    : ['Samantha', 'Ava', 'Allison', 'Zoe', 'Google US English', 'Microsoft Aria', 'Microsoft Jenny', 'Karen', 'Serena'];
   for (const name of prefer) { const found = voices.find(voice => voice.name.includes(name)); if (found) return found; }
   return voices.find(voice => /^en(-|_)US/i.test(voice.lang)) || voices.find(voice => /^en/i.test(voice.lang));
 }
@@ -149,7 +151,64 @@ const SPOKEN: Partial<Record<Command, string[]>> = {
   repeat: ['repeat'], skip: ['skip'], pause: ['pause'], resume: ['resume'], end: ['end workout'], ask: ['coach'],
 };
 
+/* ---------- The natural voice ----------
+   Each line comes from forge-speak as an mp3 and is kept twice: in memory for
+   this workout and in the browser's cache for good, so a line said once is
+   free and instant forever after. The next line is fetched while this one
+   plays, which is what takes the gaps out. */
+export type CoachVoice = 'coral' | 'ash';
+export const VOICE_LABEL: Record<CoachVoice, string> = { coral: 'Female voice', ash: 'Male voice' };
+export type Speak = (text: string, voice: CoachVoice) => Promise<Blob>;
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+const CACHE_NAME = 'forge-coach-voice-v1';
+function hashLine(text: string) { let h = 5381; for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + text.length; }
+
 export class Coach {
+  /* Set by the app when the natural voice is available (signed in). */
+  private speakCloud: Speak | null = null;
+  voice: CoachVoice = 'coral';
+  private audio: HTMLAudioElement | null = null;
+  private lines = new Map<string, Promise<string>>();
+  private cloudSpeakFailures = 0;
+
+  useNaturalVoice(speak: Speak) { this.speakCloud = speak; }
+  get natural() { return Boolean(this.speakCloud) && this.cloudSpeakFailures < 2; }
+
+  /* Call from a tap: iOS only lets a page start sound in answer to one. */
+  unlockAudio() {
+    if (typeof Audio === 'undefined') return;
+    if (!this.audio) { this.audio = new Audio(); this.audio.preload = 'auto'; (this.audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true; }
+    try { this.audio.src = SILENT_WAV; void this.audio.play().catch(() => {}); } catch { /* fine */ }
+    if (canSpeak()) { try { const warm = new SpeechSynthesisUtterance(''); window.speechSynthesis.speak(warm); } catch { /* fine */ } }
+  }
+
+  /* An mp3 URL for a line, from memory, the browser cache, or forge-speak. */
+  private lineUrl(text: string): Promise<string> {
+    const key = `${this.voice}:${text}`;
+    const known = this.lines.get(key);
+    if (known) return known;
+    const job = (async () => {
+      const request = `https://forge.local/voice/${this.voice}/${hashLine(text)}`;
+      try {
+        if (typeof caches !== 'undefined') {
+          const cache = await caches.open(CACHE_NAME);
+          const hit = await cache.match(request);
+          if (hit) return URL.createObjectURL(await hit.blob());
+          const blob = await this.speakCloud!(text, this.voice);
+          void cache.put(request, new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })).catch(() => {});
+          return URL.createObjectURL(blob);
+        }
+      } catch (error) { if (!(error instanceof DOMException)) throw error; }
+      return URL.createObjectURL(await this.speakCloud!(text, this.voice));
+    })();
+    this.lines.set(key, job);
+    job.catch(() => this.lines.delete(key));
+    return job;
+  }
+
+  /* Fetch a line before it is needed. */
+  prefetch(text: string) { if (this.natural && !this.muted && text) void this.lineUrl(text).catch(() => {}); }
+
   /* 'cloud' hears with forge-voice (the Wispr Flow way); 'phone' with the
      browser's recognizer. Cloud falls back to phone on its own if the
      service fails twice in a row. */
@@ -227,14 +286,40 @@ export class Coach {
   say(text: string, listenFor?: Command[]) {
     this.allowed = listenFor;
     this.stopListening();
-    if (!canSpeak() || this.muted) { this.speaking = false; this.emit(); if (listenFor) this.listen(); return; }
+    if (this.muted) { this.speaking = false; this.emit(); if (listenFor) this.listen(); return; }
+    const token = ++this.sayToken;
+    if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } }
+    if (canSpeak()) window.speechSynthesis.cancel();
+    const finish = () => { if (token !== this.sayToken) return; this.speaking = false; this.emit(); if (listenFor) this.listen(); };
+    this.speaking = true; this.emit();
+    if (this.natural && this.audio) {
+      /* The natural voice, with the phone's as the safety net: if the line
+         is not ready in 3.5 s, or fails, the phone says it instead. */
+      const audio = this.audio;
+      let settled = false;
+      const fallback = () => { if (settled || token !== this.sayToken) return; settled = true; this.speakPhone(text, finish); };
+      const timer = window.setTimeout(() => { this.cloudSpeakFailures += 0.5; fallback(); }, 3500);
+      this.lineUrl(text).then(url => {
+        if (settled || token !== this.sayToken) return;
+        settled = true; window.clearTimeout(timer); this.cloudSpeakFailures = 0;
+        audio.onended = finish; audio.onerror = () => this.speakPhone(text, finish);
+        audio.src = url;
+        void audio.play().catch(() => this.speakPhone(text, finish));
+      }).catch(() => { window.clearTimeout(timer); this.cloudSpeakFailures += 1; fallback(); });
+      return;
+    }
+    this.speakPhone(text, finish);
+  }
+
+  private sayToken = 0;
+  private speakPhone(text: string, finish: () => void) {
+    if (!canSpeak()) { finish(); return; }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = pickVoice();
+    const voice = pickVoice(this.voice === 'ash' ? 'male' : 'female');
     if (voice) utterance.voice = voice;
-    utterance.rate = 1.0; utterance.pitch = 1.0;
-    this.speaking = true; this.emit();
-    const finish = () => { this.speaking = false; this.emit(); if (listenFor) this.listen(); };
+    /* A touch slower reads as calmer and less clipped on the built-in voice. */
+    utterance.rate = 0.96; utterance.pitch = 1.0;
     utterance.onend = finish; utterance.onerror = finish;
     window.speechSynthesis.speak(utterance);
   }
@@ -282,7 +367,7 @@ export class Coach {
     this.emit();
   }
 
-  stop() { this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
+  stop() { this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
 
   private emit() { this.onState({ speaking: this.speaking, listening: this.listening }); }
 }

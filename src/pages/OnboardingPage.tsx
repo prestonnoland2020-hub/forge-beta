@@ -36,7 +36,7 @@ import { raceMiles } from '../lib/goalFeasibility';
    lift/race pick when the goal is a body weight, and running when the split
    has no cardio. Everything the builder offers beyond the common case —
    custom events, pace metrics, other lifts — is one tap away on Goals. */
-type StepId = 'agree' | 'name' | 'focus' | 'days' | 'goal' | 'target' | 'running' | 'numbers' | 'week';
+type StepId = 'agree' | 'name' | 'mode' | 'focus' | 'days' | 'goal' | 'target' | 'running' | 'numbers' | 'week';
 
 const blank: AthleteSetup = {
   displayName: '', username: '', birthDate: '', units: 'Imperial', height: '', startingWeight: '', currentWeight: '',
@@ -272,7 +272,7 @@ function OnboardingForm() {
 
   const steps = useMemo<StepId[]>(() => [
     ...(isEditing ? [] : ['agree'] as StepId[]),
-    'name', 'focus', 'days',
+    'name', ...(isEditing ? [] : ['mode'] as StepId[]), 'focus', 'days',
     ...(askGoal ? (weightGoal ? ['target'] : ['goal', 'target']) as StepId[] : []),
     ...(runningPlanned ? ['running'] as StepId[] : []),
     ...(isEditing ? [] : ['numbers'] as StepId[]),
@@ -420,19 +420,21 @@ function OnboardingForm() {
     go(1);
   };
 
-  const finish = async () => {
+  const finish = async (coachMode = false) => {
     /* Agreements live on the first screen; anyone who reached the end
        without them (a deep link into the week) is sent back to tick them. */
     if (!isEditing && (!agreedTerms || !healthConsent || !data.acceptedSafety)) { setDirection('back'); setStepId('agree'); return fail('Tick the three boxes to start.'); }
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
-    if (!goals.length && !pendingGoal) return fail('Set a goal first. Forge builds the plan around it.');
-    if (unmappedDays.length) return fail(`Pick at least one lift for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
+    if (!coachMode && !goals.length && !pendingGoal) return fail('Set a goal first. Forge builds the plan around it.');
+    /* Coach me skips the week screen, so it takes Forge's picks as they are. */
+    const lifts = coachMode && !Object.keys(dayExercises).length ? defaultLifts(plannedDays, strengthLibrary, []) : dayExercises;
+    if (!coachMode && unmappedDays.length) return fail(`Pick at least one lift for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
     const weight = Number(data.currentWeight);
     const weightGiven = Boolean(String(data.currentWeight || '').trim()) && Number.isFinite(weight) && weight > 0;
     setSaving(true); setError('');
     const requested = (data.username || data.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '')).slice(0, 18);
-    const splitDays = plannedDays.map((day, index) => ({ ...day, exercises: dayExercises[index] || [] }));
+    const splitDays = plannedDays.map((day, index) => ({ ...day, exercises: lifts[index] || [] }));
     try {
       /* THE SPLIT IS WRITTEN FIRST; the irreversible onboarding flag goes last,
          so a failure here is only ever a retry. */
@@ -469,7 +471,7 @@ function OnboardingForm() {
       /* A runner's days default to the cardio days in the split. Never more
          days than they train. */
       const runningDays = Math.min(data.trainingDays, data.runningDays || plannedCardioDays || 0);
-      const completed = { ...data, username, runningDays, splitDays, splitSource: data.splitSource || 'Recommended', acceptedSafety: true, completedAt: new Date().toISOString(),
+      const completed = { ...data, ...(isEditing ? {} : { trainingMode: coachMode ? 'coach' as const : 'goals' as const }), username, runningDays, splitDays, splitSource: data.splitSource || 'Recommended', acceptedSafety: true, completedAt: new Date().toISOString(),
         ...(startingList.length ? { startingNumbers: startingList } : {}),
         ...(isEditing ? {} : { acceptedTermsAt: new Date().toISOString(), healthConsentAt: new Date().toISOString(), consentVersion: LEGAL.version }) };
       /* The goal lands after every await, so a failed save above can be
@@ -484,6 +486,7 @@ function OnboardingForm() {
       success();
       /* Setup is done: the 7-day Pro trial can start (BillingProvider asks the server). */
       if (!isEditing) window.dispatchEvent(new Event('forge:onboarded'));
+      if (coachMode) { try { localStorage.setItem('forge-today-mode', 'coach'); } catch { /* fine */ } navigate('/guided', { replace: true }); return; }
       navigate(importStrava && !isEditing ? '/profile?view=connections' : from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
     } catch (reason) {
       fail(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
@@ -554,6 +557,20 @@ function OnboardingForm() {
         </>,
         action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!nameReady} onClick={() => nameReady && tap()}>Continue</button>,
       };
+      case 'mode': return { body: <>
+        <h1>How do you want to train?</h1>
+        <p className="ob-lead">You can switch any time from the Today screen.</p>
+        <div className="ob-cards" role="radiogroup" aria-label="How you want to train">
+          <button type="button" role="radio" aria-checked={false} className="ob-card" disabled={saving} onClick={() => { tap(); void finish(true); }}>
+            <span className="ob-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg></span>
+            <span className="ob-card-text"><strong>{saving ? 'Setting up your coach…' : 'Coach me'}</strong><small>Tell me what to do. A coach builds each workout and talks you through it.</small></span>
+          </button>
+          <button type="button" role="radio" aria-checked={false} className="ob-card" disabled={saving} onClick={() => tapThen(() => set('trainingMode', 'goals'))}>
+            <span className="ob-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span>
+            <span className="ob-card-text"><strong>I have goals</strong><small>Build a plan around a lift, a race or a body weight. Log your top sets.</small></span>
+          </button>
+        </div>
+      </> };
       case 'focus': return { body: <>
         <h1>What are you training for?</h1>
         <div className="ob-cards" role="radiogroup" aria-label="Training focus">{focusCards.map(card => {

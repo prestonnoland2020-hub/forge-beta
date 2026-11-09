@@ -14,7 +14,10 @@ export function SplitGuidePrompt() {
   const navigate = useNavigate();
   const [asked, setAsked] = useState(() => readGuideState());
   const starter = Boolean(setup?.completedAt) && setup?.splitSource !== 'Custom';
-  if (!starter || asked) return null;
+  /* Someone the coach trains (Coach me) has no split to build; ask later if they switch. */
+  let coaching = setup?.trainingMode === 'coach';
+  try { coaching = coaching || localStorage.getItem('forge-today-mode') === 'coach'; } catch { /* fine */ }
+  if (!starter || asked || coaching) return null;
   const dayNames = (setup?.splitDays || []).map(day => day.name).filter(Boolean);
   const later = () => { tap(); try { localStorage.setItem(SPLIT_GUIDE_KEY, 'later'); } catch { /* per-device */ } setAsked('later'); };
   return <div className="sgp-backdrop" role="dialog" aria-modal="true" aria-labelledby="sgp-title">
