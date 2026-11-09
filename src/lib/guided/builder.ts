@@ -173,3 +173,21 @@ export const swapFor = (step: Step, way: 'easier' | 'harder', have: Set<Equip>):
   const move = id ? MOVE(id) : undefined;
   return move && canDo(move, have) ? move : undefined;
 };
+
+/* BUILD MY OWN. She picks the moves from the Guided list, in her order; the
+   coach still sets the sets, reps, rest and starting weight, and still talks
+   her through it. Warm-up and stretch moves stay warm-up and cool-down. */
+export const CUSTOM_KEY = 'forge-guided-custom-v1';
+export function customWorkout(prefs: GuidedPrefs, ids: string[], style: Style, options: { remembered?: Record<string, number>; metric?: boolean } = {}): Workout {
+  const steps: Step[] = [];
+  for (const id of ids) {
+    const move = MOVES.find(item => item.id === id);
+    if (!move) continue;
+    const part: Step['part'] = move.pattern === 'warmup' ? 'warmup' : move.pattern === 'stretch' ? 'cooldown' : 'main';
+    const load = part === 'main' ? startWeight(move, prefs.level, options.remembered || {}, Boolean(options.metric)) : { weight: null };
+    steps.push({ move, part, ...dose(move, style, prefs.level, part), ...load });
+  }
+  const workout: Workout = { title: 'My workout', focus: 'Full body', minutes: 0, steps };
+  workout.minutes = estimateMinutes(workout);
+  return workout;
+}

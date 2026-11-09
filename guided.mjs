@@ -1,6 +1,6 @@
 /* FORGE GUIDED: the builder makes safe, fitting workouts; the coach hears
    short commands; the weights follow how each set felt. */
-import { buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
+import { customWorkout, buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
 import { parseCommand, matchCommand, normalizePhrase } from './src/lib/guided/voice.ts';
 import { MOVES } from './src/lib/guided/catalog.ts';
 import { planWorkout } from './src/lib/guided/fromPlan.ts';
@@ -75,5 +75,10 @@ check('plan: one top set each', pw.steps.filter(s => s.part === 'main').every(s 
 check('plan: title is the split day', pw.title === 'Upper Strength');
 check('plan: known lift gets warm-up ramp', /Warm up first: 95 for 8, then 140 for 3/.test(pw.steps[1].move.cue), pw.steps[1].move.cue);
 check('plan: unknown lift still coached (map, no photo, work-up cue)', pw.steps[2].move.photo === '' && /Work up to/.test(pw.steps[2].move.cue), pw.steps[2].move.cue);
+/* BUILD MY OWN */
+const cw = customWorkout(home, ['hip-circles', 'glute-bridge', 'goblet-squat', 'nope', 'childs-pose'], 'Pilates', {});
+check('custom: keeps her order, drops unknown ids', cw.steps.map(s => s.move.id).join() === 'hip-circles,glute-bridge,goblet-squat,childs-pose');
+check('custom: warm-up and stretch moves keep their part', cw.steps.every(s => s.part === (s.move.pattern === 'warmup' ? 'warmup' : s.move.pattern === 'stretch' ? 'cooldown' : 'main')), cw.steps.map(s => `${s.move.id}:${s.part}`).join());
+check('custom: main moves get sets and a time estimate', cw.steps.filter(s => s.part === 'main').every(s => s.sets >= 2) && cw.minutes > 0);
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);
