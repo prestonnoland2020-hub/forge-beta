@@ -206,7 +206,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               </span>
               <span className="gx-foot"><b>{item.share === null ? (goal.type === 'Strength' ? 'Starts with your first set' : goal.type === 'Body Composition' ? 'Starts with a weigh-in' : 'Starts with your first run') : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
             </button>
-            {isOpen && verdicts[index]?.prediction && <GoalPredictionCard verdict={verdicts[index]} date={goal.date} unit={setup?.units === 'Metric' ? 'kg' : 'lb'} hoursFirst={String(goal.unit || '').includes('hh:mm:ss')} />}
+            {isOpen && verdicts[index]?.prediction && <GoalPredictionCard verdict={verdicts[index]} date={goal.date} unit={setup?.units === 'Metric' ? 'kg' : 'lb'} hoursFirst={String(goal.unit || '').includes('hh:mm:ss')} now={item.current} />}
             {/* With a prediction, the card above already says where the goal lands;
                the roadmap card is for goals the model cannot predict. */}
             {isOpen && roadmaps[index] && !verdicts[index]?.prediction && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}
