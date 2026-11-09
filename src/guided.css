@@ -209,3 +209,7 @@ html[data-theme="dark"] .guided { --g-bg: #0F151C; --g-surface: #18212B; --g-ink
 .gd-setup-row span { font-size: 13px; font-weight: 700; color: var(--g-ink2); }
 .gd-setup-row b { font-size: 15px; font-weight: 700; color: var(--g-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gd-setup-row .gd-link { font-size: 14px; padding: 8px 0; }
+.gd-photos-map { display: grid; place-items: center; background: var(--g-surface); }
+.gd-photos-map .gd-body { width: 62%; }
+.gd-move-map { width: 56px; height: 42px; border-radius: 10px; background: var(--g-soft); display: grid; place-items: center; overflow: hidden; flex: none; }
+.gd-move-map .gd-body { width: 40px; }

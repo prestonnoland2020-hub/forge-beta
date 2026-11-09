@@ -3,6 +3,7 @@
 import { buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
 import { parseCommand, matchCommand, normalizePhrase } from './src/lib/guided/voice.ts';
 import { MOVES } from './src/lib/guided/catalog.ts';
+import { planWorkout } from './src/lib/guided/fromPlan.ts';
 import { existsSync } from 'node:fs';
 
 let fails = 0;
@@ -65,5 +66,14 @@ check('phrases are stored plainly', normalizePhrase("I'm  DONE!") === 'im done')
 check('feel step only hears feel words', parseCommand("I'm done", ['easy', 'right', 'hard']) === null);
 check('rest: "ready" while only ready/more allowed', parseCommand('okay ready', ['ready', 'more']) === 'ready');
 
+
+/* COACH ME THROUGH IT: today's planned lifts, coached. */
+const pw = planWorkout('Upper Strength', [{ exercise: 'Bench Press', muscle: 'Chest', weight: 185, reps: 5 }, { exercise: 'Cable Fly Machine', muscle: 'Chest', weight: 0, reps: 10 }], false);
+check('plan: warm-up then one step per planned lift', pw.steps[0].part === 'warmup' && pw.steps.filter(s => s.part === 'main').length === 2, pw.steps.map(s => s.part).join());
+check('plan: keeps the planned weight and reps', pw.steps[1].weight === 185 && pw.steps[1].reps === 5, JSON.stringify(pw.steps[1]));
+check('plan: one top set each', pw.steps.filter(s => s.part === 'main').every(s => s.sets === 1));
+check('plan: title is the split day', pw.title === 'Upper Strength');
+check('plan: known lift gets warm-up ramp', /Warm up first: 95 for 8, then 140 for 3/.test(pw.steps[1].move.cue), pw.steps[1].move.cue);
+check('plan: unknown lift still coached (map, no photo, work-up cue)', pw.steps[2].move.photo === '' && /Work up to/.test(pw.steps[2].move.cue), pw.steps[2].move.cue);
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

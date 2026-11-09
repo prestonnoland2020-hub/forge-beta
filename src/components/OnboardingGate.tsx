@@ -25,6 +25,8 @@ export function OnboardingGate(){
   if(loading||!hydrated)return <ForgeLoader label="Loading your training profile…"/>;
   if(!completed)return <Navigate to="/onboarding" replace state={{from:location.pathname}}/>;
   /* Set up before the goal step existed: finish the part that is missing. */
+  /* Coach me needs no goal and no mapped split: Guided builds every workout. */
+  if(setup?.trainingMode==='coach')return <Outlet/>;
   if(!goals.length)return <Navigate to="/onboarding" replace state={{from:location.pathname,needsGoal:true}}/>;
   /* AND A LIFTING DAY MUST NAME A MOVEMENT. The starter split arrives with
      empty days; a block built over them prescribes nothing, and a goal lift can

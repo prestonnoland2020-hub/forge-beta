@@ -37,6 +37,9 @@ export type AthleteSetup = {
      HYROX division it suggests, and tells the coach who it is talking to
      (women's health — periods, pregnancy, postpartum). */
   sex?:'Female'|'Male'|'Unspecified';
+  /* Chosen on the first setup question. 'coach' = the coach builds and talks
+     her through every workout (Forge Guided); no goal is required. */
+  trainingMode?:'goals'|'coach';
 };
 
 const legacyStorageKey='forge-athlete-setup-v1';

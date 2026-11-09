@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { CoachToday, TodayModeSwitch, TODAY_MODE_KEY } from '../components/CoachToday';
+import { FROM_PLAN_KEY } from '../lib/guided/fromPlan';
 import { PartnersCard } from '../components/PartnersCard';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
@@ -56,6 +58,11 @@ export function HomePage() {
   const [firstWeekHidden, setFirstWeekHidden] = useState(() => { try { return localStorage.getItem('forge-first-week-hidden') === '1'; } catch { return false; } });
   const [coachTried, setCoachTried] = useState(() => { try { return localStorage.getItem('forge-coach-opened') === '1'; } catch { return false; } });
   const markCoachTried = () => { setCoachTried(true); try { localStorage.setItem('forge-coach-opened', '1'); } catch { /* per-device */ } };
+  /* MY PLAN | COACH ME. Which Today she sees; remembered on the device. Someone
+     who chose "Coach me" in setup starts on the coach side. */
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<'plan' | 'coach'>(() => { try { const saved = localStorage.getItem(TODAY_MODE_KEY); if (saved === 'plan' || saved === 'coach') return saved; } catch { /* fine */ } return (setup as { trainingMode?: string } | null)?.trainingMode === 'coach' ? 'coach' : 'plan'; });
+  const chooseMode = (next: 'plan' | 'coach') => { setMode(next); try { localStorage.setItem(TODAY_MODE_KEY, next); } catch { /* fine */ } };
   const hideFirstWeek = () => { setFirstWeekHidden(true); try { localStorage.setItem('forge-first-week-hidden', '1'); } catch { /* per-device convenience */ } };
 
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">Today</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
@@ -89,10 +96,13 @@ export function HomePage() {
     {/* January only: last year's Wrapped, above the day's work for one month. */}
     <WrappedEntry />
 
+    <TodayModeSwitch mode={mode} onChange={chooseMode} />
+    {mode === 'coach' && <CoachToday />}
+
     {/* ONE CARD, ONE ACTION. The guide's Today: a status chip, the day's name
         as the headline, each lift as one line with its load on the right, and
         Start as the only button. Tapping a line still drops it from today. */}
-    {completedToday ? <section className="td-card done">
+    {mode === 'plan' && (completedToday ? <section className="td-card done">
       <div className="td-card-top"><span className="td-chip done"><Icon name="check" size={12} stroke={3} />Done</span><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></div>
       <h3 className="td-title">{completedToday.title}</h3>
       {/* How long the lifting took, from the watch's strength session — matched
@@ -138,17 +148,21 @@ export function HomePage() {
       {recommendedSets.some(set => set.source !== 'history') && <p className="td-note td-first">{(() => { const fresh = recommendedSets.filter(set => set.source !== 'history'); const reps = fresh[0].reps || 5; return <><b>First time on {fresh.length === 1 ? fresh[0].exercise : 'these lifts'}?</b> Work up to a weight you could do for {reps} with 2 reps left in the tank, and log that one set. Forge sets your numbers from it.</>; })()}</p>}
       {(recommendation.coachNote || recommendation.bodyLogNote) && <p className="td-note">{recommendation.coachNote || recommendation.bodyLogNote}</p>}
       <Link className="button wide" to={startUrl}>{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
-    </section>}
+      {/* COACH ME THROUGH IT: the same planned lifts, with the coach talking
+          her through the warm-up and each top set. */}
+      {recommendedSets.length > 0 && <button type="button" className="td-coach-btn" onClick={() => {
+        const sets = selectedSets.length ? selectedSets : recommendedSets;
+        try { sessionStorage.setItem(FROM_PLAN_KEY, JSON.stringify({ title: recommendation.splitDay.name, lifts: sets.map(set => ({ exercise: set.exercise, muscle: set.muscle, weight: set.weight, reps: set.reps })), link: { recommendationId: recommendation.id, splitId: recommendation.splitDay.splitId, splitDayId: recommendation.splitDay.id, splitPosition: recommendation.splitDay.position, topSetIds: Object.fromEntries(sets.map(set => [set.exercise, set.id])) } })); } catch { /* fine */ }
+        navigate('/guided?plan=1');
+      }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>Coach me through it</button>}
+    </section>)}
 
     {/* THE PLAN LIVES ONE TAP UNDER TODAY. It was its own tab whose first row
         repeated this card with a second Start button; now Today says what to
         do and this row opens the rest of the week. */}
-    {/* FORGE GUIDED. For anyone who would rather be told what to do: the
-        coach builds a workout and talks them through it, out loud. */}
-    <Link className="gd-entry" to="/guided"><span className="gd-entry-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg></span><span><b>Coach me through a workout</b><small>Pick your time. The coach builds it and talks you through every set.</small></span><Icon name="right" size={16} /></Link>
-    <Link className="td-week-link" to="/plan"><span><b>See your week</b><small>Every session, week by week</small></span><Icon name="right" size={16} /></Link>
+    {mode === 'plan' && <Link className="td-week-link" to="/plan"><span><b>See your week</b><small>Every session, week by week</small></span><Icon name="right" size={16} /></Link>}
 
-    {!firstWeekHidden && trainedDays < 3 && (() => {
+    {mode === 'plan' && !firstWeekHidden && trainedDays < 3 && (() => {
       const steps = [
         { label: 'Log your first workout', detail: 'One top set per lift is enough.', done: trainedDays > 0, to: startUrl },
         ...(runner ? [{ label: 'Bring in your runs', detail: 'Connect your watch, or log a run.', done: ranLogged, to: '/profile?view=connections' }] : []),

@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Model from 'react-body-highlighter';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { photoUrl, type Move, type Style } from '../lib/guided/catalog';
 import { amountText, buildWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
-import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, teachPhrase, type Command } from '../lib/guided/voice';
+import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
 import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
+import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
 import { isDemoMode } from '../lib/env';
 
@@ -20,6 +21,14 @@ import { isDemoMode } from '../lib/env';
    preview build, or when that service is down, the phone's recognizer. */
 const cloudVoice = () => !isDemoMode && cloudEarsSupported();
 const voiceInput = () => canListen() || cloudVoice();
+/* The natural coach voice, one line at a time. */
+async function speakLine(text: string, voice: CoachVoice): Promise<Blob> {
+  const { data, error } = await supabase.functions.invoke('forge-speak', { body: { text, voice } });
+  if (error || !(data instanceof Blob) || data.size < 200) throw error || new Error('No audio');
+  return data;
+}
+const VOICE_KEY = 'forge-guided-voice-name';
+const FEEL_LINE = 'How did that feel? Too easy, just right, or too hard?';
 async function transcribe(blob: Blob, hints: { words: string[]; phrases: string[]; context: string }): Promise<string> {
   const audio = await blobToBase64(blob);
   const { data, error } = await supabase.functions.invoke('forge-voice', { body: { audio, mime: 'audio/wav', ...hints } });
@@ -98,6 +107,8 @@ function BodyMap({ move }: { move: Move }) {
 }
 
 function Photos({ move, still }: { move: Move; still?: boolean }) {
+  /* A lift from her plan that Guided has no photos for: the muscles instead. */
+  if (!move.photo) return <div className="gd-photos gd-photos-map" role="img" aria-label={`${move.name}: muscles worked`}><BodyMap move={move} /></div>;
   return <div className={still ? 'gd-photos still' : 'gd-photos'} role="img" aria-label={`${move.name}: start and finish positions`}>
     <img src={photoUrl(move, 0)} alt="" draggable={false} />
     <img src={photoUrl(move, 1)} alt="" draggable={false} />
@@ -106,6 +117,12 @@ function Photos({ move, still }: { move: Move; still?: boolean }) {
 
 export function GuidedPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  /* "Coach me through it" from Today: the plan's lifts, handed over once. */
+  const [fromPlan] = useState<{ title: string; lifts: PlanLift[]; link: Record<string, unknown> } | null>(() => {
+    if (params.get('plan') !== '1') return null;
+    try { const saved = JSON.parse(sessionStorage.getItem(FROM_PLAN_KEY) || 'null'); return saved && Array.isArray(saved.lifts) && saved.lifts.length ? saved : null; } catch { return null; }
+  });
   const { addRecord, records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
   const { isPro } = useBilling();
@@ -124,8 +141,8 @@ export function GuidedPage() {
      wants today, defaulting to her first pick. It only changes today. */
   const [todayStyle, setTodayStyle] = useState<Style>(() => prefs?.styles[0] || 'Strength');
   const [focus, setFocus] = useState<Focus>(() => prefs ? suggestFocus(last.focus, prefs) : 'Full body');
-  const [workout, setWorkout] = useState<Workout | null>(null);
-  const [phase, setPhase] = useState<Phase>(prefs ? 'today' : 'setup');
+  const [workout, setWorkout] = useState<Workout | null>(() => fromPlan ? planWorkout(fromPlan.title, fromPlan.lifts, setup?.units === 'Metric') : null);
+  const [phase, setPhase] = useState<Phase>(fromPlan ? 'preview' : prefs ? 'today' : 'setup');
   const [stepIndex, setStepIndex] = useState(0);
   const [setIndex, setSetIndex] = useState(0);
   const [weights, setWeights] = useState<Record<number, number | null>>({});
@@ -136,7 +153,9 @@ export function GuidedPage() {
   const [paused, setPaused] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
   const [handsFree, setHandsFree] = useState(voiceInput());
-  const [voiceOn, setVoiceOn] = useState(canSpeak());
+  const [voiceOn, setVoiceOn] = useState(canSpeak() || cloudVoice());
+  /* A woman's voice for women, a man's for men; anyone can switch. */
+  const [coachVoice, setCoachVoice] = useState<CoachVoice>(() => read<CoachVoice | null>(VOICE_KEY, null) || (setup?.sex === 'Male' ? 'ash' : 'coral'));
   const [voiceState, setVoiceState] = useState({ speaking: false, listening: false });
   const [heard, setHeard] = useState('');
   const [savedNote, setSavedNote] = useState('');
@@ -178,6 +197,13 @@ export function GuidedPage() {
     return () => { c.stop(); html.style.overflow = before; };
   }, []);
   useEffect(() => { if (coach.current) coach.current.muted = !voiceOn; }, [voiceOn]);
+  useEffect(() => { const c = coach.current; if (!c) return; c.voice = coachVoice; if (cloudVoice()) c.useNaturalVoice(speakLine); c.prefetch(FEEL_LINE); }, [coachVoice]);
+  const pickVoice = (voice: CoachVoice) => {
+    setCoachVoice(voice); write(VOICE_KEY, voice);
+    const c = coach.current; if (!c) return;
+    c.voice = voice; c.unlockAudio();
+    c.say(voice === 'ash' ? "Hey, I'm your coach. Let's get to work." : "Hi, I'm your coach. Let's get to work.");
+  };
   useEffect(() => { coach.current?.setHandsFree(handsFree && (phase === 'card' || phase === 'feel' || phase === 'rest' || phase === 'preview' || Boolean(check))); }, [handsFree, phase, check]);
 
   /* Opens the cloud ears from a tap (iOS needs one), once per workout. */
@@ -188,6 +214,15 @@ export function GuidedPage() {
   const weight = step ? (weights[stepIndex] !== undefined ? weights[stepIndex] : step.weight) : null;
   const have = useMemo(() => owned(prefs || draft), [prefs, draft]);
   const freeLeft = Math.max(0, FREE_WORKOUTS - read<number>(COUNT_KEY, 0));
+
+  /* "Start with my coach" on Today lands straight on the built workout. */
+  const autoBuilt = useRef(false);
+  useEffect(() => {
+    if (autoBuilt.current || fromPlan || !prefs || params.get('go') !== '1') return;
+    autoBuilt.current = true;
+    const m = Number(params.get('min')); if ([20, 30, 45, 60].includes(m)) setMinutes(m);
+    build(focus, [20, 30, 45, 60].includes(m) ? m : minutes);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- Lines the coach says ---- */
   const cardLine = (s: Step, setNo: number, w: number | null) => {
@@ -325,12 +360,16 @@ export function GuidedPage() {
     const today = { ...prefs, styles: [todayStyle, ...prefs.styles.filter(item => item !== todayStyle)] };
     const plan = buildWorkout(today, chosenMinutes, chosenFocus, { seed: Date.now() % 100000, recent: last.moves || [], remembered: read<Record<string, number>>(WEIGHTS_KEY, {}), metric });
     setWorkout(plan); setPhase('preview');
+    /* The first thing the coach will say, fetched while she reads the list. */
+    coach.current?.prefetch(introLine(plan));
   };
+  const introLine = (plan: Workout) => `Let's go. ${plan.steps.length} moves, about ${fromPlan ? plan.minutes : estimateMinutes(plan)} minutes. I'll talk you through every one. ${cardLine(plan.steps[0], 0, plan.steps[0].weight)}`;
   const start = () => {
     if (!workout) return;
+    coach.current?.unlockAudio();
     openEars();
     setStepIndex(0); setSetIndex(0); setWeights({}); setLogged([]); setStartedAt(Date.now()); setPhase('card'); setTimer(workout.steps[0].reps); setRunning(false);
-    say(`Let's go. ${workout.steps.length} moves, about ${estimateMinutes(workout)} minutes. I'll talk you through every one. ${cardLine(workout.steps[0], 0, workout.steps[0].weight)}`, CARD_CMDS);
+    say(introLine(workout), CARD_CMDS);
   };
   const goTo = (index: number) => {
     if (!workout) return;
@@ -344,7 +383,7 @@ export function GuidedPage() {
     setRunning(false);
     if (step.part !== 'main') { record(null); goTo(stepIndex + 1); return; }
     setPhase('feel');
-    say('How did that feel? Too easy, just right, or too hard?', ['ask', 'easy', 'right', 'hard', 'repeat', 'end']);
+    say(FEEL_LINE, ['ask', 'easy', 'right', 'hard', 'repeat', 'end']);
   };
   const record = (feel: Feel | null) => {
     if (!step) return;
@@ -366,6 +405,8 @@ export function GuidedPage() {
     const upNext = lastSet ? workout.steps[stepIndex + 1] : step;
     const why = feel === 'easy' && nextW !== null && !lastSet ? ` Going up to ${nextW} ${unitWord}.` : feel === 'hard' && nextW !== null && !lastSet ? ` Dropping to ${nextW} ${unitWord}.` : feel === 'hard' && swapped ? ` Next set: ${swapped.name}, an easier version.` : '';
     setPhase('rest'); setTimer(restFor); setRunning(true); setPaused(false);
+    /* What comes after the rest, fetched during it. */
+    { const nextIndex = lastSet ? stepIndex + 1 : stepIndex; const nextSet = lastSet ? 0 : setIndex + 1; const s2 = workout.steps[nextIndex]; if (s2) coach.current?.prefetch(cardLine(s2, nextSet, nextIndex === stepIndex ? (nextW ?? weight) : s2.weight)); }
     say(`${cheer(logged.length)}${why} Rest ${restFor >= 60 ? `${Math.floor(restFor / 60)} minute${restFor >= 120 ? 's' : ''}${restFor % 60 ? ` ${restFor % 60} seconds` : ''}` : `${restFor} seconds`}. Up next, ${upNext.move.name}. Say ready when you are.`, ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end']);
   };
   const afterRest = () => {
@@ -412,13 +453,20 @@ export function GuidedPage() {
     const best = new Map<string, LoggedSet>();
     for (const item of main) if (item.weight !== null && (!best.has(item.moveId) || (item.weight ?? 0) > (best.get(item.moveId)!.weight ?? 0))) best.set(item.moveId, item);
     const muscles = [...new Set(logged.flatMap(item => item.muscles))];
-    const notes = `Forge Guided · ${workout.focus}. ` + [...new Set(main.map(item => item.name))].map(name => { const sets = main.filter(item => item.name === name); return `${name} ${sets.length}×${sets[0].timed ? `${sets[0].reps}s` : sets[0].reps}${sets[0].weight !== null ? ` @ ${sets[sets.length - 1].weight} ${unit}` : ''}`; }).join(' · ');
+    const notes = `${fromPlan ? 'Coached' : 'Forge Guided'} · ${fromPlan ? workout.title : workout.focus}. ` + [...new Set(main.map(item => item.name))].map(name => { const sets = main.filter(item => item.name === name); return `${name} ${sets.length}×${sets[0].timed ? `${sets[0].reps}s` : sets[0].reps}${sets[0].weight !== null ? ` @ ${sets[sets.length - 1].weight} ${unit}` : ''}`; }).join(' · ');
     if (logged.length) {
-      const result = addRecord({ date: todayIso(), title: `Guided · ${workout.focus}`, muscles, hasCardio: false, notes, durationMinutes: minutesTaken,
-        topSets: [...best.values()].map(item => ({ muscle: item.muscles[0] || 'Full body', lift: item.name, weight: item.weight as number, reps: item.reps, completed: true })) });
+      /* A coached run of today's plan is logged as today's plan: its day name,
+         its recommendation and split position, and each top set tied to the
+         planned one — so the split advances and progression reads it. */
+      const link = fromPlan?.link || {};
+      const planSetIds = (link.topSetIds || {}) as Record<string, string>;
+      const result = addRecord({ date: todayIso(), title: fromPlan ? workout.title : `Guided · ${workout.focus}`, muscles, hasCardio: false, notes, durationMinutes: minutesTaken,
+        ...(fromPlan ? { recommendationId: link.recommendationId as string | undefined, splitId: link.splitId as string | undefined, splitDayId: link.splitDayId as string | undefined, splitPosition: link.splitPosition as number | undefined, selectedRecommendationTopSetIds: Object.values(planSetIds) } : {}),
+        topSets: [...best.values()].map(item => ({ muscle: item.muscles[0] || 'Full body', lift: item.name, weight: item.weight as number, reps: item.reps, completed: true, ...(planSetIds[item.name] ? { recommendationTopSetId: planSetIds[item.name] } : {}) })) });
       setSavedNote(result.ok ? 'Saved to your log.' : 'Already in your log.');
       write(COUNT_KEY, read<number>(COUNT_KEY, 0) + 1);
-      write(LAST_KEY, { focus: workout.focus, moves: workout.steps.map(item => item.move.id) });
+      if (!fromPlan) write(LAST_KEY, { focus: workout.focus, moves: workout.steps.map(item => item.move.id) });
+      if (fromPlan) { try { sessionStorage.removeItem(FROM_PLAN_KEY); } catch { /* fine */ } }
     }
     const sets = main.length;
     coach.current?.say(logged.length ? `That's the workout. ${sets} sets in ${minutesTaken} minutes. Really well done. It's saved to your log.` : 'No problem. Come back when you are ready.');
@@ -486,10 +534,15 @@ export function GuidedPage() {
     <span className="gd-top-fill" />
     {right}
   </div>;
-  const voiceToggles = <div className="gd-voice-row">
+  const voiceToggles = <>
+  <div className="gd-voice-row">
+    {(['coral', 'ash'] as CoachVoice[]).map(voice => <button type="button" key={voice} className={coachVoice === voice ? 'gd-chip on' : 'gd-chip'} aria-pressed={coachVoice === voice} onClick={() => pickVoice(voice)}>{VOICE_LABEL[voice]}</button>)}
+  </div>
+  <div className="gd-voice-row">
     <button type="button" className={voiceOn ? 'gd-pill on' : 'gd-pill'} aria-pressed={voiceOn} onClick={() => setVoiceOn(v => !v)}><Svg d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" size={16} />Coach voice</button>
     {voiceInput() && <button type="button" className={handsFree ? 'gd-pill on' : 'gd-pill'} aria-pressed={handsFree} onClick={() => setHandsFree(v => !v)}><Svg d={MIC} size={16} />Hands-free</button>}
-  </div>;
+  </div>
+  </>;
 
   if (phase === 'setup') {
     const toggle = (key: 'styles' | 'vibe' | 'gear', value: string) => setDraft(d => ({ ...d, [key]: (d[key] as string[]).includes(value) ? (d[key] as string[]).filter(x => x !== value) : [...(d[key] as string[]), value] }));
@@ -557,15 +610,15 @@ export function GuidedPage() {
   </div>);
 
   if (phase === 'preview' && workout) return frame(<div className="gd-screen">
-    {top(() => setPhase('today'))}
-    <h1>{workout.focus}</h1>
-    <p className="gd-lead strong">About {estimateMinutes(workout)} min · {workout.steps.length} moves</p>
+    {top(fromPlan ? undefined : () => setPhase('today'))}
+    <h1>{workout.title}</h1>
+    <p className="gd-lead strong">About {fromPlan ? workout.minutes : estimateMinutes(workout)} min · {workout.steps.length} moves</p>
     <div className="gd-moves">{workout.steps.map((item, index) => <div className="gd-move" key={`${item.move.id}-${index}`}>
-      <img src={photoUrl(item.move, 1)} alt="" />
-      <span><strong>{item.move.name}</strong><small>{item.part === 'warmup' ? 'Warm-up · ' : item.part === 'cooldown' ? 'Cool-down · ' : `${item.sets} sets × `}{amountText(item)}{item.weight !== null ? ` · ${item.weight} ${unit}` : ''}</small></span>
+      {item.move.photo ? <img src={photoUrl(item.move, 1)} alt="" /> : <span className="gd-move-map"><BodyMap move={item.move} /></span>}
+      <span><strong>{item.move.name}</strong><small>{item.part === 'warmup' ? 'Warm-up · ' : item.part === 'cooldown' ? 'Cool-down · ' : (item.sets === 1 ? (fromPlan ? 'Top set · ' : '1 set × ') : `${item.sets} sets × `)}{amountText(item)}{item.weight !== null ? ` · ${item.weight} ${unit}` : ''}</small></span>
     </div>)}</div>
     <p className="gd-muted">Weights are a starting guess. Tell the coach how each set felt and the next one adjusts.</p>
-    <button type="button" className="gd-secondary" onClick={() => build()}>Shuffle moves</button>
+    {!fromPlan && <button type="button" className="gd-secondary" onClick={() => build()}>Shuffle moves</button>}
     <button type="button" className="gd-cta" onClick={() => { if (handsFree && voiceInput() && mic !== 'granted') setMicAsk(true); else start(); }}><Svg d="M7 4v16l13-8z" size={18} />Start</button>
     {micSheet}
   </div>);
