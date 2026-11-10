@@ -37,10 +37,10 @@
   overflow: visible;
 }
 
-.strike-base { fill: var(--mark-shade); }
+.strike-base { fill: var(--mark-base); }
 .strike-wedge { fill: var(--mark-face); }
 .strike-arm1,
-.strike-arm2 { fill: var(--accent); }
+.strike-arm2 { fill: var(--mark-arm-a); }
 
 .strike-shadow {
   position: absolute;

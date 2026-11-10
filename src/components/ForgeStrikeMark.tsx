@@ -1,3 +1,4 @@
+import { useId } from 'react';
 /* THE FULL FACETED MARK, IN FOUR PIECES, SO IT CAN ASSEMBLE.
 
    Everywhere else the mark is a one-colour CSS mask (--forge-mark), which is
@@ -23,6 +24,9 @@ export const FACETS = [
 ];
 
 export function ForgeStrikeMark() {
+  /* A gradient id per drawing: a shared id resolves to the first copy in the
+     page, and when that copy is hidden the arms of every other mark vanish. */
+  const gradId = `forge-arm-${useId().replace(/:/g, '')}`;
   return (
     <span className="strike-mark" aria-hidden="true">
       {/* The long shadow is the one-colour mask stepped out along 45° by a
@@ -31,8 +35,18 @@ export function ForgeStrikeMark() {
           shadow off. */}
       <span className="strike-shadow"><i /></span>
       <svg viewBox="0 0 732 620">
+      {/* DARK ATMOSPHERE MARK: the arms carry one restrained gradient, light
+          lavender into smoky plum; the wedge stays soft white and the base
+          is deep teal (brand.css, login-strike.css). One gradient for both
+          arms, read per arm, so each facet shades the same way. */}
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style={{ stopColor: 'var(--mark-arm-a)' }} />
+          <stop offset="1" style={{ stopColor: 'var(--mark-arm-b)' }} />
+        </linearGradient>
+      </defs>
         {FACETS.map(({ part, d }) => (
-          <g key={part} className={`strike-${part}`}>
+          <g key={part} className={`strike-${part}`} style={part.startsWith('arm') ? { fill: `url(#${gradId})` } : undefined}>
             <g transform={TRACE}><path d={d} /></g>
           </g>
         ))}
@@ -46,10 +60,21 @@ export function ForgeStrikeMark() {
    rather than the one-colour mask, now that the logo stands without the
    FORGE wordmark beside it. Fills live in brand.css (.forge-mark-full). */
 export function ForgeMark({ className = '' }: { className?: string }) {
+  const gradId = `forge-arm-${useId().replace(/:/g, '')}`;
   return (
     <svg className={`forge-mark-full ${className}`.trim()} viewBox="0 0 732 620" aria-hidden="true">
+      {/* DARK ATMOSPHERE MARK: the arms carry one restrained gradient, light
+          lavender into smoky plum; the wedge stays soft white and the base
+          is deep teal (brand.css, login-strike.css). One gradient for both
+          arms, read per arm, so each facet shades the same way. */}
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style={{ stopColor: 'var(--mark-arm-a)' }} />
+          <stop offset="1" style={{ stopColor: 'var(--mark-arm-b)' }} />
+        </linearGradient>
+      </defs>
       {FACETS.map(({ part, d }) => (
-        <g key={part} className={`forge-mark-${part}`}>
+        <g key={part} className={`forge-mark-${part}`} style={part.startsWith('arm') ? { fill: `url(#${gradId})` } : undefined}>
           <g transform={TRACE}><path d={d} /></g>
         </g>
       ))}

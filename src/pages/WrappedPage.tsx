@@ -104,7 +104,7 @@ function Strongest({ w, unit }: { w: Wrapped; unit: string }) {
   </div>;
 }
 
-const CONFETTI = ['#4d7cff', '#8b5cf6', '#ffffff', '#38bdf8', '#c4b5fd'];
+const CONFETTI = ['#d7ff45', '#8985a5', '#f1f0f2', '#715b70', '#315b5a'];
 function Prs({ w, unit }: { w: Wrapped; unit: string }) {
   const pieces = useMemo(() => Array.from({ length: 50 }, (_, index) => ({ left: Math.random() * 100, delay: 0.4 + Math.random() * 0.8, duration: 2.4 + Math.random() * 1.6, drift: (Math.random() - 0.5) * 140, color: CONFETTI[index % CONFETTI.length] })), []);
   return <div className="wr-stack">
@@ -214,7 +214,7 @@ async function shareImage(w: Wrapped, unit: string, metric: boolean, name: strin
   canvas.width = 1080; canvas.height = 1920;
   const ctx = canvas.getContext('2d')!;
   const bg = ctx.createLinearGradient(0, 0, 1080, 1920);
-  bg.addColorStop(0, '#0b1230'); bg.addColorStop(0.55, '#2a1a6e'); bg.addColorStop(1, '#3b5bff');
+  bg.addColorStop(0, '#090a0d'); bg.addColorStop(0.55, '#2a2130'); bg.addColorStop(1, '#315b5a');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, 1080, 1920);
   const glow = ctx.createRadialGradient(860, 360, 0, 860, 360, 620);
   glow.addColorStop(0, 'rgba(139,92,246,.55)'); glow.addColorStop(1, 'rgba(139,92,246,0)');

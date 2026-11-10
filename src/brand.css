@@ -392,9 +392,9 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
    Doubled class so it outranks every older .topbar rule without !important. */
 .forge-mark-full { display: block; width: 34px; height: 29px; flex: none; overflow: visible; }
 .forge-mark-arm1,
-.forge-mark-arm2 { fill: var(--accent); }
+.forge-mark-arm2 { fill: var(--mark-arm-a); }
 .forge-mark-wedge { fill: var(--text); }
-.forge-mark-base { fill: var(--mark-shade); }
+.forge-mark-base { fill: var(--mark-base); }
 .brand .forge-mark-full { width: 38px; height: 32px; }
 
 .topbar.topbar {
