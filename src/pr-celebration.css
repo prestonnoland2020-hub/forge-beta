@@ -7,8 +7,8 @@
   color: var(--accent-text, var(--accent)) !important;
   background: color-mix(in oklch, var(--accent) 14%, transparent);
 }
-.top-set-pr.big { color: #7a5200 !important; background: linear-gradient(90deg, #ffe08a, #f5c542); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .top-set-pr.big { color: #3d2900 !important; } }
+.top-set-pr.big { color: #090a0d !important; background: #d7ff45; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .top-set-pr.big { color: #090a0d !important; } }
 
 @media (prefers-reduced-motion: no-preference) {
   .top-set-pr.fresh { animation: pr-pop .5s cubic-bezier(.3, 1.6, .5, 1) both, pr-glow 1.6s ease-out .2s 1; }
@@ -42,12 +42,12 @@
 }
 .pr-celebration-eyebrow {
   padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 900; letter-spacing: .12em;
-  color: #3d2900; background: linear-gradient(90deg, #ffe08a, #f5c542);
+  color: #090a0d; background: #d7ff45;
 }
 .pr-celebration-card strong { font-size: 56px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
 .pr-celebration-card strong small { font-size: 20px; font-weight: 800; color: var(--ink-3, var(--muted)); }
 .pr-celebration-card p { margin: 0; font-size: 16px; font-weight: 700; }
-.pr-celebration-card p b { color: var(--good, #1f7a3d); }
+.pr-celebration-card p b { color: var(--accent-text); }
 .pr-celebration-hint { margin-top: 6px; font-size: 13px; color: var(--ink-3, var(--muted)); }
 @keyframes pr-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pr-card { from { transform: scale(.6) translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }

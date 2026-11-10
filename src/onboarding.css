@@ -242,7 +242,7 @@ textarea.ob-input{min-height:96px;resize:vertical}
 .ob-day-lifts{display:grid;gap:6px}
 .ob-day-lift{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 12px;border:1px solid color-mix(in oklch,var(--accent) 45%,transparent);border-radius:14px;background:color-mix(in oklch,var(--accent) 9%,transparent);color:var(--ink);font:inherit;font-weight:700;text-align:left}
 .ob-day-lift>span:nth-child(2){flex:1}
-.ob-day-tick{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff}
+.ob-day-tick{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent-strong);color:var(--accent-ink)}
 .ob-day-x{font-size:20px;line-height:1;color:var(--ink-3);font-weight:500}
 .ob-day-empty{margin:0;font-size:14px;color:var(--ink-3)}
 .ob-day-add-label{margin:4px 0 0;font-size:13px;font-weight:700;color:var(--ink-3)}

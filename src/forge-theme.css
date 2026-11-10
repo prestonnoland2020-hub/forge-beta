@@ -58,11 +58,11 @@
   /* ---- Grounds and surfaces --------------------------------------------
      A ladder, not a set. Each step is one perceptible lift from the last, so
      depth reads without a shadow. */
-  --bg: #f3f5f5;
+  --bg: #f3f2f4;
   --surface-1: #ffffff;         /* a card on the ground */
-  --surface-2: #e8ecec;         /* a control on a card */
-  --surface-3: #dbe1e1;         /* hover, active chip */
-  --surface-sunken: #eaeeee;    /* an inset well: track, input */
+  --surface-2: #e9e8ec;         /* a control on a card */
+  --surface-3: #dcdae1;         /* hover, active chip */
+  --surface-sunken: #ebeaee;    /* an inset well: track, input */
 
   /* --surface-0 IS THE CHROME GROUND, and until now it did not exist.
      Three rules ask for it — the topbar's translucent ground, the phone tab
@@ -80,8 +80,8 @@
   --surface-0: #ffffff;
 
   /* ---- Lines ------------------------------------------------------------ */
-  --hairline: #dce2e2;
-  --hairline-strong: #bac3c3;
+  --hairline: #dfdde3;
+  --hairline-strong: #bdbac4;
 
   /* ---- Text -------------------------------------------------------------
      Three steps and no more. Every "muted grey" in the old CSS was one of
@@ -94,9 +94,9 @@
      a rank in the hierarchy, not permission to be unreadable — this is a
      training log people read mid-set. #7b807e keeps its job on dark grounds
      and in the mark; it does not get to set type on white. */
-  --ink: #14181a;
-  --ink-2: #454c4b;
-  --ink-3: #5f6563;
+  --ink: #0d0e12;
+  --ink-2: #46444c;
+  --ink-3: #605d66;
 
   /* ---- Status -----------------------------------------------------------
      Meaning, never decoration.
@@ -111,16 +111,16 @@
   --good: #1a6e52;
   --warn: #86601a;
   --bad: #ad3a30;
-  --info: #6d4ac4;
+  --info: #5d5894;
 
   /* ---- Data --------------------------------------------------------------
      Series 1 follows the accent (see the accent blocks). The rest are fixed and
      chosen to stay distinguishable from it and from each other for the ~8% of
      men with red-green colour vision deficiency: the pairs are separated by
      lightness as well as hue. */
-  --chart-2: #c2410c;
-  --chart-3: #6d4ac4;
-  --chart-4: #0f7d74;
+  --chart-2: #2f6b68;
+  --chart-3: #7a5a78;
+  --chart-4: #4d6b00;
   --chart-5: #8a5a00;
   --chart-6: #b3261e;
 
@@ -129,8 +129,8 @@
      it rather than match it, so they flip with the tone instead of following
      it. Without this pair, the tooltip was a near-white box on a near-white
      page. */
-  --inverse-surface: #14181a;
-  --inverse-ink: #f3f5f5;
+  --inverse-surface: #17171d;
+  --inverse-ink: #f1f0f2;
 
   /* ---- Depth ------------------------------------------------------------
      Light UI reads depth from soft shadows; dark UI reads it from surface
@@ -148,7 +148,7 @@
      a dark ground and does nothing on a light one. --lift is whichever
      direction actually separates in the current tone, so `color-mix(in oklch,
      var(--surface-1) 96%, var(--lift))` reads correctly in both. */
-  --lift: #14181a;
+  --lift: #17171d;
   /* THE FACETED MARK'S OWN COLOURS, the same in both tones. The app's mark is
      normally a one-colour mask; the sign-in entrance draws the full logo, and
      these are its tile, its near-white wedge, its grey wedge and the long
@@ -222,8 +222,8 @@
      app's own font with tabular figures, so a column of top sets lines up. */
   --num: var(--display);
   /* The ink on a brand-blue fill when it is a mark, not text: the coach's F. */
-  --on-brand: #ffffff;
-  --violet: #9274ff;
+  --on-brand: #090a0d;
+  --violet: #6f6a92;
   --title-weight: 700;
   --title-stretch: 100%;
   --title-tracking: -.02em;
@@ -255,35 +255,35 @@
     --tint: var(--a-tint-d);
     --chart-1: var(--a-chart-d);
 
-    --bg: #101e25;
-    --surface-1: #16262f;
-    --surface-2: #1d313b;
-    --surface-3: #2c4553;
-    --surface-sunken: #0b161b;
-    --surface-0: #16262f;
+    --bg: #090a0d;
+    --surface-1: #17171d;
+    --surface-2: #202027;
+    --surface-3: #2d2c36;
+    --surface-sunken: #0e0e12;
+    --surface-0: #17171d;
 
-    --hairline: #233740;
-    --hairline-strong: #3a5464;
+    --hairline: #26252d;
+    --hairline-strong: #3b3a46;
 
-    --ink: #edf1f1;
-    --ink-2: #b9c1c0;
-    --ink-3: #939997;
+    --ink: #f1f0f2;
+    --ink-2: #c8c5cc;
+    --ink-3: #a5a2aa;
 
-    --on-brand: #ffffff;
-    --violet: #9274ff;
+    --on-brand: #090a0d;
+    --violet: #8985a5;
     --good: #6cc3a0;
     --warn: #dcb46a;
     --bad: #e3897e;
-    --info: #b49bff;
+    --info: #aaa6c8;
 
-    --chart-2: #fb923c;
-    --chart-3: #b49bff;
-    --chart-4: #5fe0c6;
-    --chart-5: #f6c453;
-    --chart-6: #ef8a7b;
+    --chart-2: #6fb1ad;
+    --chart-3: #b994b6;
+    --chart-4: #d7ff45;
+    --chart-5: #d9b26a;
+    --chart-6: #a5a2aa;
 
-    --inverse-surface: #edf1f1;
-    --inverse-ink: #131819;
+    --inverse-surface: #f1f0f2;
+    --inverse-ink: #090a0d;
 
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .40);
     --shadow-2: 0 6px 20px rgba(0, 0, 0, .45);
@@ -293,7 +293,7 @@
     --scrim: rgba(0, 0, 0, .72);
 
     --lift: #ffffff;
-    --mark-tile: #3f4849;
+    --mark-tile: #202027;
     --mark-face: #f3f5f5;
     --mark-shade: #7b807e;
     --mark-shadow: rgba(0, 0, 0, .34);
@@ -313,35 +313,35 @@
   --tint: var(--a-tint-d);
   --chart-1: var(--a-chart-d);
 
-  --bg: #101e25;
-  --surface-1: #16262f;
-  --surface-2: #1d313b;
-  --surface-3: #2c4553;
-  --surface-sunken: #0b161b;
-  --surface-0: #16262f;
+  --bg: #090a0d;
+  --surface-1: #17171d;
+  --surface-2: #202027;
+  --surface-3: #2d2c36;
+  --surface-sunken: #0e0e12;
+  --surface-0: #17171d;
 
-  --hairline: #233740;
-  --hairline-strong: #3a5464;
+  --hairline: #26252d;
+  --hairline-strong: #3b3a46;
 
-  --ink: #edf1f1;
-  --ink-2: #b9c1c0;
-  --ink-3: #939997;
+  --ink: #f1f0f2;
+  --ink-2: #c8c5cc;
+  --ink-3: #a5a2aa;
 
-  --on-brand: #ffffff;
-  --violet: #9274ff;
+  --on-brand: #090a0d;
+  --violet: #8985a5;
   --good: #6cc3a0;
   --warn: #dcb46a;
   --bad: #e3897e;
-  --info: #b49bff;
+  --info: #aaa6c8;
 
-  --chart-2: #fb923c;
-  --chart-3: #b49bff;
-  --chart-4: #5fe0c6;
-  --chart-5: #f6c453;
-  --chart-6: #ef8a7b;
+  --chart-2: #6fb1ad;
+  --chart-3: #b994b6;
+  --chart-4: #d7ff45;
+  --chart-5: #d9b26a;
+  --chart-6: #a5a2aa;
 
-  --inverse-surface: #edf1f1;
-  --inverse-ink: #131819;
+  --inverse-surface: #f1f0f2;
+  --inverse-ink: #090a0d;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .40);
   --shadow-2: 0 6px 20px rgba(0, 0, 0, .45);
@@ -351,7 +351,7 @@
   --scrim: rgba(0, 0, 0, .72);
 
   --lift: #ffffff;
-  --mark-tile: #3f4849;
+  --mark-tile: #202027;
   --mark-face: #f3f5f5;
   --mark-shade: #7b807e;
   --mark-shadow: rgba(0, 0, 0, .34);
@@ -404,14 +404,19 @@
    is why it is declared on bare :root as well as on its own attribute. */
 :root,
 [data-accent="signal"] {
-  /* Electric blue #168fd1 — the primary. Deep navy is the dark ground. */
-  --a-fill: #168fd1;   --a-fill-d: #168fd1;
-  --a-strong: #0f74ad; --a-strong-d: #1f9ae0;
-  --a-ink: #ffffff;    --a-ink-d: #0b1a22;
-  --a-text: #006bad;   --a-text-d: #3aa8ea;
-  --a-dim: #a4daff;    --a-dim-d: #0b6799;
-  --a-tint: #168fd1;   --a-tint-d: #168fd1;
-  --a-chart: #006bad;  --a-chart-d: #3aa8ea;
+  /* FORGE LIME #d7ff45 — Dark Atmosphere (Nov 2026). The signature action and
+     achievement colour: primary buttons, selected states, PRs, progression.
+     On dark it is the fill itself with obsidian ink (17:1). On light, lime is
+     unreadable as text, so text and lines go to a deep olive on the same hue;
+     a filled control stays lime with dark ink. Series 1 in charts is the
+     analytics lavender, not lime: lime is kept for moments that matter. */
+  --a-fill: #5c7d00;   --a-fill-d: #d7ff45;
+  --a-strong: #d7ff45; --a-strong-d: #d7ff45;
+  --a-ink: #090a0d;    --a-ink-d: #090a0d;
+  --a-text: #4f4a7a;   --a-text-d: #c3bfdc;
+  --a-dim: #e9ffa6;    --a-dim-d: #55661b;
+  --a-tint: #8fae1f;   --a-tint-d: #d7ff45;
+  --a-chart: #5d5894;  --a-chart-d: #aaa6c8;
 }
 
 /* FLARE — the hot red. */

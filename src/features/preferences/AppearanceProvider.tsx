@@ -41,8 +41,8 @@ function readSettings(): AppearanceSettings {
     const stored = JSON.parse(raw || '{}') as Partial<Record<string, unknown>>;
     /* Anyone carrying a choice from the five-package era lands on dark, which
        is what four of those five packages were. */
-    return { theme: isTheme(stored.theme) ? stored.theme : (localStorage.getItem('forge-appearance-v2') ? 'dark' : 'system') };
-  } catch { return { theme: 'system' }; }
+    return { theme: isTheme(stored.theme) ? stored.theme : 'dark' };
+  } catch { return { theme: 'dark' }; }
 }
 
 const prefersDark = () =>

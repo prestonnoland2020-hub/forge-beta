@@ -1,0 +1,87 @@
+/* DARK ATMOSPHERE — the ground every Forge screen is lit on (Nov 2026).
+
+   A dark silk: one thin lavender line high up, a wide smoky-plum band through
+   the middle, deep teal low on the left, and grain over all of it. It is
+   painted once, fixed to the screen, behind everything, so content scrolls
+   across it and every card (Graphite, opaque) sits on top of it rather than
+   being tinted by it. The top third and the bottom stay near-black: that is
+   the negative space headers and the tab bar read on.
+
+   The plan glow (--week-glow, how much of the week is logged) and the record
+   flare still drive it: the silk brightens a little as the week fills, and
+   flashes once on a new record (forge-logbook.css keeps those animations). */
+
+:root {
+  --atmo-lavender: 137 133 165;   /* #8985a5 */
+  --atmo-plum: 113 91 112;        /* #715b70 */
+  --atmo-mauve: 150 128 150;
+  --atmo-teal: 49 91 90;          /* #315b5a */
+  /* The mark (ForgeStrikeMark.tsx): arms light lavender into plum, base teal. */
+  --mark-arm-a: #b9b5d4;
+  --mark-arm-b: #7d6680;
+  --mark-base: #3f6e6c;
+  --atmo-strength: .5;            /* light tone: a faint wash only */
+  --atmo-grain: .06;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --atmo-strength: 1; --atmo-grain: .11; } }
+:root[data-theme="dark"] { --atmo-strength: 1; --atmo-grain: .11; }
+
+:root {
+  --atmosphere:
+    linear-gradient(174deg, transparent 35%, rgb(var(--atmo-lavender) / .32) 37%, rgb(var(--atmo-teal) / .2) 38.6%, transparent 40.5%),
+    radial-gradient(46% 6% at 6% 33%, rgb(var(--atmo-plum) / .42), transparent),
+    linear-gradient(172deg, transparent 40%, rgb(var(--atmo-plum) / .16) 47%, rgb(var(--atmo-plum) / .05) 54%, rgb(var(--atmo-mauve) / .2) 62%, rgb(var(--atmo-plum) / .08) 70%, transparent 77%),
+    radial-gradient(42% 10% at 88% 45%, rgb(var(--atmo-mauve) / .22), transparent),
+    radial-gradient(46% 9% at 52% 62%, rgb(var(--atmo-mauve) / .22), transparent),
+    radial-gradient(32% 12% at 0% 60%, rgb(var(--atmo-teal) / .6), transparent),
+    linear-gradient(174deg, transparent 69%, rgb(var(--atmo-teal) / .42) 72%, transparent 75%),
+    radial-gradient(42% 8% at 96% 78%, rgb(var(--atmo-teal) / .36), transparent);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* The app. Replaces the violet floor glow; keeps its breathing and flare. */
+.app-frame::before {
+  inset: 0 !important;
+  height: auto !important;
+  background: var(--atmosphere) !important;
+  opacity: calc(var(--atmo-strength) * (.86 + .14 * var(--week-glow, 0)));
+  transform-origin: 50% 60% !important;
+}
+.app-frame::after {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: var(--grain); background-size: 220px 220px;
+  opacity: var(--atmo-grain); mix-blend-mode: overlay;
+}
+@keyframes forge-breathe { 0%, 100% { filter: brightness(.94); } 50% { filter: brightness(1.06); } }
+
+/* Sign-in, onboarding and recovery: the same silk, painted on the page. */
+.login-page, .onboarding-shell, .app-recovery {
+  background: var(--atmosphere), var(--bg) !important;
+  background-attachment: fixed !important;
+}
+.login-page::before {
+  inset: 0; width: auto; aspect-ratio: auto; border: 0; border-radius: 0; box-shadow: none;
+  background-image: var(--grain); background-size: 220px 220px;
+  opacity: var(--atmo-grain); mix-blend-mode: overlay;
+}
+
+/* The page itself paints no glow of its own any more. */
+.app-main { background: none !important; }
+body { background: var(--bg); }
+
+@media (prefers-reduced-motion: reduce) { .app-frame::before { animation: none !important; } }
+.brand-mark { background: var(--ink) !important; }
+
+/* Lime is for moments, not for every link. Text links and quiet controls read
+   in light lavender (--accent-text); lime stays on filled actions, selection,
+   records and progression. A record keeps its lime. */
+.pr-celebration-card p b { color: var(--accent-strong); }
+
+/* No glow on the coach button: a plain, tight shadow. */
+.coach-bubble-toggle { box-shadow: 0 6px 18px -6px rgb(0 0 0 / .6) !important; }
+
+/* A disabled action is graphite, not a muddy lime. */
+:where(.button, button.button):disabled,
+.button[disabled] { background: var(--surface-3) !important; color: var(--ink-3) !important; border-color: transparent !important; filter: none !important; opacity: 1 !important; }
+.ob-next.waiting, .ob-next:disabled { background: var(--surface-3) !important; color: var(--ink-2) !important; opacity: 1 !important; filter: none !important; }
+.guided .gd-cta:disabled, .guided .gd-ask-send:disabled { background: var(--g-soft); color: var(--g-ink2); opacity: 1; }
