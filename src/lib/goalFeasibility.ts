@@ -247,7 +247,12 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
   const heart = heartRateEffort(records, localDayIso());
   const heartSeconds = heart ? equivalentSeconds(heart.seconds, heart.miles, distance,
     distance > heart.miles ? Math.max(0, Math.min(1, 1 - volume / (volumeForPace(heart.seconds / heart.miles) || volume || 1))) : 0) : 0;
-  const fromHeart = Boolean(heart && heartSeconds > 0 && (!prediction || heartSeconds < prediction.seconds));
+  /* ONLY WHEN THERE IS NOTHING ELSE. Used to win whenever it came out faster
+     than the runs, and on Preston's account it did (resting HR 38): the card
+     said 20:41 while the projection quietly started at 17:24 -- a number no
+     run of his supports and the card never showed. Heart rate fills the gap
+     for an athlete with no runs to predict from; it never overrides them. */
+  const fromHeart = Boolean(heart && heartSeconds > 0 && !prediction);
   const best = fromHeart ? { miles: heart!.miles, seconds: heart!.seconds } : prediction?.source || null;
   const pace = improvementRate(records);
   const evidence = raceEvidenceState(records);
