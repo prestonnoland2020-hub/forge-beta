@@ -36,13 +36,22 @@ async function elevenLabs(text: string, voice: string, admin: SupabaseClient): P
   const key = await elevenLabsKey(admin);
   if (!key) return null;
   const id = female(voice) ? (Deno.env.get('ELEVENLABS_VOICE_FEMALE') || 'EXAVITQu4vr4xnSDxMaL') : (Deno.env.get('ELEVENLABS_VOICE_MALE') || 'nPczCjzI2devNBz1zQrb');
-  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${id}?output_format=mp3_44100_128`, {
-    method: 'POST',
-    headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
-    body: JSON.stringify({ text, model_id: Deno.env.get('ELEVENLABS_MODEL') || 'eleven_multilingual_v2', voice_settings: { stability: 0.4, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true } }),
-  });
-  if (!response.ok) { console.error('forge-speak-elevenlabs', response.status, (await response.text()).slice(0, 300)); return null; }
-  return await response.arrayBuffer();
+  /* ElevenLabs plans cap how many lines are made at once (Starter: 3). A
+     line turned away for that is retried after a short wait instead of
+     falling back to the OpenAI voice, which mixed two voices in one workout. */
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${id}?output_format=mp3_44100_128`, {
+      method: 'POST',
+      headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+      body: JSON.stringify({ text, model_id: Deno.env.get('ELEVENLABS_MODEL') || 'eleven_multilingual_v2', voice_settings: { stability: 0.4, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true } }),
+    });
+    if (response.ok) return await response.arrayBuffer();
+    const detail = (await response.text()).slice(0, 300);
+    if (response.status === 429 && attempt < 5) { await new Promise(done => setTimeout(done, 350 + attempt * 400 + Math.random() * 300)); continue; }
+    console.error('forge-speak-elevenlabs', response.status, detail);
+    return null;
+  }
+  return null;
 }
 const STYLE = [
   'Voice: a real personal trainer, relaxed and warm, talking to one person through their headphones. Not an announcer, not a narrator, not an assistant.',
