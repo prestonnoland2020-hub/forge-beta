@@ -99,7 +99,7 @@
 .google-button:focus-visible { outline: 2px solid var(--g-stroke); outline-offset: 2px; }
 .google-mark { width: 20px; height: 20px; flex: none; }
 .google-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.google-button:disabled { cursor: default; background: color-mix(in srgb, var(--g-fill) 38%, transparent); border-color: color-mix(in srgb, var(--g-label) 12%, transparent); }
+.google-button:disabled { cursor: default; background: color-mix(in oklch, var(--g-fill) 38%, transparent); border-color: color-mix(in oklch, var(--g-label) 12%, transparent); }
 .google-button:disabled .google-mark,
 .google-button:disabled .google-label { opacity: .38; }
 

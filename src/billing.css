@@ -31,7 +31,7 @@
 .billing-hero { padding: var(--s5); }
 .billing-hero p { margin: 0; color: var(--ink-2); max-width: 46ch; }
 .billing-hero[data-tier="pro"], .billing-hero[data-tier="founder"] {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--surface-1)), var(--surface-1) 60%);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 12%, var(--surface-1)), var(--surface-1) 60%);
 }
 
 /* A quiet line under a group, the way iOS footnotes a Settings section. */
@@ -112,7 +112,7 @@
 }
 .billing-plan:active:not(:disabled) { transform: scale(.97); }
 .billing-plan:disabled { opacity: .6; cursor: default; }
-.billing-plan.recommended { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); }
+.billing-plan.recommended { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in oklch, var(--accent) 7%, var(--surface-2)); }
 .billing-plan small { font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
 .billing-plan strong {
   font-family: var(--display);

@@ -1,0 +1,242 @@
+/* DESIGN FUNDAMENTALS, ONE PLACE.
+
+   A pass over twenty design terms (kerning to shared element transitions).
+   Most were already handled somewhere in Forge's sixty stylesheets, each in
+   its own corner. This file states the rule once, app-wide, and loads last
+   so it wins without !important where it can. Anything a single screen does
+   on purpose (a timer at 96px, a chip) is still allowed to say more. */
+
+/* ── 1 KERNING ───────────────────────────────────────────────────────────
+   Pair kerning on everywhere, and optical sizing so SF switches between its
+   Text and Display cuts at the right size. */
+html {
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  /* ── 4 LAYOUT SHIFT: a page that grows past the screen never shoves
+     everything sideways to make room for a scrollbar. */
+  scrollbar-gutter: stable;
+}
+
+/* ── 7 X-HEIGHT ──────────────────────────────────────────────────────────
+   Lowercase letters are what the eye actually reads, and below about 11px
+   their x-height gets too small to read at arm's length mid-set. Nothing in
+   Forge goes under 11px; the readiness label was the one at 10. */
+.app-frame .top-readiness small { font-size: 11px !important; }
+
+/* ── 9 LEADING ───────────────────────────────────────────────────────────
+   Three steps, not dozens: body text breathes, headings sit tight, big
+   numbers sit on their own line height so a stat never pushes its label. */
+:root {
+  --leading-body: 1.5;
+  --leading-tight: 1.15;
+  --leading-num: 1;
+  /* ── 5 TRACKING: tighten big type, open small capitals. */
+  --track-display: -0.022em;
+  --track-title: -0.012em;
+  --track-caps: 0.06em;
+}
+body { line-height: var(--leading-body); }
+:where(h1, h2, h3, h4) { line-height: var(--leading-tight); }
+:where(h1, h2) { letter-spacing: var(--track-display); }
+:where(h3, h4) { letter-spacing: var(--track-title); }
+:where(.eyebrow, .field-caption, .td-chip) { letter-spacing: var(--track-caps); }
+
+/* ── 12 WIDOW ────────────────────────────────────────────────────────────
+   No single word stranded on the last line. Headings balance their lines;
+   paragraphs use the "pretty" wrap, which only fixes the last line. */
+:where(h1, h2, h3, h4, .td-title, .gate-lede, legend) { text-wrap: balance; }
+:where(p, li, small, .gpc-say, .goal-fix) { text-wrap: pretty; }
+
+/* ── 15 LINE LENGTH ──────────────────────────────────────────────────────
+   On a phone the screen is the limit. On an iPad or a desktop window a
+   paragraph stops at about 65 characters, where reading stays easy. */
+:where(.app-main) :where(p) { max-inline-size: 65ch; }
+
+/* ── 3 TABULAR NUMBERS ───────────────────────────────────────────────────
+   Every digit in Forge is the same width, so a timer ticking from 1:11 to
+   1:12 does not wobble and a column of weights lines up. Running prose
+   keeps proportional figures, which read better inside a sentence. */
+.app-frame, .app-main, [role="dialog"], .coach-bubble-panel { font-variant-numeric: tabular-nums; }
+:where(.app-main, [role="dialog"]) :where(p, li) { font-variant-numeric: proportional-nums; }
+:where(.gpc-num, .goal-number, .kpi-tile, .td-load, .dial-value, .stat, time, [data-num]) {
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-num);
+}
+
+/* ── 8 TOUCH TARGET ──────────────────────────────────────────────────────
+   44 × 44 points is the floor for anything a thumb has to hit. Small text
+   links (Change, Change day, ×) keep their look but grow an invisible hit
+   area around them instead of a bigger box. */
+:where(.text-button, .td-card-top a, .top-set-sheet-close, .search-clear, .goal-edit, .gpc-why, .ss-done) {
+  position: relative;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+:where(.td-card-top a, .search-clear, .top-set-sheet-close, .gpc-why)::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+.top-set-sheet-close { min-width: 44px; justify-content: center; }
+
+/* ── 16 AFFORDANCE ───────────────────────────────────────────────────────
+   Something you can tap looks like it. "Change day" was the same grey as
+   the label beside it, so it read as text. Links inside cards take the
+   accent; disabled buttons stop looking pressable. */
+.today .td-card-top a { color: var(--accent-text); font-weight: 700; }
+:where(.button, button):disabled { cursor: not-allowed; filter: saturate(.4); }
+
+/* ── 2 OPTICAL CENTRE ────────────────────────────────────────────────────
+   Two fixes. An arrow after a button label needs real room or the label
+   looks shifted left. A dialog in the middle of the screen sits a little
+   above true centre, where the eye reads "centred". */
+.button { gap: .45em; }
+.button > svg.icon:last-child { margin-left: 0; margin-inline-end: -.1em; }
+.gate-card { margin-block-end: 6vh; }
+
+/* ── 13 SAFE AREA ────────────────────────────────────────────────────────
+   Top and bottom insets were handled; the sides were not. In landscape an
+   iPhone's notch sits on the left or right edge, so content keeps clear. */
+.app-main {
+  padding-inline-start: env(safe-area-inset-left);
+  padding-inline-end: env(safe-area-inset-right);
+}
+
+/* ── 4 LAYOUT SHIFT (header) ─────────────────────────────────────────────
+   "Saving…" used to appear in the header and push Progress and Log to the
+   left every time a set was saved. It now floats over the space beside
+   them, so nothing moves when it comes and goes. */
+.top-actions { position: relative; }
+.app-frame .top-actions .data-sync-state {
+  position: absolute;
+  inset-inline-end: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── 14 STAGGER ──────────────────────────────────────────────────────────
+   Cards on Goals and Activities arrive one after another, 40ms apart, so
+   the eye reads the list top to bottom. Only the first eight stagger; after
+   that the delay would just make the page feel slow. */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *) {
+    animation: dt-rise .32s cubic-bezier(.2, .8, .2, 1) both;
+  }
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *):nth-child(2) { animation-delay: 40ms; }
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *):nth-child(3) { animation-delay: 80ms; }
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *):nth-child(4) { animation-delay: 120ms; }
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *):nth-child(5) { animation-delay: 160ms; }
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *):nth-child(6) { animation-delay: 200ms; }
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *):nth-child(7) { animation-delay: 240ms; }
+  :where(.gx-group > *, .simple-preview-results > *, .td-stack > *):nth-child(n + 8) { animation-delay: 280ms; }
+}
+@keyframes dt-rise { from { opacity: 0; transform: translateY(8px); } }
+
+/* ── 18 INTERRUPTIBLE ANIMATION ──────────────────────────────────────────
+   Press feedback and sheets use transitions, not keyframes: a transition
+   reverses from wherever it is when the finger lifts or the sheet is
+   dismissed halfway in, instead of finishing its whole run first. The top
+   set sheet now opens and closes this way (TopSetSheet.tsx). */
+.top-set-sheet-backdrop {
+  animation: none;
+  opacity: 0;
+  transition: opacity .24s ease;
+}
+.top-set-sheet-backdrop[data-state="open"] { opacity: 1; }
+.top-set-sheet-backdrop .top-set-sheet {
+  animation: none;
+  transform: translateY(28px) scale(.97);
+  transition: transform .36s cubic-bezier(.2, .9, .25, 1);
+}
+.top-set-sheet-backdrop[data-state="open"] .top-set-sheet { transform: none; }
+:where(.button, .tab, .td-card, .gx-card, .muscle-chip) {
+  transition: transform .14s ease, background-color .14s ease, opacity .14s ease;
+}
+:where(.button, .muscle-chip):active { transform: scale(.97); }
+
+/* ── 10 ORIGIN-AWARE ANIMATION ───────────────────────────────────────────
+   Things grow out of whatever opened them. The Adjust panel unfolds from
+   the Adjust button above it on the right; the coach opens from the coach
+   button in the bottom right corner. */
+.app-frame .adjust-panel { transform-origin: top right; animation-name: dt-unfold; }
+@keyframes dt-unfold { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
+.coach-bubble-shell.expanded .coach-bubble-panel { transform-origin: bottom right; }
+.coach-bubble-toggle { transform-origin: center; }
+
+/* ── 20 SHARED ELEMENT TRANSITION ────────────────────────────────────────
+   Tapping "Open workout" on Today carries the day's name ("Legs", "Rest")
+   across to the top of the workout screen instead of fading one out and
+   another in. Each screen has one of these at a time, which is what the
+   browser needs to pair them. */
+.app-frame .td-title,
+.app-frame .workout-date strong { view-transition-name: forge-day-title; width: fit-content; }
+::view-transition-group(forge-day-title) { animation-duration: .34s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+
+/* ── 19 PROGRESSIVE DISCLOSURE ───────────────────────────────────────────
+   The goal projection shows its answer first; the range bar and the
+   advice open from "Why" (GoalPredictionCard.tsx). */
+.gpc-why {
+  border: 0; background: none; padding: 0;
+  color: var(--accent-text); font: inherit; font-weight: 700; font-size: 14px;
+  gap: 4px; cursor: pointer;
+}
+.gpc-why svg { transition: transform .2s ease; }
+.gpc-why[aria-expanded="true"] svg { transform: rotate(90deg); }
+.gpc-detail { display: grid; gap: 12px; }
+
+/* ── 17 COMBOBOX ─────────────────────────────────────────────────────────
+   The exercise search is a real combobox now: arrow keys move through the
+   results, Enter picks, and the highlighted row is visible. */
+.top-set-sheet-results.typing .top-set-sheet-result[aria-selected="true"],
+.top-set-sheet-results.typing .top-set-sheet-new[aria-selected="true"] {
+  background: var(--surface-3);
+  outline: 2px solid color-mix(in oklch, var(--accent) 60%, transparent);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .top-set-sheet-backdrop, .top-set-sheet-backdrop .top-set-sheet { transition-duration: 1ms; }
+  ::view-transition-group(forge-day-title) { animation: none; }
+}
+
+/* ── 11 OKLCH ────────────────────────────────────────────────────────────
+   Status colours are set in OKLCH, so green, yellow and red share one
+   lightness and one saturation and none of them shouts louder than the
+   others. The hex values in forge-theme.css stay as the fallback for
+   browsers without OKLCH. Every colour-mix in Forge also blends in OKLCH
+   now (build step: see the commit), which keeps tints from going grey. */
+@supports (color: oklch(0 0 0)) {
+  :root {
+    --good: oklch(49% 0.095 165);
+    --warn: oklch(51% 0.095 78);
+    --bad: oklch(52% 0.13 28);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --good: oklch(76% 0.1 165);
+      --warn: oklch(78% 0.1 82);
+      --bad: oklch(74% 0.11 28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --good: oklch(76% 0.1 165);
+    --warn: oklch(78% 0.1 82);
+    --bad: oklch(74% 0.11 28);
+  }
+}
+
+/* ── 2 OPTICAL CENTRE · 4 LAYOUT SHIFT (calendar) ─────────────────────────
+   A day with training showed its number higher than a day without, because
+   the dot under it pushed it up, so the rows looked uneven. The dot now
+   sits in its own spot at the bottom and every number lines up. */
+.app-frame .classic-calendar .calendar-grid > button { position: relative; display: grid; place-items: center; }
+.app-frame .classic-calendar .calendar-grid > button .calendar-markers {
+  position: absolute !important; left: 50%; bottom: 7px; transform: translateX(-50%); margin: 0;
+}

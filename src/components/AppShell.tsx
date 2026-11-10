@@ -122,6 +122,23 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
     if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { navigate(to, options); return; }
     doc.startViewTransition(() => { crossfading.current = true; flushSync(() => navigate(to, options)); });
   }, [navigate]);
+  /* SHARED ELEMENT TRANSITIONS. A link marked data-vt goes through the same
+     view transition as a tab, so an element named on both screens (the day's
+     title on Today and on the workout, design-terms.css) moves across
+     instead of fading out and back in. */
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as Element | null)?.closest?.('a[data-vt]') as HTMLAnchorElement | null;
+      if (!link) return;
+      const url = new URL(link.href, window.location.href);
+      const hash = url.hash.startsWith('#/') ? url.hash.slice(1) : '';
+      event.preventDefault();
+      goTab(hash || `${url.pathname}${url.search}`);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [goTab]);
   /* A TAB ANSWERS THE FIRST TAP. On iOS a tap that lands while the page is
      still coasting from a scroll only stops the scroll — the click never
      comes, so the bar felt stuck until it was tapped again. Touch events do

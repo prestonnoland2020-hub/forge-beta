@@ -32,8 +32,8 @@ article .connection-message { padding: 4px 0 0; border-top: 0; }
 html {
   background-color: var(--surface-sunken) !important;
   background-image:
-    radial-gradient(120% 60% at 10% -8%, color-mix(in srgb, var(--accent) var(--hue-strength, 16%), transparent), transparent 72%),
-    radial-gradient(80% 45% at 105% 18%, color-mix(in srgb, var(--accent) calc(var(--hue-strength, 16%) * .6), transparent), transparent 70%) !important;
+    radial-gradient(120% 60% at 10% -8%, color-mix(in oklch, var(--accent) var(--hue-strength, 16%), transparent), transparent 72%),
+    radial-gradient(80% 45% at 105% 18%, color-mix(in oklch, var(--accent) calc(var(--hue-strength, 16%) * .6), transparent), transparent 70%) !important;
   background-size: 100% 100lvh !important;
   background-repeat: no-repeat !important;
 }
@@ -149,7 +149,7 @@ body { background: transparent !important; }
   .plan-day-list::-webkit-scrollbar { display: none; }
   .plan-day-list > div { display: none; }
   .plan-day-list > button { flex: 0 0 78%; min-height: 74px; border: 1px solid var(--hairline-strong) !important; border-radius: 20px; padding: 12px 16px; scroll-snap-align: center; background: var(--surface-1); }
-  .plan-day-list > button.active { border-color: var(--accent) !important; box-shadow: inset 4px 0 var(--accent); background: color-mix(in srgb, var(--tint) 7%, transparent); }
+  .plan-day-list > button.active { border-color: var(--accent) !important; box-shadow: inset 4px 0 var(--accent); background: color-mix(in oklch, var(--tint) 7%, transparent); }
   .plan-day-list > .add-plan-day { flex-basis: 58%; display: grid; place-items: center; }
   .day-editor-panel { touch-action: pan-y; }
   .day-editor-panel > header { padding: 24px 16px; gap: 12px; }
@@ -385,7 +385,7 @@ body { background: transparent !important; }
 }
 .exercise-picker-filters button.active {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  background: color-mix(in oklch, var(--tint) 14%, transparent);
   color:var(--accent-text);
 }
 .exercise-picker-options > button { grid-template-columns: 24px 1fr; }

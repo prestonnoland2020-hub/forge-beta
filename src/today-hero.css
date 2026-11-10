@@ -14,8 +14,8 @@
 .today .td-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); padding: var(--s5); border-radius: var(--r-lg); background: var(--surface-1); border: 1px solid var(--hairline); }
 .today .td-card-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 .today .td-card-top a { font-size: var(--fs-small); font-weight: 700; color: var(--ink-3); text-decoration: none; }
-.today .td-chip { display: inline-flex; align-items: center; gap: var(--s1); padding: var(--s1) var(--s3); border-radius: var(--r-pill); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); color: var(--accent-text); font-size: var(--fs-label); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.today .td-chip.done { background: color-mix(in srgb, var(--good) 16%, var(--surface-1)); color: var(--good); }
+.today .td-chip { display: inline-flex; align-items: center; gap: var(--s1); padding: var(--s1) var(--s3); border-radius: var(--r-pill); background: color-mix(in oklch, var(--accent) 14%, var(--surface-1)); color: var(--accent-text); font-size: var(--fs-label); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.today .td-chip.done { background: color-mix(in oklch, var(--good) 16%, var(--surface-1)); color: var(--good); }
 
 /* The day's name is a title, set the way every title in Forge is. */
 .today .td-title { margin: 0; font-family: var(--display); font-style: italic; font-weight: var(--title-weight); font-stretch: var(--title-stretch); letter-spacing: var(--title-tracking); text-transform: uppercase; font-size: var(--fs-h2); line-height: 1; color: var(--ink); text-wrap: balance; }
@@ -64,7 +64,7 @@
 
 /* The first-week card: three steps that tick themselves off. Quieter than the
    workout card above it, so the workout stays the one thing to do. */
-.fw-card { display: grid; gap: var(--s2); padding: var(--s4); border-radius: var(--r-lg); background: color-mix(in srgb, var(--accent) 6%, var(--surface-1)); border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--hairline)); }
+.fw-card { display: grid; gap: var(--s2); padding: var(--s4); border-radius: var(--r-lg); background: color-mix(in oklch, var(--accent) 6%, var(--surface-1)); border: 1px solid color-mix(in oklch, var(--accent) 18%, var(--hairline)); }
 .fw-card header { display: flex; align-items: center; gap: var(--s2); }
 .fw-card header small { font: 700 var(--fs-label) var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-text); }
 .fw-card header span { margin-left: auto; font-size: var(--fs-small); font-weight: 700; color: var(--ink-3); }

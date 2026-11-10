@@ -146,7 +146,7 @@
   /* ---- The tint mixer ----------------------------------------------------
      Several components lift a surface by mixing WHITE into it, which works on
      a dark ground and does nothing on a light one. --lift is whichever
-     direction actually separates in the current tone, so `color-mix(in srgb,
+     direction actually separates in the current tone, so `color-mix(in oklch,
      var(--surface-1) 96%, var(--lift))` reads correctly in both. */
   --lift: #14181a;
   /* THE FACETED MARK'S OWN COLOURS, the same in both tones. The app's mark is
@@ -174,8 +174,8 @@
      Derived, not declared. Every wash mixes from --tint, which is already
      tone-resolved, so a wash is correct in both tones and for every accent
      without a single extra rgba() anywhere. */
-  --accent-wash: color-mix(in srgb, var(--tint) 10%, transparent);
-  --accent-wash-strong: color-mix(in srgb, var(--tint) 18%, transparent);
+  --accent-wash: color-mix(in oklch, var(--tint) 10%, transparent);
+  --accent-wash-strong: color-mix(in oklch, var(--tint) 18%, transparent);
 
   /* ---- Shape, rhythm, type and motion ------------------------------------
      Every value here is the brand guide's (Icons, Type, Buttons, Forms and
@@ -493,8 +493,8 @@
   --accent-dim: var(--a-dim);
   --tint: var(--a-tint);
   --chart-1: var(--a-chart);
-  --accent-wash: color-mix(in srgb, var(--tint) 10%, transparent);
-  --accent-wash-strong: color-mix(in srgb, var(--tint) 18%, transparent);
+  --accent-wash: color-mix(in oklch, var(--tint) 10%, transparent);
+  --accent-wash-strong: color-mix(in oklch, var(--tint) 18%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {

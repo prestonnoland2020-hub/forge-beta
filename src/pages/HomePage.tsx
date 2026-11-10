@@ -147,7 +147,7 @@ export function HomePage() {
           your weight" it tells the athlete how to find it, once. */}
       {recommendedSets.some(set => set.source !== 'history') && <p className="td-note td-first">{(() => { const fresh = recommendedSets.filter(set => set.source !== 'history'); const reps = fresh[0].reps || 5; return <><b>First time on {fresh.length === 1 ? fresh[0].exercise : 'these lifts'}?</b> Work up to a weight you could do for {reps} with 2 reps left in the tank, and log that one set. Forge sets your numbers from it.</>; })()}</p>}
       {(recommendation.coachNote || recommendation.bodyLogNote) && <p className="td-note">{recommendation.coachNote || recommendation.bodyLogNote}</p>}
-      <Link className="button wide" to={startUrl}>{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
+      <Link className="button wide" to={startUrl} data-vt="">{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
       {/* COACH ME THROUGH IT: the same planned lifts, with the coach talking
           her through the warm-up and each top set. */}
       {recommendedSets.length > 0 && <button type="button" className="td-coach-btn" onClick={() => {

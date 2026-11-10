@@ -1,6 +1,6 @@
 /* THE SPLIT GUIDE (components/SplitGuide): one question per screen, a
    progress line on top, the main button pinned at the bottom. Phone first. */
-.sg-backdrop{position:fixed;inset:0;z-index:2000;display:flex;justify-content:center;background:color-mix(in srgb,#000 45%,transparent)}
+.sg-backdrop{position:fixed;inset:0;z-index:2000;display:flex;justify-content:center;background:color-mix(in oklch,#000 45%,transparent)}
 .sg-sheet{display:grid;grid-template-rows:auto minmax(0,1fr) auto;width:100%;max-width:560px;height:100%;background:var(--ground,var(--surface-1));color:var(--ink,var(--text))}
 @media(min-width:600px){.sg-backdrop{align-items:center;padding:24px}.sg-sheet{height:min(860px,100%);border-radius:24px;overflow:hidden;background:var(--surface-1)}}
 .sg-top{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;border-bottom:1px solid var(--hairline,var(--line))}
@@ -23,13 +23,13 @@
 
 .sg-preview{display:grid;gap:10px;margin:4px 0 0;padding:0;list-style:none}
 .sg-preview li{display:grid;grid-template-columns:36px minmax(0,1fr);align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--surface-1);border:1px solid var(--hairline,var(--line));font-size:17px;font-weight:700}
-.sg-preview b{display:grid;place-items:center;width:36px;height:36px;border-radius:999px;background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent-text,var(--accent));font-weight:900}
+.sg-preview b{display:grid;place-items:center;width:36px;height:36px;border-radius:999px;background:color-mix(in oklch,var(--accent) 15%,transparent);color:var(--accent-text,var(--accent));font-weight:900}
 
 .sg-cards{display:grid;gap:10px}
 .sg-card{display:grid;gap:6px;width:100%;padding:16px;border-radius:16px;border:1.5px solid var(--hairline-strong,var(--line));background:var(--surface-1);color:var(--ink,var(--text));text-align:left}
 .sg-card strong{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:18px;font-weight:800}
 .sg-card small{font-size:15px;line-height:1.45;color:var(--ink-2,var(--muted))}
-.sg-card.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface-1));box-shadow:0 0 0 1px var(--accent)}
+.sg-card.on{border-color:var(--accent);background:color-mix(in oklch,var(--accent) 10%,var(--surface-1));box-shadow:0 0 0 1px var(--accent)}
 .sg-card-plain{border-style:dashed}
 .sg-badge{padding:2px 8px;border-radius:999px;font-style:normal;font-size:12px;font-weight:800;color:var(--accent-contrast,#fff);background:var(--accent)}
 
@@ -45,14 +45,14 @@
 .sg-chips button{min-height:44px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--hairline-strong,var(--line));background:transparent;color:var(--ink,var(--text));font-size:15px;font-weight:700}
 .sg-chips button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast,#fff)}
 
-.sg-explain{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:14px;border-radius:14px;background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.sg-explain{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:14px;border-radius:14px;background:color-mix(in oklch,var(--accent) 10%,transparent)}
 .sg-explain svg{width:18px;height:18px;margin-top:2px;color:var(--accent-text,var(--accent))}
 .sg-explain p{margin:0;font-size:15px;line-height:1.5;color:var(--ink-2,var(--muted))}
 
 .sg-picked{display:grid;gap:8px}
-.sg-picked button{display:flex;align-items:center;gap:10px;min-height:52px;padding:10px 14px;border-radius:14px;border:1.5px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface-1));color:var(--ink,var(--text));font-size:17px;font-weight:800;text-align:left}
+.sg-picked button{display:flex;align-items:center;gap:10px;min-height:52px;padding:10px 14px;border-radius:14px;border:1.5px solid var(--accent);background:color-mix(in oklch,var(--accent) 10%,var(--surface-1));color:var(--ink,var(--text));font-size:17px;font-weight:800;text-align:left}
 .sg-picked svg{width:16px;height:16px;flex:none;color:var(--accent-text,var(--accent))}
-.sg-create{justify-self:start;min-height:44px;padding:0 14px;border:0;border-radius:12px;background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent-text,var(--accent));font-size:15px;font-weight:800}
+.sg-create{justify-self:start;min-height:44px;padding:0 14px;border:0;border-radius:12px;background:color-mix(in oklch,var(--accent) 10%,transparent);color:var(--accent-text,var(--accent));font-size:15px;font-weight:800}
 .sg-new{display:grid;gap:14px;padding:16px;border-radius:16px;background:var(--surface-sunken);border:1px solid var(--hairline,var(--line))}
 .sg-new-actions{display:flex;justify-content:flex-end;gap:10px}
 
@@ -66,7 +66,7 @@
 
 .sg-review{display:grid;gap:8px;margin:0;padding:0;list-style:none}
 .sg-review button{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;min-height:64px;padding:12px 14px;border-radius:14px;border:1px solid var(--hairline,var(--line));background:var(--surface-1);color:var(--ink,var(--text));text-align:left}
-.sg-review b{display:grid;place-items:center;width:36px;height:36px;border-radius:999px;background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent-text,var(--accent));font-size:14px;font-weight:900}
+.sg-review b{display:grid;place-items:center;width:36px;height:36px;border-radius:999px;background:color-mix(in oklch,var(--accent) 15%,transparent);color:var(--accent-text,var(--accent));font-size:14px;font-weight:900}
 .sg-review span{display:grid;gap:2px;min-width:0}
 .sg-review strong{font-size:17px}
 .sg-review small{font-size:14px;line-height:1.35;color:var(--ink-3,var(--muted))}
@@ -79,17 +79,17 @@
 
 /* HOME'S FIRST-RUN QUESTION (components/SplitGuidePrompt), and the one-time
    "your split is ready" line the guide lands on. */
-.sgp-backdrop{position:fixed;inset:0;z-index:1500;display:flex;align-items:flex-end;justify-content:center;background:color-mix(in srgb,#000 45%,transparent)}
+.sgp-backdrop{position:fixed;inset:0;z-index:1500;display:flex;align-items:flex-end;justify-content:center;background:color-mix(in oklch,#000 45%,transparent)}
 .sgp-sheet{display:grid;gap:12px;width:100%;max-width:520px;padding:24px 20px calc(env(safe-area-inset-bottom,0px) + 20px);border-radius:24px 24px 0 0;background:var(--surface-1);color:var(--ink,var(--text));box-shadow:0 -10px 40px rgba(0,0,0,.25)}
 @media(min-width:600px){.sgp-backdrop{align-items:center}.sgp-sheet{border-radius:24px}}
-.sgp-mark{display:grid;place-items:center;width:48px;height:48px;border-radius:999px;background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent-text,var(--accent))}
+.sgp-mark{display:grid;place-items:center;width:48px;height:48px;border-radius:999px;background:color-mix(in oklch,var(--accent) 15%,transparent);color:var(--accent-text,var(--accent))}
 .sgp-mark svg{width:22px;height:22px}
 .sgp-sheet h2{margin:0;font-size:26px;line-height:1.15;font-weight:900}
 .sgp-sheet p{margin:0;font-size:16px;line-height:1.5;color:var(--ink-2,var(--muted))}
 .sgp-sheet p b{color:var(--ink,var(--text))}
 .sgp-sheet .button{width:100%;min-height:54px;font-size:17px}
 .sgp-sheet small{text-align:center;font-size:13px;color:var(--ink-3,var(--muted))}
-.sgp-ready{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:color-mix(in srgb,var(--good,#1f7a3d) 14%,var(--surface-1));color:var(--ink,var(--text))}
+.sgp-ready{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:color-mix(in oklch,var(--good,#1f7a3d) 14%,var(--surface-1));color:var(--ink,var(--text))}
 .sgp-ready svg{width:18px;height:18px;color:var(--good,#1f7a3d)}
 .sgp-ready p{margin:0;font-size:15px;line-height:1.4}
 .sgp-ready button{width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:var(--ink-3,var(--muted));font-size:22px}

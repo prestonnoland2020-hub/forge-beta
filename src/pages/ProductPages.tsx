@@ -307,8 +307,9 @@ function WorkoutEditor() {
        the day's terms; the exercise's own mapping is what it counts toward. */
     const muscle=draft.muscles.find(item=>sourceMuscles.includes(item))||draft.muscles[0]||'Primary';
     const added:LoggedTopSet={id:`top-set-${Date.now()}`,muscle,lift:draft.lift,weight:draft.weight,reps:draft.reps,completed:true};
+    /* Optimistic: the set is on the log at once; the sheet slides away on
+       its own and closes itself (TopSetSheet), so the two never race. */
     setTopSets(current=>[...current,added]);
-    setAddingTopSet(false);
     quickLogTopSet(added);
   };
   /* Editing an old day must keep THAT day's split metadata — stamping today's

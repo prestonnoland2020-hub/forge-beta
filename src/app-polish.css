@@ -120,7 +120,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .top-set-entry:not(.closed) .top-set-entry-head { min-height: 0; margin-bottom: 0; padding-bottom: 0; align-items: center; }
 .top-set-entry:not(.closed) { display: grid; gap: 12px; }
 .quick-log-flash { text-align: center; }
-.quick-log-flash small { display: inline-block; padding: 8px 16px; border-radius: 999px; font-weight: 700; color: var(--accent-text, var(--accent)); background: color-mix(in srgb, var(--accent) 12%, transparent); animation: screen-fade .3s ease-out; }
+.quick-log-flash small { display: inline-block; padding: 8px 16px; border-radius: 999px; font-weight: 700; color: var(--accent-text, var(--accent)); background: color-mix(in oklch, var(--accent) 12%, transparent); animation: screen-fade .3s ease-out; }
 
 /* ── THE DIAL, AS AN INSTRUMENT ──────────────────────────────────────────
    An iOS picker sheet: a grabber, Cancel and Done in the header, the number
@@ -157,11 +157,11 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .dial-nudges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .dial-nudges button {
   min-height: 48px; border-radius: 14px; border: 0;
-  background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent);
+  background: color-mix(in oklch, var(--ink, var(--text)) 7%, transparent);
   color: var(--ink, var(--text)); font: 800 18px var(--display-font, inherit); font-variant-numeric: tabular-nums;
   transition: transform .12s ease, background-color .12s ease;
 }
-.dial-nudges button:active { transform: scale(.94); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.dial-nudges button:active { transform: scale(.94); background: color-mix(in oklch, var(--accent) 16%, transparent); }
 .dial-nudges button:disabled { opacity: .35; }
 
 .dial-pro .dial-columns { height: 200px; }
@@ -171,7 +171,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
   mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
 }
 .dial-pro .dial-pad { height: 78px; }
-.dial-pro .dial-band { border: 0; border-radius: 12px; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); }
+.dial-pro .dial-band { border: 0; border-radius: 12px; background: color-mix(in oklch, var(--ink, var(--text)) 7%, transparent); }
 .dial-pro .dial-value { font-size: 20px; opacity: .45; }
 .dial-pro .dial-value.active { font-size: 26px; opacity: 1; transform: none; }
 .dial-pro .dial-plus { color: var(--ink-3, var(--muted)); font-weight: 800; }
@@ -205,7 +205,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-head small { color: var(--ink-3, var(--muted)); font-weight: 600; font-size: 14px; }
 .ss-head .split-autosave { font-size: 12px; font-weight: 700; white-space: nowrap; }
 
-.ss-templates { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: color-mix(in srgb, var(--accent) 7%, var(--surface-1, var(--card))); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+.ss-templates { display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: color-mix(in oklch, var(--accent) 7%, var(--surface-1, var(--card))); border: 1px solid color-mix(in oklch, var(--accent) 22%, transparent); }
 .ss-templates-head { display: flex; align-items: center; justify-content: space-between; }
 .ss-templates-head strong { font-size: 16px; }
 .ss-templates > button { display: grid; gap: 2px; text-align: left; padding: 12px 16px; min-height: 56px; border-radius: 14px; border: 1px solid var(--hairline-strong, var(--line)); background: var(--surface-1, var(--card)); color: var(--ink, var(--text)); transition: transform .12s ease; }
@@ -216,9 +216,9 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-days { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .ss-day > button { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; text-align: left; min-height: 68px; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--hairline, var(--line)); background: var(--surface-1, var(--card)); color: var(--ink, var(--text)); transition: transform .12s ease, background-color .12s ease; }
 .ss-day > button:active { transform: scale(.985); }
-.ss-num { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; font-weight: 800; font-size: 14px; background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent-text, var(--accent)); text-transform: capitalize; }
-.ss-rest .ss-num { background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); color: var(--ink-3, var(--muted)); }
-.ss-cardio .ss-num, .ss-hyrox .ss-num { background: color-mix(in srgb, var(--chart-2) 16%, var(--surface-1)); color: var(--chart-2); }
+.ss-num { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; font-weight: 800; font-size: 14px; background: color-mix(in oklch, var(--accent) 13%, transparent); color: var(--accent-text, var(--accent)); text-transform: capitalize; }
+.ss-rest .ss-num { background: color-mix(in oklch, var(--ink, var(--text)) 7%, transparent); color: var(--ink-3, var(--muted)); }
+.ss-cardio .ss-num, .ss-hyrox .ss-num { background: color-mix(in oklch, var(--chart-2) 16%, var(--surface-1)); color: var(--chart-2); }
 .ss-text { display: grid; gap: 2px; min-width: 0; }
 .ss-text strong { font-size: 18px; }
 .ss-text small { font-size: 14px; color: var(--ink-3, var(--muted)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -250,7 +250,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 16px; display: grid; gap: 16px; }
 .ss-field { display: grid; gap: 8px; font-weight: 700; font-size: 14px; }
 .ss-field input, .ss-search { width: 100%; box-sizing: border-box; min-height: 48px; padding: 12px 16px; border-radius: 14px; border: 1.5px solid var(--hairline-strong, var(--line)); background: var(--surface-sunken); color: var(--ink, var(--text)); font-size: 18px; font-weight: 600; }
-.ss-segment { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); }
+.ss-segment { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: color-mix(in oklch, var(--ink, var(--text)) 7%, transparent); }
 .ss-segment.two { grid-template-columns: 1fr 1fr; }
 .ss-segment.three { grid-template-columns: repeat(3, 1fr); }
 .ss-segment button { min-height: 48px; border: 0; border-radius: 10px; background: none; color: var(--ink-2, var(--text)); font-size: 16px; font-weight: 800; transition: background-color .15s ease; }
@@ -266,12 +266,12 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-chips button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast, #fff); }
 .ss-lifts { display: grid; gap: 8px; max-height: 300px; overflow-y: auto; }
 .ss-lifts button { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--hairline, var(--line)); background: transparent; color: var(--ink, var(--text)); font-size: 16px; font-weight: 700; text-align: left; }
-.ss-lifts button.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.ss-lifts button.selected { border-color: var(--accent); background: color-mix(in oklch, var(--accent) 9%, transparent); }
 .ss-check { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--hairline-strong, var(--line)); font-size: 14px; color: var(--accent-contrast, #fff); }
 .ss-lifts button.selected .ss-check { background: var(--accent); border-color: var(--accent); }
 .ss-empty, .ss-note { margin: 0; color: var(--ink-3, var(--muted)); font-size: 14px; line-height: 1.5; }
 .ss-sheet-foot { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 12px 18px calc(12px + var(--safe-b, env(safe-area-inset-bottom))); border-top: 1px solid var(--hairline, var(--line)); }
-.ss-sheet-foot button { min-height: 48px; border-radius: 12px; border: 0; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); color: var(--ink, var(--text)); font-weight: 800; font-size: 16px; }
+.ss-sheet-foot button { min-height: 48px; border-radius: 12px; border: 0; background: color-mix(in oklch, var(--ink, var(--text)) 7%, transparent); color: var(--ink, var(--text)); font-weight: 800; font-size: 16px; }
 .ss-sheet-foot button.danger { color: var(--bad); }
 .ss-sheet-foot button:disabled { opacity: .35; }
 /* SUGGESTED, NOT LISTED. The day sheet leads with the lifts and sessions a
@@ -286,7 +286,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-browse span { font-size: 20px; color: var(--ink-3, var(--muted)); }
 .ss-add-cardio { min-height: 48px; border-radius: 14px; border: 1.5px dashed var(--hairline-strong, var(--line)); background: transparent; color: var(--accent); font-weight: 800; font-size: 15px; }
 .ss-block-head .text-button { font-size: 14px; font-weight: 800; color: var(--ink-3, var(--muted)); }
-.ss-forge-default { margin: 0; display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 9%, transparent); color: var(--ink, var(--text)); font-weight: 700; font-size: 14px; }
+.ss-forge-default { margin: 0; display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: 14px; background: color-mix(in oklch, var(--accent) 9%, transparent); color: var(--ink, var(--text)); font-weight: 700; font-size: 14px; }
 .ss-forge-default svg { color: var(--accent); flex: none; }
 .ss-cardio-more { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .ss-cardio-more .text-button, .ss-forge-plan { font-weight: 800; font-size: 15px; justify-self: start; }
@@ -299,7 +299,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-more[open] > summary::after { transform: rotate(90deg); }
 .ss-more > div { display: grid; gap: 12px; padding-top: 12px; }
 .ss-more-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-.ss-more-actions button { min-height: 48px; border-radius: 12px; border: 0; background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); color: var(--ink, var(--text)); font-weight: 800; font-size: 16px; }
+.ss-more-actions button { min-height: 48px; border-radius: 12px; border: 0; background: color-mix(in oklch, var(--ink, var(--text)) 7%, transparent); color: var(--ink, var(--text)); font-weight: 800; font-size: 16px; }
 .ss-more-actions button.danger { color: var(--bad); }
 .ss-more-actions button:disabled { opacity: .35; }
 @media (prefers-reduced-motion: reduce) { .ss-sheet, .ss-backdrop { animation: none; } }
@@ -327,9 +327,9 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .gx-hero-text > strong { font-size: var(--fs-title); font-weight: 700; line-height: 1.2; }
 .gx-tally { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s1); }
 .gx-tally b, .gx-pill { padding: var(--s1) var(--s3); border-radius: var(--r-pill); font-size: var(--fs-label); font-weight: 800; white-space: nowrap; }
-.gx-tally .good, .gx-pill.tone-on-track, .gx-pill.tone-reached { background: color-mix(in srgb, var(--good) 16%, var(--surface-1)); color: var(--good); }
-.gx-tally .work, .gx-pill.tone-needs-work { background: color-mix(in srgb, var(--warn) 16%, var(--surface-1)); color: var(--warn); }
-.gx-tally .off, .gx-pill.tone-off-track { background: color-mix(in srgb, var(--bad) 16%, var(--surface-1)); color: var(--bad); }
+.gx-tally .good, .gx-pill.tone-on-track, .gx-pill.tone-reached { background: color-mix(in oklch, var(--good) 16%, var(--surface-1)); color: var(--good); }
+.gx-tally .work, .gx-pill.tone-needs-work { background: color-mix(in oklch, var(--warn) 16%, var(--surface-1)); color: var(--warn); }
+.gx-tally .off, .gx-pill.tone-off-track { background: color-mix(in oklch, var(--bad) 16%, var(--surface-1)); color: var(--bad); }
 .gx-pill.tone-unknown { background: var(--surface-2); color: var(--ink-3); }
 
 .gx-group { display: grid; gap: var(--s3); }
@@ -374,7 +374,7 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .gx-empty-art .endurance { animation-delay: 80ms; } .gx-empty-art .body { animation-delay: 160ms; }
 .gx-add { width: 100%; min-height: var(--control-l); border-radius: var(--r-md); border: 0; box-shadow: inset 0 0 0 1.5px var(--hairline-strong);
   background: transparent; color: var(--ink-2); font: 700 var(--fs-lead) var(--body); transition: transform var(--dur-tap) var(--ease-strike), background var(--dur-quick) var(--ease-respond); }
-.gx-add:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+.gx-add:hover { background: color-mix(in oklch, var(--ink) 6%, transparent); color: var(--ink); }
 .gx-add:active { transform: scale(.97); }
 
 /* Arrivals come in on the mark's 45° line. */
@@ -396,17 +396,17 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .wk-bar { display: block; height: 6px; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
 .wk-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 .wk-prs { display: flex; flex-wrap: wrap; gap: 8px; }
-.wk-prs span { padding: 8px 12px; border-radius: 999px; font-size: 14px; font-weight: 800; background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); color: var(--accent-text); }
+.wk-prs span { padding: 8px 12px; border-radius: 999px; font-size: 14px; font-weight: 800; background: color-mix(in oklch, var(--accent) 14%, var(--surface-1)); color: var(--accent-text); }
 .wk-change { margin: 0; font-size: 16px; line-height: 1.45; font-weight: 600; }
 .wk-next { margin: 0; display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; }
-.wk-next span { padding: 3px 8px; border-radius: 10px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text, var(--accent)); }
+.wk-next span { padding: 3px 8px; border-radius: 10px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; background: color-mix(in oklch, var(--accent) 14%, transparent); color: var(--accent-text, var(--accent)); }
 
 /* ── THE PLAN WEEK: TODAY GREEN, DONE DAYS CHECKED ──────────────────────
    Today is the one green row, open by default, with Start on it; a day that
    was trained wears a filled green check; days with nothing on them recede. */
 .pv-row-line { display: flex; align-items: center; gap: 12px; }
 .pv-row-line .pv-row-main { flex: 1; min-width: 0; }
-.pv-row.today { background: color-mix(in srgb, var(--accent) 10%, var(--surface-1)) !important; border-radius: var(--r-md); box-shadow: inset 0 0 0 2px var(--accent); }
+.pv-row.today { background: color-mix(in oklch, var(--accent) 10%, var(--surface-1)) !important; border-radius: var(--r-md); box-shadow: inset 0 0 0 2px var(--accent); }
 .pv-row.today .pv-row-date b, .pv-row.today .pv-row-date small, .pv-row.today .pv-row-state { color: var(--accent-text) !important; }
 .pv-row-start { flex: none; display: inline-flex; align-items: center; min-height: var(--control-s); margin-right: var(--s3); padding: 0 var(--s4); border-radius: var(--r-md); background: var(--accent-strong); color: var(--accent-ink) !important; font: 700 var(--fs-lead) var(--body); text-decoration: none; transition: transform var(--dur-tap) var(--ease-strike); }
 .pv-row-start:active { transform: scale(.97); }
@@ -439,7 +439,7 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 
 /* THE LIMITATION FLAG, ON BRAND. The coach's shield in an accent disc and
    the brand wash behind it — Forge adjusting the plan, not a hazard sign. */
-.buffer-banner { border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); background: linear-gradient(100deg, color-mix(in srgb, var(--tint) 12%, var(--surface-1)), var(--surface-1)); border-radius: 14px; padding: 12px 16px 12px 12px; gap: 12px; min-height: 56px; box-shadow: inset 3px 0 var(--accent); }
+.buffer-banner { border: 1px solid color-mix(in oklch, var(--accent) 28%, transparent); background: linear-gradient(100deg, color-mix(in oklch, var(--tint) 12%, var(--surface-1)), var(--surface-1)); border-radius: 14px; padding: 12px 16px 12px 12px; gap: 12px; min-height: 56px; box-shadow: inset 3px 0 var(--accent); }
 .buffer-banner-mark { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--accent-strong, var(--accent)); color: var(--accent-ink, #fff); font-style: normal; }
 .buffer-banner .buffer-banner-mark svg { color: inherit; width: 18px; height: 18px; }
 .buffer-banner > span { display: grid; gap: 1px; flex: 1; min-width: 0; font-size: 14px; font-weight: 700; line-height: 1.25; }
@@ -454,14 +454,14 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 /* AN OPEN GOAL IS ONE ANSWER: where you will be on the day. Brand wash,
    one big number, the bar to the target, one line on the margin. */
 .gx-card .goal-card-detail { border-top: 0; padding: 0 16px 8px 16px; }
-.goal-progress-card.gp-simple { display: grid; gap: 8px; margin: 0; padding: 12px 16px 12px; border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 20px; background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 11%, var(--surface-1)), var(--surface-1) 70%); box-shadow: none; --gp: var(--gx-good, #22a35a); }
+.goal-progress-card.gp-simple { display: grid; gap: 8px; margin: 0; padding: 12px 16px 12px; border: 1px solid color-mix(in oklch, var(--accent) 22%, transparent); border-radius: 20px; background: linear-gradient(160deg, color-mix(in oklch, var(--tint) 11%, var(--surface-1)), var(--surface-1) 70%); box-shadow: none; --gp: var(--gx-good, #22a35a); }
 .gp-simple.tone-work { --gp: var(--gx-work, #e3a008); }
 .gp-simple.tone-off { --gp: var(--gx-off, #dc4a3d); }
 .gp-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
 /* Smaller than the card's own number above it — this is the follow-up, not the headline. */
 .gp-hero { font: 800 26px/1.1 var(--display); letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
-.gp-track { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); margin-bottom: 16px; }
-.gp-track i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--gp) 60%, #fff), var(--gp)); transition: width .9s cubic-bezier(.2,.8,.2,1); }
+.gp-track { position: relative; height: 12px; border-radius: 999px; background: color-mix(in oklch, var(--ink) 8%, transparent); margin-bottom: 16px; }
+.gp-track i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, color-mix(in oklch, var(--gp) 60%, #fff), var(--gp)); transition: width .9s cubic-bezier(.2,.8,.2,1); }
 .gp-track::after { content: ''; position: absolute; right: 0; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: var(--ink); }
 .gp-track b { position: absolute; right: 0; top: 17px; font-size: 12px; font-weight: 800; color: var(--ink-2); }
 .gp-line { margin: 0; font-size: 14px; font-weight: 650; color: var(--ink-2); }
@@ -476,7 +476,7 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
    below, the band exactly one row tall in the exact middle. */
 .dial-simple { --dial-item: 52px; gap: 8px; }
 .dial-simple .dial-columns { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; height: calc(var(--dial-item) * 5); margin: 4px 0 8px; }
-.dial-simple .dial-band { position: absolute; left: 0; right: 0; top: calc(var(--dial-item) * 2); height: var(--dial-item); transform: none; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dial-simple .dial-band { position: absolute; left: 0; right: 0; top: calc(var(--dial-item) * 2); height: var(--dial-item); transform: none; border: 0; border-radius: 14px; background: color-mix(in oklch, var(--accent) 12%, transparent); }
 .dial-simple .dial-wheel { display: block; position: relative; height: calc(var(--dial-item) * 5); min-width: 96px; scroll-snap-type: y mandatory; }
 .dial-simple .dial-pad { height: calc(var(--dial-item) * 2); }
 .dial-simple .dial-value { display: block; width: 100%; height: var(--dial-item); line-height: var(--dial-item); min-height: 0; padding: 0; scroll-snap-align: center; font: 700 20px/var(--dial-item) var(--display-font, var(--display)); color: var(--ink-3, var(--muted)); opacity: .5; transform: none; transition: opacity .12s, color .12s; }
@@ -485,7 +485,7 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .dial-simple .dial-suffix { position: relative; align-self: center; min-width: 0; font: 800 16px var(--body, inherit); letter-spacing: .02em; text-transform: none; color: var(--accent-text); }
 
 /* Activities: custom days that lost their muscles, one tap from fixing. */
-.muscle-review { display: grid; gap: 12px; border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 10%, var(--surface-1)), var(--surface-1) 70%); }
+.muscle-review { display: grid; gap: 12px; border: 1px solid color-mix(in oklch, var(--accent) 26%, transparent); background: linear-gradient(160deg, color-mix(in oklch, var(--tint) 10%, var(--surface-1)), var(--surface-1) 70%); }
 .muscle-review header { display: grid; gap: 4px; }
 .muscle-review h3 { margin: 0; font-size: 18px; text-transform: none; }
 .muscle-review p { margin: 0; font-size: 14px; color: var(--muted); }
@@ -563,7 +563,7 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .cx-card { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1, var(--card)); }
 .cx-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
 .cx-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--good); white-space: nowrap; }
-.cx-status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent); }
+.cx-status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in oklch, currentColor 22%, transparent); }
 .cx-line { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink, var(--text)); line-height: 1.35; }
 .cx-line span { color: var(--muted); font-weight: 600; }
 .cx-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
@@ -609,7 +609,7 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 /* Goal lifts and supporting lifts: one line of why, and a tag on the goal lifts. */
 .ss-topset-why { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
 .ss-topset-why b { color: var(--ink, var(--text)); font-weight: 800; }
-.ss-goal-tag { margin-left: auto; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; color: var(--accent-text, var(--accent)); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.ss-goal-tag { margin-left: auto; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; color: var(--accent-text, var(--accent)); background: color-mix(in oklch, var(--accent) 14%, transparent); }
 /* Running behind the plan: the range to change, in two fields. */
 .running-behind-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 4px 0 8px; }
 .running-behind-fields label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); }
@@ -622,7 +622,7 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 
 /* MAKE AN EXERCISE FROM THE SPLIT DAY (TrainingPlanPage): the way in is an
    accent text row under the lifts; the form is a small sunken panel. */
-.ss-create-open { justify-self: stretch; min-height: 48px; padding: 0 16px; border: 0; border-radius: 14px; text-align: left; font-size: 16px; font-weight: 800; color: var(--accent-text, var(--accent)); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ss-create-open { justify-self: stretch; min-height: 48px; padding: 0 16px; border: 0; border-radius: 14px; text-align: left; font-size: 16px; font-weight: 800; color: var(--accent-text, var(--accent)); background: color-mix(in oklch, var(--accent) 10%, transparent); }
 .ss-every-lift { justify-self: start; min-height: 44px; font-weight: 800; }
 .ss-create { display: grid; gap: 14px; padding: 16px; border-radius: 16px; background: var(--surface-sunken); border: 1px solid var(--hairline, var(--line)); }
 .ss-create label { display: grid; gap: 6px; margin: 0; }
@@ -640,7 +640,7 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .ss-swipe-hint { margin: -2px 2px 0; font-size: 13px; color: var(--ink-3, var(--muted)); }
 
 /* THE WAY INTO THE SPLIT GUIDE. */
-.ss-guide-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 16px; border: 0; border-radius: 16px; text-align: left; background: color-mix(in srgb, var(--accent) 12%, var(--surface-1)); color: var(--ink, var(--text)); }
+.ss-guide-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 16px; border: 0; border-radius: 16px; text-align: left; background: color-mix(in oklch, var(--accent) 12%, var(--surface-1)); color: var(--ink, var(--text)); }
 .ss-guide-entry span:first-child { display: grid; gap: 4px; }
 .ss-guide-entry strong { font-size: 17px; font-weight: 800; color: var(--accent-text, var(--accent)); }
 .ss-guide-entry small { font-size: 14px; line-height: 1.4; color: var(--ink-2, var(--muted)); }

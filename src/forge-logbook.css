@@ -196,7 +196,7 @@ body { background: var(--bg) !important; }
      both tones. */
   .app-frame .coach-bubble-toggle:not(.active) {
     background: var(--accent-strong) !important; color: var(--on-brand) !important;
-    border: 0 !important; box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-strong) 35%, transparent) !important;
+    border: 0 !important; box-shadow: 0 6px 18px color-mix(in oklch, var(--accent-strong) 35%, transparent) !important;
   }
   .app-frame .coach-bubble-toggle:active { transform: translateY(1px) scale(.985) !important; }
 }
@@ -278,8 +278,8 @@ body { background: var(--bg) !important; }
   content: ''; position: fixed; inset: auto -30% -6% -30%; height: 70%;
   pointer-events: none; z-index: -1;
   background: radial-gradient(55% 75% at 50% 92%,
-    color-mix(in srgb, var(--violet) calc(18% + 32% * var(--week-glow, 0)), transparent),
-    color-mix(in srgb, var(--violet) calc(6% + 12% * var(--week-glow, 0)), transparent) 42%,
+    color-mix(in oklch, var(--violet) calc(18% + 32% * var(--week-glow, 0)), transparent),
+    color-mix(in oklch, var(--violet) calc(6% + 12% * var(--week-glow, 0)), transparent) 42%,
     transparent 80%);
   animation: forge-breathe 8s ease-in-out infinite;
   transform-origin: 50% 100%;
@@ -341,9 +341,9 @@ body { background: var(--bg) !important; }
 .goal-prediction.compact .gpc-head { display: flex; justify-content: space-between; align-items: center; }
 .goal-prediction.compact .gpc-head span { font-size: 13px; font-weight: 500; color: var(--ink-3); }
 .goal-prediction.compact .gpc-head em { font-style: normal; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
-.goal-prediction.compact.tone-good .gpc-head em { color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface-2)); }
-.goal-prediction.compact.tone-stretch .gpc-head em { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--surface-2)); }
-.goal-prediction.compact.tone-hard .gpc-head em { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, var(--surface-2)); }
+.goal-prediction.compact.tone-good .gpc-head em { color: var(--good); background: color-mix(in oklch, var(--good) 14%, var(--surface-2)); }
+.goal-prediction.compact.tone-stretch .gpc-head em { color: var(--warn); background: color-mix(in oklch, var(--warn) 14%, var(--surface-2)); }
+.goal-prediction.compact.tone-hard .gpc-head em { color: var(--bad); background: color-mix(in oklch, var(--bad) 14%, var(--surface-2)); }
 .goal-prediction.compact .gpc-num { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .goal-prediction.compact .gpc-num > b { font-family: var(--num); font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .goal-prediction.compact .gpc-num > span { font-size: 15px; color: var(--ink-2); }

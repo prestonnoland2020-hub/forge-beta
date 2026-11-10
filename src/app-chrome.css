@@ -50,8 +50,8 @@
     padding: 8px;
     display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); /* Today, Goals, Activities, Profile */
     border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--ink, var(--text)) 8%, transparent);
-    background: color-mix(in srgb, var(--surface-1, var(--panel)) 80%, transparent);
+    border: 1px solid color-mix(in oklch, var(--ink, var(--text)) 8%, transparent);
+    background: color-mix(in oklch, var(--surface-1, var(--panel)) 80%, transparent);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
     box-shadow: 0 12px 32px -8px rgb(0 0 0 / .22), 0 2px 6px rgb(0 0 0 / .06);
@@ -73,7 +73,7 @@
     position: absolute; top: 6px; bottom: 6px; left: 6px;
     width: calc((100% - 12px) / 4);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    background: color-mix(in oklch, var(--accent) 15%, transparent);
     transform: translateX(calc(var(--tab-index, 0) * 100%));
     transition: transform .42s var(--spring);
   }
@@ -85,7 +85,7 @@
      the pill follows quickly, so it reads as held. */
   .tab-bar, .tab-bar .tab { touch-action: pan-y; }
   .tab-bar.scrubbing { transform: scale(1.03); }
-  .tab-bar.scrubbing .tab-indicator { transition-duration: .2s; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .tab-bar.scrubbing .tab-indicator { transition-duration: .2s; background: color-mix(in oklch, var(--accent) 22%, transparent); }
   .tab-bar .tab {
     position: relative; z-index: 1;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -112,7 +112,7 @@
   .app-frame:has(.tab-bar.away) .save-workout { bottom: calc(var(--safe-b, env(safe-area-inset-bottom)) + 10px) !important; }
 
   /* ── Header: a large plain title ─────────────────────────────────────── */
-  .topbar { height: calc(62px + env(safe-area-inset-top)); border-bottom-color: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent); }
+  .topbar { height: calc(62px + env(safe-area-inset-top)); border-bottom-color: color-mix(in oklch, var(--ink, var(--text)) 7%, transparent); }
   .topbar h1 { font-size: 26px; line-height: 1.1; text-transform: none; letter-spacing: -.02em; font-weight: 800; }
   .top-actions .top-insights, .top-actions .top-log { width: 40px; height: 40px; }
   .top-actions a, .top-back { transition: transform .14s ease, background-color .14s ease; }
@@ -129,7 +129,7 @@
   html.keyboard-open .coach-bubble-shell:not(.expanded):not(:has(.coach-bubble-panel.open)) { transform: translateY(24px); opacity: 0; pointer-events: none; }
   .coach-bubble-toggle {
     width: 54px; min-width: 54px; height: 54px; padding: 0; border-radius: 999px; justify-content: center;
-    box-shadow: 0 10px 26px -6px color-mix(in srgb, var(--accent) 55%, transparent), 0 2px 6px rgb(0 0 0 / .12);
+    box-shadow: 0 10px 26px -6px color-mix(in oklch, var(--accent) 55%, transparent), 0 2px 6px rgb(0 0 0 / .12);
     transition: transform .16s var(--spring);
   }
   .coach-bubble-toggle:active { transform: scale(.9); }
@@ -157,7 +157,7 @@
   }
   .coach-bubble-panel > header span { display: none; }
   .coach-bubble-panel > header strong { font-size: 20px; text-transform: none; letter-spacing: -.01em; }
-  .coach-bubble-panel > header button { border: 0; border-radius: 999px; width: 38px; height: 38px; font-size: 18px; background: color-mix(in srgb, var(--ink, var(--text)) 8%, transparent); }
+  .coach-bubble-panel > header button { border: 0; border-radius: 999px; width: 38px; height: 38px; font-size: 18px; background: color-mix(in oklch, var(--ink, var(--text)) 8%, transparent); }
   .coach-bubble-backdrop { display: block; z-index: 40; animation: scrim-in .3s ease; }
 }
 

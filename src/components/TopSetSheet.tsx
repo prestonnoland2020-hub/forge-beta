@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { DialField } from './NumberDial';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -49,12 +49,28 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const search = useRef<HTMLInputElement>(null);
+  /* OPENS AND CLOSES ON A TRANSITION, NOT A KEYFRAME. A transition can be
+     reversed from wherever it is, so a sheet dismissed while it is still
+     rising goes straight back down instead of finishing the rise first.
+     The parent unmounts it only once it is off screen. */
+  const [shown, setShown] = useState(false);
+  const closing = useRef(false);
+  useEffect(() => { const frame = requestAnimationFrame(() => setShown(true)); return () => cancelAnimationFrame(frame); }, []);
+  const close = useCallback(() => {
+    if (closing.current) return;
+    closing.current = true;
+    setShown(false);
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    window.setTimeout(onClose, reduce ? 0 : 360);
+  }, [onClose]);
+  /* Combobox: the highlighted row, moved with the arrow keys. */
+  const [active, setActive] = useState(0);
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [close]);
   useEffect(() => { search.current?.focus(); }, []);
 
   const lift = chosen?.name || newName;
@@ -113,13 +129,29 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
 
      Comparing target to currentTarget cannot be undone by an unmount: a click
      that started inside the sheet never reads as a click on the backdrop. */
-  const closeOnBackdrop = (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose(); };
+  const closeOnBackdrop = (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) close(); };
 
-  return <div className="top-set-sheet-backdrop" role="dialog" aria-modal="true" aria-label="Add a top set" onClick={closeOnBackdrop}>
+  /* The rows the combobox moves through, in the order they are drawn. */
+  const options: string[] = [...(offerNew ? ['new'] : []), ...matches.map(exercise => String(exercise.id))];
+  const activeIndex = Math.min(active, Math.max(0, options.length - 1));
+  const optionId = (key: string) => `ts-option-${key}`;
+  const onSearchKey = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (!options.length) return;
+    if (event.key === 'ArrowDown') { event.preventDefault(); setActive((activeIndex + 1) % options.length); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); setActive((activeIndex - 1 + options.length) % options.length); }
+    else if (event.key === 'Enter') {
+      event.preventDefault();
+      const key = options[activeIndex];
+      if (key === 'new') startNew();
+      else { const exercise = matches.find(item => String(item.id) === key); if (exercise) pick(exercise); }
+    }
+  };
+
+  return <div className="top-set-sheet-backdrop" data-state={shown ? 'open' : 'closed'} role="dialog" aria-modal="true" aria-label="Add a top set" onClick={closeOnBackdrop}>
     <div className="top-set-sheet">
       <header>
         <div><strong>Add a top set</strong><small>The one heaviest meaningful set. Forge measures progress from it.</small></div>
-        <button type="button" className="top-set-sheet-close" aria-label="Close" onClick={onClose}>×</button>
+        <button type="button" className="top-set-sheet-close" aria-label="Close" onClick={close}>×</button>
       </header>
 
       {lift
@@ -129,14 +161,16 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
           </div>
         : <label className="top-set-sheet-search">
             Exercise
-            <SearchField ref={search} value={query} onChange={setQuery} placeholder="Search exercises, e.g. Smith incline bench" />
+            <SearchField ref={search} value={query} onChange={value => { setQuery(value); setActive(0); }} placeholder="Search exercises, e.g. Smith incline bench"
+              role="combobox" aria-expanded={options.length > 0} aria-controls="ts-results" aria-autocomplete="list"
+              aria-activedescendant={options.length ? optionId(options[activeIndex]) : undefined} onKeyDown={onSearchKey} />
           </label>}
 
-      {!lift && <div className="top-set-sheet-results">
-        {offerNew && <button type="button" className="top-set-sheet-new" onClick={startNew}>
+      {!lift && <div className={typed ? 'top-set-sheet-results typing' : 'top-set-sheet-results'} id="ts-results" role="listbox" aria-label="Exercises">
+        {offerNew && <button type="button" className="top-set-sheet-new" id={optionId('new')} role="option" aria-selected={options[activeIndex] === 'new'} tabIndex={-1} onClick={startNew}>
           <span>＋</span><div><strong>Use “{typed}”</strong><small>Adds it to your exercise library</small></div>
         </button>}
-        {matches.map(exercise => <button type="button" className="top-set-sheet-result" key={exercise.id} onClick={() => pick(exercise)}>
+        {matches.map(exercise => <button type="button" className="top-set-sheet-result" key={exercise.id} id={optionId(String(exercise.id))} role="option" aria-selected={options[activeIndex] === String(exercise.id)} tabIndex={-1} onClick={() => pick(exercise)}>
           <div><strong>{exercise.name}</strong><small>{exercise.muscles.join(' · ') || 'Strength'}</small></div>
           {suggested.includes(exercise.name) && <b>Today</b>}
         </button>)}
@@ -161,8 +195,8 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
 
       {blockedReason ? <p className="top-set-sheet-warning">{blockedReason}</p> : null}
       <footer>
-        <button type="button" className="button" disabled={!ready} onClick={() => onSave({ lift, muscles, isNew, weight: Number(weight), reps: Number(reps) })}>Save top set</button>
-        <button type="button" className="button ghost" onClick={onClose}>Cancel</button>
+        <button type="button" className="button" disabled={!ready} onClick={() => { onSave({ lift, muscles, isNew, weight: Number(weight), reps: Number(reps) }); close(); }}>Save top set</button>
+        <button type="button" className="button ghost" onClick={close}>Cancel</button>
       </footer>
     </div>
   </div>;
