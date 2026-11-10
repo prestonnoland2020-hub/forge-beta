@@ -27,6 +27,8 @@ const THRESHOLD_EFFORT_MILES = 6.214;
    about an hour. 0.89 sits in the middle of the 0.86–0.92 every lab range
    lands in. */
 export const THRESHOLD_SHARE = 0.89;
+/* The hardest run a heart-rate threshold may be read from (see heartRateEffort). */
+export const MIN_TOP_SHARE_FOR_RACE = 0.8;
 /* The effort bands, as shares of max heart rate. */
 export const EASY_CEILING_SHARE = 0.76;
 export const STEADY_CEILING_SHARE = 0.84;
@@ -124,7 +126,7 @@ export const heartRateTargets = (max: MaxHeartRate | null): HeartRateTargets | n
    so the athlete's average run is carried to threshold along a line through
    zero speed at 45% of max — a population slope, labelled 'anchored' so a
    consumer can trust it less. */
-export type AerobicFit = { thresholdSecondsPerMile: number; runs: number; method: 'fit' | 'anchored'; asOf: string };
+export type AerobicFit = { thresholdSecondsPerMile: number; runs: number; method: 'fit' | 'anchored'; asOf: string; topShare: number };
 export function aerobicFit(runs: HrRun[], maxHr: number, asOf: string, windowDays = FIT_WINDOW_DAYS): AerobicFit | null {
   const points = runs
     .filter(run => run.miles >= MIN_RUN_MILES && run.date <= asOf && daysBetween(run.date, asOf) <= windowDays)
@@ -151,7 +153,7 @@ export function aerobicFit(runs: HrRun[], maxHr: number, asOf: string, windowDay
     speedAtThreshold = median * (THRESHOLD_SHARE - ZERO_SPEED_SHARE);
   }
   if (!(speedAtThreshold > 4) || speedAtThreshold > 14) return null;
-  return { thresholdSecondsPerMile: 3600 / speedAtThreshold, runs: points.length, method, asOf };
+  return { thresholdSecondsPerMile: 3600 / speedAtThreshold, runs: points.length, method, asOf, topShare: Math.max(...shares) };
 }
 
 /* HOW THAT PACE IS MOVING. The fit is taken as of each of the last twelve
@@ -185,6 +187,14 @@ export function heartRateEffort(records: HrRecord[], todayIso: string, birthDate
   if (!max) return null;
   const fit = aerobicFit(heartRateRuns(records), max.bpm, todayIso);
   if (!fit) return null;
+  /* ONLY WHEN THE RUNS GET NEAR THRESHOLD. Preston's easy runs (8:50/mi at
+     68-75% of max) were carried up a population line to 89% and came out as
+     a 5:51/mi threshold -- a 17:27 5K from a man whose actual 5K is near 21.
+     A line read far past the last point it was fitted on is a guess, and as
+     a race prediction it took 74% of the weight. So: a real fitted line (not
+     the anchored fallback), and at least one run at 80% of max or harder,
+     so threshold is a short step from the data rather than a long leap. */
+  if (fit.method !== 'fit' || fit.topShare < MIN_TOP_SHARE_FOR_RACE) return null;
   return { date: todayIso, miles: THRESHOLD_EFFORT_MILES, seconds: fit.thresholdSecondsPerMile * THRESHOLD_EFFORT_MILES };
 }
 
