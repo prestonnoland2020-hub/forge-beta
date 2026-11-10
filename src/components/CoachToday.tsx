@@ -15,6 +15,14 @@ export function CoachToday() {
   const prefs = read<GuidedPrefs | null>(GUIDED_KEYS.prefs, null);
   const last = read<{ focus?: Focus }>(GUIDED_KEYS.last, {});
   const [minutes, setMinutes] = useState(30);
+  /* A Guided workout left part-way (GuidedPage keeps it for 24 hours). */
+  const paused = read<{ savedAt?: number; workout?: { focus?: string }; logged?: unknown[] } | null>('forge-guided-resume-v1', null);
+  if (paused?.savedAt && Date.now() - paused.savedAt < 24 * 3600 * 1000) return <section className="td-card ct-card">
+    <span className="ct-eyebrow">WORKOUT IN PROGRESS</span>
+    <h3 className="td-title">{paused.workout?.focus || 'Your workout'}</h3>
+    <p className="ct-lead">{(paused.logged?.length || 0)} sets done. Pick up right where you stopped.</p>
+    <button type="button" className="button wide" onClick={() => navigate('/guided')}>Resume workout</button>
+  </section>;
   if (!prefs) return <section className="td-card ct-card">
     <span className="ct-eyebrow">YOUR COACH</span>
     <h3 className="td-title">Let the coach run your workout</h3>

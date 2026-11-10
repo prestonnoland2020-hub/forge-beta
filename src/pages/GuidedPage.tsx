@@ -67,6 +67,9 @@ async function requestMic(): Promise<MicStatus> {
 
 const read = <T,>(key: string, fallback: T): T => { try { const value = localStorage.getItem(key); return value ? JSON.parse(value) as T : fallback; } catch { return fallback; } };
 const write = (key: string, value: unknown) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* per device */ } };
+const RESUME_KEY = 'forge-guided-resume-v1';
+type SavedSession = { workout: Workout; stepIndex: number; setIndex: number; weights: Record<number, number | null>; logged: LoggedSet[]; startedAt: number; custom: boolean; savedAt: number };
+const clearResume = () => { try { localStorage.removeItem(RESUME_KEY); } catch { /* fine */ } };
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.max(0, seconds) % 60).padStart(2, '0')}`;
 
@@ -154,6 +157,11 @@ export function GuidedPage() {
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
+  /* RESUME. A workout in progress is kept on the phone, so leaving (or the
+     phone killing the page) never loses it: Guided offers to pick up at the
+     same move and set. Kept for 24 hours. */
+  const [resume, setResume] = useState<SavedSession | null>(() => { const saved = read<SavedSession | null>(RESUME_KEY, null); return saved && Date.now() - saved.savedAt < 24 * 3600 * 1000 && saved.workout ? saved : null; });
+  const [endAsk, setEndAsk] = useState(false);
   const [handsFree, setHandsFree] = useState(voiceInput());
   const [voiceOn, setVoiceOn] = useState(canSpeak() || cloudVoice());
   /* A woman's voice for women, a man's for men; anyone can switch. */
@@ -464,7 +472,7 @@ export function GuidedPage() {
     say(`Here's how you do it. First, ${step.move.steps[0]} Then, ${step.move.steps[1]} And finally, ${step.move.steps[2]} You should feel it in ${step.move.feel.replace(/\.$/, '').toLowerCase()}. One thing to watch: ${step.move.mistake} Say done when you've finished the set.`, CARD_CMDS);
   };
   const finish = () => {
-    writeLive(null);
+    writeLive(null); clearResume(); setEndAsk(false);
     coach.current?.stop();
     setRunning(false); setPhase('done');
   };
@@ -551,7 +559,34 @@ export function GuidedPage() {
   };
   useEffect(() => { coach.current?.on((command, heardText) => commandRef.current(command, heardText)); }, []);
 
-  const close = () => { writeLive(null); coach.current?.stop(); navigate('/'); };
+  const active = (phase === 'card' || phase === 'feel' || phase === 'rest') && Boolean(workout);
+  const leave = () => { writeLive(null); coach.current?.stop(); navigate('/'); };
+  /* The X during a workout asks first: save what was done, keep it to
+     resume later, or carry on. */
+  const close = () => { if (active) { setEndAsk(true); return; } leave(); };
+  useEffect(() => {
+    if (!active || !workout) return;
+    write(RESUME_KEY, { workout, stepIndex, setIndex, weights, logged, startedAt, custom, savedAt: Date.now() } satisfies SavedSession);
+  }, [active, workout, stepIndex, setIndex, weights, logged, startedAt, custom]);
+  const resumeNow = () => {
+    if (!resume) return;
+    const saved = resume; setResume(null);
+    const s = saved.workout.steps[saved.stepIndex]; if (!s) { clearResume(); return; }
+    coach.current?.unlockAudio(); openEars();
+    setWorkout(saved.workout); setCustom(saved.custom); setStepIndex(saved.stepIndex); setSetIndex(saved.setIndex); setWeights(saved.weights); setLogged(saved.logged); setStartedAt(saved.startedAt || Date.now());
+    setTimer(s.reps); setRunning(false); setPhase('card');
+    const w = saved.weights[saved.stepIndex] ?? s.weight;
+    say(`Welcome back. ${cardLine(s, saved.setIndex, w)}`, CARD_CMDS);
+  };
+  const endSheet = endAsk ? <div className="gd-sheet-back" onClick={event => { if (event.target === event.currentTarget) setEndAsk(false); }}>
+      <section className="gd-sheet" role="dialog" aria-modal="true" aria-labelledby="gd-end-title">
+        <h2 id="gd-end-title">End this workout?</h2>
+        <p className="gd-lead">{logged.length ? `You've done ${logged.length} set${logged.length === 1 ? '' : 's'}. Save them, or keep the workout to finish later.` : 'Nothing is logged yet. You can come back and pick up right here.'}</p>
+        {logged.length > 0 && <button type="button" className="gd-cta" onClick={finish}>Save and end</button>}
+        <button type="button" className={logged.length ? 'gd-secondary' : 'gd-cta'} onClick={() => { setEndAsk(false); leave(); }}>Pause, finish later</button>
+        <button type="button" className="gd-secondary" onClick={() => setEndAsk(false)}>Keep going</button>
+      </section>
+    </div> : null;
 
   /* ---------- Screens ---------- */
   const frame = (content: ReactNode, tone = '') => createPortal(<div className={`guided ${tone}`} role="dialog" aria-modal="true" aria-label="Forge Guided">{content}</div>, document.body);
@@ -570,6 +605,19 @@ export function GuidedPage() {
   </div>
   </>;
 
+  /* A workout left part-way: offer to pick it back up, before anything else. */
+  if (resume && !active && phase !== 'done') {
+    const s = resume.workout.steps[resume.stepIndex];
+    const doneSets = resume.logged.length;
+    return frame(<div className="gd-screen">
+      {top()}
+      <span className="gd-badge">WORKOUT IN PROGRESS</span>
+      <h1>Pick up where you left off?</h1>
+      <p className="gd-lead">{resume.workout.focus}{s ? ` · ${s.move.name}, set ${resume.setIndex + 1} of ${s.sets}` : ''}. {doneSets} set{doneSets === 1 ? '' : 's'} done so far.</p>
+      <button type="button" className="gd-cta" onClick={resumeNow}><Svg d="M7 4v16l13-8z" size={18} />Resume workout</button>
+      <button type="button" className="gd-secondary" onClick={() => { clearResume(); setResume(null); }}>Start a new one</button>
+    </div>);
+  }
   if (phase === 'setup') {
     const toggle = (key: 'styles' | 'vibe' | 'gear', value: string) => setDraft(d => ({ ...d, [key]: (d[key] as string[]).includes(value) ? (d[key] as string[]).filter(x => x !== value) : [...(d[key] as string[]), value] }));
     const next = () => { if (setupStep < 2 && !editOne) setSetupStep(s => s + 1); else { setEditOne(false); write(PREFS_KEY, draft); setPrefs(draft); setTodayStyle(draft.styles[0] || 'Strength'); setFocus(suggestFocus(last.focus, draft)); setPhase('today'); } };
@@ -709,7 +757,7 @@ export function GuidedPage() {
       {upNext && <div className="gd-next"><span>UP NEXT</span><strong>{upNext.move.name}{upNext === step ? ` · set ${setIndex + 2} of ${step.sets}` : ''}</strong><small>{amountText(upNext)}{(upNext === step ? weight : upNext.weight) !== null ? ` · ${upNext === step ? weight : upNext.weight} ${unit}` : ''}</small></div>}
       {didYouMean || (heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>)}
       <button type="button" className="gd-ask-pill" onClick={() => setAskOpen(true)}><Svg d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" size={16} />Ask coach</button>
-      {askSheet}
+      {askSheet}{endSheet}
       <div className="gd-row">
         <button type="button" className="gd-ghost" onClick={() => setTimer(t => t + 30)}>+30 sec</button>
         <button type="button" className="gd-cta light" onClick={afterRest}>I'm ready</button>
@@ -725,7 +773,7 @@ export function GuidedPage() {
     <button type="button" className="gd-feel main" onClick={() => answer('right')}><span className="gd-ic"><Svg d="M5 12.5 10 17l9-10" /></span><span><strong>Just right</strong><small>Hard by the last rep, good form</small></span></button>
     <button type="button" className="gd-feel" onClick={() => answer('hard')}><span className="gd-ic warn"><Svg d="M12 5v14M5 12l7 7 7-7" /></span><span><strong>Too hard</strong><small>{weight !== null ? 'Next set gets lighter' : 'Next set gets an easier version'}</small></span></button>
     {handsFree && <p className="gd-muted center">{tapTalk ? 'Or tap the mic and say it: “that was easy”.' : 'Or just say it: “that was easy”.'}</p>}
-    {askSheet}
+    {askSheet}{endSheet}
     {didYouMean || (heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>)}
   </div>);
 
@@ -734,8 +782,8 @@ export function GuidedPage() {
   const easier = swapFor(step, 'easier', have);
   const harder = swapFor(step, 'harder', have);
   return frame(<div className="gd-screen gd-cardscreen">
-    {top(undefined, <>{listenBadge}<button type="button" className="gd-link" onClick={() => setAskOpen(true)}>Ask coach</button><button type="button" className="gd-link" onClick={finish}>End</button></>)}
-    {askSheet}
+    {top(undefined, <>{listenBadge}<button type="button" className="gd-link" onClick={() => setAskOpen(true)}>Ask coach</button><button type="button" className="gd-link" onClick={() => setEndAsk(true)}>End</button></>)}
+    {askSheet}{endSheet}
     {progress}
     <div className="gd-media">
       <Photos move={step.move} still={learn} />

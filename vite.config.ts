@@ -39,6 +39,10 @@ export default defineConfig({
           "style-src 'self' 'unsafe-inline'",
           "img-src 'self' data: blob: https:",
           "font-src 'self' data:",
+          /* The coach's voice plays from in-memory audio (blob:/data:). With no
+             media-src this fell back to default-src 'self', which blocked every
+             line, and iPhone fell back to the robot voice. */
+          "media-src 'self' blob: data: https:",
           "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
           "worker-src 'self'",
           "manifest-src 'self'",
