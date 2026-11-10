@@ -291,7 +291,7 @@ export function GuidedPage() {
     <section className="gd-sheet" role="dialog" aria-modal="true" aria-labelledby="gd-ask-title">
       <h2 id="gd-ask-title">Ask your coach</h2>
       {askAnswer && <div className="gd-ask-turn"><p className="gd-ask-q">{askAnswer.q}</p><p className="gd-ask-a">{askBusy ? 'Thinking…' : askAnswer.a}</p></div>}
-      {!askAnswer && <p className="gd-lead">{handsFree && voiceInput() ? 'Just talk. Or type below.' : 'Type a question. Why this weight, how to do the move, what is next.'}</p>}
+      {!askAnswer && <p className="gd-lead">{handsFree && voiceInput() ? (coach.current?.tapToTalk ? 'Tap the mic and ask. Or type below.' : 'Just talk. Or type below.') : 'Type a question. Why this weight, how to do the move, what is next.'}</p>}
       <form className="gd-ask-form" onSubmit={event => { event.preventDefault(); void askCoach(askText); }}>
         <input className="gd-ask-input" value={askText} onChange={event => setAskText(event.target.value)} placeholder="e.g. Why is it 15 pounds?" aria-label="Your question" />
         <button type="submit" className="gd-ask-send" disabled={!askText.trim() || askBusy} aria-label="Ask"><Svg d="M5 12h14M13 6l6 6-6 6" size={20} stroke={2.4} /></button>
@@ -359,7 +359,10 @@ export function GuidedPage() {
           setMicBusy(true);
           const status = await requestMic();
           setMicBusy(false); setMic(status); write(MIC_KEY, status);
-          if (status === 'granted') { openEars(); runCheck(0); }
+          /* On iPhone everything after the permission prompt is outside the
+             tap, where iOS will not start sound or the mic, so the workout
+             starts from her next tap on Start (tap to talk, voice.ts). */
+          if (status === 'granted') { if (coach.current?.tapToTalk) { setMicAsk(false); return; } openEars(); runCheck(0); }
         }}>{micBusy ? 'Waiting for your phone…' : 'Allow microphone'}</button>}
         {!check && <button type="button" className="gd-secondary" onClick={() => { setHandsFree(false); setMicAsk(false); start(); }}>{mic === 'denied' ? 'Start, I’ll tap' : 'Not now, I’ll tap'}</button>}
       </section>
@@ -683,7 +686,13 @@ export function GuidedPage() {
   if (!workout || !step) return frame(<div className="gd-screen">{top()}<p className="gd-lead">Loading…</p></div>);
 
   const progress = <div className="gd-dots" aria-label={`Move ${stepIndex + 1} of ${workout.steps.length}`}>{workout.steps.map((_, i) => <span key={i} className={i < stepIndex ? 'done' : i === stepIndex ? 'now' : ''} />)}</div>;
-  const listenBadge = handsFree && voiceInput() ? <span className={voiceState.listening ? 'gd-listen on' : 'gd-listen'}><Svg d={MIC} size={14} stroke={2.4} />{voiceState.speaking ? 'Coach talking' : voiceState.listening ? 'Listening' : 'Mic'}</span> : null;
+  /* On iPhone the mic badge is a button: tap it, say it (tap to talk, voice.ts). */
+  const tapTalk = Boolean(coach.current?.tapToTalk);
+  const listenBadge = handsFree && voiceInput()
+    ? tapTalk
+      ? <button type="button" className={voiceState.listening ? 'gd-listen gd-talk on' : 'gd-listen gd-talk'} aria-pressed={voiceState.listening} onClick={() => { coach.current?.unlockAudio(); if (coach.current?.mode !== 'cloud') openEars(); coach.current?.talkNow(); }}><Svg d={MIC} size={16} stroke={2.4} />{voiceState.listening ? 'Listening…' : 'Tap to talk'}</button>
+      : <span className={voiceState.listening ? 'gd-listen on' : 'gd-listen'}><Svg d={MIC} size={14} stroke={2.4} />{voiceState.speaking ? 'Coach talking' : voiceState.listening ? 'Listening' : 'Mic'}</span>
+    : null;
 
   if (phase === 'rest') {
     const total = Math.max(1, step.rest);
@@ -712,7 +721,7 @@ export function GuidedPage() {
     <button type="button" className="gd-feel" onClick={() => answer('easy')}><span className="gd-ic"><Svg d="M12 19V5M5 12l7-7 7 7" /></span><span><strong>Too easy</strong><small>{weight !== null ? 'Next set goes up a little' : 'Keep going, you are strong'}</small></span></button>
     <button type="button" className="gd-feel main" onClick={() => answer('right')}><span className="gd-ic"><Svg d="M5 12.5 10 17l9-10" /></span><span><strong>Just right</strong><small>Hard by the last rep, good form</small></span></button>
     <button type="button" className="gd-feel" onClick={() => answer('hard')}><span className="gd-ic warn"><Svg d="M12 5v14M5 12l7 7 7-7" /></span><span><strong>Too hard</strong><small>{weight !== null ? 'Next set gets lighter' : 'Next set gets an easier version'}</small></span></button>
-    {handsFree && <p className="gd-muted center">Or just say it: “that was easy”.</p>}
+    {handsFree && <p className="gd-muted center">{tapTalk ? 'Or tap the mic and say it: “that was easy”.' : 'Or just say it: “that was easy”.'}</p>}
     {askSheet}
     {didYouMean || (heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>)}
   </div>);

@@ -221,13 +221,16 @@ export class Coach {
   async useCloud(transcribe: Transcribe) {
     if (!cloudEarsSupported()) return false;
     const ears = new CloudEars(blob => transcribe(blob));
-    ears.onText = text => { this.cloudFailures = 0; this.handleHeard([text]); };
+    ears.onText = text => { this.cloudFailures = 0; if (this.tapToTalk) { this.oneShot += 1; this.stopListening(); } this.handleHeard([text]); };
     ears.onError = () => {
       this.cloudFailures += 1;
       if (this.cloudFailures >= 2) { ears.close(); this.ears = null; this.mode = 'phone'; this.onMode('phone'); if (this.wantListen && !this.speaking) this.listen(); }
     };
     try { await ears.open(); } catch { return false; }
     this.ears = ears; this.mode = 'cloud'; this.onMode('cloud');
+    /* Tap to talk: the mic was opened only to ask permission; let it go so
+       the coach starts in full-quality sound. */
+    if (this.tapToTalk) { ears.paused = true; ears.releaseMic(); this.emit(); return true; }
     if (this.wantListen && !this.speaking && this.allowed) this.listen();
     return true;
   }
@@ -333,11 +336,29 @@ export class Coach {
     this.say(text, keep);
   }
 
+  /* TAP TO TALK, on iPhone. A web page there cannot keep the microphone open
+     while the coach talks without the headphones dropping to phone-call
+     sound, and it cannot reopen the mic on its own without a tap. So on iPhone
+     the mic opens when she taps it, takes one thing said, and closes again;
+     the coach's voice stays full quality. Elsewhere it listens hands-free. */
+  tapToTalk = typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  private oneShot = 0;
+  talkNow() {
+    if (this.mode !== 'cloud' || !this.ears) { if (canListen()) { this.wantListen = true; this.listen(); } return; }
+    const ears = this.ears;
+    if (this.speaking) { this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; }
+    const shot = ++this.oneShot;
+    this.listening = true; this.emit();
+    void ears.takeMic().then(() => { if (this.ears === ears && this.oneShot === shot) ears.paused = false; }).catch(error => { this.listening = false; this.emit(); ears.onError(error); });
+    window.setTimeout(() => { if (this.oneShot === shot && this.listening) this.stopListening(); }, 8000);
+  }
+
   setHandsFree(on: boolean) { this.wantListen = on; if (!on) this.stopListening(); else if (!this.speaking && this.allowed) this.listen(); }
   get handsFree() { return this.wantListen; }
 
   private listen() {
     if (!this.wantListen || this.listening) return;
+    if (this.mode === 'cloud' && this.ears && this.tapToTalk) return;
     if (this.mode === 'cloud' && this.ears) {
       /* The mic is off while the coach talks (on iPhone an open mic makes
          playback thin, like a phone call); it comes back to listen. */

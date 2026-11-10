@@ -69,10 +69,16 @@ export class CloudEars {
 
   /* Call from a tap: iOS only opens audio in answer to one. */
   async open() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') await this.ctx.resume(); return; }
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (this.ctx) { this.wake(); if (this.ctx.state !== 'running') await this.ctx.resume().catch(() => {}); return; }
+    /* THE AUDIO ENGINE FIRST, STILL INSIDE THE TAP. It used to be made after
+       waiting for the microphone, by which point iOS no longer counted it as
+       part of the tap and left it suspended: the mic was open, nothing ever
+       reached it, and Forge never heard a word (forge-voice had zero calls). */
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.ctx = new Ctx();
+    const resuming = this.ctx.state === 'running' ? Promise.resolve() : this.ctx.resume().catch(() => {});
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    await resuming;
     this.node = this.ctx.createScriptProcessor(2048, 1, 1);
     this.node.onaudioprocess = event => this.frame(event.inputBuffer.getChannelData(0));
     this.source = this.ctx.createMediaStreamSource(this.stream);
@@ -81,8 +87,11 @@ export class CloudEars {
        silent so her own voice is never played back. */
     const mute = this.ctx.createGain(); mute.gain.value = 0;
     this.node.connect(mute); mute.connect(this.ctx.destination);
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    if (this.ctx.state !== 'running') await this.ctx.resume().catch(() => {});
   }
+
+  /* Call from a tap: brings a suspended or interrupted engine back. */
+  wake() { if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume().catch(() => {}); }
 
   private frame(input: Float32Array) {
     if (!this.ctx) return;
@@ -145,6 +154,7 @@ export class CloudEars {
   }
   async takeMic() {
     if (!this.ctx || !this.node) { await this.open(); return; }
+    this.wake();
     if (this.stream && this.stream.getAudioTracks().some(track => track.readyState === 'live')) return;
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => {});

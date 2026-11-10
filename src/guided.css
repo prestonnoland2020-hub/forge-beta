@@ -227,3 +227,6 @@ html[data-theme="dark"] .guided { --g-bg: #090A0D; --g-surface: #17171D; --g-ink
 /* A solid strip under the phone's clock, so content scrolls under it rather
    than through the time and battery. */
 .guided::before { content: ''; position: sticky; top: 0; display: block; height: env(safe-area-inset-top, 0px); margin-bottom: calc(-1 * env(safe-area-inset-top, 0px)); background: var(--g-bg); z-index: 5; }
+/* Tap to talk (iPhone): the mic badge is a real button, big enough to hit mid-set. */
+.gd-listen.gd-talk { border: 0; min-height: 44px; padding: 0 16px; font: inherit; font-size: 15px; font-weight: 800; gap: 7px; cursor: pointer; }
+.gd-listen.gd-talk:active { transform: scale(.96); }
