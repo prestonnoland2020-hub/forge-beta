@@ -199,6 +199,9 @@ export function GuidedPage() {
     return () => { c.stop(); html.style.overflow = before; };
   }, []);
   useEffect(() => { if (coach.current) coach.current.muted = !voiceOn; }, [voiceOn]);
+  /* Voice diagnostics: up to 60 events a workout, so a silent fallback to the
+     robot voice shows up in voice_events with its reason. */
+  useEffect(() => { const c = coach.current; if (!c) return; let sent = 0; c.onReport = (event, detail) => { if (isDemoMode || sent >= 60) return; sent += 1; void supabase.from('voice_events').insert({ event, detail: `${detail || ''} | cloudVoice=${cloudVoice()} ua=${navigator.userAgent.slice(0, 120)}`.slice(0, 400) }).then(() => {}, () => {}); }; }, []);
   useEffect(() => { const c = coach.current; if (!c) return; c.voice = coachVoice; if (cloudVoice()) c.useNaturalVoice(speakLine); [FEEL_LINE, 'Okay, go!', 'Ten seconds.', 'Three, two, one.', 'Done. Nice.', 'Switch sides.', 'Sure, thirty more seconds.'].forEach(line => c.prefetch(line)); }, [coachVoice]);
   const pickVoice = (voice: CoachVoice) => {
     setCoachVoice(voice); write(VOICE_KEY, voice);

@@ -183,6 +183,8 @@ export class Coach {
   private audio: HTMLAudioElement | null = null;
   private lines = new Map<string, Promise<string>>();
   private cloudSpeakFailures = 0;
+  /* Diagnostics: what happened to each line on this phone (voice_events). */
+  onReport: (event: string, detail?: string) => void = () => {};
 
   useNaturalVoice(speak: Speak) { this.speakCloud = speak; }
   get natural() { return Boolean(this.speakCloud) && this.cloudSpeakFailures < 2; }
@@ -308,6 +310,7 @@ export class Coach {
     if (canSpeak()) window.speechSynthesis.cancel();
     const finish = () => { if (token !== this.sayToken) return; this.speaking = false; this.emit(); if (listenFor) this.listen(); };
     this.speaking = true; this.emit();
+    if (!this.natural || !this.audio) this.onReport('phone-voice', `natural=${this.natural} audio=${Boolean(this.audio)} cloud=${Boolean(this.speakCloud)} failures=${this.cloudSpeakFailures}`);
     if (this.natural && this.audio) {
       /* The natural voice. The phone's robot voice is only the safety net for
          a real failure: a slow line is waited for (lines are fetched ahead,
@@ -315,15 +318,15 @@ export class Coach {
          than a short pause. */
       const audio = this.audio;
       let settled = false;
-      const fallback = () => { if (settled || token !== this.sayToken) return; settled = true; this.speakPhone(text, finish); };
+      const fallback = () => { if (settled || token !== this.sayToken) return; settled = true; this.onReport('timeout'); this.speakPhone(text, finish); };
       const timer = window.setTimeout(fallback, 10000);
       this.lineUrl(text).then(url => {
         if (settled || token !== this.sayToken) return;
         settled = true; window.clearTimeout(timer); this.cloudSpeakFailures = 0;
-        audio.onended = finish; audio.onerror = () => { this.cloudSpeakFailures += 1; this.speakPhone(text, finish); };
+        audio.onended = finish; audio.onerror = () => { this.onReport('decode-error', `code=${audio.error?.code} ${audio.error?.message || ''}`); this.cloudSpeakFailures += 1; this.speakPhone(text, finish); };
         audio.src = url;
-        void audio.play().catch(() => this.speakPhone(text, finish));
-      }).catch(() => { window.clearTimeout(timer); this.cloudSpeakFailures += 1; fallback(); });
+        void audio.play().then(() => this.onReport('played', text.slice(0, 40))).catch(error => { this.onReport('play-rejected', `${(error as Error)?.name}: ${(error as Error)?.message}`.slice(0, 200)); this.speakPhone(text, finish); });
+      }).catch(error => { window.clearTimeout(timer); this.onReport('fetch-failed', String((error as Error)?.message || error).slice(0, 200)); this.cloudSpeakFailures += 1; fallback(); });
       return;
     }
     this.speakPhone(text, finish);
