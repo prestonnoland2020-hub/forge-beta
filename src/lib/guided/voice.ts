@@ -160,7 +160,7 @@ export type CoachVoice = 'coral' | 'ash';
 export const VOICE_LABEL: Record<CoachVoice, string> = { coral: 'Female voice', ash: 'Male voice' };
 export type Speak = (text: string, voice: CoachVoice) => Promise<Blob>;
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-const CACHE_NAME = 'forge-coach-voice-v6';
+const CACHE_NAME = 'forge-coach-voice-v7';
 /* Lines saved from the old voice are dropped, so nothing old is replayed. */
 if (typeof caches !== 'undefined') void caches.keys().then(names => names.filter(name => name.startsWith('forge-coach-voice-') && name !== CACHE_NAME).forEach(name => void caches.delete(name))).catch(() => {});
 /* At most two lines are made at once: the voice service turns away a third. */
@@ -174,6 +174,15 @@ async function oneAtATime<T>(job: () => Promise<T>): Promise<T> {
    is how the line arrives; it errored, and the robot voice filled in. Every
    line is relabelled as the mp3 it is before it is played or saved. */
 const asMp3 = (blob: Blob) => (blob.type === 'audio/mpeg' ? blob : new Blob([blob], { type: 'audio/mpeg' }));
+/* PLAYED FROM A data: URL, NOT A blob: URL. iPhone refused every blob: line
+   with "not supported" (voice_events, media error 4) even though the mp3 was
+   good; a data: URL of the same bytes is what iOS Safari plays reliably. */
+const playable = (blob: Blob) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result).replace(/^data:[^;,]*/, 'data:audio/mpeg'));
+  reader.onerror = () => reject(reader.error);
+  reader.readAsDataURL(asMp3(blob));
+});
 function hashLine(text: string) { let h = 5381; for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + text.length; }
 
 export class Coach {
@@ -208,13 +217,14 @@ export class Coach {
         if (typeof caches !== 'undefined') {
           const cache = await caches.open(CACHE_NAME);
           const hit = await cache.match(request);
-          if (hit) return URL.createObjectURL(asMp3(await hit.blob()));
+          if (hit) return playable(await hit.blob());
           const blob = asMp3(await oneAtATime(() => this.speakCloud!(text, this.voice)));
+          if (blob.size < 1000) this.onReport('small-audio', `size=${blob.size} type=${blob.type}`);
           void cache.put(request, new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })).catch(() => {});
-          return URL.createObjectURL(blob);
+          return playable(blob);
         }
       } catch (error) { if (!(error instanceof DOMException)) throw error; }
-      return URL.createObjectURL(asMp3(await oneAtATime(() => this.speakCloud!(text, this.voice))));
+      return playable(await oneAtATime(() => this.speakCloud!(text, this.voice)));
     })();
     this.lines.set(key, job);
     job.catch(() => this.lines.delete(key));
@@ -323,7 +333,7 @@ export class Coach {
       this.lineUrl(text).then(url => {
         if (settled || token !== this.sayToken) return;
         settled = true; window.clearTimeout(timer); this.cloudSpeakFailures = 0;
-        audio.onended = finish; audio.onerror = () => { this.onReport('decode-error', `code=${audio.error?.code} ${audio.error?.message || ''}`); this.cloudSpeakFailures += 1; this.speakPhone(text, finish); };
+        audio.onended = finish; audio.onerror = () => { this.onReport('decode-error', `code=${audio.error?.code} ${audio.error?.message || ''} src=${audio.src.slice(0, 40)} len=${audio.src.length}`); this.cloudSpeakFailures += 1; this.speakPhone(text, finish); };
         audio.src = url;
         void audio.play().then(() => this.onReport('played', text.slice(0, 40))).catch(error => { this.onReport('play-rejected', `${(error as Error)?.name}: ${(error as Error)?.message}`.slice(0, 200)); this.speakPhone(text, finish); });
       }).catch(error => { window.clearTimeout(timer); this.onReport('fetch-failed', String((error as Error)?.message || error).slice(0, 200)); this.cloudSpeakFailures += 1; fallback(); });
