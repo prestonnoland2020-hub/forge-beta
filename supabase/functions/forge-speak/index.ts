@@ -1,3 +1,4 @@
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { consumeQuota, corsFor, errorResponse, HttpError, refundQuota, requireCaller } from '../_shared/guard.ts';
 
 /* FORGE SPEAK — the Guided coach's voice.
@@ -17,8 +18,22 @@ const female = (voice: string) => !['ash', 'cedar', 'onyx', 'echo', 'verse', 'ba
 /* ELEVENLABS, the most human-sounding voices available. Used whenever the
    ELEVENLABS_API_KEY secret is set; OpenAI is the fallback. Voices can be
    changed with ELEVENLABS_VOICE_FEMALE / ELEVENLABS_VOICE_MALE (voice IDs). */
-async function elevenLabs(text: string, voice: string): Promise<ArrayBuffer | null> {
-  const key = Deno.env.get('ELEVENLABS_API_KEY');
+/* The key comes from the ELEVENLABS_API_KEY secret, or, when that is not
+   set, from the server_secrets table (RLS on, no policies: only the service
+   role reads it). Looked up once per warm instance. */
+let storedKey: Promise<string | null> | null = null;
+function elevenLabsKey(admin: SupabaseClient): Promise<string | null> {
+  const env = Deno.env.get('ELEVENLABS_API_KEY');
+  if (env) return Promise.resolve(env);
+  storedKey ??= (async () => {
+    const { data } = await admin.from('server_secrets').select('value').eq('name', 'ELEVENLABS_API_KEY').maybeSingle();
+    return (data as { value?: string } | null)?.value || null;
+  })().catch(() => null);
+  return storedKey;
+}
+
+async function elevenLabs(text: string, voice: string, admin: SupabaseClient): Promise<ArrayBuffer | null> {
+  const key = await elevenLabsKey(admin);
   if (!key) return null;
   const id = female(voice) ? (Deno.env.get('ELEVENLABS_VOICE_FEMALE') || 'EXAVITQu4vr4xnSDxMaL') : (Deno.env.get('ELEVENLABS_VOICE_MALE') || 'nPczCjzI2devNBz1zQrb');
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${id}?output_format=mp3_44100_128`, {
@@ -50,7 +65,7 @@ Deno.serve(async (request: Request) => {
     const voice = typeof body.voice === 'string' && VOICES.has(body.voice) ? body.voice : 'coral';
     await consumeQuota(caller, 'forge-speak');
     spent = true;
-    const human = await elevenLabs(text, voice);
+    const human = await elevenLabs(text, voice, caller.admin);
     if (human) return new Response(human, { headers: { ...cors, 'Content-Type': 'application/octet-stream', 'X-Voice-Provider': 'elevenlabs' } });
     const response = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
