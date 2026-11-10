@@ -97,6 +97,7 @@ import './today-hero.css';
 import './forge-logbook.css';
 import './wrapped.css';
 import './guided.css';
+import './design-terms.css';
 import { startNativeChrome } from './features/shell/nativeChrome';
 
 // OAuth providers return to the public app URL before the hash route. Send the

@@ -42,7 +42,7 @@
 
 .side-nav .nav-submenu a:hover,
 .side-nav .nav-submenu a.sub-active {
-  background: color-mix(in srgb, var(--tint) 6%, transparent);
+  background: color-mix(in oklch, var(--tint) 6%, transparent);
   color: var(--text);
 }
 

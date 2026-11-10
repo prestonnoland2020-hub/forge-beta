@@ -54,6 +54,10 @@ function GoalFix({ verdict }: { verdict: Feasibility }) {
 }
 
 export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean; now?: number | null }) {
+  /* PROGRESSIVE DISCLOSURE: the answer and what to do about it are always
+     shown; the range behind the answer opens on request. */
+  const [open, setOpen] = useState(false);
+  const rangeId = `gpc-range-${verdict.goal.replace(/[^a-z0-9]+/gi, '-')}`;
   const model = verdict.prediction;
   if (!model) return null;
   /* Carried from the number the card above shows, so the two always agree. */
@@ -82,8 +86,14 @@ export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now }: { v
   return <section className={`goal-prediction compact tone-${tone}`} aria-label="Forge's prediction">
     <div className="gpc-head"><span>Projected by {shortDate(date)}</span><em>{label}</em></div>
     <div className="gpc-num"><b>{show(p.typical)}</b><span>{line}</span></div>
-    <div className="gpc-bar" aria-hidden="true"><i style={{ width: `${at(p.typical)}%` }} /><s style={{ left: `${at(p.target)}%` }} /></div>
-    <p className="gpc-meta"><span>Best case {show(p.ceiling)}</span><span>Goal {show(p.target)}</span></p>
+    <button type="button" className="gpc-why" aria-expanded={open} aria-controls={rangeId} onClick={() => setOpen(value => !value)}>
+      {open ? 'Hide range' : 'See range'}
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+    </button>
+    {open && <div className="gpc-detail" id={rangeId}>
+      <div className="gpc-bar" aria-hidden="true"><i style={{ width: `${at(p.typical)}%` }} /><s style={{ left: `${at(p.target)}%` }} /></div>
+      <p className="gpc-meta"><span>Best case {show(p.ceiling)}</span><span>Goal {show(p.target)}</span></p>
+    </div>}
     {/* The estimate already clears the goal but the time actually run does
        not: the advice is to go and prove it, not "hold it". */}
     {reach(model.start) && !reach(p.start)

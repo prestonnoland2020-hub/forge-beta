@@ -16,7 +16,7 @@
   padding: 16px;
   border: 1px solid var(--accent-dim);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--tint) 5.5%, transparent);
+  background: color-mix(in oklch, var(--tint) 5.5%, transparent);
 }
 
 .running-event-builder {
@@ -58,7 +58,7 @@
   gap: 8px;
   padding: 12px;
   border-left: 3px solid var(--accent);
-  background: color-mix(in srgb, var(--tint) 5%, transparent);
+  background: color-mix(in oklch, var(--tint) 5%, transparent);
 }
 
 .event-summary span {

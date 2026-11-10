@@ -8,10 +8,10 @@
 .cb-modal .cb-name:focus{outline:none;box-shadow:inset 0 -2px 0 var(--accent)}
 .cb-close{flex:none;width:44px;height:44px;border-radius:999px;border:0;font-size:24px;line-height:1;background:var(--surface-sunken);color:var(--ink,var(--text))}
 
-.cb-ask{display:grid;gap:10px;padding:14px;border-radius:16px;background:color-mix(in srgb,var(--accent) 10%,var(--surface-1))}
+.cb-ask{display:grid;gap:10px;padding:14px;border-radius:16px;background:color-mix(in oklch,var(--accent) 10%,var(--surface-1))}
 .cb-ask textarea{width:100%;min-height:64px;resize:vertical;font-size:16px}
 .cb-ask .button{justify-self:stretch}
-.cb-ask-again{justify-self:start;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border:0;border-radius:999px;font-weight:800;font-size:15px;color:var(--accent-text,var(--accent));background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.cb-ask-again{justify-self:start;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border:0;border-radius:999px;font-weight:800;font-size:15px;color:var(--accent-text,var(--accent));background:color-mix(in oklch,var(--accent) 12%,transparent)}
 .cb-ask-again svg{width:16px;height:16px}
 .cb-forge-note{margin:-6px 0 0;font-size:15px;line-height:1.45;color:var(--ink-2,var(--muted))}
 
@@ -33,7 +33,7 @@
 .cb-item{border-radius:16px;background:var(--surface-1);border:1px solid var(--hairline,var(--line))}
 .cb-item.open{border-color:var(--accent)}
 .cb-line{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;min-height:64px;padding:12px 16px;border:0;background:transparent;text-align:left;color:var(--ink,var(--text))}
-.cb-num{display:grid;place-items:center;width:30px;height:30px;border-radius:999px;font-size:14px;font-weight:900;color:var(--accent-text,var(--accent));background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.cb-num{display:grid;place-items:center;width:30px;height:30px;border-radius:999px;font-size:14px;font-weight:900;color:var(--accent-text,var(--accent));background:color-mix(in oklch,var(--accent) 14%,transparent)}
 .cb-what{display:grid;gap:2px;min-width:0}
 .cb-what strong{font-size:18px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
 .cb-what small{font-size:14px;font-weight:600;color:var(--ink-3,var(--muted))}

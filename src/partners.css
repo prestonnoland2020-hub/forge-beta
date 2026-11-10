@@ -22,10 +22,10 @@
 .partner-row small,.partner-full-main small{font-size:var(--fs-label);color:var(--ink-3)}
 .partner-full-main>b{color:var(--good);font-size:var(--fs-body)}
 .partner-mark{width:40px;height:40px;border-radius:var(--r-sm);display:grid;place-items:center;background:var(--surface-2);color:var(--ink-2);font:italic 800 var(--fs-small) var(--display);letter-spacing:-.02em}
-.partner-row.trained .partner-mark,.partner-full.done .partner-mark{background:color-mix(in srgb,var(--good) 18%,var(--surface-1));color:var(--good)}
+.partner-row.trained .partner-mark,.partner-full.done .partner-mark{background:color-mix(in oklch,var(--good) 18%,var(--surface-1));color:var(--good)}
 .partner-did{font-size:var(--fs-small);color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .partner-quiet{font-size:var(--fs-small);color:var(--ink-3)}
-.partner-chip{display:inline-flex;align-items:center;gap:var(--s1);padding:var(--s1) var(--s3);border-radius:var(--r-pill);background:color-mix(in srgb,var(--good) 16%,var(--surface-1));color:var(--good);font-size:var(--fs-label);font-weight:800}
+.partner-chip{display:inline-flex;align-items:center;gap:var(--s1);padding:var(--s1) var(--s3);border-radius:var(--r-pill);background:color-mix(in oklch,var(--good) 16%,var(--surface-1));color:var(--good);font-size:var(--fs-label);font-weight:800}
 .partner-go,.partner-invite-prompt>svg{color:var(--ink-3);transform:rotate(-90deg)}
 
 /* ── The partner screen ─────────────────────────────────────────────────── */
@@ -65,7 +65,7 @@
 .partner-result>span:nth-child(2){display:grid;gap:2px;min-width:0}
 .partner-result strong{font-size:var(--fs-body);font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .partner-result small{font-size:var(--fs-small);color:var(--ink-3)}
-.partner-result>b{padding:var(--s1) var(--s3);border-radius:var(--r-pill);background:color-mix(in srgb,var(--accent) 14%,var(--surface-1));font-size:var(--fs-small);font-weight:700;color:var(--accent-text);white-space:nowrap}
+.partner-result>b{padding:var(--s1) var(--s3);border-radius:var(--r-pill);background:color-mix(in oklch,var(--accent) 14%,var(--surface-1));font-size:var(--fs-small);font-weight:700;color:var(--accent-text);white-space:nowrap}
 .partner-result:disabled>b{background:var(--surface-2);color:var(--ink-3)}
 .partner-result:active:not(:disabled){opacity:.7}
 

@@ -5,7 +5,7 @@
   margin-top: 2px; padding: 2px 8px; border-radius: 999px;
   font-size: 12px !important; font-weight: 800 !important; letter-spacing: .01em;
   color: var(--accent-text, var(--accent)) !important;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
 }
 .top-set-pr.big { color: #7a5200 !important; background: linear-gradient(90deg, #ffe08a, #f5c542); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .top-set-pr.big { color: #3d2900 !important; } }
@@ -15,12 +15,12 @@
   .top-set-pr.fresh svg { animation: pr-spin .8s ease-out .1s 1; }
 }
 @keyframes pr-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@keyframes pr-glow { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+@keyframes pr-glow { 0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
 @keyframes pr-spin { from { transform: rotate(-180deg) scale(.6); } to { transform: none; } }
 
 .pr-celebration {
   position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 16px;
-  background: color-mix(in srgb, #000 35%, transparent); cursor: pointer;
+  background: color-mix(in oklch, #000 35%, transparent); cursor: pointer;
   animation: pr-fade .25s ease-out both;
 }
 .pr-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
