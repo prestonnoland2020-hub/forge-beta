@@ -240,3 +240,17 @@ body { line-height: var(--leading-body); }
 .app-frame .classic-calendar .calendar-grid > button .calendar-markers {
   position: absolute !important; left: 50%; bottom: 7px; transform: translateX(-50%); margin: 0;
 }
+
+/* ── 14 STAGGER, everywhere ───────────────────────────────────────────────
+   Activities and Profile now arrive the way Today and Goals do: each block
+   rises into place a beat after the one above it. */
+@media (prefers-reduced-motion: no-preference) {
+  .history-page > *, .simple-profile > *, .simple-profile > * > .simple-settings-list > *, .simple-settings-list > * {
+    animation: gx-rise var(--dur-emphasis) var(--ease-strike) both;
+  }
+  :is(.history-page, .simple-profile, .simple-settings-list) > :nth-child(2) { animation-delay: 70ms; }
+  :is(.history-page, .simple-profile, .simple-settings-list) > :nth-child(3) { animation-delay: 140ms; }
+  :is(.history-page, .simple-profile, .simple-settings-list) > :nth-child(4) { animation-delay: 210ms; }
+  :is(.history-page, .simple-profile, .simple-settings-list) > :nth-child(5) { animation-delay: 280ms; }
+  :is(.history-page, .simple-profile, .simple-settings-list) > :nth-child(n + 6) { animation-delay: 350ms; }
+}
