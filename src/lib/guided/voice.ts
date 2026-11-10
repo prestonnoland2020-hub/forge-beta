@@ -160,7 +160,7 @@ export type CoachVoice = 'coral' | 'ash';
 export const VOICE_LABEL: Record<CoachVoice, string> = { coral: 'Female voice', ash: 'Male voice' };
 export type Speak = (text: string, voice: CoachVoice) => Promise<Blob>;
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-const CACHE_NAME = 'forge-coach-voice-v5-elevenlabs';
+const CACHE_NAME = 'forge-coach-voice-v6';
 /* Lines saved from the old voice are dropped, so nothing old is replayed. */
 if (typeof caches !== 'undefined') void caches.keys().then(names => names.filter(name => name.startsWith('forge-coach-voice-') && name !== CACHE_NAME).forEach(name => void caches.delete(name))).catch(() => {});
 /* At most two lines are made at once: the voice service turns away a third. */
@@ -170,6 +170,10 @@ async function oneAtATime<T>(job: () => Promise<T>): Promise<T> {
   inFlight += 1;
   try { return await job(); } finally { inFlight -= 1; waiting.shift()?.(); }
 }
+/* iPhone will not play audio it is told is "application/octet-stream", which
+   is how the line arrives; it errored, and the robot voice filled in. Every
+   line is relabelled as the mp3 it is before it is played or saved. */
+const asMp3 = (blob: Blob) => (blob.type === 'audio/mpeg' ? blob : new Blob([blob], { type: 'audio/mpeg' }));
 function hashLine(text: string) { let h = 5381; for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + text.length; }
 
 export class Coach {
@@ -202,13 +206,13 @@ export class Coach {
         if (typeof caches !== 'undefined') {
           const cache = await caches.open(CACHE_NAME);
           const hit = await cache.match(request);
-          if (hit) return URL.createObjectURL(await hit.blob());
-          const blob = await oneAtATime(() => this.speakCloud!(text, this.voice));
+          if (hit) return URL.createObjectURL(asMp3(await hit.blob()));
+          const blob = asMp3(await oneAtATime(() => this.speakCloud!(text, this.voice)));
           void cache.put(request, new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })).catch(() => {});
           return URL.createObjectURL(blob);
         }
       } catch (error) { if (!(error instanceof DOMException)) throw error; }
-      return URL.createObjectURL(await oneAtATime(() => this.speakCloud!(text, this.voice)));
+      return URL.createObjectURL(asMp3(await oneAtATime(() => this.speakCloud!(text, this.voice))));
     })();
     this.lines.set(key, job);
     job.catch(() => this.lines.delete(key));
