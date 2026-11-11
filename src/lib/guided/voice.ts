@@ -258,12 +258,15 @@ export class Coach {
     if (!nativeVoice) return false;
     if (this.nativeOn) return true;
     try {
-      const { status } = await nativeVoice.permission();
-      if (status !== 'granted') return false;
+      /* Ask iPhone here if it has not been asked: a mic allowed in an older
+         version of the app says nothing about speech recognition. */
+      let { status } = await nativeVoice.permission();
+      if (status === 'unknown') status = (await nativeVoice.requestPermission()).status;
+      if (status !== 'granted') { this.onReport('native-permission', status); return false; }
       const result = await nativeVoice.start({ hints: NATIVE_HINTS, listen: false });
       if (!result.started) { this.onReport('native-start', result.reason || ''); return false; }
     } catch (error) { this.onReport('native-start', String(error).slice(0, 200)); return false; }
-    this.nativeOn = true; this.tapToTalk = false; this.mode = 'native'; this.onMode('native');
+    this.nativeOn = true; this.tapToTalk = false; this.mode = 'native'; this.onMode('native'); this.onReport('native-on');
     this.nativeSub = await nativeVoice.addListener('heard', ({ text, final }) => {
       if (!this.listening || !text) return;
       if (!final) {
@@ -274,6 +277,7 @@ export class Coach {
         if (!match || (match.how !== 'rule' && match.how !== 'learned')) return;
       }
       void nativeVoice?.reset();
+      this.onReport('native-heard', text.slice(0, 60));
       this.handleHeard([text]);
     });
     if (this.wantListen && !this.speaking && this.allowed) this.listen();
@@ -359,7 +363,7 @@ export class Coach {
     this.speaking = true; this.emit();
     if (this.nativeOn && nativeVoice) {
       const native = nativeVoice;
-      const play = (audio?: string) => native.play({ audio, text }).then(result => { if (!result.cancelled) finish(); }, finish);
+      const play = (audio?: string) => native.play({ audio, text }).then(result => { this.onReport(audio ? 'native-played' : 'native-phone-voice', text.slice(0, 40)); if (!result.cancelled) finish(); }, error => { this.onReport('native-play-failed', String(error).slice(0, 160)); finish(); });
       if (this.natural) this.lineUrl(text).then(url => play(url.split(',')[1]), () => { this.onReport('native-fetch-failed'); void play(); });
       else void play();
       return;
