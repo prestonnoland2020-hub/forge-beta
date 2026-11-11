@@ -24,6 +24,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Forge listens when you talk to your coach during a guided workout.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Forge turns what you say to your coach into text so it can answer.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
