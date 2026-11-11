@@ -203,8 +203,10 @@ export class Coach {
 
   /* Call from a tap: iOS only lets a page start sound in answer to one. */
   unlockAudio() {
-    /* The app speaks natively; web audio here would take over its sound. */
-    if (typeof Audio === 'undefined' || nativeVoice) return;
+    /* Once the app speaks natively, web audio here would take over its
+       sound. Until then (or if the native side fails) the web player is the
+       way the natural voice plays, so it must be unlocked. */
+    if (typeof Audio === 'undefined' || this.nativeOn) return;
     if (!this.audio) { this.audio = new Audio(); this.audio.preload = 'auto'; (this.audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true; }
     /* The last line's handlers must not see this clip (an error here once
        re-read the previous line in the robot voice). */
