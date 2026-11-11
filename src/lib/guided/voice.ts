@@ -301,7 +301,7 @@ export class Coach {
         if (!match || (match.how !== 'rule' && match.how !== 'learned')) return;
       }
       void nativeVoice?.reset();
-      this.onReport('native-heard', text.slice(0, 60));
+      this.onReport(final ? 'native-phrase' : 'native-heard', text.slice(0, 60));
       this.handleHeard([text]);
     });
     if (this.wantListen && !this.speaking && this.allowed) this.listen();
@@ -501,6 +501,21 @@ export class Coach {
     this.emit();
   }
 
+  /* The workout is over: stop listening and talking, but keep the native
+     voice for the goodbye line (farewell), so it is not said by the robot. */
+  hush() {
+    this.sayToken += 1; this.wantListen = false; this.stopListening();
+    if (this.nativeOn && nativeVoice) void nativeVoice.stopPlaying();
+    if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } }
+    this.speaking = false; this.emit();
+  }
+  /* Say the last line, then switch everything off (mic, native voice). */
+  farewell(text: string) {
+    this.say(text);
+    const token = this.sayToken;
+    const done = () => { if (this.sayToken === token && !this.speaking) this.stop(); else if (this.sayToken === token) window.setTimeout(done, 500); };
+    window.setTimeout(done, 800);
+  }
   stop() { if (this.nativeOn && nativeVoice) { this.nativeOn = false; this.mode = 'phone'; void this.nativeSub?.remove(); this.nativeSub = null; void nativeVoice.stop(); } this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
 
   private emit() { this.onState({ speaking: this.speaking, listening: this.listening }); }
