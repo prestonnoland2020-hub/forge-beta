@@ -590,17 +590,17 @@ export function GuidedPage() {
     if (!workout) return null;
     const total = workout.steps.length;
     const done = Math.min(total, stepIndex);
-    if (phase === 'done') return { title: 'Workout done', detail: `${logged.length} sets`, phase: 'done', done: total, total };
+    if (phase === 'done') return { title: 'Workout done', detail: `${logged.length} sets`, phase: 'done', done: total, total, short: 'Done' };
     const current = workout.steps[stepIndex];
     if (!current) return null;
     if (phase === 'rest') {
       const lastSet = setIndex + 1 >= current.sets;
       const next = lastSet ? workout.steps[stepIndex + 1] : current;
-      return { title: 'Rest', detail: next ? `Next: ${next.move.name}${next === current ? ` · set ${setIndex + 2} of ${current.sets}` : ''}` : 'Last one done', phase: 'rest', restEndsAt: restEnd.current, done: lastSet ? done + 1 : done, total };
+      return { title: 'Rest', detail: next ? `Next: ${next.move.name}${next === current ? ` · set ${setIndex + 2} of ${current.sets}` : ''}` : 'Last one done', phase: 'rest', restEndsAt: restEnd.current, done: lastSet ? done + 1 : done, total, short: 'Rest' };
     }
     const w = weights[stepIndex] ?? current.weight;
     const detail = phase === 'feel' ? 'How did that feel?' : `${current.sets > 1 ? `Set ${setIndex + 1} of ${current.sets} · ` : ''}${amountText(current)}${w !== null && w !== undefined ? ` · ${w} ${metric ? 'kg' : 'lb'}` : ''}`;
-    return { title: current.move.name, detail, phase: paused ? 'paused' : 'work', done, total };
+    return { title: current.move.name, detail, phase: paused ? 'paused' : 'work', done, total, short: paused ? 'Paused' : phase === 'feel' ? 'Feel?' : current.part !== 'main' ? (current.part === 'warmup' ? 'Warm' : 'Cool') : current.sets > 1 ? `${setIndex + 1}/${current.sets}` : 'Go' };
   };
   useEffect(() => {
     /* The rest end moves only when rest starts or +30 is added; the per-second
@@ -638,22 +638,22 @@ export function GuidedPage() {
       for (let n = s === stepIndex ? setIndex : 0; n < item.sets && beats.length < 16; n += 1) {
         const here = s === stepIndex && n === setIndex;
         const amount = `${item.sets > 1 ? `Set ${n + 1} of ${item.sets} · ` : ''}${amountText(item)}${w !== null && w !== undefined ? ` · ${w} ${metric ? 'kg' : 'lb'}` : ''}`;
-        const ticker = { title: item.move.name, detail: amount, done: s, total };
+        const ticker = { title: item.move.name, detail: amount, done: s, total, short: item.part !== 'main' ? (item.part === 'warmup' ? 'Warm' : 'Cool') : item.sets > 1 ? `${n + 1}/${item.sets}` : 'Go' };
         if (!(here && (phase === 'feel' || phase === 'rest'))) beats.push({ id: `card:${s}:${n}:${w ?? ''}`, kind: 'card', line: cardLine(item, n, w ?? null), seconds: item.move.timed ? item.reps : 0, timed: Boolean(item.move.timed), perSide: Boolean(item.move.perSide && item.part === 'main'), step: s, set: n, ticker });
         if (item.part !== 'main') continue;
-        if (!(here && phase === 'rest')) beats.push({ id: `feel:${s}:${n}`, kind: 'feel', line: FEEL_LINE, seconds: 0, timed: false, perSide: false, step: s, set: n, ticker: { ...ticker, detail: 'How did that feel?' } });
+        if (!(here && phase === 'rest')) beats.push({ id: `feel:${s}:${n}`, kind: 'feel', line: FEEL_LINE, seconds: 0, timed: false, perSide: false, step: s, set: n, ticker: { ...ticker, detail: 'How did that feel?', short: 'Feel?' } });
         const lastSet = n + 1 >= item.sets;
         if (lastSet && s + 1 >= total) break;
         const upNext = lastSet ? workout.steps[s + 1] : item;
         const line = `${cheer(count)} Take ${timeWords(item.rest)}${item.rest >= 60 ? ' to recover' : ''}. ${lastSet ? `Next up is ${upNext.move.name}.` : 'Same move next.'} Tell me when you're ready.`;
         count += 1;
-        beats.push({ id: `rest:${s}:${n}:${count}`, kind: 'rest', line, seconds: item.rest, timed: false, perSide: false, step: s, set: n, ticker: { title: 'Rest', detail: `Next: ${upNext.move.name}`, done: lastSet ? s + 1 : s, total } });
+        beats.push({ id: `rest:${s}:${n}:${count}`, kind: 'rest', line, seconds: item.rest, timed: false, perSide: false, step: s, set: n, ticker: { title: 'Rest', detail: `Next: ${upNext.move.name}`, done: lastSet ? s + 1 : s, total, short: 'Rest' } });
       }
     }
     if (beats.length < 16 && workout.steps.length) {
       const lastStep = workout.steps[total - 1];
       const reachesEnd = beats.some(beat => beat.step === total - 1 && beat.set === lastStep.sets - 1);
-      if (reachesEnd) beats.push({ id: 'end', kind: 'end', line: "That's the whole workout. Amazing work. Open Forge and I'll save it for you.", seconds: 0, timed: false, perSide: false, step: total - 1, set: lastStep.sets - 1, ticker: { title: 'Workout done', detail: 'Open Forge to save it', done: total, total } });
+      if (reachesEnd) beats.push({ id: 'end', kind: 'end', line: "That's the whole workout. Amazing work. Open Forge and I'll save it for you.", seconds: 0, timed: false, perSide: false, step: total - 1, set: lastStep.sets - 1, ticker: { title: 'Workout done', detail: 'Open Forge to save it', done: total, total, short: 'Done' } });
     }
     return beats;
   };

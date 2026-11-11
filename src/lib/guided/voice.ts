@@ -206,7 +206,10 @@ export class Coach {
     /* Once the app speaks natively, web audio here would take over its
        sound. Until then (or if the native side fails) the web player is the
        way the natural voice plays, so it must be unlocked. */
-    if (typeof Audio === 'undefined' || this.nativeOn) return;
+    /* In the app, web audio also stops her music (iPhone treats it as an
+       app taking over the sound), so it is used only if the native voice
+       could not start. */
+    if (typeof Audio === 'undefined' || this.nativeOn || (nativeVoice && !this.nativeFailed)) return;
     if (!this.audio) { this.audio = new Audio(); this.audio.preload = 'auto'; (this.audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true; }
     /* The last line's handlers must not see this clip (an error here once
        re-read the previous line in the robot voice). */
@@ -255,6 +258,7 @@ export class Coach {
   /* THE IPHONE APP: native ears and mouth (nativeVoice.ts). Always listening
      during a workout, no taps; the coach plays at full quality over music. */
   private nativeOn = false;
+  private nativeFailed = false;
   private nativeSub: { remove: () => Promise<void> } | null = null;
   /* The recorded line, as base64 mp3, for the background coach. */
   async audioFor(text: string): Promise<string | null> {
@@ -269,7 +273,12 @@ export class Coach {
     this.listening = false; this.emit();
     if (this.wantListen && !this.speaking) this.listen();
   }
-  async useNative() {
+  private nativeStarting: Promise<boolean> | null = null;
+  useNative() {
+    if (!this.nativeStarting) this.nativeStarting = this.startNative().finally(() => { this.nativeStarting = null; });
+    return this.nativeStarting;
+  }
+  private async startNative() {
     if (!nativeVoice) return false;
     if (this.nativeOn) return true;
     try {
@@ -277,10 +286,10 @@ export class Coach {
          version of the app says nothing about speech recognition. */
       let { status } = await nativeVoice.permission();
       if (status === 'unknown') status = (await nativeVoice.requestPermission()).status;
-      if (status !== 'granted') { this.onReport('native-permission', status); return false; }
+      if (status !== 'granted') { this.onReport('native-permission', status); this.nativeFailed = true; return false; }
       const result = await nativeVoice.start({ hints: NATIVE_HINTS, listen: false });
-      if (!result.started) { this.onReport('native-start', result.reason || ''); return false; }
-    } catch (error) { this.onReport('native-start', String(error).slice(0, 200)); return false; }
+      if (!result.started) { this.onReport('native-start', result.reason || ''); this.nativeFailed = true; return false; }
+    } catch (error) { this.onReport('native-start', String(error).slice(0, 200)); this.nativeFailed = true; return false; }
     this.nativeOn = true; this.tapToTalk = false; this.mode = 'native'; this.onMode('native'); this.onReport('native-on');
     this.nativeSub = await nativeVoice.addListener('heard', ({ text, final }) => {
       if (!this.listening || !text) return;
@@ -373,7 +382,10 @@ export class Coach {
     if (this.muted) { this.speaking = false; this.emit(); if (listenFor) this.listen(); return; }
     const token = ++this.sayToken;
     if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } }
-    if (canSpeak()) window.speechSynthesis.cancel();
+    if (canSpeak() && !nativeVoice) window.speechSynthesis.cancel();
+    /* In the app, the first line waits the moment the native voice takes to
+       start, rather than playing through the web view (which stops music). */
+    if (this.nativeStarting && !this.nativeOn) { const starting = this.nativeStarting; void starting.then(() => { if (token === this.sayToken) { this.sayToken -= 1; this.say(text, listenFor); } }); return; }
     const finish = () => { if (token !== this.sayToken) return; this.speaking = false; this.emit(); if (listenFor) this.listen(); };
     this.speaking = true; this.emit();
     if (this.nativeOn && nativeVoice) {

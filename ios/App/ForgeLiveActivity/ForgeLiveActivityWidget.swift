@@ -101,13 +101,22 @@ struct ForgeLiveActivityWidget: Widget {
                     Progress(done: context.state.done, total: context.state.total).padding(.top, 6)
                 }
             } compactLeading: {
-                Image(systemName: context.state.phase == "rest" ? "pause.circle.fill" : "figure.strengthtraining.traditional")
-                    .foregroundStyle(lime)
+                if let short = context.state.short, !short.isEmpty {
+                    Text(short)
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(lime)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .frame(maxWidth: 52)
+                } else {
+                    Image(systemName: context.state.phase == "rest" ? "pause.circle.fill" : "figure.strengthtraining.traditional")
+                        .foregroundStyle(lime)
+                }
             } compactTrailing: {
                 Clock(context: context)
-                    .font(.caption.weight(.bold))
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
                     .foregroundStyle(lime)
-                    .frame(maxWidth: 46)
+                    .frame(maxWidth: 52)
             } minimal: {
                 Image(systemName: "figure.strengthtraining.traditional").foregroundStyle(lime)
             }

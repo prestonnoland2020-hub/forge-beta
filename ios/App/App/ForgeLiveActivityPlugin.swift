@@ -31,7 +31,8 @@ public class ForgeLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             phase: call.getString("phase") ?? "work",
             restEndsAt: Self.date(call.getDouble("restEndsAt")),
             done: call.getInt("done") ?? 0,
-            total: call.getInt("total") ?? 0
+            total: call.getInt("total") ?? 0,
+            short: call.getString("short")
         )
     }
     #endif

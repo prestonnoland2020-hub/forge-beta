@@ -11,6 +11,8 @@ export type TickerState = {
   detail: string;
   phase: 'work' | 'rest' | 'paused' | 'done';
   restEndsAt?: number;
+  /* A word or two for the small Dynamic Island: "2/3", "Rest". */
+  short?: string;
   done: number;
   total: number;
 };

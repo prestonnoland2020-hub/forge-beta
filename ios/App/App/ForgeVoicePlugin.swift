@@ -546,7 +546,8 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
             phase: beat.kind == "rest" ? "rest" : (beat.kind == "end" ? "done" : "work"),
             restEndsAt: beat.kind == "rest" ? restEndsAt : nil,
             done: (t["done"] as? NSNumber)?.intValue ?? 0,
-            total: (t["total"] as? NSNumber)?.intValue ?? 0)
+            total: (t["total"] as? NSNumber)?.intValue ?? 0,
+            short: t["short"] as? String)
         Task { for activity in Activity<ForgeWorkoutAttributes>.activities { await activity.update(.init(state: state, staleDate: nil)) } }
         #endif
     }

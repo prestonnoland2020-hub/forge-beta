@@ -20,6 +20,8 @@ public struct ForgeWorkoutAttributes: ActivityAttributes {
         /* Moves done of the whole workout, for the progress bar. */
         public var done: Int
         public var total: Int
+        /* A word or two for the small Dynamic Island: "2/3", "Rest". */
+        public var short: String?
     }
     /* The workout's name, and when it started (the elapsed clock). */
     public var workoutTitle: String

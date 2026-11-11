@@ -5,7 +5,7 @@ import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor
    playback of the coach's lines over music. Absent on the web. */
 
 /* One step of the background coach's script (see ForgeVoicePlugin.swift). */
-export type ScriptBeat = { id: string; kind: 'card' | 'feel' | 'rest' | 'end'; line: string; seconds: number; timed: boolean; perSide: boolean; step: number; set: number; ticker: { title: string; detail: string; done: number; total: number } };
+export type ScriptBeat = { id: string; kind: 'card' | 'feel' | 'rest' | 'end'; line: string; seconds: number; timed: boolean; perSide: boolean; step: number; set: number; ticker: { title: string; detail: string; done: number; total: number; short?: string } };
 export type NativeMicStatus = 'granted' | 'denied' | 'unknown';
 type Plugin = {
   permission(): Promise<{ status: NativeMicStatus }>;
