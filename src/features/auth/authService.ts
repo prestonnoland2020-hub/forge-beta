@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { isDemoMode } from '../../lib/env';
+import { isNative } from '../billing/platform';
 
 /* SIGN IN WITH APPLE IS NOT OPTIONAL.
 
@@ -19,6 +20,11 @@ export type OAuthProvider = 'google' | 'apple';
 export async function signInWithProvider(provider: OAuthProvider) {
   if (isDemoMode) {
     window.location.hash = '/';
+    return;
+  }
+  if (isNative()) {
+    const { signInInsideApp } = await import('./nativeSignIn');
+    await signInInsideApp(provider);
     return;
   }
   const { error } = await supabase.auth.signInWithOAuth({
