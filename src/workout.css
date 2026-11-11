@@ -229,6 +229,14 @@
 .top-set-sheet footer{display:grid;gap:12px}
 .top-set-sheet footer .button{width:100%}
 .top-set-sheet footer .button.ghost{border-color:transparent;background:none;color:var(--muted);font-weight:700}
+/* CHOOSING THE EXERCISE, WITH THE KEYBOARD UP. The keyboard leaves about half
+   the screen, and the sheet spent it on a subtitle and a Save button that
+   cannot be pressed until a lift is chosen, so two results showed. While
+   picking, both step aside and the results take every pixel that is left. */
+.top-set-sheet.picking{grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;gap:12px;max-height:calc(100dvh - 32px)}
+.top-set-sheet.picking header small,.top-set-sheet.picking footer{display:none}
+.top-set-sheet.picking .top-set-sheet-results{max-height:none;min-height:0}
+@media (max-width:600px){.top-set-sheet.picking{padding:16px;align-self:start}}
 .add-top-set-button{justify-self:start;margin-top:2px}
 
 /* Sets already logged for a synced day: assigning the day ties them to it —

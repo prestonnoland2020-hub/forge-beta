@@ -367,3 +367,45 @@ body { background: var(--bg) !important; }
 @media (max-width: 900px) {
   .app-frame .workout-finish-bar { position: static !important; background: none !important; padding-bottom: 8px !important; }
 }
+
+
+/* The page has a drawing behind it now, so the dashed "add" rows are filled:
+   their label sits on the card colour, not on the strands. */
+.app-frame :is(.gx-add, .top-set-add, .top-set-card-stack > .top-set-add) { background: var(--surface-1) !important; }
+
+/* ── Named header actions ─────────────────────────────────────────────── */
+/* Two bare glyphs (a chart and a plus) told a new athlete nothing. Each now
+   carries its word: Progress, Log. */
+.app-frame .top-actions > :is(.top-insights, .top-log).labeled {
+  display: inline-flex !important; align-items: center; gap: 6px;
+  width: auto !important; min-width: 0 !important; padding: 0 12px 0 10px !important;
+}
+.app-frame .top-actions > :is(.top-insights, .top-log).labeled svg { width: 18px; height: 18px; flex: none; }
+.app-frame .top-actions > :is(.top-insights, .top-log).labeled span { font-size: 14px; font-weight: 700; line-height: 1; }
+
+/* ── "Ask coach", until it has been tried ─────────────────────────────── */
+.app-frame .coach-bubble-toggle.named {
+  width: auto !important; min-width: 0 !important; padding: 0 18px 0 14px !important; gap: 8px !important;
+}
+.app-frame .coach-bubble-toggle.named b { display: inline !important; font-size: 15px; font-weight: 800; }
+
+/* ── Controls on top ─────────────────────────────────────────────────────
+   Exercises opens on Lifts · Cardio · Circuits tabs; Plan and Split keep
+   their settings behind one Adjust pill in the header instead of under
+   the whole page. */
+.app-frame .lib-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface-sunken); border: 1px solid var(--hairline); }
+.app-frame .lib-tabs button { min-height: 36px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-3); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .18s ease, color .18s ease; }
+.app-frame .lib-tabs button.active { background: var(--surface-3); color: var(--ink); }
+.app-frame .exercise-circuit-actions.top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 4px; }
+.app-frame .exercise-circuit-actions.top .button { min-height: 44px; padding: 0 12px; font-size: 15px; white-space: nowrap; }
+.app-frame .pv-progress-head { align-items: center; }
+.app-frame .pv-progress-head .pv-progress-name { margin-left: auto; }
+.app-frame .ss-head { align-items: center; }
+.app-frame .ss-head-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.app-frame .adjust-pill { flex: none; min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hairline-strong, var(--hairline)); background: var(--surface-1); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.app-frame .adjust-pill.open { background: var(--surface-3); border-color: transparent; }
+.app-frame .adjust-panel { display: grid; gap: 14px; animation: adjust-in .2s ease both; }
+.app-frame .adjust-panel .pv-actions { margin: 0; }
+.app-frame .adjust-panel .ss-mileage { padding-top: 12px; border-top: 1px solid var(--hairline); }
+@keyframes adjust-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .app-frame .adjust-panel { animation: none; } }

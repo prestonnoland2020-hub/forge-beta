@@ -148,7 +148,7 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
   };
 
   return <div className="top-set-sheet-backdrop" data-state={shown ? 'open' : 'closed'} role="dialog" aria-modal="true" aria-label="Add a top set" onClick={closeOnBackdrop}>
-    <div className="top-set-sheet">
+    <div className={lift ? 'top-set-sheet' : 'top-set-sheet picking'}>
       <header>
         <div><strong>Add a top set</strong><small>The one heaviest meaningful set. Forge measures progress from it.</small></div>
         <button type="button" className="top-set-sheet-close" aria-label="Close" onClick={close}>×</button>
