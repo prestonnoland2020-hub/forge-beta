@@ -484,7 +484,7 @@ export function GuidedPage() {
   };
   const finish = () => {
     writeLive(null); clearResume(); setEndAsk(false);
-    coach.current?.stop();
+    coach.current?.hush();
     setRunning(false); setPhase('done');
   };
 
@@ -514,7 +514,7 @@ export function GuidedPage() {
       if (fromPlan) { try { sessionStorage.removeItem(FROM_PLAN_KEY); } catch { /* fine */ } }
     }
     const sets = main.length;
-    coach.current?.say(logged.length ? `And that's the workout! ${sets} sets in ${minutesTaken} minutes. Seriously, great job today. It's all saved for you.` : "No problem. Come back whenever you're ready.");
+    coach.current?.farewell(logged.length ? `And that's the workout! ${sets} sets in ${minutesTaken} minutes. Seriously, great job today. It's all saved for you.` : "No problem. Come back whenever you're ready.");
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- Timers: rest counts down; a timed move counts down once started ---- */

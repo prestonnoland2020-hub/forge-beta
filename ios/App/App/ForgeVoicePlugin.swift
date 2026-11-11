@@ -155,11 +155,37 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
                 call.resolve(["started": false, "reason": error.localizedDescription]); return
             }
             NotificationCenter.default.addObserver(self, selector: #selector(self.interrupted(_:)), name: AVAudioSession.interruptionNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(self.engineChanged(_:)), name: .AVAudioEngineConfigurationChange, object: self.engine)
             self.running = true
             self.observeApp()
             self.listening = call.getBool("listen") ?? true
             self.newTask()
             call.resolve(["started": true])
+        }
+    }
+
+    /* Changing the sound settings (to lower her music while the coach talks)
+       can stop the mic engine without a word. Put it back whenever it is
+       needed: before every listening session, and on a configuration change. */
+    private func ensureEngine() {
+        guard running, !engine.isRunning else { return }
+        let input = engine.inputNode
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0 else { return }
+        input.removeTap(onBus: 0)
+        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+            guard let self = self, self.listening else { return }
+            self.request?.append(buffer)
+        }
+        engine.prepare()
+        try? engine.start()
+    }
+
+    @objc private func engineChanged(_ note: Notification) {
+        DispatchQueue.main.async {
+            guard self.running else { return }
+            self.ensureEngine()
+            if self.listening { self.newTask() }
         }
     }
 
@@ -169,7 +195,7 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
               AVAudioSession.InterruptionType(rawValue: raw) == .ended, running else { return }
         DispatchQueue.main.async {
             self.configureSession(duck: false)
-            if !self.engine.isRunning { try? self.engine.start() }
+            self.ensureEngine()
             self.newTask()
         }
     }
@@ -181,11 +207,12 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
         pauseTimer?.invalidate(); pauseTimer = nil
         /* No session while muted: nothing to hear, nothing to restart. */
         guard running, listening, let recognizer = recognizer else { return }
+        ensureEngine()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
         request.contextualStrings = hints
-        request.taskHint = .confirmation
+        request.taskHint = .unspecified
         if #available(iOS 16.0, *) { request.addsPunctuation = false }
         self.request = request
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
@@ -287,8 +314,9 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     private func finishPlaying(cancelled: Bool) {
         player?.stop(); player = nil
         if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
-        if let call = playCall { playCall = nil; call.resolve(["cancelled": cancelled]) }
         configureSession(duck: false)
+        ensureEngine()
+        if let call = playCall { playCall = nil; call.resolve(["cancelled": cancelled]) }
     }
 
     public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
@@ -565,6 +593,7 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
             self.engine.inputNode.removeTap(onBus: 0)
             if self.engine.isRunning { self.engine.stop() }
             NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: .AVAudioEngineConfigurationChange, object: self.engine)
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             call.resolve()
         }
