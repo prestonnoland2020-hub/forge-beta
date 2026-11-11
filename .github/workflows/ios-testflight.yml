@@ -6,12 +6,17 @@ name: iOS build to TestFlight
 # Signing is automatic: Xcode uses the App Store Connect API key to make or
 # reuse the distribution certificate and profile, so no certificates live here.
 
+# Every merge to main ships a new TestFlight build, so the app on testers'
+# phones matches the website. A newer merge replaces a build still in progress.
 on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'supabase/**', 'tests/**']
   workflow_dispatch:
 
 concurrency:
   group: ios-testflight
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   testflight:
