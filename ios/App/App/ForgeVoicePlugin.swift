@@ -243,12 +243,16 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     }
     @objc func mute(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            if self.autopilot { call.resolve(); return } self.listening = false; self.newTask(); call.resolve() }
+            if self.autopilot { call.resolve(); return }
+            self.listening = false; self.newTask(); call.resolve()
+        }
     }
     /* A command was acted on: clear what was heard so it is not acted on twice. */
     @objc func reset(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            if self.autopilot { call.resolve(); return } self.newTask(); call.resolve() }
+            if self.autopilot { call.resolve(); return }
+            self.newTask(); call.resolve()
+        }
     }
 
     /* ---------- Speaking ---------- */
