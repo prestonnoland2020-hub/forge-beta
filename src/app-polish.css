@@ -200,6 +200,13 @@ details.session-details[open] > summary { margin-bottom: 16px; }
 .ss-library-save { flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--surface-2); color: var(--ink); font-weight: 800; font-size: 14px; white-space: nowrap; }
 .ss-library-save:disabled { background: transparent; color: var(--ink-3, var(--muted)); }
 .ss-settings .ss-forget { justify-self: start; color: var(--bad, #c0392b); }
+.ss-saved { display: grid; gap: 4px; padding-top: 12px; border-top: 1px solid var(--hairline, var(--line)); }
+.ss-saved > strong { font-size: 14px; }
+.ss-saved-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
+.ss-saved-row > span { display: grid; gap: 2px; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-saved-row > span small { font-weight: 600; }
+.ss-saved-row > button { flex: none; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--hairline-strong, var(--line)); background: transparent; color: var(--ink-2, var(--ink)); font-weight: 700; font-size: 14px; }
+.ss-saved-row > button.confirming { border-color: var(--bad); background: color-mix(in oklch, var(--bad) 14%, transparent); color: var(--bad); }
 .ss-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .ss-head h2 { margin: 0; font-size: 26px; line-height: 1.15; text-transform: none; letter-spacing: -.015em; }
 .ss-head small { color: var(--ink-3, var(--muted)); font-weight: 600; font-size: 14px; }
@@ -483,6 +490,11 @@ svg.icon { display: inline-block; flex: none; vertical-align: -0.18em; }
 .dial-simple .dial-value.active { font-size: 32px; font-weight: 800; color: var(--ink, var(--text)); opacity: 1; transform: none; }
 .dial-simple .dial-point { font: 800 26px var(--display-font, var(--display)); color: var(--ink, var(--text)); align-self: center; }
 .dial-simple .dial-suffix { position: relative; align-self: center; min-width: 0; font: 800 16px var(--body, inherit); letter-spacing: .02em; text-transform: none; color: var(--accent-text); }
+/* ONE WHEEL FILLS THE ROW. It was 96px wide under a band that spans the
+   sheet, so a thumb on the band beside the number scrolled nothing. The unit
+   sits beside the centred value without taking touches. */
+.dial-simple .dial-single .dial-wheel { flex: 1; min-width: 0; }
+.dial-simple .dial-single .dial-suffix { position: absolute; left: calc(50% + 58px); top: 50%; transform: translateY(-50%); pointer-events: none; }
 
 /* Activities: custom days that lost their muscles, one tap from fixing. */
 .muscle-review { display: grid; gap: 12px; border: 1px solid color-mix(in oklch, var(--accent) 26%, transparent); background: linear-gradient(160deg, color-mix(in oklch, var(--tint) 10%, var(--surface-1)), var(--surface-1) 70%); }

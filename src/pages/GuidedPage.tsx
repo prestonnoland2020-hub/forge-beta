@@ -77,13 +77,16 @@ const clearResume = () => { try { localStorage.removeItem(RESUME_KEY); } catch {
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.max(0, seconds) % 60).padStart(2, '0')}`;
 
+/* ONE DRAWING PER STYLE, each a thing you would recognise on a gym wall: a
+   loaded barbell, the Pilates teaser, a flexed arm, a pull-up, an interval
+   timer, a lotus. The first set were stick figures that read as one another. */
 const STYLES: Array<[Style, string]> = [
-  ['Strength', 'M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12'],
-  ['Pilates', 'M12 5a2 2 0 1 0 0-.01M4 20l5-6 3 2 3-2 5 6M9 14l3-5 3 5'],
-  ['Build muscle', 'M7 7c0 3 2 5 5 5s5-2 5-5M5 21c0-4 3-7 7-7s7 3 7 7'],
-  ['Bodyweight', 'M12 4a2 2 0 1 0 0 .01M12 8v6M8 21l4-7 4 7M6 11h12'],
-  ['HIIT / CrossFit-style', 'M13 2 4 14h7l-1 8 9-12h-7l1-8z'],
-  ['Stretch & mobility', 'M4 20c4-8 12-8 16 0M12 4a2 2 0 1 0 0 .01M12 8v4'],
+  ['Strength', 'M3 12h18M6.5 8v8M9.5 6v12M14.5 6v12M17.5 8v8'],
+  ['Pilates', 'M5.5 6.8a1.7 1.7 0 1 0 .01 0M7 11.5l4.5 6.5 8.5-8M8.2 13.4l7-2.2M6 21h12'],
+  ['Build muscle', 'M12.409 13.017A5 5 0 0 1 22 15c0 3.866-4 7-9 7-4.077 0-8.153-.82-10.371-2.462-.426-.316-.631-.832-.62-1.362C2.118 12.723 2.627 2 10 2a3 3 0 0 1 3 3 2 2 0 0 1-2 2c-1.105 0-1.64-.444-2-1M15 14a5 5 0 0 0-7.584 2M9.964 6.825C8.019 7.977 9.5 13 8 15'],
+  ['Bodyweight', 'M4 4h16M8 4v3.5M16 4v3.5M12 7.5a1.7 1.7 0 1 0 .01 0M8 7.5c0 3 1.5 4.5 4 4.5s4-1.5 4-4.5M12 12v4.5M12 16.5l-2.5 4.5M12 16.5l2.5 4.5'],
+  ['HIIT / CrossFit-style', 'M10 2h4M12 5a8.5 8.5 0 1 0 .01 0M12.8 9l-2.6 4.2h3.6L11.2 17.5'],
+  ['Stretch & mobility', 'M12 4.5c2.6 3.2 2.6 8.3 0 12.5c-2.6-4.2-2.6-9.3 0-12.5zM12 17c-4 0-7.4-2.6-8.5-7c3.2 0 5.6 1.2 7 3M12 17c4 0 7.4-2.6 8.5-7c-3.2 0-5.6 1.2-7 3M7 20.5h10'],
 ];
 const VIBES = ['Slow & controlled', 'High energy', 'Low impact', 'Core focus', 'Glutes & legs', 'Upper body', 'Short & sweet'];
 const PLACES: Array<[Place, string]> = [['Gym', 'Machines, barbells, dumbbells'], ['Home', 'A few things at home'], ['Anywhere', 'No equipment at all']];
@@ -782,7 +785,7 @@ export function GuidedPage() {
       {!editOne && <div className="gd-bar"><i style={{ width: `${((setupStep + 1) / 3) * 100}%` }} /></div>}
       {setupStep === 0 && <>
         <h1>What do you enjoy?</h1><p className="gd-lead">Pick as many as you like.</p>
-        <div className="gd-tiles">{STYLES.map(([label, icon]) => { const on = draft.styles.includes(label); return <button type="button" key={label} className={on ? 'gd-tile on' : 'gd-tile'} aria-pressed={on} onClick={() => toggle('styles', label)}><span className="gd-ic"><Svg d={icon} size={20} /></span><strong>{label}</strong></button>; })}</div>
+        <div className="gd-tiles">{STYLES.map(([label, icon]) => { const on = draft.styles.includes(label); return <button type="button" key={label} className={on ? 'gd-tile on' : 'gd-tile'} aria-pressed={on} onClick={() => toggle('styles', label)}><span className="gd-ic"><Svg d={icon} size={22} stroke={1.9} /></span><strong>{label}</strong></button>; })}</div>
         <h2>Your style</h2>
         <div className="gd-chips">{VIBES.map(label => { const on = draft.vibe.includes(label); return <button type="button" key={label} className={on ? 'gd-chip on' : 'gd-chip'} aria-pressed={on} onClick={() => toggle('vibe', label)}>{label}</button>; })}</div>
       </>}
