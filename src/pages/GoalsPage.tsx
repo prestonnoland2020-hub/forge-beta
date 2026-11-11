@@ -12,7 +12,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { MileageCheckOnGoal } from '../components/MileageGate';
-import { tap } from '../lib/haptics';
+import { land, rise, tap } from '../lib/haptics';
 import { Icon } from '../components/Icon';
 
 /* THE GOALS PAGE IS THE CRUX, SO IT READS LIKE A SCOREBOARD.
@@ -45,11 +45,17 @@ function CountUp({ to, delay = 0, duration = 1100, format = (value: number) => S
   useEffect(() => {
     if (reducedMotion()) { setValue(to); return; }
     let frame = 0;
+    let shown = format(0);
     const start = performance.now() + delay;
     const step = (now: number) => {
       const t = Math.max(0, Math.min(1, (now - start) / duration));
-      setValue(to * (1 - Math.pow(1 - t, 3)));
-      if (t < 1) frame = requestAnimationFrame(step);
+      const next = to * (1 - Math.pow(1 - t, 3));
+      setValue(next);
+      /* Felt as well as seen: a click each time the shown figure changes, and
+         a firmer tap when it lands. */
+      const text = format(next);
+      if (text !== shown) { shown = text; if (t < 1) rise(); }
+      if (t < 1) frame = requestAnimationFrame(step); else if (to > 0) land();
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);

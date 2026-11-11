@@ -53,3 +53,22 @@ export function warning() {
   if (haptics?.notification) { haptics.notification({ type: 'WARNING' }).catch(() => {}); return; }
   buzz([20, 40, 20]);
 }
+
+/* A NUMBER CLIMBING. Goal figures count up when the page opens; each step
+   clicks like a dial turning and the landing is a firmer tap. Every counter
+   on the page shares one clock, so six numbers rising together feel like one
+   roll rather than six buzzers. */
+let lastRise = 0;
+export function rise() {
+  const now = Date.now();
+  if (now - lastRise < 70) return;
+  lastRise = now;
+  tick();
+}
+let lastLand = 0;
+export function land() {
+  const now = Date.now();
+  if (now - lastLand < 250) return;
+  lastLand = now;
+  tap();
+}
