@@ -12,6 +12,7 @@ import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
 import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
+import { tickerEnd, tickerLive, tickerStart, tickerUpdate, type TickerState } from '../lib/liveActivity';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
 import { isDemoMode } from '../lib/env';
@@ -568,6 +569,45 @@ export function GuidedPage() {
     if (!active || !workout) return;
     write(RESUME_KEY, { workout, stepIndex, setIndex, weights, logged, startedAt, custom, savedAt: Date.now() } satisfies SavedSession);
   }, [active, workout, stepIndex, setIndex, weights, logged, startedAt, custom]);
+  /* LIVE WORKOUT TICKER: the lock screen / Dynamic Island card on iPhone.
+     Started when the workout starts, updated on every move, set and rest,
+     ended when it is saved or put away. Rest counts down to a fixed end time
+     (moved only when +30 is added), so it keeps counting in the background. */
+  const restEnd = useRef(0);
+  const prevTimer = useRef(0);
+  const prevPhase = useRef<Phase>(phase);
+  const tickerState = (): TickerState | null => {
+    if (!workout) return null;
+    const total = workout.steps.length;
+    const done = Math.min(total, stepIndex);
+    if (phase === 'done') return { title: 'Workout done', detail: `${logged.length} sets`, phase: 'done', done: total, total };
+    const current = workout.steps[stepIndex];
+    if (!current) return null;
+    if (phase === 'rest') {
+      const lastSet = setIndex + 1 >= current.sets;
+      const next = lastSet ? workout.steps[stepIndex + 1] : current;
+      return { title: 'Rest', detail: next ? `Next: ${next.move.name}${next === current ? ` · set ${setIndex + 2} of ${current.sets}` : ''}` : 'Last one done', phase: 'rest', restEndsAt: restEnd.current, done: lastSet ? done + 1 : done, total };
+    }
+    const w = weights[stepIndex] ?? current.weight;
+    const detail = phase === 'feel' ? 'How did that feel?' : `${current.sets > 1 ? `Set ${setIndex + 1} of ${current.sets} · ` : ''}${amountText(current)}${w !== null && w !== undefined ? ` · ${w} ${metric ? 'kg' : 'lb'}` : ''}`;
+    return { title: current.move.name, detail, phase: paused ? 'paused' : 'work', done, total };
+  };
+  useEffect(() => {
+    /* The rest end moves only when rest starts or +30 is added; the per-second
+       tick is iOS's job, and an unchanged card is not re-sent. */
+    if (phase === 'rest' && (prevPhase.current !== 'rest' || timer > prevTimer.current + 1)) restEnd.current = Date.now() + timer * 1000;
+    prevTimer.current = timer; prevPhase.current = phase;
+    const state = tickerState();
+    if (active && state) {
+      if (!tickerLive()) tickerStart(workout?.title || 'Workout', startedAt || Date.now(), state);
+      else tickerUpdate(state);
+    } else if (!active && tickerLive()) {
+      const done = phase === 'done' && state ? state : { title: 'Workout', detail: '', phase: 'done' as const, done: 0, total: 0 };
+      tickerEnd(phase === 'done', done);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, phase, stepIndex, setIndex, paused, logged.length, weights, workout, timer]);
+  useEffect(() => () => { if (tickerLive()) tickerEnd(false, { title: 'Workout', detail: '', phase: 'done', done: 0, total: 0 }); }, []);
   const resumeNow = () => {
     if (!resume) return;
     const saved = resume; setResume(null);
