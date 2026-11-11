@@ -268,7 +268,11 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
     }
     if(wanted){
       const found=pick(wanted)||(wanted==='Long'?pick('Easy'):undefined);
-      if(found)return stationsDay(found)||{...found,status:'Scheduled' as const};
+      /* A day the athlete NAMED for its run keeps that run. "Long Run" with no
+         long session written fell back to the easy run, and the easy run was
+         then swapped for HYROX stations — on the one day the split said run
+         long. Only a day named easy can give way to station work. */
+      if(found)return(wanted==='Easy'?stationsDay(found):undefined)||{...found,status:'Scheduled' as const};
     }
     return stationsDay(weekly.scheduled[0])||weekly.scheduled[0];
   })();
