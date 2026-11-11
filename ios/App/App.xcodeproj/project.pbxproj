@@ -19,9 +19,11 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		6CC394471D5D9B94E76787D2 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C98CC92D9DACC53CDFDAE97C /* SwiftUI.framework */; };
 		7FD4CF6BDEA3ECBEBD4FAB86 /* ForgeLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E62B1CD143670672FB87FAF /* ForgeLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		86C712F01CC359C97A54C4BD /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B830C9FAFF48FD1A1F92AC54 /* Speech.framework */; };
 		8A5B608C984B33A59ECCA845 /* ForgeWorkoutAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB943B294AFD5A77682B0C83 /* ForgeWorkoutAttributes.swift */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		C3521C5AB7E3BF2F2156B8EA /* ForgeBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB545520181BD26067C28F41 /* ForgeBridgeViewController.swift */; };
+		CE9E5E5965EA4787CDC474E5 /* ForgeVoicePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4840FBBE6AB5F0EE4518387E /* ForgeVoicePlugin.swift */; };
 		D2154581B60D78979E395220 /* ForgeLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4965BD1BC8C1630C933CBE1E /* ForgeLiveActivityWidget.swift */; };
 		E361C700C9B1F61D8C236296 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4411446051FCB63292F1EB94 /* WidgetKit.framework */; };
 		EF4247FBF0E5BFEB21E6C313 /* ForgeLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8D9F14B099E13BBE581939 /* ForgeLiveActivityPlugin.swift */; };
@@ -54,6 +56,7 @@
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		4411446051FCB63292F1EB94 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
+		4840FBBE6AB5F0EE4518387E /* ForgeVoicePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ForgeVoicePlugin.swift; sourceTree = "<group>"; };
 		4965BD1BC8C1630C933CBE1E /* ForgeLiveActivityWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ForgeLiveActivityWidget.swift; sourceTree = "<group>"; };
 		4F12EDD812FBFC364B877664 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
@@ -67,6 +70,7 @@
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		9E62B1CD143670672FB87FAF /* ForgeLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ForgeLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B830C9FAFF48FD1A1F92AC54 /* Speech.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Speech.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Speech.framework; sourceTree = DEVELOPER_DIR; };
 		BE8D9F14B099E13BBE581939 /* ForgeLiveActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ForgeLiveActivityPlugin.swift; sourceTree = "<group>"; };
 		BFB64996F605E9AD3947BD63 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C98CC92D9DACC53CDFDAE97C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
@@ -80,6 +84,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+				86C712F01CC359C97A54C4BD /* Speech.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -102,6 +107,7 @@
 				4F12EDD812FBFC364B877664 /* Foundation.framework */,
 				4411446051FCB63292F1EB94 /* WidgetKit.framework */,
 				C98CC92D9DACC53CDFDAE97C /* SwiftUI.framework */,
+				B830C9FAFF48FD1A1F92AC54 /* Speech.framework */,
 			);
 			name = iOS;
 			sourceTree = "<group>";
@@ -149,6 +155,7 @@
 				EB943B294AFD5A77682B0C83 /* ForgeWorkoutAttributes.swift */,
 				BE8D9F14B099E13BBE581939 /* ForgeLiveActivityPlugin.swift */,
 				DB545520181BD26067C28F41 /* ForgeBridgeViewController.swift */,
+				4840FBBE6AB5F0EE4518387E /* ForgeVoicePlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -285,6 +292,7 @@
 				8A5B608C984B33A59ECCA845 /* ForgeWorkoutAttributes.swift in Sources */,
 				EF4247FBF0E5BFEB21E6C313 /* ForgeLiveActivityPlugin.swift in Sources */,
 				C3521C5AB7E3BF2F2156B8EA /* ForgeBridgeViewController.swift in Sources */,
+				CE9E5E5965EA4787CDC474E5 /* ForgeVoicePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
