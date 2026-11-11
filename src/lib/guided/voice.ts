@@ -254,6 +254,19 @@ export class Coach {
      during a workout, no taps; the coach plays at full quality over music. */
   private nativeOn = false;
   private nativeSub: { remove: () => Promise<void> } | null = null;
+  /* The recorded line, as base64 mp3, for the background coach. */
+  async audioFor(text: string): Promise<string | null> {
+    if (!this.natural) return null;
+    try { const url = await this.lineUrl(text); return url.split(',')[1] || null; } catch { return null; }
+  }
+  get native() { return this.nativeOn; }
+  /* Back from the background: the native side stopped listening for us. */
+  nativeResumed(allowed?: Command[]) {
+    if (!this.nativeOn) return;
+    if (allowed) this.allowed = allowed;
+    this.listening = false; this.emit();
+    if (this.wantListen && !this.speaking) this.listen();
+  }
   async useNative() {
     if (!nativeVoice) return false;
     if (this.nativeOn) return true;

@@ -12,7 +12,7 @@ import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
 import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
-import { nativeVoice } from '../lib/guided/nativeVoice';
+import { nativeVoice, type ScriptBeat } from '../lib/guided/nativeVoice';
 import { tickerEnd, tickerLive, tickerStart, tickerUpdate, type TickerState } from '../lib/liveActivity';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
@@ -618,6 +618,111 @@ export function GuidedPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, phase, stepIndex, setIndex, paused, logged.length, weights, workout, timer]);
   useEffect(() => () => { if (tickerLive()) tickerEnd(false, { title: 'Workout', detail: '', phase: 'done', done: 0, total: 0 }); }, []);
+  /* THE BACKGROUND COACH (iPhone app). While she is in another app, iPhone
+     pauses this page, so the native side runs the next part of the workout
+     from a script kept up to date here: each move's line, "How'd that feel?",
+     the rest, the next set — with the coach's recorded voice. When she comes
+     back, the page takes what happened (sets done, how they felt) and picks up
+     where the native coach is. */
+  const scriptRef = useRef<ScriptBeat[]>([]);
+  const sentAudio = useRef(new Set<string>());
+  const timeWords = (secs: number) => secs >= 60 ? `${Math.floor(secs / 60)} minute${secs >= 120 ? 's' : ''}${secs % 60 ? ` ${secs % 60} seconds` : ''}` : `${secs} seconds`;
+  const buildScript = (): ScriptBeat[] => {
+    if (!workout || !step) return [];
+    const beats: ScriptBeat[] = [];
+    const total = workout.steps.length;
+    let count = logged.length;
+    for (let s = stepIndex; s < total && beats.length < 16; s += 1) {
+      const item = workout.steps[s];
+      const w = weights[s] !== undefined ? weights[s] : item.weight;
+      for (let n = s === stepIndex ? setIndex : 0; n < item.sets && beats.length < 16; n += 1) {
+        const here = s === stepIndex && n === setIndex;
+        const amount = `${item.sets > 1 ? `Set ${n + 1} of ${item.sets} · ` : ''}${amountText(item)}${w !== null && w !== undefined ? ` · ${w} ${metric ? 'kg' : 'lb'}` : ''}`;
+        const ticker = { title: item.move.name, detail: amount, done: s, total };
+        if (!(here && (phase === 'feel' || phase === 'rest'))) beats.push({ id: `card:${s}:${n}:${w ?? ''}`, kind: 'card', line: cardLine(item, n, w ?? null), seconds: item.move.timed ? item.reps : 0, timed: Boolean(item.move.timed), perSide: Boolean(item.move.perSide && item.part === 'main'), step: s, set: n, ticker });
+        if (item.part !== 'main') continue;
+        if (!(here && phase === 'rest')) beats.push({ id: `feel:${s}:${n}`, kind: 'feel', line: FEEL_LINE, seconds: 0, timed: false, perSide: false, step: s, set: n, ticker: { ...ticker, detail: 'How did that feel?' } });
+        const lastSet = n + 1 >= item.sets;
+        if (lastSet && s + 1 >= total) break;
+        const upNext = lastSet ? workout.steps[s + 1] : item;
+        const line = `${cheer(count)} Take ${timeWords(item.rest)}${item.rest >= 60 ? ' to recover' : ''}. ${lastSet ? `Next up is ${upNext.move.name}.` : 'Same move next.'} Tell me when you're ready.`;
+        count += 1;
+        beats.push({ id: `rest:${s}:${n}:${count}`, kind: 'rest', line, seconds: item.rest, timed: false, perSide: false, step: s, set: n, ticker: { title: 'Rest', detail: `Next: ${upNext.move.name}`, done: lastSet ? s + 1 : s, total } });
+      }
+    }
+    if (beats.length < 16 && workout.steps.length) {
+      const lastStep = workout.steps[total - 1];
+      const reachesEnd = beats.some(beat => beat.step === total - 1 && beat.set === lastStep.sets - 1);
+      if (reachesEnd) beats.push({ id: 'end', kind: 'end', line: "That's the whole workout. Amazing work. Open Forge and I'll save it for you.", seconds: 0, timed: false, perSide: false, step: total - 1, set: lastStep.sets - 1, ticker: { title: 'Workout done', detail: 'Open Forge to save it', done: total, total } });
+    }
+    return beats;
+  };
+  useEffect(() => {
+    const c = coach.current;
+    if (!nativeVoice || !c?.native || !active) return;
+    const beats = buildScript();
+    scriptRef.current = beats;
+    const timedEndsAt = phase === 'card' && running && step?.move.timed ? Date.now() + timer * 1000 : 0;
+    void nativeVoice.setScript({ beats, entered: true, restEndsAt: phase === 'rest' ? restEnd.current : 0, timedEndsAt });
+    for (const beat of beats) {
+      const key = `${beat.id}|${beat.line}`;
+      if (sentAudio.current.has(key)) continue;
+      sentAudio.current.add(key);
+      void c.audioFor(beat.line).then(audio => { if (audio) void nativeVoice?.setAudio({ id: beat.id, audio }); else sentAudio.current.delete(key); });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, phase, stepIndex, setIndex, weights, workout, logged.length, running, voiceState.listening]);
+  /* The short lines the background coach says between beats. */
+  useEffect(() => {
+    const c = coach.current;
+    if (!nativeVoice || !c?.native) return;
+    for (const line of ['Okay, go!', 'Ten seconds.', 'Done. Nice.', 'Switch sides.', 'Sure, thirty more seconds.']) void c.audioFor(line).then(audio => { if (audio) void nativeVoice?.setAudio({ id: `fx:${line}`, audio }); });
+  }, [voiceState.listening]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Back in Forge: take what the background coach did and carry on from there. */
+  useEffect(() => {
+    if (!nativeVoice) return;
+    const catchUp = async () => {
+      if (document.visibilityState !== 'visible' || !workout) return;
+      const result = await nativeVoice!.takeBackground().catch(() => null);
+      if (!result?.ran) { coach.current?.nativeResumed(); return; }
+      const beats = scriptRef.current;
+      const nextWeights = { ...weights };
+      const added: LoggedSet[] = [];
+      for (const entry of result.log) {
+        if (entry.type !== 'set' || entry.step === undefined) continue;
+        const item = workout.steps[entry.step]; if (!item) continue;
+        const used = nextWeights[entry.step] !== undefined ? nextWeights[entry.step] : item.weight;
+        const feel = entry.feel ?? null;
+        added.push({ moveId: item.move.id, name: item.move.name, muscles: item.move.muscles, reps: item.reps, weight: used ?? null, feel, timed: Boolean(item.move.timed) });
+        if (feel && item.part === 'main' && entry.set !== undefined && entry.set + 1 < item.sets) {
+          const w = nextWeight(used ?? null, feel, item.move.load, metric);
+          if (w !== null) { nextWeights[entry.step] = w; const remembered = read<Record<string, number>>(WEIGHTS_KEY, {}); remembered[item.move.id] = w; write(WEIGHTS_KEY, remembered); }
+        }
+      }
+      if (added.length) setLogged(list => [...list, ...added]);
+      setWeights(nextWeights);
+      const beat = beats[result.index];
+      if (!beat || beat.kind === 'end') { coach.current?.nativeResumed(); finish(); return; }
+      const item = workout.steps[beat.step];
+      setStepIndex(beat.step); setSetIndex(beat.set); setPaused(false);
+      if (beat.kind === 'rest') {
+        const left = result.restEndsAt ? Math.max(1, Math.round((result.restEndsAt - Date.now()) / 1000)) : beat.seconds;
+        restEnd.current = result.restEndsAt || Date.now() + beat.seconds * 1000;
+        setPhase('rest'); setTimer(left); setRunning(true);
+      } else if (beat.kind === 'feel') { setPhase('feel'); setRunning(false); }
+      else {
+        const timedLeft = result.timedEndsAt ? Math.max(1, Math.round((result.timedEndsAt - Date.now()) / 1000)) : 0;
+        setPhase('card'); setTimer(timedLeft || item.reps); setRunning(Boolean(timedLeft));
+      }
+      const listen: Command[] = beat.kind === 'feel' ? ['ask', 'easy', 'right', 'hard', 'repeat', 'end'] : beat.kind === 'rest' ? ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end'] : CARD_CMDS;
+      lastLine.current = { text: beat.line, listen };
+      coach.current?.nativeResumed(listen);
+    };
+    const onVisible = () => { void catchUp(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workout, weights, stepIndex, setIndex, phase]);
   const resumeNow = () => {
     if (!resume) return;
     const saved = resume; setResume(null);
