@@ -180,7 +180,7 @@ export function GuidedPage() {
   const [micAsk, setMicAsk] = useState(false);
   const [micBusy, setMicBusy] = useState(false);
   useEffect(() => {
-    if (nativeVoice) { nativeVoice.permission().then(({ status }) => { if (status !== 'unknown') { setMic(status); write(MIC_KEY, status); } }).catch(() => {}); return; }
+    if (nativeVoice) { nativeVoice.permission().then(({ status }) => { setMic(status); write(MIC_KEY, status); }).catch(() => {}); return; }
     const perms = (navigator as Navigator & { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } }).permissions;
     perms?.query({ name: 'microphone' }).then(result => { if (result.state === 'granted') { setMic('granted'); write(MIC_KEY, 'granted'); } else if (result.state === 'denied') setMic('denied'); }).catch(() => { /* Safari may not answer */ });
   }, []);

@@ -18,6 +18,6 @@ type Plugin = {
   addListener(event: 'heard', handler: (data: { text: string; final: boolean }) => void): Promise<PluginListenerHandle>;
 };
 
-const supported = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('ForgeVoice');
+const supported = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 export const nativeVoice: Plugin | null = supported ? registerPlugin<Plugin>('ForgeVoice') : null;
 export const hasNativeVoice = () => Boolean(nativeVoice);
