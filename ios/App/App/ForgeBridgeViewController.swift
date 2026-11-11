@@ -6,5 +6,6 @@ import Capacitor
 class ForgeBridgeViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(ForgeLiveActivityPlugin())
+        bridge?.registerPluginInstance(ForgeVoicePlugin())
     }
 }

@@ -12,6 +12,7 @@ import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
 import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
+import { nativeVoice } from '../lib/guided/nativeVoice';
 import { tickerEnd, tickerLive, tickerStart, tickerUpdate, type TickerState } from '../lib/liveActivity';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
@@ -21,7 +22,7 @@ import { isDemoMode } from '../lib/env';
    to forge-voice, a strong cloud speech model told what to expect. In the
    preview build, or when that service is down, the phone's recognizer. */
 const cloudVoice = () => !isDemoMode && cloudEarsSupported();
-const voiceInput = () => canListen() || cloudVoice();
+const voiceInput = () => Boolean(nativeVoice) || canListen() || cloudVoice();
 /* The natural coach voice, one line at a time. */
 async function speakLine(text: string, voice: CoachVoice): Promise<Blob> {
   const { data, error } = await supabase.functions.invoke('forge-speak', { body: { text, voice } });
@@ -58,6 +59,8 @@ type MicStatus = 'unknown' | 'granted' | 'denied';
    prompt appears on our button press, then lets go of it straight away —
    the coach's recognizer opens its own when it listens. */
 async function requestMic(): Promise<MicStatus> {
+  /* The app: iPhone's microphone and speech recognition prompts. */
+  if (nativeVoice) { try { return (await nativeVoice.requestPermission()).status === 'granted' ? 'granted' : 'denied'; } catch { return 'denied'; } }
   try {
     if (!navigator.mediaDevices?.getUserMedia) return voiceInput() ? 'granted' : 'denied';
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -177,6 +180,7 @@ export function GuidedPage() {
   const [micAsk, setMicAsk] = useState(false);
   const [micBusy, setMicBusy] = useState(false);
   useEffect(() => {
+    if (nativeVoice) { nativeVoice.permission().then(({ status }) => { if (status !== 'unknown') { setMic(status); write(MIC_KEY, status); } }).catch(() => {}); return; }
     const perms = (navigator as Navigator & { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } }).permissions;
     perms?.query({ name: 'microphone' }).then(result => { if (result.state === 'granted') { setMic('granted'); write(MIC_KEY, 'granted'); } else if (result.state === 'denied') setMic('denied'); }).catch(() => { /* Safari may not answer */ });
   }, []);
@@ -221,7 +225,13 @@ export function GuidedPage() {
   useEffect(() => { coach.current?.setHandsFree(handsFree && (phase === 'card' || phase === 'feel' || phase === 'rest' || phase === 'preview' || Boolean(check))); }, [handsFree, phase, check]);
 
   /* Opens the cloud ears from a tap (iOS needs one), once per workout. */
-  const openEars = () => { const c = coach.current; if (!c || !handsFree || !cloudVoice() || c.mode === 'cloud') return; void c.useCloud(blob => transcribe(blob, c.hints())); };
+  const openEars = () => {
+    const c = coach.current; if (!c || !handsFree || c.mode !== 'phone') return;
+    /* The app: native, always-on listening. No tap needed, ever. */
+    if (nativeVoice) { void c.useNative(); return; }
+    if (!cloudVoice()) return;
+    void c.useCloud(blob => transcribe(blob, c.hints()));
+  };
   const say = (text: string, listen?: Command[]) => { lastLine.current = { text, listen }; coach.current?.say(text, listen); };
 
   const step: Step | undefined = workout?.steps[stepIndex];
@@ -358,7 +368,7 @@ export function GuidedPage() {
             ? <button type="button" className="gd-cta" onClick={() => { setCheck(null); setMicAsk(false); if (workout && phase === 'preview') start(); }}>{phase === 'preview' ? 'Start workout' : 'Done'}</button>
             : <button type="button" className="gd-secondary" onClick={() => { if (coach.current) coach.current.capture = null; setCheck(null); setMicAsk(false); if (phase === 'preview') start(); }}>Skip the check</button>}
         </> : mic === 'denied'
-          ? <p className="gd-lead">Your phone is blocking the microphone for Forge. To turn it on, go to Settings, then Safari, then Microphone, and choose Allow. You can still do the workout by tapping.</p>
+          ? <p className="gd-lead">{nativeVoice ? 'Forge is not allowed to use the microphone. To turn it on, open Settings, then Forge, and turn on Microphone and Speech Recognition. You can still do the workout by tapping.' : 'Your phone is blocking the microphone for Forge. To turn it on, go to Settings, then Safari, then Microphone, and choose Allow. You can still do the workout by tapping.'}</p>
           : <>
               <p className="gd-lead">Say “done”, “too easy” or “ready” instead of tapping. Your phone will ask to use the microphone next.</p>
               <ul className="gd-mic-list">
@@ -781,7 +791,7 @@ export function GuidedPage() {
   const tapTalk = Boolean(coach.current?.tapToTalk);
   const listenBadge = handsFree && voiceInput()
     ? tapTalk
-      ? <button type="button" className={voiceState.listening ? 'gd-listen gd-talk on' : 'gd-listen gd-talk'} aria-pressed={voiceState.listening} onClick={() => { coach.current?.unlockAudio(); if (coach.current?.mode !== 'cloud') openEars(); coach.current?.talkNow(); }}><Svg d={MIC} size={16} stroke={2.4} />{voiceState.listening ? 'Listening…' : 'Tap to talk'}</button>
+      ? <button type="button" className={voiceState.listening ? 'gd-listen gd-talk on' : 'gd-listen gd-talk'} aria-pressed={voiceState.listening} onClick={() => { coach.current?.unlockAudio(); if (coach.current?.mode === 'phone') openEars(); coach.current?.talkNow(); }}><Svg d={MIC} size={16} stroke={2.4} />{voiceState.listening ? 'Listening…' : 'Tap to talk'}</button>
       : <span className={voiceState.listening ? 'gd-listen on' : 'gd-listen'}><Svg d={MIC} size={14} stroke={2.4} />{voiceState.speaking ? 'Coach talking' : voiceState.listening ? 'Listening' : 'Mic'}</span>
     : null;
 

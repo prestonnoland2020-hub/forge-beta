@@ -142,6 +142,7 @@ function pickVoice(gender: 'female' | 'male' = 'female'): SpeechSynthesisVoice |
   return voices.find(voice => /^en(-|_)US/i.test(voice.lang)) || voices.find(voice => /^en/i.test(voice.lang));
 }
 
+import { nativeVoice } from './nativeVoice';
 import { CloudEars, cloudEarsSupported, type Transcribe } from './cloudEars';
 
 /* The words the cloud model is told to expect, per command. */
@@ -159,7 +160,9 @@ const SPOKEN: Partial<Record<Command, string[]>> = {
 export type CoachVoice = 'coral' | 'ash';
 export const VOICE_LABEL: Record<CoachVoice, string> = { coral: 'Female voice', ash: 'Male voice' };
 export type Speak = (text: string, voice: CoachVoice) => Promise<Blob>;
-const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+/* A tenth of a second of real silence. (The old clip had no samples; iPhone
+   refused to decode it, and its error counted against the natural voice.) */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
 const CACHE_NAME = 'forge-coach-voice-v7';
 /* Lines saved from the old voice are dropped, so nothing old is replayed. */
 if (typeof caches !== 'undefined') void caches.keys().then(names => names.filter(name => name.startsWith('forge-coach-voice-') && name !== CACHE_NAME).forEach(name => void caches.delete(name))).catch(() => {});
@@ -200,8 +203,12 @@ export class Coach {
 
   /* Call from a tap: iOS only lets a page start sound in answer to one. */
   unlockAudio() {
-    if (typeof Audio === 'undefined') return;
+    /* The app speaks natively; web audio here would take over its sound. */
+    if (typeof Audio === 'undefined' || nativeVoice) return;
     if (!this.audio) { this.audio = new Audio(); this.audio.preload = 'auto'; (this.audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true; }
+    /* The last line's handlers must not see this clip (an error here once
+       re-read the previous line in the robot voice). */
+    this.audio.onended = null; this.audio.onerror = null;
     try { this.audio.src = SILENT_WAV; void this.audio.play().catch(() => {}); } catch { /* fine */ }
     if (canSpeak()) { try { const warm = new SpeechSynthesisUtterance(''); window.speechSynthesis.speak(warm); } catch { /* fine */ } }
   }
@@ -237,11 +244,41 @@ export class Coach {
   /* 'cloud' hears with forge-voice (the Wispr Flow way); 'phone' with the
      browser's recognizer. Cloud falls back to phone on its own if the
      service fails twice in a row. */
-  mode: 'cloud' | 'phone' = 'phone';
+  mode: 'cloud' | 'phone' | 'native' = 'phone';
   private ears: CloudEars | null = null;
   private cloudFailures = 0;
   context = '';
-  onMode: (mode: 'cloud' | 'phone') => void = () => {};
+  onMode: (mode: 'cloud' | 'phone' | 'native') => void = () => {};
+
+  /* THE IPHONE APP: native ears and mouth (nativeVoice.ts). Always listening
+     during a workout, no taps; the coach plays at full quality over music. */
+  private nativeOn = false;
+  private nativeSub: { remove: () => Promise<void> } | null = null;
+  async useNative() {
+    if (!nativeVoice) return false;
+    if (this.nativeOn) return true;
+    try {
+      const { status } = await nativeVoice.permission();
+      if (status !== 'granted') return false;
+      const result = await nativeVoice.start({ hints: NATIVE_HINTS, listen: false });
+      if (!result.started) { this.onReport('native-start', result.reason || ''); return false; }
+    } catch (error) { this.onReport('native-start', String(error).slice(0, 200)); return false; }
+    this.nativeOn = true; this.tapToTalk = false; this.mode = 'native'; this.onMode('native');
+    this.nativeSub = await nativeVoice.addListener('heard', ({ text, final }) => {
+      if (!this.listening || !text) return;
+      if (!final) {
+        /* Act on a clear command the moment it is said; anything else waits
+           for the end of the phrase. */
+        if (this.capture || this.freeText) return;
+        const match = matchCommand(text, this.allowed, this.memory);
+        if (!match || (match.how !== 'rule' && match.how !== 'learned')) return;
+      }
+      void nativeVoice?.reset();
+      this.handleHeard([text]);
+    });
+    if (this.wantListen && !this.speaking && this.allowed) this.listen();
+    return true;
+  }
 
   async useCloud(transcribe: Transcribe) {
     if (!cloudEarsSupported()) return false;
@@ -320,6 +357,13 @@ export class Coach {
     if (canSpeak()) window.speechSynthesis.cancel();
     const finish = () => { if (token !== this.sayToken) return; this.speaking = false; this.emit(); if (listenFor) this.listen(); };
     this.speaking = true; this.emit();
+    if (this.nativeOn && nativeVoice) {
+      const native = nativeVoice;
+      const play = (audio?: string) => native.play({ audio, text }).then(result => { if (!result.cancelled) finish(); }, finish);
+      if (this.natural) this.lineUrl(text).then(url => play(url.split(',')[1]), () => { this.onReport('native-fetch-failed'); void play(); });
+      else void play();
+      return;
+    }
     if (!this.natural || !this.audio) this.onReport('phone-voice', `natural=${this.natural} audio=${Boolean(this.audio)} cloud=${Boolean(this.speakCloud)} failures=${this.cloudSpeakFailures}`);
     if (this.natural && this.audio) {
       /* The natural voice. The phone's robot voice is only the safety net for
@@ -333,7 +377,7 @@ export class Coach {
       this.lineUrl(text).then(url => {
         if (settled || token !== this.sayToken) return;
         settled = true; window.clearTimeout(timer); this.cloudSpeakFailures = 0;
-        audio.onended = finish; audio.onerror = () => { this.onReport('decode-error', `code=${audio.error?.code} ${audio.error?.message || ''} src=${audio.src.slice(0, 40)} len=${audio.src.length}`); this.cloudSpeakFailures += 1; this.speakPhone(text, finish); };
+        audio.onended = finish; audio.onerror = () => { if (token !== this.sayToken) return; this.onReport('decode-error', `code=${audio.error?.code} ${audio.error?.message || ''} src=${audio.src.slice(0, 40)} len=${audio.src.length}`); this.cloudSpeakFailures += 1; this.speakPhone(text, finish); };
         audio.src = url;
         void audio.play().then(() => this.onReport('played', text.slice(0, 40))).catch(error => { this.onReport('play-rejected', `${(error as Error)?.name}: ${(error as Error)?.message}`.slice(0, 200)); this.speakPhone(text, finish); });
       }).catch(error => { window.clearTimeout(timer); this.onReport('fetch-failed', String((error as Error)?.message || error).slice(0, 200)); this.cloudSpeakFailures += 1; fallback(); });
@@ -367,9 +411,10 @@ export class Coach {
      sound, and it cannot reopen the mic on its own without a tap. So on iPhone
      the mic opens when she taps it, takes one thing said, and closes again;
      the coach's voice stays full quality. Elsewhere it listens hands-free. */
-  tapToTalk = typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  tapToTalk = !nativeVoice && typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
   private oneShot = 0;
   talkNow() {
+    if (this.nativeOn) { this.wantListen = true; this.listen(); return; }
     if (this.mode !== 'cloud' || !this.ears) { if (canListen()) { this.wantListen = true; this.listen(); } return; }
     const ears = this.ears;
     if (this.speaking) { this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; }
@@ -384,6 +429,7 @@ export class Coach {
 
   private listen() {
     if (!this.wantListen || this.listening) return;
+    if (this.nativeOn && nativeVoice) { this.listening = true; this.emit(); void nativeVoice.listen({ on: true }); return; }
     if (this.mode === 'cloud' && this.ears && this.tapToTalk) return;
     if (this.mode === 'cloud' && this.ears) {
       /* The mic is off while the coach talks (on iPhone an open mic makes
@@ -415,6 +461,7 @@ export class Coach {
   }
 
   private stopListening() {
+    if (this.nativeOn && nativeVoice && this.listening) void nativeVoice.listen({ on: false });
     if (this.ears) { this.ears.paused = true; this.ears.releaseMic(); }
     const recognition = this.recognition;
     this.recognition = null;
@@ -423,11 +470,13 @@ export class Coach {
     this.emit();
   }
 
-  stop() { this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
+  stop() { if (this.nativeOn && nativeVoice) { this.nativeOn = false; this.mode = 'phone'; void this.nativeSub?.remove(); this.nativeSub = null; void nativeVoice.stop(); } this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
 
   private emit() { this.onState({ speaking: this.speaking, listening: this.listening }); }
 }
 
 /* Encouragement, rotated so it does not say the same thing every set. */
+/* Words the iPhone listens for hardest. */
+const NATIVE_HINTS = ['done', 'ready', 'too easy', 'just right', 'too hard', 'skip', 'repeat', 'pause', 'resume', 'more rest', 'go', 'how', 'coach', 'easier', 'harder', 'end workout'];
 const CHEERS = ['Nice! That looked really solid.', 'Yes! Good set.', 'Love that. Nice and controlled.', "There you go, that's how it's done.", 'Good work. That was smooth.', 'Beautiful. Keep that rhythm going.', "Awesome. You're moving well today."];
 export const cheer = (n: number) => CHEERS[n % CHEERS.length];
