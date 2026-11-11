@@ -100,6 +100,7 @@ import './guided.css';
 import './design-terms.css';
 import './atmosphere.css';
 import { startNativeChrome } from './features/shell/nativeChrome';
+import { listenForSignInReturn } from './features/auth/nativeSignIn';
 
 // OAuth providers return to the public app URL before the hash route. Send the
 // callback into Profile, where the signed-in user can finish the connection.
@@ -147,6 +148,9 @@ if ((!launch || launch === 'navigate')
    chase the visual viewport every frame, which is what made the bar stick
    halfway up the screen. See features/shell/nativeChrome. */
 startNativeChrome();
+
+/* Inside the iOS app, sign-in returns on a link; this catches it. */
+listenForSignInReturn();
 
 /* THE LAUNCH STEPS ASIDE once React has painted its first screen AND the
    strike has finished — the last facet landing, plus a beat to hold the
