@@ -196,6 +196,9 @@ export function GuidedPage() {
      that phrase. Two misses in a row and the coach says what it listens for. */
   const [unknown, setUnknown] = useState<string | null>(null);
   const misses = useRef(0);
+  /* The question belongs to the moment it was asked: once the workout moves
+     on (a tap counts too), it goes away. */
+  useEffect(() => { setUnknown(null); misses.current = 0; }, [phase, stepIndex, setIndex]);
   const [learnedCount, setLearnedCount] = useState(() => Object.keys(loadVoiceMemory()).length);
   /* The voice check: three words, once. */
   const [check, setCheck] = useState<{ index: number; results: Array<'ok' | 'learned' | 'skipped'> } | null>(null);
@@ -300,7 +303,9 @@ export function GuidedPage() {
     const q = question.trim(); if (!q) return;
     setAskOpen(true); setAskBusy(true); setAskAnswer({ q, a: '' }); setAskText('');
     const safety = /\b(hurt|hurts|pain|painful|sharp|injur)/i.test(q);
-    if (safety) say(localAnswer(q));
+    /* Listen straight away: the safe answer says "say skip", so skip must be heard. */
+    const resume: Command[] = phase === 'feel' ? ['ask', 'easy', 'right', 'hard', 'repeat', 'end'] : phase === 'rest' ? ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end'] : CARD_CMDS;
+    if (safety) say(localAnswer(q), resume);
     const recentGuided = records.filter(record => /^Guided/.test(record.title)).slice(0, 5).map(record => ({ date: record.date, title: record.title, notes: record.notes }));
     const response = await requestForgeCoach({ question: q, scope: 'today', context: {
       surface: 'forge-guided-voice',
@@ -309,7 +314,6 @@ export function GuidedPage() {
     } }, localAnswer(q));
     const answer = response.source === 'ai' || response.source === 'limit' ? response.answer : localAnswer(q);
     setAskBusy(false); setAskAnswer({ q, a: answer });
-    const resume: Command[] = phase === 'feel' ? ['ask', 'easy', 'right', 'hard', 'repeat', 'end'] : phase === 'rest' ? ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end'] : CARD_CMDS;
     if (!safety) say(answer, resume); else lastLine.current = { text: answer, listen: resume };
   };
   const askSheet = askOpen ? <div className="gd-sheet-back" onClick={event => { if (event.target === event.currentTarget) setAskOpen(false); }}>
