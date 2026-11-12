@@ -210,7 +210,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               <span className="gx-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct * 100)} aria-label={`${goal.title}: ${Math.round(pct * 100)}%`}>
                 <i style={{ width: filled ? `${Math.max(item.share === null ? 0 : 4, pct * 100)}%` : '0%' }} />
               </span>
-              <span className="gx-foot"><b>{item.share === null ? (goal.type === 'Strength' ? 'Starts with your first set' : goal.type === 'Body Composition' ? 'Starts with a weigh-in' : 'Starts with your first run') : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
+              <span className="gx-foot"><b>{item.share === null ? (goal.type === 'Strength' ? 'Starts with your first set' : goal.type === 'Body Composition' ? 'Starts with a weigh-in' : /hyrox/i.test(`${goal.exercise || ''} ${goal.title}`) ? 'Starts with a HYROX time' : expectedRunMiles(goal) === null ? 'Starts with your first logged time' : 'Starts with your first run') : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
             </button>
             {isOpen && verdicts[index]?.prediction && <GoalPredictionCard verdict={verdicts[index]} date={goal.date} unit={setup?.units === 'Metric' ? 'kg' : 'lb'} hoursFirst={String(goal.unit || '').includes('hh:mm:ss')} now={item.current} />}
             {/* With a prediction, the card above already says where the goal lands;

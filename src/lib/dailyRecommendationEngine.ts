@@ -32,7 +32,7 @@ import { exerciseBlocked,bodyLogReason,EMPTY_BODY_LOG,type BodyLogState } from '
    that no longer produces it. */
 /* v7 adds the HYROX split day: Forge writes the session itself. v8 writes it
    only for an athlete with a HYROX goal. */
-export const DAILY_RECOMMENDATION_VERSION='hyrox-v8';
+export const DAILY_RECOMMENDATION_VERSION='hyrox-v9';
 
 export type RecommendationSplitDay={
   id?:string;

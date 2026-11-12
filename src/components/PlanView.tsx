@@ -158,7 +158,19 @@ const sameDayName = (a: string, b: string) =>
 export function reconcileToday(sessions: PlanSession[], recommendation: DailyRecommendation | null | undefined, todayIso: string): PlanSession[] {
   if (!recommendation?.splitDay) return sessions;
   return sessions.map(session => {
-    if (localDayIso(session.date) !== todayIso || session.title === recommendation.splitDay.name) return session;
+    if (localDayIso(session.date) !== todayIso) return session;
+    if (session.title === recommendation.splitDay.name) {
+      /* SAME DAY, SAME RUN. Today's card and Start session read the
+         recommendation; if this row ever sized the run differently the
+         athlete saw two distances for one run. Today's row takes the
+         recommendation's run, and keeps its own heart-rate note. */
+      const planned = recommendation.cardio;
+      /* Miles only: a metric week list is already converted and stays as drawn. */
+      if (!planned || !session.run || planned.session?.stress === 'High' || !/\bmi\b/.test(session.run.text)) return session;
+      const text = planned.summary.includes(' · ') ? planned.summary.split(' · ').slice(1).join(' · ') : planned.summary;
+      const heart = session.run.text.match(/ · HR .*$/)?.[0] || '';
+      return /\d/.test(text) && /run/i.test(planned.title) ? { ...session, run: { kind: (planned.session?.role === 'Long' ? 'Long run' : 'Easy run') as PlanRun['kind'], text: `${text}${text.includes(' · HR ') ? '' : heart}` } } : session;
+    }
     const rest = recommendation.splitDay.type === 'rest';
     const lifts = recommendation.topSets.filter(set => set.selected && set.weight > 0).map(set => ({ exercise: set.exercise, weight: set.weight, reps: set.reps }));
     const cardio = recommendation.cardio;

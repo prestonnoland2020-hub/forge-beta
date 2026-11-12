@@ -390,7 +390,7 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
       <i style={{ width: `${share * 100}%` }} />
       <b>{formatGoalTarget(goal.target,goal.metric,goal.unit)}</b>
     </div>
-    <p className="gp-line">{goalReached ? 'Already there — hold it to the date.' : !projectedNumber ? 'Log it once and Forge projects the day.' : clears ? <>Clears it by <b>{gapText}</b></> : <><b>{gapText}</b> short on the day</>}</p>
+    <p className="gp-line">{goalReached ? 'Already there — hold it to the date.' : !projectedNumber ? (isHyrox ? 'Your runs set the training paces, but only a HYROX race or full simulation times this. Log one and Forge projects the day.' : 'Log it once and Forge projects the day.') : clears ? <>Clears it by <b>{gapText}</b></> : <><b>{gapText}</b> short on the day</>}</p>
     <p className="gp-meta">{/* The card it opens from already shows where a lift is now; a second, different "now" (demonstrated vs calculated) only argued with it. */}{goal.type!=='Strength' && <span>Now {currentText}</span>}{range && <span>{range}</span>}<span>{roadmap.weeksRemaining} wks left</span></p>
   </article>;
 }

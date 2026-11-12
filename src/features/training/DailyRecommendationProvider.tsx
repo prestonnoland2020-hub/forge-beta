@@ -7,7 +7,8 @@ import { useGoals } from '../goals/GoalsProvider';
 import { enduranceTarget } from '../../lib/qualitySession';
 import { peakConflict } from '../../lib/interference';
 import { paceModel } from '../../lib/paceModel';
-import { medianWeeklyMiles } from '../../lib/goalTrajectory';
+import { medianWeeklyMiles,longestContinuousRun } from '../../lib/goalTrajectory';
+import { planRunningEvidence } from './planRunningEvidence';
 import { useProfileSetup } from '../profile/ProfileSetupProvider';
 import { useAdaptiveTraining } from './AdaptiveTrainingProvider';
 import { useCoachingStrategy } from './CoachingStrategyProvider';
@@ -189,6 +190,9 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      current week prescribes a top set for this split day, that exercise,
      weight, and reps replace the engine's guess — so Today, Plan, and the
      coach all quote the same prescription. */
+  /* Judged once per change of history, not once per split day asked about. */
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  const runEvidence=useMemo(()=>{const plan=readLocalAiPlan();return plan?planRunningEvidence(records,plan,setup,goals):null},[records,goals,setup,aiPlanStamp]);
   const applyPlan=useCallback((generatedBase:DailyRecommendation)=>{
     const storedPlan=readLocalAiPlan();
     if(!generatedBase||!storedPlan)return generatedBase;
@@ -209,7 +213,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
        called 3.5. One window, one answer. */
     const planRhythm=(()=>{try{return (JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null')?.rhythm==='weekly'?'weekly':'rolling') as 'weekly'|'rolling'}catch{return 'rolling' as const}})();
     const windowDays=weekCycleDays(storedPlan.startDate,currentWeekIndex(storedPlan),days,planRhythm,{position:generatedBase.splitDay.position});
-    const week=resolveWeekRunning(rawWeek,windowDays,{easyRunWeeks:easyRunWeeks(athleteNotes,isoToday()),runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage,/* The profile's readiness, as the Plan tab resolves with: a low-confidence guess counts as ready, so a hard run is never dropped here and kept there. */readiness:profile?.readiness,goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile,goalMiles:enduranceTarget(goals)?.miles,paces:paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[])},planBlockFor(storedPlan,goals));
+    const week=resolveWeekRunning(rawWeek,windowDays,{easyRunWeeks:easyRunWeeks(athleteNotes,isoToday()),runningDays:Number(setup?.runningDays)||profile?.runningDays,minWeeklyMileage:Number(setup?.minWeeklyMileage)||0,maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,weeklyMileage:Number(setup?.weeklyMileage)||profile?.weeklyMileage,/* The profile's readiness, as the Plan tab resolves with: a low-confidence guess counts as ready, so a hard run is never dropped here and kept there. */readiness:profile?.readiness,goalPaceSecondsPerMile:enduranceTarget(goals)?.paceSecondsPerMile,goalMiles:enduranceTarget(goals)?.miles,/* The same evidence the Plan tab resolves with — what he actually runs, his longest run, the judged paces and ladder levels. Without them the hard run was sized differently here, and the easy miles left over with it: Today said 3 mi where the week list said 2.5. */longestRunMiles:profile?.longestRunMiles,recentWeeklyMileage:medianWeeklyMiles(records),recentLongestRun:longestContinuousRun(records),paces:runEvidence?.paces||paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[]),levels:runEvidence?.levels.levels},planBlockFor(storedPlan,goals));
     /* THE PLAN OWNS TODAY'S CARDIO. The engine's weekly generator was a
        second opinion that could contradict the block — 4 × 200 m on a leg
        day the plan had given an easy run. With a stored plan, today's cardio
@@ -406,7 +410,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       return{...set,exercise,weight:wave.weight,reps:wave.reps,source:wave.source,calculatedMax:calculateEstimatedOneRepMax(wave.weight,wave.reps)||0,rationale:wave.rationale};
     });
     return{...cardioBase,topSets};
-  },[records,goals,setup,days,profile,aiPlanStamp,goalStamp,planInputsStamp,recovery,bodyLog,exercises]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[records,goals,setup,days,profile,aiPlanStamp,goalStamp,planInputsStamp,recovery,bodyLog,exercises,runEvidence]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* The due day, and the same pipeline for any other. `buildFor` is what the
      logger calls when the athlete overrides the day; nothing about it is a

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { tap } from '../lib/haptics';
+import { tap, tick } from '../lib/haptics';
 
 /* NUMBERS ARE PICKED, NOT TYPED. A keyboard for a barbell load is the wrong
    instrument: it covers half the screen, offers 40 characters when 12 are
@@ -71,35 +71,48 @@ function Wheel({ values, selected, onSelect, format }: {
   values: number[]; selected: number; onSelect: (value: number) => void; format?: (value: number) => string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const settle = useRef<number>(0);
+  const frame = useRef<number>(0);
   const index = Math.max(0, values.indexOf(selected));
+  /* WHO MOVED THE WHEEL. A value the finger scrolled to must not be answered
+     with a scroll of our own: the selection used to wait 90 ms, then the
+     wheel was told to glide to the value it was already on — under a thumb
+     that had only paused, so the wheel tugged back against the drag. And a
+     glide we started (a tap on a value, a typed number) must not pick the
+     values it passes on the way. */
+  const byFinger = useRef(false);
+  const gliding = useRef<number | null>(null);
 
   /* Open on the current value rather than at zero — and follow it after
-     that, so a tap on +5 or a preset turns the wheel to the new value instead
-     of leaving it showing the old one. */
+     that, so a tap or a typed number turns the wheel to the new value
+     instead of leaving it showing the old one. */
   const mounted = useRef(false);
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
     const target = index * ITEM_HEIGHT;
     if (!mounted.current) { node.scrollTop = target; mounted.current = true; return; }
-    if (Math.abs(node.scrollTop - target) > 2) node.scrollTo({ top: target, behavior: 'smooth' });
+    if (byFinger.current) { byFinger.current = false; return; }
+    if (Math.abs(node.scrollTop - target) > 2) { gliding.current = index; node.scrollTo({ top: target, behavior: 'smooth' }); }
   }, [index]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
+  /* The value under the band is the selection AS IT PASSES, with a detent
+     click for each — the way an iOS picker reads — not a beat after the
+     wheel stops. */
   const onScroll = () => {
-    const node = ref.current;
-    if (!node) return;
-    window.clearTimeout(settle.current);
-    settle.current = window.setTimeout(() => {
-      const nearest = Math.round(node.scrollTop / ITEM_HEIGHT);
-      const value = values[Math.max(0, Math.min(values.length - 1, nearest))];
-      /* A click under the thumb for each value the wheel lands on, the way
-         an iOS picker ticks. */
-      if (value !== undefined && value !== selected) { tap(); onSelect(value); }
-    }, 90);
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      const node = ref.current;
+      if (!node) return;
+      const nearest = Math.max(0, Math.min(values.length - 1, Math.round(node.scrollTop / ITEM_HEIGHT)));
+      if (gliding.current !== null) { if (nearest === gliding.current) gliding.current = null; return; }
+      const value = values[nearest];
+      if (value !== undefined && value !== selected) { byFinger.current = true; tick(); onSelect(value); }
+    });
   };
+  const takeOver = () => { gliding.current = null; };
 
-  return <div className="dial-wheel" ref={ref} onScroll={onScroll} role="listbox" tabIndex={0}>
+  return <div className="dial-wheel" ref={ref} onScroll={onScroll} onTouchStart={takeOver} onPointerDown={takeOver} onWheel={takeOver} role="listbox" tabIndex={0}>
     <div className="dial-pad" />
     {values.map(value => <button
       type="button"
@@ -107,7 +120,7 @@ function Wheel({ values, selected, onSelect, format }: {
       className={value === selected ? 'dial-value active' : 'dial-value'}
       role="option"
       aria-selected={value === selected}
-      onClick={() => { onSelect(value); ref.current?.scrollTo({ top: values.indexOf(value) * ITEM_HEIGHT, behavior: 'smooth' }); }}
+      onClick={() => { if (value !== selected) { tap(); onSelect(value); } }}
     >{format ? format(value) : value}</button>)}
     <div className="dial-pad" />
   </div>;
@@ -181,7 +194,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
         <strong>{title}</strong>
         <button type="button" className="dial-ok" onClick={() => { tap(); confirm(); }}>Done</button>
       </header>
-      <div className="dial-columns" aria-live="polite">
+      <div className={singleWheel ? "dial-columns dial-single" : "dial-columns"} aria-live="polite">
         {/* The highlighted band is the selection, exactly as a picker reads. */}
         <div className="dial-band" aria-hidden="true" />
         {kind === 'clock'

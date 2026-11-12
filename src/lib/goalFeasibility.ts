@@ -424,7 +424,12 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
     const nextByLabel = weeks >= 8 ? new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : new Date(`${nextBy}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return { goal: goal.title, verdict: 'reachable', say,
       ...(next >= best + 5 ? { suggest: { targetText: String(next), label: `${next} ${goal.unit || 'lb'} by ${nextByLabel}`, why: 'Your next target', ...(weeks >= 8 ? {} : { date: nextBy }) } } : {}),
-      prediction: { start: Math.round(best), typical: Math.round(best), ceiling: Math.round(best), target, better: 'higher', weeks: Math.max(0, Math.round(weeksUntil(goal.date))) } };
+      /* THE CURVES STILL CLIMB AFTER THE ESTIMATE CLEARS THE GOAL. They were
+         flat here (typical and ceiling both equal to today), which was fine
+         in Estimated mode and wrong in Actual: carried to a tested 490 they
+         said he would still be at 490 on the date, so a 500 squat seven weeks
+         out read "Out of reach" at 98%. */
+      prediction: { start: Math.round(best), typical: Math.round(liftTypical(best, weeks, measuredLiftRate(sets))), ceiling: Math.round(liftCeiling(best, weeks)), target, better: 'higher', weeks: Math.max(0, Math.round(weeksUntil(goal.date))) } };
   }
   /* An entered best is a lift they already know, not one they are learning. */
   const newLift = sets.length > 0 && new Set(sets.map(set => set.date)).size < NEW_LIFT_SESSIONS;
