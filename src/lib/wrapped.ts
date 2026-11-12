@@ -5,9 +5,10 @@ import { runLines } from './stats';
 
 /* FORGE WRAPPED. The athlete's year, told back to them on January 1.
 
-   Everything here is read from their own log and nothing is invented: no
-   "top 2% of lifters" (Forge has no fair way to rank one athlete against
-   another yet), no guessed calories. A slide with nothing behind it is not
+   Everything here is read from their own log and nothing is invented, no
+   guessed calories. The one comparison with other people ("stronger than
+   82% of lifters") comes from published strength standards for her sex and
+   body weight, says so on the slide, and is left out without a body weight. A slide with nothing behind it is not
    shown — a lifter who never ran does not get a running slide of zeros. */
 
 export type WrappedLift = { name: string; start: number; best: number; gain: number; bestDate: string; sets: number };
@@ -15,6 +16,10 @@ export type WrappedLift = { name: string; start: number; best: number; gain: num
    lifted on that lift, with the reps it went for — not an estimated max. */
 export type WrappedPr = { lift: string; max: number; reps: number; date: string };
 export type Persona = { name: string; line: string };
+/* Where a lift stands against other lifters of the same sex and body weight. */
+export type Standing = { lift: string; best: number; ratio: number; percentile: number };
+/* Time spent lifting against time spent running, for the balance scale. */
+export type Balance = { liftMinutes: number; runMinutes: number; liftShare: number; verdict: string };
 
 export type Wrapped = {
   year: number;
@@ -44,6 +49,8 @@ export type Wrapped = {
   /* 0 rest, 1 lifted, 2 ran, 3 both — one entry per day of the year. */
   calendar: number[];
   persona: Persona;
+  standing: Standing[];
+  balance: Balance | null;
 };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -57,6 +64,45 @@ const daysInYear = (year: number) => (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 
 /* Monday-based week number, counted from the Monday on or before Jan 1. */
 const weekNumber = (iso: string) => { const [y] = parts(iso); const jan1 = weekday(`${y}-01-01`); return Math.floor((dayIndex(iso) + jan1) / 7); };
 const round1 = (value: number) => Math.round(value * 10) / 10;
+
+/* STRENGTH STANDARDS. One-rep max as a multiple of body weight at five
+   points of the lifting population (the beginner / novice / intermediate /
+   advanced / elite levels of the common strength-standard tables: stronger
+   than 5%, 20%, 50%, 80% and 95% of lifters). Between points the percentile
+   is read off a straight line in log-ratio, outside them it tapers to 1 and
+   99. These are lifters, not everyone: against the whole population the
+   number would be higher, so the slide says "of lifters". */
+type MainLift = 'bench' | 'squat' | 'deadlift' | 'press';
+const LEVELS = [5, 20, 50, 80, 95];
+const STANDARDS: Record<'Male' | 'Female', Record<MainLift, number[]>> = {
+  Male: { bench: [0.5, 0.75, 1.0, 1.5, 2.0], squat: [0.75, 1.25, 1.5, 2.0, 2.5], deadlift: [1.0, 1.5, 2.0, 2.5, 3.0], press: [0.35, 0.55, 0.75, 1.0, 1.25] },
+  Female: { bench: [0.25, 0.5, 0.75, 1.0, 1.5], squat: [0.5, 0.75, 1.25, 1.5, 2.0], deadlift: [0.5, 1.0, 1.25, 1.75, 2.5], press: [0.2, 0.35, 0.5, 0.75, 1.0] },
+};
+const LIFT_NAMES: Record<MainLift, string> = { bench: 'Bench press', squat: 'Squat', deadlift: 'Deadlift', press: 'Overhead press' };
+/* Only the barbell versions the standards describe. */
+export function mainLiftOf(name: string): MainLift | null {
+  const n = name.toLowerCase();
+  if (/dumbbell|\bdb\b|machine|smith|incline|decline|close.?grip|floor|pin|board|band/.test(n)) return null;
+  if (/bench/.test(n)) return 'bench';
+  if (/deadlift/.test(n) && !/romanian|rdl|stiff|single|trap|hex|deficit|block|rack|sumo/.test(n)) return 'deadlift';
+  if (/squat/.test(n) && !/front|goblet|split|bulgarian|hack|box|pause|overhead|zercher|safety|ssb|jump|pistol/.test(n)) return 'squat';
+  if (/(overhead|military|strict|shoulder) press|\bohp\b/.test(n) && !/push|seated/.test(n)) return 'press';
+  return null;
+}
+export function percentileFor(lift: MainLift, sex: 'Male' | 'Female', ratio: number): number {
+  const table = STANDARDS[sex][lift];
+  if (!(ratio > 0)) return 0;
+  const x = Math.log(ratio);
+  const xs = table.map(Math.log);
+  let pct: number;
+  if (x <= xs[0]) pct = LEVELS[0] * Math.exp((x - xs[0]) * 2.5);
+  else if (x >= xs[4]) pct = 100 - (100 - LEVELS[4]) * Math.exp(-(x - xs[4]) * 4);
+  else {
+    const i = xs.findIndex((value, index) => x >= value && x <= xs[index + 1]);
+    pct = LEVELS[i] + (LEVELS[i + 1] - LEVELS[i]) * (x - xs[i]) / (xs[i + 1] - xs[i]);
+  }
+  return Math.max(1, Math.min(99, Math.round(pct)));
+}
 
 /* Something the size of the athlete's year, in pounds. The biggest thing
    that still makes a pile of at least five — "0.02 blue whales" and "2 semi
@@ -89,7 +135,7 @@ function personaFor(w: Pick<Wrapped, 'trainingDays' | 'liftDays' | 'runDays' | '
 }
 
 /* `metric`: the log's weights are kilograms, so the comparison converts. */
-export function buildWrapped(records: WorkoutRecord[], year: number, metric = false): Wrapped | null {
+export function buildWrapped(records: WorkoutRecord[], year: number, metric = false, athlete: { sex?: string; bodyWeight?: number } = {}): Wrapped | null {
   const prefix = `${year}-`;
   const ofYear = records.filter(record => /^\d{4}-\d{2}-\d{2}$/.test(String(record.date || '')) && record.date.startsWith(prefix));
   if (!ofYear.length) return null;
@@ -179,6 +225,52 @@ export function buildWrapped(records: WorkoutRecord[], year: number, metric = fa
   let longestWeekStreak = 0, streak = 0, last = -2;
   [...weeks].sort((a, b) => a - b).forEach(week => { streak = week === last + 1 ? streak + 1 : 1; last = week; longestWeekStreak = Math.max(longestWeekStreak, streak); });
 
+  /* Where her best lifts stand. Body weight: the latest she logged this year,
+     else her profile's. Best = the year's best estimated max for the lift. */
+  const loggedWeight = [...ofYear].filter(record => Number(record.bodyWeight) > 0).sort((a, b) => b.date.localeCompare(a.date))[0]?.bodyWeight;
+  const bodyWeight = Number(loggedWeight) || Number(athlete.bodyWeight) || 0;
+  const sex = athlete.sex === 'Male' || athlete.sex === 'Female' ? athlete.sex : null;
+  const standing: Standing[] = [];
+  if (bodyWeight > 0 && sex) {
+    const bestByLift = new Map<MainLift, { best: number }>();
+    for (const lift of liftList) {
+      const main = mainLiftOf(lift.name);
+      if (!main) continue;
+      const held = bestByLift.get(main);
+      if (!held || lift.best > held.best) bestByLift.set(main, { best: lift.best });
+    }
+    for (const main of ['squat', 'bench', 'deadlift', 'press'] as MainLift[]) {
+      const entry = bestByLift.get(main);
+      if (!entry) continue;
+      const ratio = entry.best / bodyWeight;
+      standing.push({ lift: LIFT_NAMES[main], best: Math.round(entry.best), ratio: Math.round(ratio * 100) / 100, percentile: percentileFor(main, sex, ratio) });
+    }
+  }
+
+  /* THE BALANCE: time lifting against time running. Running time is what
+     she logged per run; a lifting day counts its logged length minus any run
+     that day, or 45 minutes when no length was logged. Shown only when she
+     did both. */
+  const runMinutesByDate = new Map<string, number>();
+  for (const line of lines) runMinutesByDate.set(line.date, (runMinutesByDate.get(line.date) || 0) + (line.minutes > 0 ? line.minutes : line.miles * 10));
+  const runMinutes = [...runMinutesByDate.values()].reduce((a, b) => a + b, 0);
+  let liftMinutes = 0;
+  const countedLiftDates = new Set<string>();
+  for (const record of ofYear) {
+    const lifted = (record.topSets || []).some(set => set && set.lift && set.completed !== false && Number(set.weight) > 0);
+    if (!lifted || countedLiftDates.has(record.date)) continue;
+    countedLiftDates.add(record.date);
+    const logged = Number(record.durationMinutes) || 0;
+    const minusRun = logged - (runMinutesByDate.get(record.date) || 0);
+    liftMinutes += minusRun >= 15 ? minusRun : 45;
+  }
+  const both = liftMinutes > 0 && runMinutes > 0;
+  const liftShare = both ? liftMinutes / (liftMinutes + runMinutes) : 0;
+  const balance: Balance | null = both ? {
+    liftMinutes: Math.round(liftMinutes), runMinutes: Math.round(runMinutes), liftShare: Math.round(liftShare * 100) / 100,
+    verdict: liftShare >= 0.75 ? 'Lifter, through and through' : liftShare >= 0.58 ? 'A lifter who runs' : liftShare > 0.42 ? 'A true hybrid' : liftShare > 0.25 ? 'A runner who lifts' : 'Runner, through and through',
+  } : null;
+
   const favoriteDay = WEEKDAYS[weekdays.indexOf(Math.max(...weekdays))];
   const bestMonth = MONTHS[daysByMonth.indexOf(Math.max(...daysByMonth))];
   const base = { trainingDays: trainingDates.size, liftDays, runDays: runDates.size, weekdays, longestWeekStreak, prCount: prs.length, runMiles };
@@ -201,6 +293,8 @@ export function buildWrapped(records: WorkoutRecord[], year: number, metric = fa
     bestMonth,
     calendar,
     persona: personaFor(base),
+    standing,
+    balance,
   };
 }
 

@@ -190,3 +190,36 @@
   .wrapped *, .wr-entry::after { animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
   .wr-progress i.now { animation: none; width: 100%; }
 }
+
+/* Stronger than X% of lifters */
+.wr-rank { width: 100%; margin-top: 24px; display: grid; gap: 14px; }
+.wr-rank-row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name pct" "bar bar"; gap: 6px 12px; align-items: end; text-align: left; }
+.wr-rank-row span { grid-area: name; font-weight: 800; font-size: 1.05rem; display: flex; flex-direction: column; }
+.wr-rank-row span small { font-weight: 600; font-size: .8rem; opacity: .7; }
+.wr-rank-row b { grid-area: pct; font-size: 1.15rem; font-weight: 900; color: var(--wr-lilac); }
+.wr-rank-row > div { grid-area: bar; height: 12px; border-radius: 8px; background: rgba(255,255,255,.12); overflow: hidden; }
+.wr-rank-row i { display: block; height: 100%; width: var(--w, 0%); border-radius: inherit; background: linear-gradient(90deg, rgba(255,255,255,.55), var(--wr-lilac)); animation: wr-grow 1.3s cubic-bezier(.2,.8,.2,1) both; }
+.wr-foot { margin: 18px 0 0; font-size: .78rem; line-height: 1.35; opacity: .6; max-width: 30ch; }
+
+/* The balance scale */
+.wr-scale { position: relative; width: min(74vw, 290px); height: 220px; margin: 26px auto 6px; }
+.wr-post { position: absolute; left: 50%; bottom: 0; width: 10px; height: 150px; margin-left: -5px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #fff, rgba(255,255,255,.55)); }
+.wr-post::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 110px; height: 10px; margin-left: -55px; border-radius: 6px; background: rgba(255,255,255,.7); }
+.wr-beam { position: absolute; left: 4%; right: 4%; top: 62px; height: 8px; border-radius: 6px; background: #fff; transform-origin: 50% 50%; animation: wr-tip 2.2s .9s cubic-bezier(.3,1.4,.4,1) both; z-index: 1; }
+.wr-beam::after { content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--wr-lilac); box-shadow: 0 0 0 4px rgba(0,0,0,.25); }
+@keyframes wr-tip { 0% { transform: rotate(0deg); } 35% { transform: rotate(calc(var(--tilt, 0deg) * -0.6)); } 70% { transform: rotate(calc(var(--tilt, 0deg) * 1.15)); } 100% { transform: rotate(var(--tilt, 0deg)); } }
+.wr-pan { position: absolute; top: 4px; width: 92px; display: flex; flex-direction: column; align-items: center; transform-origin: 50% 0; animation: wr-tip 2.2s .9s cubic-bezier(.3,1.4,.4,1) both; }
+.wr-pan.left { left: -46px; }
+.wr-pan.right { right: -46px; }
+.wr-pan::before { content: ''; width: 2px; height: 46px; background: rgba(255,255,255,.7); }
+.wr-pan span { margin-top: 6px; padding-top: 8px; width: 100%; border-top: 6px solid #fff; border-radius: 0 0 50px 50px; font-size: .85rem; font-weight: 800; text-align: center; }
+/* The pans hang level: each turns back by exactly what the beam turns
+   (its --tilt is the beam's, negated), through the same wobble. */
+.wr-weight { width: calc(44px * var(--s, 1)); height: calc(30px * var(--s, 1)); border-radius: 8px 8px 4px 4px; animation: wr-stack .6s .5s cubic-bezier(.3,1.6,.5,1) both; }
+.wr-weight.lift { background: linear-gradient(180deg, #fff, var(--wr-lilac)); }
+.wr-weight.run { background: linear-gradient(180deg, #fff, #8985a5); }
+.wr-split { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+.wr-split div { display: flex; flex-direction: column; align-items: center; padding: 12px 8px; border-radius: 16px; background: rgba(255,255,255,.1); }
+.wr-split b { font-size: 2.2rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.wr-split small { margin-top: 4px; font-size: .82rem; font-weight: 700; opacity: .75; }
+@media (prefers-reduced-motion: reduce) { .wr-beam, .wr-pan { animation-duration: .01s; animation-delay: 0s; } }
