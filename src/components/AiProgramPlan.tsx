@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { HYROX_NO_GOAL, hyroxGoalOf, hyroxPlanDetail, withHyroxPaces } from '../lib/hyroxSession';
+import { HYROX_NO_GOAL, hyroxGoalOf, hyroxPlanDetail } from '../lib/hyroxSession';
 import { bestRunDay, type PlannedDay } from '../lib/interference';
-import { paceModel } from '../lib/paceModel';
 import { enduranceTarget } from '../lib/qualitySession';
 import type { CreatedGoal } from './GoalBuilder';
 import type { AdaptiveProfile } from '../features/training/AdaptiveTrainingProvider';
@@ -36,10 +35,7 @@ import { liftPositions, rungFor } from '../lib/liftProgression';
 import { easyRunWeeks } from '../lib/bodyLog';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
-import { progressionLevels } from '../lib/progressionLevels';
-import { sessionVerdicts } from '../features/training/sessionVerdicts';
-import { workoutEfforts } from '../lib/workoutEvidence';
-import { QUALITY_MAX_SHARE, WARMUP_COOLDOWN_MILES } from '../lib/qualitySession';
+import { planRunningEvidence } from '../features/training/planRunningEvidence';
 import { Icon } from './Icon';
 
 type SplitDay = { name: string; dayType: string; muscles?: string[]; exercises?: string[]; cardioPolicy?: 'none' | 'forge' | 'planned'; cardio?: PlannedCardio[] };
@@ -291,26 +287,13 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      hardest recent continuous run, corrected for how far their weekly running
      falls short of what that pace is normally built on — so a fast mile off
      eight miles a week does not become a marathon pace nobody can hold. */
-  const basePaces = useMemo(
-    () => paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || []),
-    [records, runGoal, setup?.excludedEfforts],
-  );
+  /* Computed by the one helper Today reads too (planRunningEvidence), so the
+     two screens size the week's running from the same judged sessions. */
+  const { judged, paces, levels } = useMemo(() => planRunningEvidence(records, stored, setup, goals), [records, stored, setup, goals]);
 
   /* EVERY HARD SESSION IN THE BLOCK, JUDGED — and it is read ONCE, here,
      because three different things downstream need it: the ladder the plan
      prescribes off, the training paces, and the projections. */
-  const judged = useMemo(() => {
-    const split = (setup?.splitDays || []).map(day => ({ name: day.name, dayType: day.type }));
-    return sessionVerdicts(records, stored, split, {
-      runningDays: Number(setup?.runningDays) || 0,
-      minWeeklyMileage: Number(setup?.minWeeklyMileage) || 0,
-      maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0,
-      weeklyMileage: Number(setup?.weeklyMileage) || 0,
-      goalPaceSecondsPerMile: runGoal?.paceSecondsPerMile,
-      goalMiles: runGoal?.miles,
-      paces: basePaces,
-    }, localDayIso(), undefined, goals);
-  }, [records, stored, setup, runGoal, basePaces, goals]);
 
   /* AND THE SESSIONS THE ATHLETE COMPLETED ARE EVIDENCE ABOUT THEM, not only
      the races they ran. See workoutEvidence: a judged session becomes a dated
@@ -323,11 +306,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      sessionVerdicts). The paces everything else reads are then rebuilt with
      the workouts included. Feeding these back round would let a session help
      decide whether it was a session. */
-  const paces = useMemo(
-    /* A HYROX goal with no running race sets the paces from its own table. */
-    () => withHyroxPaces(paceModel(records, runGoal, localDayIso(), medianWeeklyMiles(records), setup?.excludedEfforts || [], workoutEfforts(judged)), goals),
-    [records, runGoal, setup?.excludedEfforts, judged, goals],
-  );
 
   /* WHERE THE ATHLETE IS ON EACH LADDER — the plan's memory of how the last
      hard sessions went. Derived, never stored: sessionVerdicts reads what was
@@ -342,16 +320,6 @@ export function AiProgramPlan({ goals, profile, splitDays, rhythm = 'rolling', m
      that does is whether a session counts as SHORT, which is judged against
      the base rep count rather than the one on the card. Worth knowing; not
      worth a fixed point. */
-  const levels = useMemo(() => {
-    const moves = judged.map(verdict => ({ date: verdict.date, outcome: verdict.outcome, text: verdict.text }));
-    return progressionLevels({
-      weeklyMiles: medianWeeklyMiles(records),
-      qualityShare: QUALITY_MAX_SHARE,
-      warmupMiles: WARMUP_COOLDOWN_MILES,
-      thresholdPaceSecondsPerMile: paces.threshold,
-      provenQuality: moves.length > 0,
-    }, moves);
-  }, [records, judged, paces]);
   /* Which set each number came from. A calc max of 380 is a conclusion drawn
      from something like 315 × 6, and showing that set is the difference
      between a number the athlete trusts and one that looks invented. */

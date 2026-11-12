@@ -137,6 +137,9 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
     if (fromNow === 'off-track') tone = 'off-track';
     else if (fromNow === 'needs-work') tone = 'needs-work';
   }
-  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? 'No tested time yet' : 'No tested max yet') : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
+  /* A HYROX goal is not timed by runs: logged running does not start it, so
+     it must not say "first run" to someone with months of runs on file. */
+  const hyrox = goal.type === 'Endurance' && /hyrox/i.test(`${goal.exercise || ''} ${goal.title}`);
+  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? (hyrox ? 'No HYROX time yet' : 'No tested time yet') : 'No tested max yet') : hyrox ? 'No HYROX time yet' : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
   return { share, current, currentText: current ? show(current) : '—', targetText: target ? show(target) : String(goal.target || ''), tone, label };
 }
