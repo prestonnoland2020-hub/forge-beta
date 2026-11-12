@@ -7,6 +7,7 @@ import { sendPush, type PushTarget } from './webpush.ts';
      morning   the day's training, once, in their own morning
      partner   a training partner logged and you have not
      sync      their Garmin watch just delivered a new activity
+     wrapped   Jan 1, 9 am their time: last year's Forge Wrapped is out
      test      one push to one athlete, on demand, to prove the path
      status    what this function can and cannot do right now
 
@@ -66,13 +67,13 @@ const log = async (rows: LogRow[]) => {
 };
 
 /* Their local hour and their local day, without a timezone library. */
-const localHour = (timezone: string) => {
-  try { return Number(new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }).format(new Date())); }
-  catch { return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', hour12: false }).format(new Date())); }
+const localHour = (timezone: string, now = new Date()) => {
+  try { return Number(new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }).format(now)) % 24; }
+  catch { return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', hour12: false }).format(now)) % 24; }
 };
-const localDate = (timezone: string) => {
-  try { return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date()); }
-  catch { return new Date().toISOString().slice(0, 10); }
+const localDate = (timezone: string, now = new Date()) => {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(now); }
+  catch { return now.toISOString().slice(0, 10); }
 };
 
 /* TWO QUESTIONS, ASKED ONCE FOR EVERYONE RATHER THAN TWICE PER PERSON.
@@ -249,6 +250,8 @@ const COLUMNS = 'endpoint,owner_id,p256dh,auth,timezone,wants_morning,wants_part
 const MORNING_HOUR = 6;
 const QUIET_START = MORNING_HOUR;
 const QUIET_END = 21;
+/* Forge Wrapped lands at 9 am on Jan 1, their time. */
+const WRAPPED_HOUR = 9;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -330,6 +333,33 @@ Deno.serve(async request => {
         : { title: 'Today’s training', body: nextUp.get(key)?.line || 'Open Forge to see what is next in your split.', tag: `morning-${date}`, url: './#/' };
       messages.push({ row, date, payload });
     }
+  }
+
+  if (kind === 'wrapped') {
+    /* FORGE WRAPPED IS OUT. The hourly cron calls this all year; it acts only
+       for a phone whose own clock says Jan 1, 9 am, and only for someone who
+       trained in the year being wrapped. Once per athlete per year. */
+    /* dry + at: a rehearsal for a given moment ("2027-01-01T15:00:00Z") that
+       says who would be told and sends nothing — the only way to check Jan 1
+       before Jan 1. */
+    const now = typeof body.at === 'string' && !Number.isNaN(Date.parse(body.at)) ? new Date(body.at) : new Date();
+    const { data } = await admin.from('push_subscriptions').select(COLUMNS);
+    const due = ((data || []) as Row[])
+      .map(row => ({ row, date: localDate(row.timezone, now) }))
+      .filter(({ row, date }) => date.endsWith('-01-01') && localHour(row.timezone, now) === WRAPPED_HOUR);
+    if (due.length) {
+      const year = Number(due[0].date.slice(0, 4)) - 1;
+      const owners = [...new Set(due.map(({ row }) => row.owner_id))];
+      const { data: trained } = await admin.from('workout_days').select('owner_id').in('owner_id', owners).gte('workout_date', `${year}-01-01`).lte('workout_date', `${year}-12-31`);
+      const active = new Set((trained || []).map((item: { owner_id: string }) => item.owner_id));
+      const told = await sentDays(kind, due.map(({ row, date }) => [row.owner_id, date] as [string, string]));
+      for (const { row, date } of due) {
+        if (!active.has(row.owner_id)) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: `no training in ${year}` }); continue; }
+        if (told.has(pairKey(row.owner_id, date))) { skipped.push({ kind, owner_id: row.owner_id, local_date: date, outcome: 'skipped', note: 'already told' }); continue; }
+        messages.push({ row, date, payload: { title: `Your ${year} Forge Wrapped is here`, body: 'Your year in training, told back to you. Tap to see it.', tag: `wrapped-${year}`, url: './#/wrapped' } });
+      }
+    }
+    if (body.dry) return json({ dry: true, at: now.toISOString(), wouldSend: messages.map(({ row, date, payload }) => ({ owner: row.owner_id.slice(0, 8), timezone: row.timezone, date, title: payload.title })), skipped: skipped.map(item => `${item.owner_id?.slice(0, 8)} ${item.note}`) });
   }
 
   if (kind === 'partner') {
