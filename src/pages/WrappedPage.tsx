@@ -142,6 +142,49 @@ function Running({ w, metric }: { w: Wrapped; metric: boolean }) {
   </div>;
 }
 
+/* STRONGER THAN: each main lift against lifters of her sex and body weight. */
+function Standing({ w, unit }: { w: Wrapped; unit: string }) {
+  const top = w.standing.reduce((a, b) => (b.percentile > a.percentile ? b : a));
+  return <div className="wr-stack">
+    <p className="wr-kicker wr-in">Your {top.lift.toLowerCase()} is stronger than</p>
+    <h2 className="wr-huge"><Count to={top.percentile} /><small>%</small></h2>
+    <p className="wr-lead wr-in" style={{ animationDelay: '.6s' }}>of lifters your size</p>
+    <div className="wr-rank">
+      {w.standing.map((item, index) => <div key={item.lift} className="wr-rank-row wr-slide-in" style={{ animationDelay: `${1.1 + index * 0.3}s` }}>
+        <span>{item.lift}<small>{fmt(item.best)} {unit} · {fmt(item.ratio, 2)}× body weight</small></span>
+        <div aria-hidden="true"><i style={{ ['--w' as string]: `${item.percentile}%`, animationDelay: `${1.3 + index * 0.3}s` }} /></div>
+        <b>Top {Math.max(1, 100 - item.percentile)}%</b>
+      </div>)}
+    </div>
+    <p className="wr-foot wr-in" style={{ animationDelay: '2.8s' }}>Estimated from common strength standards for your sex and body weight, using your best estimated max of {w.year}.</p>
+  </div>;
+}
+
+/* THE BALANCE: lifting on one pan, running on the other; the beam tips
+   toward whichever got more of her time. */
+function BalanceSlide({ w }: { w: Wrapped }) {
+  const b = w.balance!;
+  const liftPct = Math.round(b.liftShare * 100);
+  const runPct = 100 - liftPct;
+  const tilt = Math.max(-18, Math.min(18, (b.liftShare - 0.5) * 60));
+  const hours = (minutes: number) => minutes >= 90 ? `${fmt(minutes / 60, minutes >= 600 ? 0 : 1)} hours` : `${fmt(minutes)} min`;
+  return <div className="wr-stack">
+    <p className="wr-kicker wr-in">Lifting vs running</p>
+    <h2 className="wr-name wr-in" style={{ animationDelay: '.2s' }}>{b.verdict}</h2>
+    <div className="wr-scale" aria-label={`${liftPct}% of your training time lifting, ${runPct}% running`} role="img">
+      <div className="wr-beam" style={{ ['--tilt' as string]: `${-tilt}deg` }}>
+        <div className="wr-pan left" style={{ ['--tilt' as string]: `${tilt}deg` }}><i className="wr-weight lift" style={{ ['--s' as string]: String(0.6 + b.liftShare * 0.8) }} /><span>Lifting</span></div>
+        <div className="wr-pan right" style={{ ['--tilt' as string]: `${tilt}deg` }}><i className="wr-weight run" style={{ ['--s' as string]: String(0.6 + (1 - b.liftShare) * 0.8) }} /><span>Running</span></div>
+      </div>
+      <div className="wr-post" />
+    </div>
+    <div className="wr-split wr-in" style={{ animationDelay: '2.4s' }}>
+      <div><b><Count to={liftPct} delay={2400} />%</b><small>{hours(b.liftMinutes)} lifting</small></div>
+      <div><b><Count to={runPct} delay={2400} />%</b><small>{hours(b.runMinutes)} running</small></div>
+    </div>
+  </div>;
+}
+
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 function Rhythm({ w }: { w: Wrapped }) {
   const top = Math.max(...w.weekdays, 1);
@@ -267,7 +310,7 @@ export function WrappedPage() {
   /* ?year= opens a specific year — used to preview the current one early. */
   const requested = Number(params.get('year'));
   const year = Number.isInteger(requested) && requested > 2000 ? requested : wrappedWindow().year;
-  const w = useMemo(() => buildWrapped(records, year, metric), [records, year, metric]);
+  const w = useMemo(() => buildWrapped(records, year, metric, { sex: setup?.sex, bodyWeight: Number(setup?.currentWeight) || Number(setup?.startingWeight) || undefined }), [records, year, metric, setup?.sex, setup?.currentWeight, setup?.startingWeight]);
 
   useEffect(() => { try { localStorage.setItem(`forge-wrapped-seen-${year}`, '1'); } catch { /* per-device */ } }, [year]);
 
@@ -278,12 +321,14 @@ export function WrappedPage() {
     if (w.topSets > 0) list.push({ key: 'tonnage', tone: 't-violet', body: <Tonnage w={w} unit={unit} /> });
     if (w.strongest) list.push({ key: 'lift', tone: 't-navy', body: <Strongest w={w} unit={unit} /> });
     if (w.prCount > 0) list.push({ key: 'prs', tone: 't-electric', body: <Prs w={w} unit={unit} /> });
+    if (w.standing.length) list.push({ key: 'standing', tone: 't-blue', body: <Standing w={w} unit={unit} /> });
     if (w.runs > 0) list.push({ key: 'run', tone: 't-violet', body: <Running w={w} metric={metric} /> });
+    if (w.balance) list.push({ key: 'balance', tone: 't-navy', body: <BalanceSlide w={w} /> });
     list.push({ key: 'rhythm', tone: 't-navy', body: <Rhythm w={w} /> });
     if (w.longestWeekStreak >= 2) list.push({ key: 'streak', tone: 't-blue', body: <Streak w={w} /> });
     list.push({ key: 'persona', tone: 't-electric', body: <PersonaSlide w={w} /> });
     return list;
-  }, [w, unit, metric, name]);
+  }, [w, unit, metric, name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
