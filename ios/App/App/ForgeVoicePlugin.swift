@@ -79,6 +79,11 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
+    /* Which recognition session is the current one. A session that was
+       replaced still reports back once ("cancelled"); that report must not
+       restart anything, or the new session is cancelled in turn and the mic
+       never gets long enough to hear a word. */
+    private var taskSerial = 0
     private var running = false
     private var listening = false
     private var hints: [String] = []
@@ -216,6 +221,8 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     }
 
     private func newTask() {
+        taskSerial += 1
+        let serial = taskSerial
         task?.cancel(); task = nil
         request?.endAudio()
         lastText = ""
@@ -233,6 +240,8 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
             DispatchQueue.main.async {
+                /* Only the current session counts. */
+                guard serial == self.taskSerial else { return }
                 if let result = result {
                     let text = result.bestTranscription.formattedString
                     if self.autopilot {
