@@ -223,3 +223,4 @@
 .wr-split b { font-size: 2.2rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
 .wr-split small { margin-top: 4px; font-size: .82rem; font-weight: 700; opacity: .75; }
 @media (prefers-reduced-motion: reduce) { .wr-beam, .wr-pan { animation-duration: .01s; animation-delay: 0s; } }
+.wr-remind { width: 100%; text-align: left; font: inherit; cursor: pointer; }

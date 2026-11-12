@@ -22,6 +22,7 @@ import { needsFollowUp } from '../features/training/athleteNotesService';
 import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyPartnerTrained } from '../lib/notifications';
 import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
+import { onWrappedReminderTap } from '../lib/wrappedReminder';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
 import { getGarminConnection, syncGarmin } from '../features/training/garminConnectionService';
@@ -155,6 +156,8 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      changing) never sends its blur, which left the bar hidden as if the
      keyboard were up. Every screen change re-reads the real state. */
   useEffect(() => { syncKeyboardState(); }, [location.pathname, location.search]);
+  /* A tap on the Jan 1 "Wrapped is here" notification (iPhone app) opens it. */
+  useEffect(() => onWrappedReminderTap(route => navigate(route)), [navigate]);
   /* A NEW BUILD TAKES OVER BY ITSELF, at a moment nobody loses anything to.
      The pill asked for a tap most people never made, so a deploy reached them
      only whenever they happened to reload. Now the app reloads on its own —

@@ -17,7 +17,7 @@ import { sessionLength } from '../lib/time';
 import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate';
 import { TodayNudges } from '../components/TodayNudges';
 import { RunningBehindNudge } from '../components/RunningBehindCard';
-import { WrappedEntry } from '../components/WrappedEntry';
+import { WrappedEntry, WrappedReminderCard } from '../components/WrappedEntry';
 import { SplitGuidePrompt, SplitReadyNote } from '../components/SplitGuidePrompt';
 import { openCoachBubble } from '../features/training/coachService';
 
@@ -95,6 +95,7 @@ export function HomePage() {
 
     {/* January only: last year's Wrapped, above the day's work for one month. */}
     <WrappedEntry />
+    <WrappedReminderCard />
 
     <TodayModeSwitch mode={mode} onChange={chooseMode} />
     {mode === 'coach' && <CoachToday />}
