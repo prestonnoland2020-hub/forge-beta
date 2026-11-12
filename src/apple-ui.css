@@ -126,3 +126,4 @@ input[type="checkbox"].ios-switch:disabled { opacity: .45; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .toggle-row input[type="checkbox"], .toggle-row input[type="checkbox"]::after, .partner-discoverable input[type="checkbox"]::after, .setup-check input[type="checkbox"] { transition: none; }
 }
+.chart-reps { fill: var(--ink-2); font-weight: 700; }

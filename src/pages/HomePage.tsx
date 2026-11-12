@@ -115,7 +115,7 @@ export function HomePage() {
       </ul>}
       <Link className="button secondary wide" to={`/workout?edit=${completedToday.id}`}>Edit workout</Link>
     </section> : <section className="td-card">
-      <div className="td-card-top"><span className="td-chip">Up next · Day {recommendation.splitDay.position}</span><Link to="/workout?source=split">Change day</Link></div>
+      <div className="td-card-top"><span className="td-chip">Suggested · Day {recommendation.splitDay.position}</span><Link to="/workout?source=split">Change day</Link></div>
       <h3 className="td-title">{recommendation.splitDay.name}</h3>
       {(recommendedSets.length > 0 || recommendation.cardio) && <ul className="td-lines">
         {recommendedSets.map(set => <li key={set.id}><label className={set.selected ? 'on' : ''}>
@@ -125,7 +125,7 @@ export function HomePage() {
           {/* A load is a record, set in mono with its unit small; an open
               instruction stays in words. The text reads the same either way. */}
           {set.source === 'history'
-            ? <b className="td-load">{set.weight}<small> {weightUnit}</small> × {set.reps}</b>
+            ? <b className="td-load">{set.weight}<small> {weightUnit}</small> × {set.reps}<small> reps</small></b>
             : <b className="td-load open">Work up to {set.reps || 5}</b>}
         </label></li>)}
         {recommendation.cardio && <li><label className={recommendation.cardio.selected ? 'on' : ''}>
