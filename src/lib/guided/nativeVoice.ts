@@ -24,5 +24,8 @@ type Plugin = {
 };
 
 const supported = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
-export const nativeVoice: Plugin | null = supported ? registerPlugin<Plugin>('ForgeVoice') : null;
+export type NativeVoicePlugin = Plugin;
+export let nativeVoice: Plugin | null = supported ? registerPlugin<Plugin>('ForgeVoice') : null;
 export const hasNativeVoice = () => Boolean(nativeVoice);
+/* Tests only: stand in a fake native plugin (voice tests in the browser). */
+export function __setNativeVoiceForTests(fake: Plugin | null) { nativeVoice = fake; }

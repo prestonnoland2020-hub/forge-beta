@@ -75,7 +75,7 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
     private var lastLineId = ""
     private var observing = false
 
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
@@ -142,20 +142,11 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
             self.recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
             guard let recognizer = self.recognizer, recognizer.isAvailable else { call.resolve(["started": false, "reason": "unavailable"]); return }
             self.configureSession(duck: false)
-            let input = self.engine.inputNode
-            let format = input.outputFormat(forBus: 0)
-            guard format.sampleRate > 0 else { call.resolve(["started": false, "reason": "no-input"]); return }
-            input.removeTap(onBus: 0)
-            input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-                guard let self = self, self.listening else { return }
-                self.request?.append(buffer)
-            }
-            self.engine.prepare()
-            do { try self.engine.start() } catch {
+            do { try self.startEngine() } catch {
+                /* Listening could not start; speaking (play) still works. */
                 call.resolve(["started": false, "reason": error.localizedDescription]); return
             }
             NotificationCenter.default.addObserver(self, selector: #selector(self.interrupted(_:)), name: AVAudioSession.interruptionNotification, object: nil)
-            NotificationCenter.default.addObserver(self, selector: #selector(self.engineChanged(_:)), name: .AVAudioEngineConfigurationChange, object: self.engine)
             self.running = true
             self.observeApp()
             self.listening = call.getBool("listen") ?? true
@@ -169,16 +160,40 @@ public class ForgeVoicePlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegat
        needed: before every listening session, and on a configuration change. */
     private func ensureEngine() {
         guard running, !engine.isRunning else { return }
+        try? startEngine()
+    }
+
+    /* A NEW mic engine every time. Reusing one after the sound settings or
+       the audio route changed (AirPods in, music ducked, a second workout)
+       left it holding the old audio format, and starting it failed with
+       error -10868 "format not supported" — which is what sent the coach back
+       to the robot voice on Nov 12. */
+    private func freshEngine(hardwareFormat: Bool) throws {
+        if engine.isRunning { engine.stop() }
+        engine.inputNode.removeTap(onBus: 0)
+        NotificationCenter.default.removeObserver(self, name: .AVAudioEngineConfigurationChange, object: engine)
+        engine = AVAudioEngine()
         let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0 else { return }
-        input.removeTap(onBus: 0)
+        let format = hardwareFormat ? input.inputFormat(forBus: 0) : input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw NSError(domain: "ForgeVoice", code: 1, userInfo: [NSLocalizedDescriptionKey: "No microphone input"])
+        }
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self = self, self.listening else { return }
             self.request?.append(buffer)
         }
         engine.prepare()
-        try? engine.start()
+        try engine.start()
+        NotificationCenter.default.addObserver(self, selector: #selector(engineChanged(_:)), name: .AVAudioEngineConfigurationChange, object: engine)
+    }
+
+    private func startEngine() throws {
+        do { try freshEngine(hardwareFormat: false) } catch {
+            /* Second try: reset the sound session and tap in the mic's own format. */
+            try? AVAudioSession.sharedInstance().setActive(false)
+            configureSession(duck: false)
+            try freshEngine(hardwareFormat: true)
+        }
     }
 
     @objc private func engineChanged(_ note: Notification) {

@@ -209,7 +209,10 @@ export class Coach {
     /* In the app, web audio also stops her music (iPhone treats it as an
        app taking over the sound), so it is used only if the native voice
        could not start. */
-    if (typeof Audio === 'undefined' || this.nativeOn || (nativeVoice && !this.nativeFailed)) return;
+    /* The app never needs this: it speaks natively, and its web view plays
+       audio without a tap if it ever has to (see say). Web audio here would
+       also stop her music. */
+    if (typeof Audio === 'undefined' || nativeVoice) return;
     if (!this.audio) { this.audio = new Audio(); this.audio.preload = 'auto'; (this.audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true; }
     /* The last line's handlers must not see this clip (an error here once
        re-read the previous line in the robot voice). */
@@ -257,8 +260,12 @@ export class Coach {
 
   /* THE IPHONE APP: native ears and mouth (nativeVoice.ts). Always listening
      during a workout, no taps; the coach plays at full quality over music. */
+  /* nativeOn: the native EARS are running (listening hands-free).
+     The native MOUTH (playback) does not need them: in the app every line is
+     played natively from the start, even if listening could not start. */
   private nativeOn = false;
-  private nativeFailed = false;
+  private nativeMouthBroken = false;
+  private lastNativeTry = 0;
   private nativeSub: { remove: () => Promise<void> } | null = null;
   /* The recorded line, as base64 mp3, for the background coach. */
   async audioFor(text: string): Promise<string | null> {
@@ -286,10 +293,11 @@ export class Coach {
          version of the app says nothing about speech recognition. */
       let { status } = await nativeVoice.permission();
       if (status === 'unknown') status = (await nativeVoice.requestPermission()).status;
-      if (status !== 'granted') { this.onReport('native-permission', status); this.nativeFailed = true; return false; }
+      this.lastNativeTry = Date.now();
+      if (status !== 'granted') { this.onReport('native-permission', status); return false; }
       const result = await nativeVoice.start({ hints: NATIVE_HINTS, listen: false });
-      if (!result.started) { this.onReport('native-start', result.reason || ''); this.nativeFailed = true; return false; }
-    } catch (error) { this.onReport('native-start', String(error).slice(0, 200)); this.nativeFailed = true; return false; }
+      if (!result.started) { this.onReport('native-start', result.reason || ''); return false; }
+    } catch (error) { this.onReport('native-start', String(error).slice(0, 200)); return false; }
     this.nativeOn = true; this.tapToTalk = false; this.mode = 'native'; this.onMode('native'); this.onReport('native-on');
     this.nativeSub = await nativeVoice.addListener('heard', ({ text, final }) => {
       if (!this.listening || !text) return;
@@ -383,16 +391,27 @@ export class Coach {
     const token = ++this.sayToken;
     if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } }
     if (canSpeak() && !nativeVoice) window.speechSynthesis.cancel();
-    /* In the app, the first line waits the moment the native voice takes to
-       start, rather than playing through the web view (which stops music). */
-    if (this.nativeStarting && !this.nativeOn) { const starting = this.nativeStarting; void starting.then(() => { if (token === this.sayToken) { this.sayToken -= 1; this.say(text, listenFor); } }); return; }
     const finish = () => { if (token !== this.sayToken) return; this.speaking = false; this.emit(); if (listenFor) this.listen(); };
     this.speaking = true; this.emit();
-    if (this.nativeOn && nativeVoice) {
+    /* THE APP: the coach's natural voice plays natively. If the native
+       player itself is missing or fails, the same recording plays in the web
+       view (the app allows that without a tap). The phone's robot voice only
+       ever speaks a line whose recording could not be fetched at all. */
+    if (nativeVoice && !this.nativeMouthBroken) {
       const native = nativeVoice;
-      const play = (audio?: string) => native.play({ audio, text }).then(result => { this.onReport(audio ? 'native-played' : 'native-phone-voice', text.slice(0, 40)); if (!result.cancelled) finish(); }, error => { this.onReport('native-play-failed', String(error).slice(0, 160)); finish(); });
-      if (this.natural) this.lineUrl(text).then(url => play(url.split(',')[1]), () => { this.onReport('native-fetch-failed'); void play(); });
-      else void play();
+      if (!this.natural) { this.onReport('native-no-natural'); this.speakPhone(text, finish); return; }
+      this.lineUrl(text).then(url => {
+        if (token !== this.sayToken) return;
+        native.play({ audio: url.split(',')[1] }).then(result => { this.onReport('native-played', text.slice(0, 40)); if (!result.cancelled) finish(); }, error => {
+          this.onReport('native-play-failed', String(error).slice(0, 160));
+          this.nativeMouthBroken = true;
+          this.playWeb(url, text, token, finish);
+        });
+      }, error => { this.onReport('fetch-failed', String((error as Error)?.message || error).slice(0, 200)); if (token === this.sayToken) this.speakPhone(text, finish); });
+      return;
+    }
+    if (nativeVoice && this.natural) {
+      this.lineUrl(text).then(url => this.playWeb(url, text, token, finish), () => { if (token === this.sayToken) this.speakPhone(text, finish); });
       return;
     }
     if (!this.natural || !this.audio) this.onReport('phone-voice', `natural=${this.natural} audio=${Boolean(this.audio)} cloud=${Boolean(this.speakCloud)} failures=${this.cloudSpeakFailures}`);
@@ -415,6 +434,17 @@ export class Coach {
       return;
     }
     this.speakPhone(text, finish);
+  }
+
+  /* The recording through the web view's player (the app's fallback). */
+  private playWeb(url: string, text: string, token: number, finish: () => void) {
+    if (token !== this.sayToken) return;
+    if (!this.audio) { this.audio = new Audio(); this.audio.setAttribute('playsinline', ''); this.audio.preload = 'auto'; }
+    const audio = this.audio;
+    audio.onended = finish;
+    audio.onerror = () => { if (token !== this.sayToken) return; this.onReport('web-decode-error', String(audio.error?.code)); this.speakPhone(text, finish); };
+    audio.src = url;
+    void audio.play().then(() => this.onReport('web-played', text.slice(0, 40))).catch(error => { if (token !== this.sayToken) return; this.onReport('web-play-rejected', String(error).slice(0, 120)); this.speakPhone(text, finish); });
   }
 
   private sayToken = 0;
@@ -461,6 +491,8 @@ export class Coach {
   private listen() {
     if (!this.wantListen || this.listening) return;
     if (this.nativeOn && nativeVoice) { this.listening = true; this.emit(); void nativeVoice.listen({ on: true }); return; }
+    /* The app's ears did not start: try again (at most every 15 s). */
+    if (nativeVoice) { if (Date.now() - this.lastNativeTry > 15000) void this.useNative(); return; }
     if (this.mode === 'cloud' && this.ears && this.tapToTalk) return;
     if (this.mode === 'cloud' && this.ears) {
       /* The mic is off while the coach talks (on iPhone an open mic makes
@@ -505,7 +537,7 @@ export class Coach {
      voice for the goodbye line (farewell), so it is not said by the robot. */
   hush() {
     this.sayToken += 1; this.wantListen = false; this.stopListening();
-    if (this.nativeOn && nativeVoice) void nativeVoice.stopPlaying();
+    if (nativeVoice) void nativeVoice.stopPlaying();
     if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } }
     this.speaking = false; this.emit();
   }
@@ -516,7 +548,7 @@ export class Coach {
     const done = () => { if (this.sayToken === token && !this.speaking) this.stop(); else if (this.sayToken === token) window.setTimeout(done, 500); };
     window.setTimeout(done, 800);
   }
-  stop() { if (this.nativeOn && nativeVoice) { this.nativeOn = false; this.mode = 'phone'; void this.nativeSub?.remove(); this.nativeSub = null; void nativeVoice.stop(); } this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak()) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
+  stop() { if (this.nativeOn && nativeVoice) { this.nativeOn = false; this.mode = 'phone'; void this.nativeSub?.remove(); this.nativeSub = null; void nativeVoice.stop(); } else if (nativeVoice) void nativeVoice.stopPlaying(); this.sayToken += 1; if (this.audio) { try { this.audio.pause(); } catch { /* fine */ } } this.wantListen = false; this.stopListening(); this.ears?.close(); this.ears = null; if (canSpeak() && !nativeVoice) window.speechSynthesis.cancel(); this.speaking = false; this.emit(); }
 
   private emit() { this.onState({ speaking: this.speaking, listening: this.listening }); }
 }
