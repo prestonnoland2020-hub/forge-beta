@@ -1,0 +1,34 @@
+/* TODAY: the day chips ("What are you training today?") and each lift's rep
+   wave. App tokens only, so light and dark both follow the theme. */
+.tp-ask { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.tp-chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -4px 14px; padding: 2px 4px 4px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.tp-chips::-webkit-scrollbar { display: none; }
+.tp-chips button {
+  flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  min-height: 44px; padding: 8px 14px; border-radius: 14px; scroll-snap-align: start;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font: inherit; font-size: 15px; font-weight: 700; line-height: 1.15; white-space: nowrap; cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.tp-chips button small { font-size: 11px; font-weight: 600; color: var(--ink-3); }
+.tp-chips button.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink, #0b100e); }
+.tp-chips button.on small { color: inherit; opacity: .75; }
+.tp-chips button:active { transform: scale(.97); }
+.tp-wave { display: flex; align-items: center; gap: 5px; margin: -2px 0 10px 34px; }
+.tp-wave span {
+  min-width: 26px; height: 22px; display: grid; place-items: center; padding: 0 4px;
+  border-radius: 7px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--ink-2); border: 1px solid var(--line);
+}
+.tp-wave span.past { border-color: transparent; color: var(--ink-3); background: var(--surface-2); }
+.tp-wave span.now { border-color: var(--accent); background: var(--accent); color: var(--accent-ink, #0b100e); }
+.tp-wave em { margin-left: 4px; font-style: normal; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+
+/* Progress: every top set as a list under the chart. */
+.ic-sessions { margin-top: 14px; border-top: 1px solid var(--line); }
+.ic-session { display: grid; grid-template-columns: 1fr auto 64px; align-items: baseline; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
+.ic-session span { color: var(--ink-2); }
+.ic-session b { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ic-session small { text-align: right; font-size: 13px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ic-session small.up { color: var(--good); }
+.ic-sessions-more { display: block; width: 100%; padding: 12px 0 2px; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }

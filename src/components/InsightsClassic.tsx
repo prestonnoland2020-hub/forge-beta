@@ -6,6 +6,7 @@ import { isCardioMovement } from '../lib/muscleGroups';
 import { primaryMusclesFor } from '../lib/liftAliases';
 import { cardioMiles, summarizeCardioDraft, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
+import '../today-picks.css';
 import { Icon } from './Icon';
 
 /* Insights rebuilt on the original Forge web app's structure: KPI tiles,
@@ -162,6 +163,7 @@ export function InsightsClassic() {
      its reps — what a lifter means by "my top sets over time". The estimated
      max is one tap away. */
   const [prMode, setPrMode] = useState<'top' | '1rm' | 'calc'>('top');
+  const [allSessions, setAllSessions] = useState(false);
   /* Endurance, weekly and readable: miles per week, or the week's best pace. */
   const [endMetric, setEndMetric] = useState<'miles' | 'pace'>('miles');
   const enduranceSeries = useMemo(() => {
@@ -326,6 +328,20 @@ export function InsightsClassic() {
         <div className="kpi-tile"><b>{prStats.best.weight} {unit}</b><span>Weight lifted</span><small>{prStats.best.reps > 1 ? `×${prStats.best.reps} reps · ` : ''}{shortDate(prStats.best.date)}</small></div>
         <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === 'top' ? 'Heaviest top set' : prMode === '1rm' ? '1RM' : 'Estimated 1RM'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
       </div>}
+      {/* EVERY TOP SET, AS A LIST. The chart shows the shape; this says the
+          numbers, newest first, each against the session before it. */}
+      {prMode === 'top' && prSeries.length > 0 && (() => {
+        const rows = prSeries.map((point, index) => ({ ...point, change: index ? point.value - prSeries[index - 1].value : null })).reverse();
+        const shown = allSessions ? rows : rows.slice(0, 5);
+        return <div className="ic-sessions">
+          {shown.map(row => <div key={row.date} className="ic-session">
+            <span>{new Date(`${row.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+            <b>{row.value} {unit} {row.label}</b>
+            <small className={row.change === null || row.change === 0 ? '' : row.change > 0 ? 'up' : 'down'}>{row.change === null ? 'First' : row.change === 0 ? 'Same' : `${row.change > 0 ? '+' : '−'}${Math.abs(Math.round(row.change * 10) / 10)}`}</small>
+          </div>)}
+          {rows.length > 5 && <button type="button" className="ic-sessions-more" onClick={() => setAllSessions(value => !value)}>{allSessions ? 'Show less' : `Show all ${rows.length}`}</button>}
+        </div>;
+      })()}
     </section>}
 
     <section className="card ic-card">

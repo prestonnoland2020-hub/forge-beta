@@ -20,6 +20,10 @@ import { RunningBehindNudge } from '../components/RunningBehindCard';
 import { WrappedEntry, WrappedReminderCard } from '../components/WrappedEntry';
 import { SplitGuidePrompt, SplitReadyNote } from '../components/SplitGuidePrompt';
 import { openCoachBubble } from '../features/training/coachService';
+import { useGoals } from '../features/goals/GoalsProvider';
+import { WAVE_REPS, ACCESSORY_REPS } from '../features/training/aiPlanService';
+import { sameLift } from '../lib/liftAliases';
+import '../today-picks.css';
 
 const todayIso = () => {
   const now = new Date();
@@ -35,7 +39,26 @@ const runDetail = (title: string, summary: string) => {
 };
 
 export function HomePage() {
-  const { recommendation, loading, syncError, toggleTopSet, setCardioSelected } = useDailyRecommendation();
+  const { recommendation: suggested, loading, syncError, toggleTopSet, setCardioSelected, recommendationFor, splitDays } = useDailyRecommendation();
+  const { goals } = useGoals();
+  /* WHAT ARE YOU TRAINING TODAY? Forge suggests the next split day; one tap
+     on a chip shows any other day instead, with that day's lifts and targets.
+     Remembered for today on this device. Nothing is skipped by choosing: the
+     split moves on from whatever day is logged. */
+  const pickKey = `forge-today-pick-${todayIso()}`;
+  const [picked, setPicked] = useState<string>(() => { try { return localStorage.getItem(pickKey) || ''; } catch { return ''; } });
+  const pick = (name: string) => { const next = name === suggested?.splitDay.name ? '' : name; setPicked(next); try { if (next) localStorage.setItem(pickKey, next); else localStorage.removeItem(pickKey); } catch { /* per-device */ } };
+  const pickedDay = picked ? splitDays.find(day => day.name === picked) : undefined;
+  const recommendation = useMemo(() => (pickedDay ? recommendationFor(pickedDay.position, pickedDay.name) : null) || suggested, [pickedDay, recommendationFor, suggested]);
+  const choosing = Boolean(pickedDay && recommendation && recommendation !== suggested);
+  /* The block's rep wave for a lift: the main lifts run 8-6-4-2-1, a lift
+     with no goal runs 12-10-8-6. Shown only when today's reps sit on it. */
+  const waveFor = (exercise: string, reps: number) => {
+    const main = goals.some(goal => goal.exercise && sameLift(goal.exercise, exercise));
+    const wave: readonly number[] = main ? WAVE_REPS : ACCESSORY_REPS;
+    const at = wave.indexOf(reps);
+    return at < 0 ? null : { wave, at };
+  };
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
   /* The day's run with its heart-rate check: a ceiling on an easy or long run,
@@ -72,9 +95,14 @@ export function HomePage() {
      half-formed — has no top sets, and reading through it turned Today into
      the crash screen. The day is still worth showing without them. */
   const recommendedSets = recommendation.topSets || [];
-  const selectedSets = recommendedSets.filter(set => set.selected);
-  const selectedCount = selectedSets.length + (recommendation.cardio?.selected ? 1 : 0);
-  const startUrl = `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}`;
+  /* A day picked from the chips is the whole day: every lift on it counts. */
+  const selectedSets = choosing ? recommendedSets : recommendedSets.filter(set => set.selected);
+  const selectedCount = selectedSets.length + (recommendation.cardio && (choosing || recommendation.cardio.selected) ? 1 : 0);
+  const startUrl = choosing && pickedDay
+    ? `/workout?source=split&day=${pickedDay.position}&dayName=${encodeURIComponent(pickedDay.name)}`
+    : `/workout?source=recommendation&recommendation=${encodeURIComponent(recommendation.id || recommendation.date)}`;
+  /* The suggested day leads, then the rest of the split in order. */
+  const chips = splitDays.filter(day => day.type !== 'rest' || day.name === suggested?.splitDay.name).sort((a, b) => Number(b.name === suggested?.splitDay.name) - Number(a.name === suggested?.splitDay.name));
 
   const dayType = recommendation.splitDay.type;
   const quiet = !recommendedSets.length && !recommendation.cardio && (dayType === 'rest' || dayType === 'cardio');
@@ -115,11 +143,13 @@ export function HomePage() {
       </ul>}
       <Link className="button secondary wide" to={`/workout?edit=${completedToday.id}`}>Edit workout</Link>
     </section> : <section className="td-card">
-      <div className="td-card-top"><span className="td-chip">Suggested · Day {recommendation.splitDay.position}</span><Link to="/workout?source=split">Change day</Link></div>
-      <h3 className="td-title">{recommendation.splitDay.name}</h3>
+      <p className="tp-ask">What are you training today?</p>
+      <div className="tp-chips" role="radiogroup" aria-label="Training day">
+        {chips.map(day => { const on = day.name === recommendation.splitDay.name; const isSuggested = day.name === suggested?.splitDay.name; return <button type="button" role="radio" aria-checked={on} key={`${day.position}-${day.name}`} className={on ? 'on' : ''} onClick={() => pick(day.name)}>{day.name}{isSuggested && <small>Suggested</small>}</button>; })}
+      </div>
       {(recommendedSets.length > 0 || recommendation.cardio) && <ul className="td-lines">
-        {recommendedSets.map(set => <li key={set.id}><label className={set.selected ? 'on' : ''}>
-          <input type="checkbox" checked={set.selected} onChange={() => toggleTopSet(set.id)} />
+        {recommendedSets.map(set => { const wave = set.source === 'history' ? waveFor(set.exercise, set.reps) : null; const on = choosing || set.selected; return <li key={set.id}><label className={on ? 'on' : ''}>
+          <input type="checkbox" checked={on} disabled={choosing} onChange={() => toggleTopSet(set.id)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
           <span>{set.exercise}{set.optional && <small>Optional</small>}</span>
           {/* A load is a record, set in mono with its unit small; an open
@@ -127,9 +157,15 @@ export function HomePage() {
           {set.source === 'history'
             ? <b className="td-load">{set.weight}<small> {weightUnit}</small> × {set.reps}<small> reps</small></b>
             : <b className="td-load open">Work up to {set.reps || 5}</b>}
-        </label></li>)}
-        {recommendation.cardio && <li><label className={recommendation.cardio.selected ? 'on' : ''}>
-          <input type="checkbox" checked={recommendation.cardio.selected} onChange={event => setCardioSelected(event.target.checked)} />
+        </label>
+        {/* THE REP WAVE: where this lift is in its block, this week lit. */}
+        {wave && <div className="tp-wave" aria-label={`Rep plan for ${set.exercise}: ${wave.wave.join(', ')}. This week ${set.reps}.`}>
+          {wave.wave.map((reps, index) => <span key={index} className={index === wave.at ? 'now' : index < wave.at ? 'past' : ''}>{reps}</span>)}
+          <em>{wave.at < wave.wave.length - 1 ? `Next: ${wave.wave[wave.at + 1]}` : 'Max week'}</em>
+        </div>}
+        </li>; })}
+        {recommendation.cardio && <li><label className={choosing || recommendation.cardio.selected ? 'on' : ''}>
+          <input type="checkbox" checked={choosing || recommendation.cardio.selected} disabled={choosing} onChange={event => setCardioSelected(event.target.checked)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
           {/* A run's detail is a sentence, not a number, so it goes under its
               name rather than in the number column — where it could not wrap
