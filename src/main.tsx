@@ -99,6 +99,7 @@ import './wrapped.css';
 import './guided.css';
 import './design-terms.css';
 import './atmosphere.css';
+import './apple-ui.css';
 import { startNativeChrome } from './features/shell/nativeChrome';
 import { listenForSignInReturn } from './features/auth/nativeSignIn';
 
@@ -188,3 +189,11 @@ createRoot(document.getElementById('root')!).render(
 );
 
 requestAnimationFrame(() => requestAnimationFrame(clearLaunch));
+
+/* apple-ui haptic: a light tap when any switch or agreement check flips. */
+if (typeof document !== 'undefined') {
+  document.addEventListener('change', event => {
+    const target = event.target as HTMLInputElement | null;
+    if (target?.type === 'checkbox' && target.closest('.toggle-row, .partner-discoverable, .cardio-plan-footer, .ios-switch')) void import('./lib/haptics').then(haptics => haptics.tick());
+  });
+}

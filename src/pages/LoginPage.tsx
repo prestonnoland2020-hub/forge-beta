@@ -12,7 +12,9 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
 
-  if (!loading && user) return <Navigate to="/" replace />;
+  /* Preview builds are always signed in; ?preview=1 shows this screen anyway. */
+  const previewing = isDemoMode && /[?&]preview=1/.test(window.location.hash);
+  if (!loading && user && !previewing) return <Navigate to="/" replace />;
 
   async function signIn(provider: OAuthProvider) {
     try {
@@ -60,29 +62,29 @@ export function LoginPage() {
     </button>
   );
 
+  /* ONE CALM SCREEN, the way iPhone apps sign in: the mark and one line of
+     what Forge is in the upper part, the buttons within thumb reach at the
+     bottom, and the legal links as one small line under them. */
   return (
-    <main className="login-page">
-      <a className="login-brand" href="#/" aria-label="Forge home">
-        <ForgeStrikeMark />
-      </a>
-
-      <section className="login-card" aria-labelledby="login-title">
-        <span className="eyebrow accent">Your training, connected</span>
-        <h1 id="login-title">Show up.<br />Forge ahead.</h1>
+    <main className="login-page signin">
+      <section className="signin-hero" aria-labelledby="login-title">
+        <a className="login-brand" href="#/" aria-label="Forge home">
+          <ForgeStrikeMark />
+        </a>
+        <h1 id="login-title">Forge</h1>
         <p>Today’s workout, your progress, and one coach that learns from every session.</p>
+      </section>
 
+      <section className="signin-actions" aria-label="Sign in">
         <div className="login-providers">{appleButton}{googleButton}</div>
-
         {error && <div className="login-error" role="alert">{error}</div>}
-        <p className="login-note">Secure sign-in. Your training stays with your account.</p>
         {/* Guideline 5.1.1(i) wants the privacy policy reachable inside the
             app, and sign-in is the first screen where it can be. */}
         <p className="login-legal">
-          By continuing you agree to the <a href="#/legal/terms">Terms</a> and <a href="#/legal/privacy">Privacy Policy</a>. See also the <a href="#/legal/health">Consumer Health Data Notice</a> and <a href="#/legal/cookies">Cookie Policy</a>.
+          By continuing you agree to the <a href="#/legal/terms">Terms</a> and <a href="#/legal/privacy">Privacy Policy</a>.
+          <span><a href="#/legal/health">Health Data Notice</a> · <a href="#/legal/cookies">Cookies</a></span>
         </p>
       </section>
-
-      <p className="login-footer">Train with intent</p>
     </main>
   );
 }
