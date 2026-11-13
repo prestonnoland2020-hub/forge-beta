@@ -4,7 +4,7 @@ import type { CreatedGoal } from './GoalBuilder';
 import type { GoalRoadmap } from '../lib/goalPlanEngine';
 import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { cardioMiles, summarizeCardioDraft } from '../lib/cardioSession';
-import { clockToSeconds, decimalMinutesToClock, formatGoalTarget } from '../lib/time';
+import { clockToSeconds, decimalMinutesToClock, formatGoalTarget, goalClockSeconds } from '../lib/time';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { sameLift } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -12,7 +12,7 @@ import { requestForgeCoach } from '../features/training/coachService';
 import { predictRaceFromLegacyMethod } from '../lib/cardioPrediction';
 import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
 import { localDayIso } from '../lib/time';
-import { goalFeasibility } from '../lib/goalFeasibility';
+import { goalFeasibility, raceMiles } from '../lib/goalFeasibility';
 import { raceDayOutlook } from '../lib/raceDay';
 import { expectedRunMiles } from '../lib/goalProgress';
 
@@ -110,8 +110,8 @@ export function GoalProgressCard({ goal, roadmap }: { goal: CreatedGoal; roadmap
   const paceGoal = goal.type === 'Endurance' && String(goal.metric).toLowerCase().includes('pace') && /^min\//i.test(String(goal.unit || ''));
   const paceSuffix = String(goal.unit || 'min/mi').replace(/^min\//i, '/');
   const expectedMiles = isHyrox ? null : expectedRunMiles(goal);
-  const target = timeGoal ? clockToSeconds(goal.target, hoursFirst) : paceGoal ? clockToSeconds(goal.target) / 60 : numeric(goal.target);
-  const entered = timeGoal ? clockToSeconds(goal.current || '', hoursFirst) : paceGoal ? clockToSeconds(goal.current || '') / 60 : numeric(goal.current);
+  const target = timeGoal ? goalClockSeconds(goal.target, hoursFirst ? 'hh:mm:ss' : goal.unit, raceMiles(String(goal.exercise || goal.title || ''))) : paceGoal ? clockToSeconds(goal.target) / 60 : numeric(goal.target);
+  const entered = timeGoal ? goalClockSeconds(goal.current || '', hoursFirst ? 'hh:mm:ss' : goal.unit, raceMiles(String(goal.exercise || goal.title || ''))) : paceGoal ? clockToSeconds(goal.current || '') / 60 : numeric(goal.current);
   const lowerIsBetter = timeGoal || paceGoal || (goal.type === 'Body Composition' && target < entered);
   const recentCutoff=new Date();recentCutoff.setDate(recentCutoff.getDate()-120);const recentCutoffIso=localDayIso(recentCutoff);
   useEffect(()=>{setQuestion('');setAnswer('');setCoachSource(null);setCoachTurns(loadGoalCoachTurns(coachKey))},[coachKey]);

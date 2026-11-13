@@ -4,7 +4,8 @@ import { isDemoMode } from '../../lib/env';
 import { normalizeMuscleGroups } from '../../lib/muscleGroups';
 import { supabase } from '../../lib/supabase';
 import { loadAthleteSettings, saveAthleteSettings } from '../profile/settingsSync';
-import { clockToSeconds, decimalMinutesToClock } from '../../lib/time';
+import { clockToSeconds, decimalMinutesToClock, goalClockSeconds } from '../../lib/time';
+import { raceMiles } from '../../lib/goalFeasibility';
 import { useAuth } from '../auth/AuthProvider';
 import { useSyncStatus } from '../sync/SyncStatusProvider';
 
@@ -169,7 +170,7 @@ export function GoalsProvider({children}:{children:ReactNode}){
       void supabase.from('goals').upsert({owner_id:user.id,type:'bodyweight',name:goal.metric||'Body weight',target_value:Number.isFinite(pounds)?pounds:0,muscle_group:null,target_date:goal.date||null},{onConflict:'owner_id,type,name'}).then(({error})=>{setSyncError(error?`This goal is saved on this device but did not reach your account (${error.message}). It may not appear on your other devices.`:null)});
       return;
     }
-    const isTime=goal.type==='Endurance'&&String(goal.metric).toLowerCase().includes('time');const numericTarget=isTime?clockToSeconds(goal.target,String(goal.unit).includes('hh:mm:ss'))/60:Number.parseFloat(goal.target);const type=goal.type==='Endurance'?'race':'lift';void supabase.from('goals').upsert({owner_id:user.id,type,name:goal.exercise||goal.title,target_value:Number.isFinite(numericTarget)?numericTarget:0,muscle_group:normalizeMuscleGroups([goal.connection]).join(', ')||null,target_date:goal.date||null},{onConflict:'owner_id,type,name'}).then(({error})=>{setSyncError(error?`This goal is saved on this device but did not reach your account (${error.message}). It may not appear on your other devices.`:null)})};
+    const isTime=goal.type==='Endurance'&&String(goal.metric).toLowerCase().includes('time');const numericTarget=isTime?goalClockSeconds(goal.target,goal.unit,raceMiles(String(goal.exercise||goal.title||'')))/60:Number.parseFloat(goal.target);const type=goal.type==='Endurance'?'race':'lift';void supabase.from('goals').upsert({owner_id:user.id,type,name:goal.exercise||goal.title,target_value:Number.isFinite(numericTarget)?numericTarget:0,muscle_group:normalizeMuscleGroups([goal.connection]).join(', ')||null,target_date:goal.date||null},{onConflict:'owner_id,type,name'}).then(({error})=>{setSyncError(error?`This goal is saved on this device but did not reach your account (${error.message}). It may not appear on your other devices.`:null)})};
   return <GoalsContext.Provider value={{goals,saveGoal,deleteGoal,hydrated,syncError}}>{children}</GoalsContext.Provider>;
 }
 export function useGoals(){const context=useContext(GoalsContext);if(!context)throw new Error('useGoals must be used inside GoalsProvider');return context}

@@ -2,7 +2,7 @@ import type { CreatedGoal } from '../components/GoalBuilder';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { weeklyRunVolume } from './cardioPrediction';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
-import { clockToSeconds, localDayIso } from './time';
+import { clockToSeconds, goalClockSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
 import { effortOf, estimateWithEffort } from './setEffort';
 import { startingNumbers } from './startingNumbers';
@@ -85,7 +85,12 @@ export const weeksUntil = (deadline: string) => {
   const ms = new Date(`${deadline}T12:00:00`).getTime();
   return Number.isFinite(ms) ? Math.max(0, (ms - Date.now()) / 604800000) : 12;
 };
-const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
+/* An hour and over reads as one: 3:22:02, not 202:02. */
+const clock = (seconds: number) => {
+  const whole = Math.round(seconds);
+  if (whole >= 3600) return `${Math.floor(whole / 3600)}:${String(Math.floor((whole % 3600) / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}`;
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+};
 const RACE_MILES: Record<string, number> = {
   mile: 1, '1 mile': 1, '1600': 1, '1600m': 1,
   '2 mile': 2, 'two mile': 2, '3200': 2, '3200m': 2,
@@ -219,7 +224,7 @@ const recentWeeklyMiles = (records: WorkoutRecord[]) => weeklyRunVolume(records)
 function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: string[] = [], workouts: CurveEffort[] = []): Feasibility | null {
   const distance = milesOf(goal);
   if (!distance) return null;
-  const targetSeconds = clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss'));
+  const targetSeconds = goalClockSeconds(goal.target, goal.unit, distance);
   if (!targetSeconds) return null;
   const weeks = weeksUntil(goal.date);
   const volume = recentWeeklyMiles(records);
@@ -300,6 +305,14 @@ function raceFeasibility(goal: CreatedGoal, records: WorkoutRecord[], excluded: 
       change: volume < volumeNeeded * 0.7 ? `Hold ${Math.round(volumeNeeded)} miles a week and race it.` : undefined };
   }
 
+  /* WITHIN 1% OF THE CEILING IS A RACE-DAY QUESTION, not a verdict: a
+     taper, a course, a good day are each worth that much. */
+  if (targetSeconds < ceiling && targetSeconds >= ceiling * 0.99) {
+    return { goal: goal.title, prediction: predicted, verdict: 'needs-more',
+      say: `A stretch, not out of reach: about ${clock(nowAtDistance)} today, ${clock(ceiling)} is the best ${Math.round(weeks)} weeks usually buy, and ${clock(targetSeconds)} needs a good day on top.`,
+      needs: { weeklyMiles: Math.round(volumeNeeded), running: Math.round(volume) },
+      change: `Keep the long runs, put the quality at ${clock(goalPace)}/mi, and taper well.` };
+  }
   if (targetSeconds < ceiling) {
     return { goal: goal.title, prediction: predicted, verdict: 'out-of-reach',
       say: `Not by ${new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}. You are worth about ${clock(nowAtDistance)} today, so this asks for ${Math.round(shortfall * 100)}% — and ${Math.round(weeks)} weeks ${!pace.measured ? 'of good training' : (pace.secondsPerMilePerWeek || 0) > 0.5 ? `at the rate your heart rate shows you improving (${pace.secondsPerMilePerWeek} s/mi a week)` : 'at your recent rate — pace at the same heart rate has held flat lately —'} buys about ${Math.round(affordable * 100)}%.`,
@@ -497,7 +510,7 @@ export function goalFeasibility(goals: CreatedGoal[], records: WorkoutRecord[], 
        constraint contradicted each other in his own settings for months. The
        cap is his to keep; being told it does not reach the goal is the point. */
     if (ceiling && goal.type === 'Endurance') {
-      const needed = volumeForRace(clockToSeconds(goal.target, String(goal.unit || '').includes('hh:mm:ss')) / (milesOf(goal) || 1), milesOf(goal) || 0);
+      const needed = volumeForRace(goalClockSeconds(goal.target, goal.unit, milesOf(goal)) / (milesOf(goal) || 1), milesOf(goal) || 0);
       if (needed > ceiling) {
         return [{ ...result,
           needs: { weeklyMiles: Math.round(needed), running: result.needs?.running ?? 0, ceiling: Math.round(ceiling) },

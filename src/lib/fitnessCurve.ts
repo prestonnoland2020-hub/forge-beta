@@ -232,7 +232,14 @@ export function fitnessCurve(efforts: Effort[], todayIso: string, confirmed: Set
     const shorter = inWindow.filter(other => effort.miles / other.miles >= OUTLIER_DISTANCE_RATIO);
     if (!shorter.length) continue;
     const bestShort = Math.min(...shorter.map(other => levelAt(other, RIEGEL)));
-    if (bestShort - levelAt(effort, RIEGEL) > OUTLIER_GAP) setAside.add(effort);
+    /* TWO LONG RUNS THAT AGREE ARE NOT A GPS GLITCH. A runner whose short runs
+       are all easy and whose long runs are the quality work — 18 miles at 7:28,
+       12 at 7:18 — had every long run set aside as "too good", and their
+       marathon judged off their jogs. A long effort that another run of at
+       least half its distance backs up (within half the outlier gap) stands. */
+    const backed = inWindow.some(other => other !== effort && other.miles >= effort.miles * 0.5 && other.miles / effort.miles < OUTLIER_DISTANCE_RATIO
+      && Math.abs(levelAt(other, RIEGEL) - levelAt(effort, RIEGEL)) <= OUTLIER_GAP / 2);
+    if (!backed && bestShort - levelAt(effort, RIEGEL) > OUTLIER_GAP) setAside.add(effort);
   }
   if (inWindow.length - setAside.size < 2) setAside.clear();
 
