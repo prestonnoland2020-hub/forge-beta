@@ -1,3 +1,4 @@
+import { effortOf, estimateWithEffort } from '../../lib/setEffort';
 import { isDemoMode } from '../../lib/env';
 import { startingNumbers } from '../../lib/startingNumbers';
 import { canonicalLiftKey, splitDayKey } from '../../lib/liftAliases';
@@ -411,7 +412,9 @@ export function bestsFromHistory(
     const days = sessionDays.get(key) || new Set<string>();
     days.add(dayKey);
     sessionDays.set(key, days);
-    const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
+    /* Reps left in the tank count: an easy 230 x 2 shows more than a grinder. */
+    const effort = effortOf(record.date, set.lift);
+    const max = effort ? estimateWithEffort(set.weight, set.reps, effort) : set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
     if (max > (bests.get(key) || 0)) bests.set(key, max);
     /* A real single is the only evidence a Real 1RM goal accepts. */
     if (set.reps === 1 && set.weight > (singles.get(key) || 0)) singles.set(key, set.weight);

@@ -21,6 +21,7 @@ import { WAVE_REPS, ACCESSORY_REPS } from '../features/training/aiPlanService';
 import { sameLift } from '../lib/liftAliases';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { openWorkout } from '../lib/workoutOpen';
+import { goalFeasibility } from '../lib/goalFeasibility';
 import { readSwaps, writeSwap, swappedName, lastSet, swapOptions } from '../lib/todaySwaps';
 import { buildFullWorkout, todaysObjective, warmupRamp } from '../lib/fullWorkout';
 import '../today-picks.css';
@@ -82,6 +83,7 @@ export function HomePage() {
   const [build, setBuild] = useState<'top' | 'full'>(() => { try { return localStorage.getItem('forge-today-build') === 'full' ? 'full' : 'top'; } catch { return 'top'; } });
   const chooseBuild = (next: 'top' | 'full') => { setBuild(next); try { localStorage.setItem('forge-today-build', next); } catch { /* fine */ } };
   const { exercises: library } = useTrainingLibrary();
+  const feasibility = useMemo(() => goalFeasibility(goals, records), [goals, records]);
   /* Swaps for today, and which lift's swap list is open. */
   const [swaps, setSwaps] = useState(() => readSwaps(currentDate));
   const [swapOpen, setSwapOpen] = useState<string | null>(null);
@@ -163,6 +165,24 @@ export function HomePage() {
      and how to get there. */
   const objective = todaysObjective(lines, isGoalLift);
   const ramp = objective ? warmupRamp(objective.weight, metric) : [];
+  /* WHY THIS NUMBER. The coach's reason in one line: what you did last time,
+     and what today does for the goal, so the weight is not a mystery. */
+  const why = (() => {
+    if (!objective) return '';
+    const last = lastSet(records, objective.exercise);
+    const goalIndex = goals.findIndex(goal => goal.type === 'Strength' && goal.exercise && sameLift(goal.exercise, objective.exercise));
+    const goal = goalIndex >= 0 ? goals[goalIndex] : undefined;
+    const verdict = goalIndex >= 0 ? feasibility[goalIndex] : undefined;
+    const target = goal ? `${String(goal.target).replace(/[^0-9.]/g, '')} ${weightUnit}` : '';
+    const by = goal?.date ? new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const lastText = last ? `Last time ${last.weight} × ${last.reps}${last.date === currentDate ? ' (today)' : ''}.` : 'First time on this lift.';
+    const goalText = !goal ? 'The next step up your rep wave.'
+      : verdict?.verdict === 'reachable' ? `Keeps you on pace for ${target}${by ? ` by ${by}` : ''}.`
+      : verdict?.verdict === 'needs-more' && /heavy single/.test(verdict.change || '') ? `You’re close to ${target} — a heavy single soon will show where you stand.`
+      : verdict?.verdict === 'needs-more' ? `Each week like this moves you toward ${target}${by ? ` by ${by}` : ''}.`
+      : `Building toward ${target}.`;
+    return `${lastText} ${goalText}`;
+  })();
 
   /* COACH ME gets the same day, written whole, to walk through with videos. */
   const coachPlan = recommendedSets.length ? {
@@ -242,6 +262,7 @@ export function HomePage() {
       {objective && <div className="tp-goal">
         <small>Today’s goal</small>
         <h3>{objective.exercise} {objective.weight > 0 ? <>{objective.weight}<em> {weightUnit}</em> × {objective.reps}</> : <>· find your {objective.reps}</>}</h3>
+        {why && <p className="tp-why">{why}</p>}
         <ol>
           {objective.weight > 0
             ? <><li>Warm up{ramp.length ? `: ${ramp.map((value, index) => `${value} × ${[5, 3, 1][index] ?? 1}`).join(', ')}` : ' with a few lighter sets'}</li>
