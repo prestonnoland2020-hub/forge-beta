@@ -10,8 +10,14 @@ import { GUIDED_KEYS } from '../lib/guided/session';
 
 const read = <T,>(key: string, fallback: T): T => { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; } };
 
-export function CoachToday() {
+export type CoachPlan = { title: string; count: number; start: () => void };
+
+export function CoachToday({ plan }: { plan?: CoachPlan } = {}) {
   const navigate = useNavigate();
+  /* TODAY'S PLAN, GUIDED, comes first: the day Forge wrote, top sets and
+     accessories, walked through with photos and the coach's voice. The
+     coach-picked workout is still one tap away for a day off the split. */
+  const [ownPick, setOwnPick] = useState(false);
   const prefs = read<GuidedPrefs | null>(GUIDED_KEYS.prefs, null);
   const last = read<{ focus?: Focus }>(GUIDED_KEYS.last, {});
   const [minutes, setMinutes] = useState(30);
@@ -22,6 +28,13 @@ export function CoachToday() {
     <h3 className="td-title">{paused.workout?.focus || 'Your workout'}</h3>
     <p className="ct-lead">{(paused.logged?.length || 0)} sets done. Pick up right where you stopped.</p>
     <button type="button" className="button wide" onClick={() => navigate('/guided')}>Resume workout</button>
+  </section>;
+  if (plan && !ownPick) return <section className="td-card ct-card">
+    <span className="ct-eyebrow">TODAY, GUIDED</span>
+    <h3 className="td-title">{plan.title}</h3>
+    <p className="ct-lead">Your full workout for today, {plan.count} {plan.count === 1 ? 'exercise' : 'exercises'}. Videos for every move, and your coach talks you through each set and logs it for you.</p>
+    <button type="button" className="button wide" onClick={plan.start}>Start guided workout</button>
+    <button type="button" className="ct-more" onClick={() => setOwnPick(true)}>Let the coach pick a different workout</button>
   </section>;
   if (!prefs) return <section className="td-card ct-card">
     <span className="ct-eyebrow">YOUR COACH</span>

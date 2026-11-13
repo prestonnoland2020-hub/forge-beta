@@ -32,3 +32,29 @@
 .ic-session small { text-align: right; font-size: 13px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .ic-session small.up { color: var(--good); }
 .ic-sessions-more { display: block; width: 100%; padding: 12px 0 2px; border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+/* TODAY'S GOAL: what the day is for, big, and how to do it in three lines. */
+.tp-goal { margin: 2px 0 16px; padding: 14px 16px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); }
+.tp-goal small { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-text, var(--accent)); }
+.tp-goal h3 { margin: 4px 0 10px; font-size: 24px; line-height: 1.15; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tp-goal h3 em { font-style: normal; font-size: 16px; font-weight: 700; color: var(--ink-2); }
+.tp-goal ol { margin: 0; padding: 0 0 0 20px; display: grid; gap: 5px; color: var(--ink-2); font-size: 14.5px; line-height: 1.4; }
+.tp-goal li::marker { font-weight: 700; color: var(--ink-3); }
+
+/* Top sets only | Build my workout. */
+.tp-build { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 0 0 12px; border-radius: 12px; background: var(--surface-2); }
+.tp-build button { min-height: 38px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+.tp-build button.on { background: var(--surface-1); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+
+/* The whole workout, one line per exercise with its numbers under it. */
+.tp-full { list-style: none; margin: 0 0 14px; padding: 0; }
+.tp-full li { padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.tp-full li:last-child { border-bottom: 0; }
+.tp-full li > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.tp-full span { font-size: 16px; font-weight: 700; color: var(--ink); }
+.tp-full b { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.tp-full b small { font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.tp-full em { display: block; margin-top: 3px; font-style: normal; font-size: 13.5px; color: var(--ink-2); }
+.tp-full li.accessory span { font-weight: 600; }
+.tp-full-head { margin: 6px 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.tp-week { display: block; margin-top: 10px; padding: 8px; text-align: center; color: var(--ink-2); font-size: 14px; font-weight: 600; text-decoration: none; }

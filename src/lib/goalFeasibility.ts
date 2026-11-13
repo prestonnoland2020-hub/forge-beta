@@ -439,6 +439,18 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   const predicted: GoalPrediction = { start: Math.round(best), typical: Math.round(typical), ceiling: Math.round(ceiling), target, better: 'higher', weeks: Math.round(weeks) };
   const needed = (target - best) / best;
   const by = new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  /* CLOSE, AND NOTHING HEAVY ON FILE, IS A QUESTION, NOT A VERDICT. The
+     estimate comes from the sets Forge prescribes — taken with reps left in
+     the tank — so it runs low for anyone who has not tested lately. Adam's
+     275 bench read "Out of reach" by 3 lb off 205 x 8s while he knew he had
+     it. Within 6% of the ceiling, with no single or double in six weeks, the
+     honest answer is "test it". Far past the ceiling stays out of reach. */
+  const tested = sets.some(set => set.reps <= 2 && Date.now() - new Date(`${set.date}T12:00:00`).getTime() <= 42 * 86400000);
+  if (target > ceiling && target <= ceiling * 1.06 && !tested) {
+    return { goal: goal.title, prediction: predicted, verdict: 'needs-more',
+      say: `Close. Your ${Math.round(best)} estimate comes from sets you didn't take to failure, so it may be low. ${Math.round(target)} by ${by} is ${Math.round(needed * 100)}% in ${Math.round(weeks)} weeks.`,
+      change: `Work up to a heavy single on ${goal.exercise} and Forge will know where you really stand.` };
+  }
   if (target > ceiling) {
     const weeksNeeded = weeksToLift(best, target, newLift);
     return { goal: goal.title, prediction: predicted, verdict: 'out-of-reach',

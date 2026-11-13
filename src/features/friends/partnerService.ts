@@ -253,3 +253,30 @@ export function lastTrainedLabel(iso: string | null): string {
   if (days < 14) return 'Trained last week';
   return `Last trained ${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 }
+
+/* THE LAST FOUR WEEKS OF A PARTNER, BY DAY: every top set and run they
+   logged, so tapping a partner shows what they actually did. */
+export type PartnerDay = { date: string; lifts: Array<{ name: string; weight: number; reps: number }>; cardio: Array<{ name: string; summary: string }> };
+export async function loadPartnerRecent(partnerId: string): Promise<PartnerDay[]> {
+  if (isDemoMode) return [];
+  const { data, error } = await supabase.rpc('forge_partner_recent', { partner_id: partnerId, p_today: localDayIso() });
+  if (error) throw error;
+  const days = new Map<string, PartnerDay>();
+  for (const row of (data || []) as Array<{ performed_on: string; kind: string; name: string; weight: number | null; reps: number | null; summary: string | null }>) {
+    const day = days.get(row.performed_on) || { date: row.performed_on, lifts: [], cardio: [] };
+    if (row.kind === 'lift') day.lifts.push({ name: row.name, weight: Number(row.weight) || 0, reps: Number(row.reps) || 0 });
+    else day.cardio.push({ name: row.name, summary: row.summary || '' });
+    days.set(row.performed_on, day);
+  }
+  return [...days.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/* Their best set on each of the lifts they do most. */
+export type PartnerBest = { lift: string; weight: number; reps: number; date: string; estimate: number };
+export async function loadPartnerBests(partnerId: string): Promise<PartnerBest[]> {
+  if (isDemoMode) return [];
+  const { data, error } = await supabase.rpc('forge_partner_bests', { partner_id: partnerId });
+  if (error) throw error;
+  return ((data || []) as Array<{ lift: string; weight: number; reps: number; performed_on: string; estimate: number }>)
+    .map(row => ({ lift: row.lift, weight: Number(row.weight), reps: Number(row.reps), date: row.performed_on, estimate: Number(row.estimate) }));
+}

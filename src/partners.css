@@ -170,3 +170,11 @@
 .partner-week-note{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
   font-size:12px;line-height:1.45;color:var(--ink-2)}
 
+
+/* A partner's recent days and best lifts. */
+.partner-recent header, .partner-bests header { display: flex; justify-content: space-between; align-items: baseline; }
+.partner-recent header small { color: var(--ink-3); font-size: 13px; }
+.partner-day { padding: 10px 0; border-top: 1px solid var(--line); }
+.partner-day:first-of-type { border-top: 0; }
+.partner-day-date { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.partner-best-date { display: block; font-size: 12px; font-weight: 500; color: var(--ink-3); }

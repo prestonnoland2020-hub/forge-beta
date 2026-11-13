@@ -44,7 +44,7 @@ const primaryNav = [
   ['/history', 'Activities', 'history'],
 ] as const;
 
-type NavGlyphName = typeof primaryNav[number][2] | 'library' | 'you' | 'chart' | 'coach' | 'gear';
+type NavGlyphName = typeof primaryNav[number][2] | 'library' | 'you' | 'chart' | 'coach' | 'gear' | 'partners';
 function NavGlyph({ name }: { name: NavGlyphName }) {
   const paths: Record<NavGlyphName, ReactNode> = {
     home: <><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5M9 21v-7h6v7"/></>,
@@ -55,6 +55,7 @@ function NavGlyph({ name }: { name: NavGlyphName }) {
     target: <><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="m15 9 6-6M17 3h4v4"/></>,
     library: <><path d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2V4Z"/><path d="M7 16h12M9 8h6M9 11h6"/></>,
     coach: <><path d="M12 3a7 7 0 0 1 7 7c0 2.4-1.2 4.1-2.6 5.4-.6.6-.9 1.3-.9 2.1V19a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2v-1.5c0-.8-.3-1.5-.9-2.1C5.2 14.1 5 12.4 5 10a7 7 0 0 1 7-7Z"/><path d="M9.5 10.5 11 12l3.5-3.5"/></>,
+    partners: <><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.8-3 3.1-4.6 6-4.6s5.2 1.6 6 4.6"/><path d="M15.5 5.6a3.1 3.1 0 0 1 0 5.8M17.6 14.9c1.8.5 3 1.9 3.4 4.1"/></>,
     you: <><circle cx="12" cy="8.2" r="3.6"/><path d="M4.8 20.2c1.1-3.4 3.9-5.2 7.2-5.2s6.1 1.8 7.2 5.2"/></>,
     gear: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z"/></>,
   };
@@ -68,8 +69,10 @@ const tabs = [
      from "See your week" on Today, and Today stays lit while it is open. */
   { to: '/', label: 'Today', icon: 'home', owns: (path: string) => path === '/' || path === '/insights' || path === '/plan' },
   { to: '/goals', label: 'Goals', icon: 'target', owns: (path: string) => path === '/goals' },
+  /* Partners are a destination of their own: who trained, and what they did. */
+  { to: '/partners', label: 'Partners', icon: 'partners', owns: (path: string) => path.startsWith('/partners') },
   { to: '/history', label: 'Activities', icon: 'history', owns: (path: string) => path === '/history' },
-  { to: '/profile', label: 'Profile', icon: 'you', owns: (path: string) => path === '/profile' || path === '/split' || path.startsWith('/partners') || path === '/exercises' },
+  { to: '/profile', label: 'Profile', icon: 'you', owns: (path: string) => path === '/profile' || path === '/split' || path === '/exercises' },
 ] as const;
 
 /* How deep a screen sits under its tab, which is what decides the direction a
@@ -208,8 +211,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   const firstScreen = useRef(true);
   useEffect(() => { if (firstScreen.current) { firstScreen.current = false; return; } document.querySelector('.app-main')?.scrollTo(0, 0); window.scrollTo(0, 0); }, [screenKey]);
   /* A partner opened from Today is still inside Today, so Today stays lit. */
-  const cameFromToday = location.pathname.startsWith('/partners') && (location.state as { origin?: string } | null)?.origin === '/';
-  const activeTab = cameFromToday ? 0 : tabs.findIndex(tab => tab.owns(location.pathname));
+  const activeTab = tabs.findIndex(tab => tab.owns(location.pathname));
   /* A workout in progress and the full coach are tasks, not places: the tab
      bar steps aside for them the way a native app's does. */
   /* The tab bar stays on every screen, a workout and the coach included, so
@@ -304,7 +306,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       case '/coach': return { title: 'Ask Forge', back: '/' };
       case '/split': return { title: 'Your split', back: '/profile' };
       case '/exercises': return { title: 'Exercise library', back: '/profile' };
-      case '/partners': return { title: 'Partners', back: navState.origin || '/profile' };
+      case '/partners': return { title: 'Partners' };
       case '/profile': {
         const view = params.get('view');
         const names: Record<string, string> = { settings: 'Settings', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Connections', faq: 'FAQ' };

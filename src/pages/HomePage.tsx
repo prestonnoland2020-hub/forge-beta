@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CoachToday, TodayModeSwitch, TODAY_MODE_KEY } from '../components/CoachToday';
 import { FROM_PLAN_KEY } from '../lib/guided/fromPlan';
-import { PartnersCard } from '../components/PartnersCard';
 import { cardioPlanSummary } from '../components/CardioPlanBuilder';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -15,14 +14,13 @@ import { isSickNote, limitationIn } from '../lib/bodyLog';
 import { Icon } from '../components/Icon';
 import { sessionLength } from '../lib/time';
 import { estimateMaxHr, heartRateRuns, heartRateTargets } from '../lib/heartRate';
-import { TodayNudges } from '../components/TodayNudges';
-import { RunningBehindNudge } from '../components/RunningBehindCard';
 import { WrappedEntry, WrappedReminderCard } from '../components/WrappedEntry';
 import { SplitGuidePrompt, SplitReadyNote } from '../components/SplitGuidePrompt';
-import { openCoachBubble } from '../features/training/coachService';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { WAVE_REPS, ACCESSORY_REPS } from '../features/training/aiPlanService';
 import { sameLift } from '../lib/liftAliases';
+import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
+import { buildFullWorkout, todaysObjective, warmupRamp } from '../lib/fullWorkout';
 import '../today-picks.css';
 
 const todayIso = () => {
@@ -71,22 +69,16 @@ export function HomePage() {
   const currentDate = todayIso();
   const completedToday = records.find(record => record.date === currentDate);
   const completedSets = (completedToday?.topSets || []).filter(set => set.completed !== false);
-  /* THE FIRST WEEK, AS THREE THINGS TO DO. A new athlete's Today is mostly
-     promises ("projections", "readiness", "Forge noticed") that need data
-     first. This says what unlocks them and ticks itself off as it happens;
-     it leaves on its own after three training days, or when hidden. */
-  const trainedDays = new Set(records.map(record => record.date)).size;
-  const runner = Boolean(setup && (Number(setup.runningDays) > 0 || setup.primaryFocus === 'Endurance' || setup.primaryFocus === 'Hybrid'));
-  const ranLogged = records.some(record => record.hasCardio || (record.cardioSessions || []).length > 0);
-  const [firstWeekHidden, setFirstWeekHidden] = useState(() => { try { return localStorage.getItem('forge-first-week-hidden') === '1'; } catch { return false; } });
-  const [coachTried, setCoachTried] = useState(() => { try { return localStorage.getItem('forge-coach-opened') === '1'; } catch { return false; } });
-  const markCoachTried = () => { setCoachTried(true); try { localStorage.setItem('forge-coach-opened', '1'); } catch { /* per-device */ } };
   /* MY PLAN | COACH ME. Which Today she sees; remembered on the device. Someone
      who chose "Coach me" in setup starts on the coach side. */
   const navigate = useNavigate();
   const [mode, setMode] = useState<'plan' | 'coach'>(() => { try { const saved = localStorage.getItem(TODAY_MODE_KEY); if (saved === 'plan' || saved === 'coach') return saved; } catch { /* fine */ } return (setup as { trainingMode?: string } | null)?.trainingMode === 'coach' ? 'coach' : 'plan'; });
   const chooseMode = (next: 'plan' | 'coach') => { setMode(next); try { localStorage.setItem(TODAY_MODE_KEY, next); } catch { /* fine */ } };
-  const hideFirstWeek = () => { setFirstWeekHidden(true); try { localStorage.setItem('forge-first-week-hidden', '1'); } catch { /* per-device convenience */ } };
+  /* TOP SETS ONLY | BUILD MY WORKOUT. The plan side is either just the top
+     sets that move the goals, or a whole session written around them. */
+  const [build, setBuild] = useState<'top' | 'full'>(() => { try { return localStorage.getItem('forge-today-build') === 'full' ? 'full' : 'top'; } catch { return 'top'; } });
+  const chooseBuild = (next: 'top' | 'full') => { setBuild(next); try { localStorage.setItem('forge-today-build', next); } catch { /* fine */ } };
+  const { exercises: library } = useTrainingLibrary();
 
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">Today</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
   if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">One quick setup</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split?guide=1&from=home">Build my split step by step <Icon name="arrow"/></Link></section><SplitGuidePrompt /></div>;
@@ -107,6 +99,42 @@ export function HomePage() {
   const dayType = recommendation.splitDay.type;
   const quiet = !recommendedSets.length && !recommendation.cardio && (dayType === 'rest' || dayType === 'cardio');
 
+  /* THE WHOLE SESSION, when "Build my workout" is chosen: each top set with
+     its back-offs, and an accessory for every muscle the day trains. */
+  const metric = setup?.units === 'Metric';
+  const isGoalLift = (exercise: string) => goals.some(goal => goal.exercise && sameLift(goal.exercise, exercise));
+  const lines = selectedSets.map(set => ({ exercise: set.exercise, muscle: set.muscle, weight: set.source === 'history' ? set.weight : 0, reps: set.reps || 5 }));
+  const full = buildFullWorkout({ topSets: lines, dayMuscles: recommendation.splitDay.muscles || [], library, records, metric, unit: weightUnit });
+  const accessories = full.filter(block => block.kind === 'accessory');
+  const extraParam = build === 'full' && recommendedSets.length && accessories.length ? `&extra=${encodeURIComponent(JSON.stringify(accessories.map(block => ({ lift: block.exercise, muscle: block.muscle, weight: block.weight, reps: block.reps }))))}` : '';
+  /* TODAY'S GOAL, said once and big: the lift that moves a goal, its load,
+     and how to get there. */
+  const objective = todaysObjective(lines, isGoalLift);
+  const ramp = objective ? warmupRamp(objective.weight, metric) : [];
+
+  /* COACH ME gets the same day, written whole, to walk through with videos. */
+  const coachPlan = recommendedSets.length ? {
+    title: recommendation.splitDay.name,
+    count: full.length,
+    start: () => {
+      try { sessionStorage.setItem(FROM_PLAN_KEY, JSON.stringify({ title: recommendation.splitDay.name,
+        lifts: full.map(block => ({ exercise: block.exercise, muscle: block.muscle, weight: block.weight, reps: block.reps, ...(block.kind === 'accessory' ? { sets: 3, accessory: true } : {}) })),
+        link: { recommendationId: recommendation.id, splitId: recommendation.splitDay.splitId, splitDayId: recommendation.splitDay.id, splitPosition: recommendation.splitDay.position, topSetIds: Object.fromEntries(selectedSets.map(set => [set.exercise, set.id])) } })); } catch { /* fine */ }
+      navigate('/guided?plan=1');
+    },
+  } : undefined;
+
+  const dayChips = <div className="tp-chips" role="radiogroup" aria-label="Training day">
+    {chips.map(day => { const on = day.name === recommendation.splitDay.name; const isSuggested = day.name === suggested?.splitDay.name; return <button type="button" role="radio" aria-checked={on} key={`${day.position}-${day.name}`} className={on ? 'on' : ''} onClick={() => pick(day.name)}>{day.name}{isSuggested && <small>Suggested</small>}</button>; })}
+  </div>;
+
+  const cardioLine = recommendation.cardio && <li><label className={choosing || recommendation.cardio.selected ? 'on' : ''}>
+    <input type="checkbox" checked={choosing || recommendation.cardio.selected} disabled={choosing} onChange={event => setCardioSelected(event.target.checked)} />
+    <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
+    <span className="td-stack">{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}
+      <em className="td-detail">{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</em></span>
+  </label></li>;
+
   return <div className="forge-feed today">
     <SplitGuidePrompt />
     <SplitReadyNote dayName={recommendation.splitDay.name} />
@@ -114,8 +142,6 @@ export function HomePage() {
     {syncError && <div className="save-confirmation save-warning">Your workout is ready here. Account sync will retry automatically.</div>}
     <StravaReviewModal />
     {bufferedNotes.length > 0 && <Link className="buffer-banner" to="/coach">
-      {/* The coach's mark, not a hazard sign: a limitation is Forge doing its
-          job, so it wears the brand rather than a warning colour. */}
       <i className="buffer-banner-mark"><Icon name="shield" size={18} stroke={2.1} /></i>
       <span><small>{bufferedNotes.some(isSickNote) ? 'Rest mode' : 'Coach adjusted'}</small>{bufferedNotes.some(isSickNote) ? 'Resting while you’re sick — tell Forge when you feel better' : `Training around ${Array.from(new Set(bufferedNotes.map(note => note.area || limitationIn(note.note || '') || (note.kind === 'fatigue' ? 'tiredness' : 'a limitation')))).join(', ')}`}</span>
       <Icon name="chevron" size={16} className="buffer-banner-go" />
@@ -125,106 +151,80 @@ export function HomePage() {
     <WrappedEntry />
     <WrappedReminderCard />
 
-    <TodayModeSwitch mode={mode} onChange={chooseMode} />
-    {mode === 'coach' && <CoachToday />}
+    {/* TODAY IS TODAY'S WORKOUT AND NOTHING ELSE. Partners have their own tab;
+        the nudges and the first-week checklist made this a feed to scroll
+        past before the one thing it is for. */}
+    {!completedToday && <TodayModeSwitch mode={mode} onChange={chooseMode} />}
+    {!completedToday && mode === 'coach' && <CoachToday plan={coachPlan} />}
 
-    {/* ONE CARD, ONE ACTION. The guide's Today: a status chip, the day's name
-        as the headline, each lift as one line with its load on the right, and
-        Start as the only button. Tapping a line still drops it from today. */}
-    {mode === 'plan' && (completedToday ? <section className="td-card done">
+    {completedToday ? <section className="td-card done">
       <div className="td-card-top"><span className="td-chip done"><Icon name="check" size={12} stroke={3} />Done</span><Link to={`/workout?edit=${completedToday.id}`}>Edit</Link></div>
       <h3 className="td-title">{completedToday.title}</h3>
-      {/* How long the lifting took, from the watch's strength session — matched
-          to the day by date, so it sits with the top set it belongs to. */}
       {completedToday.durationMinutes ? <p className="td-session-length"><Icon name="watch" size={13} />{completedSets.length ? 'Lifting' : 'Session'} · {sessionLength(completedToday.durationMinutes)} · from your watch</p> : null}
       {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <ul className="td-lines">
         {completedSets.map((set, index) => <li key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><b>{set.weight} {weightUnit} × {set.reps}</b></li>)}
         {(completedToday.cardioSessions || []).map(session => <li key={session.id}><span>{session.activity}</span><b>{formatCardioSummary(session)}</b></li>)}
       </ul>}
       <Link className="button secondary wide" to={`/workout?edit=${completedToday.id}`}>Edit workout</Link>
-    </section> : <section className="td-card">
+    </section> : mode === 'plan' && <section className="td-card">
       <p className="tp-ask">What are you training today?</p>
-      <div className="tp-chips" role="radiogroup" aria-label="Training day">
-        {chips.map(day => { const on = day.name === recommendation.splitDay.name; const isSuggested = day.name === suggested?.splitDay.name; return <button type="button" role="radio" aria-checked={on} key={`${day.position}-${day.name}`} className={on ? 'on' : ''} onClick={() => pick(day.name)}>{day.name}{isSuggested && <small>Suggested</small>}</button>; })}
-      </div>
-      {(recommendedSets.length > 0 || recommendation.cardio) && <ul className="td-lines">
+      {dayChips}
+
+      {/* THE OBJECTIVE. One line that says what today is for, and three that
+          say how. A first-time lift says how to find its number instead. */}
+      {objective && <div className="tp-goal">
+        <small>Today’s goal</small>
+        <h3>{objective.exercise} {objective.weight > 0 ? <>{objective.weight}<em> {weightUnit}</em> × {objective.reps}</> : <>· find your {objective.reps}</>}</h3>
+        <ol>
+          {objective.weight > 0
+            ? <><li>Warm up{ramp.length ? `: ${ramp.map((value, index) => `${value} × ${[5, 3, 1][index] ?? 1}`).join(', ')}` : ' with a few lighter sets'}</li>
+              <li>One top set of {objective.weight} × {objective.reps}. Stop with 1–2 reps left.</li></>
+            : <><li>Warm up with a few lighter sets, fewer reps each time.</li>
+              <li>Work up to a weight you could do {objective.reps} times with 2 reps left. That’s your top set.</li></>}
+          <li>{build === 'full' && recommendedSets.length ? 'Then the back-offs and accessories below.' : lines.length > 1 ? 'Log it, then the same for each lift below.' : 'Log it. That’s the day.'}</li>
+        </ol>
+      </div>}
+
+      {recommendedSets.length > 0 && <div className="tp-build" role="tablist" aria-label="How much to do">
+        <button type="button" role="tab" aria-selected={build === 'top'} className={build === 'top' ? 'on' : ''} onClick={() => chooseBuild('top')}>Top sets only</button>
+        <button type="button" role="tab" aria-selected={build === 'full'} className={build === 'full' ? 'on' : ''} onClick={() => chooseBuild('full')}>Build my workout</button>
+      </div>}
+
+      {build === 'top' && recommendedSets.length > 0 && <ul className="td-lines">
         {recommendedSets.map(set => { const wave = set.source === 'history' ? waveFor(set.exercise, set.reps) : null; const on = choosing || set.selected; return <li key={set.id}><label className={on ? 'on' : ''}>
           <input type="checkbox" checked={on} disabled={choosing} onChange={() => toggleTopSet(set.id)} />
           <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
           <span>{set.exercise}{set.optional && <small>Optional</small>}</span>
-          {/* A load is a record, set in mono with its unit small; an open
-              instruction stays in words. The text reads the same either way. */}
           {set.source === 'history'
             ? <b className="td-load">{set.weight}<small> {weightUnit}</small> × {set.reps}<small> reps</small></b>
             : <b className="td-load open">Work up to {set.reps || 5}</b>}
         </label>
-        {/* THE REP WAVE: where this lift is in its block, this week lit. */}
         {wave && <div className="tp-wave" aria-label={`Rep plan for ${set.exercise}: ${wave.wave.join(', ')}. This week ${set.reps}.`}>
           {wave.wave.map((reps, index) => <span key={index} className={index === wave.at ? 'now' : index < wave.at ? 'past' : ''}>{reps}</span>)}
           <em>{wave.at < wave.wave.length - 1 ? `Next: ${wave.wave[wave.at + 1]}` : 'Max week'}</em>
         </div>}
         </li>; })}
-        {recommendation.cardio && <li><label className={choosing || recommendation.cardio.selected ? 'on' : ''}>
-          <input type="checkbox" checked={choosing || recommendation.cardio.selected} disabled={choosing} onChange={event => setCardioSelected(event.target.checked)} />
-          <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
-          {/* A run's detail is a sentence, not a number, so it goes under its
-              name rather than in the number column — where it could not wrap
-              and pushed the whole card wider than the screen. */}
-          <span className="td-stack">{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}
-            <em className="td-detail">{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</em></span>
-        </label></li>}
+        {cardioLine}
       </ul>}
+
+      {/* BUILD MY WORKOUT: every line is something to do, with its numbers. */}
+      {build === 'full' && recommendedSets.length > 0 && <ul className="tp-full">
+        {full.map((block, index) => <li key={`${block.exercise}-${index}`} className={block.kind}>
+          {block.kind === 'accessory' && index === lines.length && <p className="tp-full-head">Accessories</p>}
+          <div><span>{block.exercise}</span>
+            <b>{block.kind === 'top' ? (block.weight > 0 ? <>{block.weight}<small> {weightUnit}</small> × {block.reps}</> : <>Work up to {block.reps}</>) : null}</b></div>
+          <em>{block.kind === 'top' ? `Top set. ${block.plan}` : block.plan}</em>
+        </li>)}
+        {recommendation.cardio && <li className="cardio"><div><span>{recommendation.cardio.title}</span></div><em>{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</em></li>}
+      </ul>}
+
       {!recommendedSets.length && dayType !== 'rest' && dayType !== 'cardio' && dayType !== 'hyrox' && <Link className="td-fix" to="/exercises"><span><b>Choose exercises for this day</b>Forge needs a lift mapped to it.</span><Icon name="arrow" size={16} /></Link>}
-      {/* A HYROX day only gets HYROX work for a HYROX goal; without one it is
-          open, and says where to set the goal. */}
       {dayType === 'hyrox' && !recommendation.cardio && <Link className="td-fix" to="/goals"><span><b>Add a HYROX goal</b>Forge writes HYROX sessions once you’re training for one. Today is open.</span><Icon name="arrow" size={16} /></Link>}
       {quiet && <p className="td-quiet"><b>{dayType === 'rest' ? 'Rest day' : 'No run needed today'}</b>{dayType === 'rest' ? 'Nothing required. Walk, stretch or log anything you do.' : 'Your running is covered this week.'}</p>}
-      {/* A FIRST SESSION IS A TEST, AND IT SAYS SO. A lift with no logged
-          set and no starting number has no load to give; instead of "Find
-          your weight" it tells the athlete how to find it, once. */}
-      {recommendedSets.some(set => set.source !== 'history') && <p className="td-note td-first">{(() => { const fresh = recommendedSets.filter(set => set.source !== 'history'); const reps = fresh[0].reps || 5; return <><b>First time on {fresh.length === 1 ? fresh[0].exercise : 'these lifts'}?</b> Work up to a weight you could do for {reps} with 2 reps left in the tank, and log that one set. Forge sets your numbers from it.</>; })()}</p>}
+      {!recommendedSets.length && recommendation.cardio && <ul className="td-lines">{cardioLine}</ul>}
       {(recommendation.coachNote || recommendation.bodyLogNote) && <p className="td-note">{recommendation.coachNote || recommendation.bodyLogNote}</p>}
-      <Link className="button wide" to={startUrl} data-vt="">{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
-      {/* COACH ME THROUGH IT: the same planned lifts, with the coach talking
-          her through the warm-up and each top set. */}
-      {recommendedSets.length > 0 && <button type="button" className="td-coach-btn" onClick={() => {
-        const sets = selectedSets.length ? selectedSets : recommendedSets;
-        try { sessionStorage.setItem(FROM_PLAN_KEY, JSON.stringify({ title: recommendation.splitDay.name, lifts: sets.map(set => ({ exercise: set.exercise, muscle: set.muscle, weight: set.weight, reps: set.reps })), link: { recommendationId: recommendation.id, splitId: recommendation.splitDay.splitId, splitDayId: recommendation.splitDay.id, splitPosition: recommendation.splitDay.position, topSetIds: Object.fromEntries(sets.map(set => [set.exercise, set.id])) } })); } catch { /* fine */ }
-        navigate('/guided?plan=1');
-      }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>Coach me through it</button>}
-    </section>)}
-
-    {/* THE PLAN LIVES ONE TAP UNDER TODAY. It was its own tab whose first row
-        repeated this card with a second Start button; now Today says what to
-        do and this row opens the rest of the week. */}
-    {mode === 'plan' && <Link className="td-week-link" to="/plan"><span><b>See your week</b><small>Every session, week by week</small></span><Icon name="right" size={16} /></Link>}
-
-    {mode === 'plan' && !firstWeekHidden && trainedDays < 3 && (() => {
-      const steps = [
-        { label: 'Log your first workout', detail: 'One top set per lift is enough.', done: trainedDays > 0, to: startUrl },
-        ...(runner ? [{ label: 'Bring in your runs', detail: 'Connect your watch, or log a run.', done: ranLogged, to: '/profile?view=connections' }] : []),
-        { label: 'Ask your coach', detail: 'Tap Ask coach at the bottom. Ask why a weight was picked, or to change your week.', done: coachTried, to: '', action: () => { markCoachTried(); openCoachBubble(); } },
-        { label: 'Train three times', detail: 'Then Forge starts spotting patterns and projecting your goals.', done: trainedDays >= 3, to: '' },
-      ];
-      return <section className="fw-card" aria-label="Your first week">
-        <header><small>Your first week</small><span>{steps.filter(step => step.done).length} of {steps.length}</span><button type="button" aria-label="Hide your first week" onClick={hideFirstWeek}><Icon name="close" size={14} /></button></header>
-        <ol>{steps.map((step, index) => {
-          const body = <><i aria-hidden="true">{step.done ? <Icon name="check" size={12} stroke={3} /> : index + 1}</i><span><b>{step.label}</b><small>{step.detail}</small></span>{(step.to || (step as { action?: () => void }).action) && !step.done && <Icon name="right" size={14} className="fw-go" />}</>;
-          const act = (step as { action?: () => void }).action;
-          return <li key={step.label} className={step.done ? 'done' : ''}>{act && !step.done ? <button type="button" onClick={act}>{body}</button> : step.to && !step.done ? <Link to={step.to}>{body}</Link> : <div>{body}</div>}</li>;
-        })}</ol>
-      </section>;
-    })()}
-
-
-    {/* Below the workout, never above it: the day's training is the card
-        Today exists for. */}
-    <TodayNudges />
-    <RunningBehindNudge />
-
-    {/* Under the workout, because this is the screen where you decide whether
-        to train and a partner who has already trained is the one thing that
-        changes that decision. */}
-    <PartnersCard unit={weightUnit} />
+      <Link className="button wide" to={`${startUrl}${extraParam}`} data-vt="">{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
+      <Link className="tp-week" to="/plan">See your week</Link>
+    </section>}
   </div>;
 }
