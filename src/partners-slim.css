@@ -26,3 +26,10 @@
 .ps-danger { background: #e5484d !important; color: #fff !important; border-color: #e5484d !important; }
 .ps-main .partner-mark { flex: none; width: 42px; height: 42px; display: grid; place-items: center; }
 .ps-foot { border: 0 !important; margin: 0 !important; }
+/* THE PARTNERSHIP: who trained last, what they did, how it sits beside you. */
+.ps-headline { margin: 2px 4px; font-size: 15px; line-height: 1.4; font-weight: 650; color: var(--ink); }
+.ps-session { list-style: none; margin: 10px -30px 0 0; padding: 10px 0 0; border-top: 1px solid var(--line); display: grid; gap: 6px; }
+.ps-session li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--ink-2); }
+.ps-session li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-session li b { flex: none; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ps-insights { display: grid; gap: 4px; margin: 10px -30px 0 0; padding: 9px 11px; border-radius: 10px; background: var(--surface-2); font-size: 13px; line-height: 1.35; color: var(--ink-2); }
