@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { pullEfforts } from '../../lib/setEffort';
 import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { resolveTopSetMuscle } from '../../lib/liftMuscles';
 import type { CardioLogDraft } from '../../lib/cardioSession';
@@ -14,6 +15,7 @@ type DayRow={id:string;workout_date:string;title:string;muscle_groups:string[];n
    pulled until one comes back short. */
 const PAGE = 1000;
 export async function loadWorkoutHistory():Promise<WorkoutRecord[]>{
+  void pullEfforts();
   const columns='id,workout_date,title,muscle_groups,notes,body_weight,effort,recommendation_id,split_id,split_day_id,split_position,duration_minutes,top_sets(id,recommendation_top_set_id,muscle_group,lift_name,weight,reps,calculated_max,position,prescribed_reps,prescribed_weight),cardio_sessions(id,client_key,structure,activity,summary,prescription_snapshot)';
   const rows:DayRow[]=[];
   for(let from=0;;from+=PAGE){

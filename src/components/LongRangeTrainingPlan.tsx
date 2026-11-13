@@ -6,7 +6,7 @@ import { buildLongRangePlan,type PlanWeek } from '../lib/longRangePlanEngine';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { cardioPlanSummary,type PlannedCardio } from './CardioPlanBuilder';
 import { canonicalLiftKey } from '../lib/liftAliases';
-import { bestsFromHistory,calendarEmptyState,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,waveSlot,WAVE_REPS,type SplitDayRef,type LiftAnchors } from '../features/training/aiPlanService';
+import { bestsFromHistory,calendarEmptyState,wavePrescription,testsOneRepMax,goalLiftNames,weekCycleDays,waveSlot,WAVE_REPS,type SplitDayRef,type LiftAnchors,type LatestSet } from '../features/training/aiPlanService';
 type LiveLifts=(day:SplitDay,position:number)=>PlanLift[]|null;
 import { PlanProgress,WeekList,useWeekSwipe,waveSentence,reconcileToday,type PlanSession,type PlanLift,type PlanRun } from './PlanView';
 import { MileageGate } from './MileageGate';
@@ -26,7 +26,7 @@ function scaleCardio(plan:PlannedCardio,week:PlanWeek,profile:AdaptiveProfile){
   return{summary:cardioPlanSummary(next),reason:`Scaled for ${week.phase.toLowerCase()} phase${profile.readiness<75?' and current recovery':''}.`};
 }
 
-function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number;dateIso?:string},liftAnchors?:LiftAnchors,liftSessions?:Map<string,number>,liftMisses?:Map<string,Map<number,number>>,liftLastAt?:LiftAnchors,liveLifts?:LiveLifts):CalendarSession[]{
+function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],profile:AdaptiveProfile,rhythm:'rolling'|'weekly',bests:Map<string,number>=new Map(),goalLifts:Set<string>=new Set(),anchor?:{position:number;dateIso?:string},liftAnchors?:LiftAnchors,liftSessions?:Map<string,number>,liftMisses?:Map<string,Map<number,number>>,liftLastAt?:LiftAnchors,liveLifts?:LiveLifts,liftLatest?:Map<string,LatestSet[]>):CalendarSession[]{
   const strengthGoal=goals.find(goal=>goal.type==='Strength');const enduranceGoal=goals.find(goal=>goal.type==='Endurance');const start=new Date(`${week.startDate}T12:00:00`);const cycle=splitDays.length?splitDays:[{name:'Strength',dayType:'strength'},{name:'Easy cardio',dayType:'cardio'},{name:'Rest',dayType:'rest'}];let strengthIndex=0;
   /* The same rotation the program uses, anchored to the live split cursor.
      Without the anchor this calendar drifted from the program on the same
@@ -103,7 +103,7 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
       if(week.week<=1)return item;
       const key=canonicalLiftKey(item.exercise);const best=bests.get(key)||0;const tests=testsOneRepMax(item.exercise,goalLifts);
       const base=Math.max(0,WAVE_REPS.indexOf(item.reps as typeof WAVE_REPS[number]));
-      const ahead=best?wavePrescription(best,base+week.week-1,{tests,anchors:liftAnchors?.get(key),accessory:!tests,sessions:(liftSessions?.get(key)||0)+(week.week-1),misses:liftMisses?.get(key),lastAt:liftLastAt?.get(key)}):null;
+      const ahead=best?wavePrescription(best,base+week.week-1,{tests,anchors:liftAnchors?.get(key),accessory:!tests,sessions:(liftSessions?.get(key)||0)+(week.week-1),misses:liftMisses?.get(key),lastAt:liftLastAt?.get(key),latest:liftLatest?.get(key)}):null;
       return ahead?{exercise:item.exercise,weight:ahead.weight,reps:ahead.reps}:item;
     });
     const dayTopSet=projected.length?`${projected[0].exercise}: ${projected[0].weight} × ${projected[0].reps}${week.week>1&&waveSlot(Math.max(0,WAVE_REPS.indexOf(live[0].reps as typeof WAVE_REPS[number]))+week.week-1).isMax&&testsOneRepMax(projected[0].exercise,goalLifts)?' tested MAX':''}`
@@ -142,7 +142,7 @@ export function LongRangeTrainingPlan({goals,profile,splitDays,rhythm='rolling'}
      strength day's) — so "8-REP WEEK" is true of the numbers under it. */
   const baseRung=useMemo(()=>{const lead=recommendation?.topSets.find(set=>set.selected&&set.weight>0)||splitDays.map((day,index)=>recommendationFor(index+1,day.name)?.topSets.find(set=>set.selected&&set.weight>0)).find(Boolean);const index=lead?WAVE_REPS.indexOf(lead.reps as typeof WAVE_REPS[number]):-1;return index<0?0:index},[recommendation,recommendationFor,splitDays]);
   const anchor=useMemo(()=>anchorPosition?{position:anchorPosition,dateIso:anchorDate}:undefined,[anchorPosition,anchorDate]);
-  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history.anchors,history.sessions,history.misses,history.lastAt,liveLifts):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history,liveLifts]);
+  const sessions=useMemo(()=>active?weekCalendar(active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history.anchors,history.sessions,history.misses,history.lastAt,liveLifts,history.latest):[],[active,splitDays,goals,profile,rhythm,bests,goalLifts,anchor,history,liveLifts]);
   if(!active)return null;
   /* THE PRE-PROGRAM PLAN WEARS THE SAME CLOTHES AS THE PROGRAM. This screen
      had its own layout — a 12wk/6mo/1yr toggle, an export, a rules card — so

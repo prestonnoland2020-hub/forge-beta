@@ -28,25 +28,30 @@ const day = (iso: string) => new Date(`${iso}T12:00:00`).getTime();
 export function liftTrend(exercise: string, records: Rec[], target: number, goalDate: string | undefined, unit = 'lb', today = new Date()): LiftTrend | null {
   if (!exercise || !(target > 0)) return null;
   const now = today.getTime();
-  const all: Array<{ t: number; max: number }> = [];
+  const all: Array<{ t: number; max: number; reps: number }> = [];
   for (const record of records) for (const set of record.topSets || []) {
     if (set.completed === false || !set.lift || !sameLift(set.lift, exercise) || !(set.weight > 0) || !(set.reps > 0)) continue;
-    all.push({ t: day(record.date), max: estimateWithEffort(set.weight, set.reps, effortOf(record.date, set.lift)) });
+    all.push({ t: day(record.date), reps: set.reps, max: estimateWithEffort(set.weight, set.reps, effortOf(record.date, set.lift)) });
   }
-  const within = (weeks: number) => all.filter(point => now - point.t <= weeks * 7 * DAY && point.t <= now);
+  /* Off days — under 80% of the lift's best, or past twenty reps — say
+     nothing about strength and are left out. */
+  const top = Math.max(0, ...all.map(point => point.max));
+  const solid = all.filter(point => point.max >= top * 0.8 && point.reps <= 20);
+  const within = (weeks: number) => solid.filter(point => now - point.t <= weeks * 7 * DAY && point.t <= now);
   let weeks = 8; let points = within(8);
-  const spans = (list: typeof points) => list.length >= 3 && (Math.max(...list.map(p => p.t)) - Math.min(...list.map(p => p.t))) >= 21 * DAY;
+  const spans = (list: typeof points) => new Set(list.map(p => p.t)).size >= 3 && (Math.max(...list.map(p => p.t)) - Math.min(...list.map(p => p.t))) >= 21 * DAY;
   if (!spans(points)) { weeks = 12; points = within(12); }
   if (!spans(points)) return null;
-  /* Least squares, x in weeks. */
+  /* THE MEDIAN LINE, NOT THE AVERAGE ONE (Theil–Sen): the slope is the
+     median of the slopes between every pair of days, so one tired day — or
+     one great one — barely moves it. x in weeks, today at zero. */
   const xs = points.map(point => (point.t - now) / (7 * DAY));
   const ys = points.map(point => point.max);
-  const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
-  const my = ys.reduce((a, b) => a + b, 0) / ys.length;
-  let num = 0; let den = 0;
-  xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) ** 2; });
-  const slope = den ? num / den : 0;
-  const onLine = my - slope * mx; // value at x = 0, today
+  const median = (list: number[]) => { const sorted = [...list].sort((a, b) => a - b); const mid = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2; };
+  const slopes: number[] = [];
+  for (let i = 0; i < xs.length; i += 1) for (let j = i + 1; j < xs.length; j += 1) if (Math.abs(xs[j] - xs[i]) >= 3 / 7) slopes.push((ys[j] - ys[i]) / (xs[j] - xs[i]));
+  const slope = slopes.length ? median(slopes) : 0;
+  const onLine = median(ys.map((y, i) => y - slope * xs[i])); // value at x = 0, today
   const recentBest = Math.max(...points.filter(point => now - point.t <= 28 * DAY).map(point => point.max), 0) || Math.max(...ys);
   const current = Math.round(Math.min(onLine, recentBest));
   const perWeek = Math.min(slope, current * 0.01);
