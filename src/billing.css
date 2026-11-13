@@ -306,3 +306,9 @@
 .goal-fix.suggest span b { font-weight: 800; }
 .goal-fix.suggest .button.small { padding: 8px 14px; font-size: .9rem; }
 .goal-fix-done { font-style: normal; font-weight: 700; color: var(--success, var(--accent-text)); font-size: var(--fs-small); }
+
+/* Quick win on a slipping goal: a stepping stone, added beside it. */
+.goal-quickwin { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--s3); margin: 4px 0 0; padding: var(--s3) var(--s4); border-radius: var(--r-md); border: 1px solid color-mix(in oklch, var(--good, var(--accent)) 35%, transparent); background: color-mix(in oklch, var(--good, var(--accent)) 8%, var(--surface-2)); text-align: left; }
+.goal-quickwin span { display: grid; gap: 3px; font-size: var(--fs-small); color: var(--ink-2); }
+.goal-quickwin span b { color: var(--ink); font-weight: 800; font-size: .95rem; }
+.goal-quickwin .button.small { padding: 8px 14px; font-size: .9rem; }

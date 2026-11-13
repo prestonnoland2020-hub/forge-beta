@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../features/billing/BillingProvider';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { nudgeUpgrade } from './UpgradeSheet';
-import type { Feasibility } from '../lib/goalFeasibility';
+import { weeksUntil, type Feasibility, type GoalPrediction } from '../lib/goalFeasibility';
 import { secondsToClock } from '../lib/goalInput';
 import { predictionFromNow } from '../lib/predictionFromNow';
+import type { GoalSuggestion } from '../lib/goalSuggestions';
 
 /* THE SAME PREDICTION SETUP SHOWED, ON THE GOAL ITSELF. Setup drew a path
    from where the athlete is to the goal and called it realistic, ambitious or
@@ -53,11 +54,60 @@ function GoalFix({ verdict }: { verdict: Feasibility }) {
   </div>;
 }
 
-export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean; now?: number | null }) {
-  /* PROGRESSIVE DISCLOSURE: the answer and what to do about it are always
-     shown; the range behind the answer opens on request. */
-  const [open, setOpen] = useState(false);
-  const rangeId = `gpc-range-${verdict.goal.replace(/[^a-z0-9]+/gi, '-')}`;
+/* THE WHY, AS A PACE. "388 by Mar 31" is a number; "+1.2 lb a week, the goal
+   needs +2.1" is the reason for it, and what to beat. */
+function paceOf(p: GoalPrediction, weeks: number) {
+  const race = p.better === 'lower';
+  const gain = race ? p.start - p.typical : p.typical - p.start;
+  const need = race ? p.start - p.target : p.target - p.start;
+  return { per: weeks > 0 ? gain / weeks : 0, need: weeks > 0 ? need / weeks : 0 };
+}
+const fmtRate = (value: number) => Math.abs(value) >= 10 ? Math.round(value).toString() : (Math.round(value * 10) / 10).toFixed(1);
+
+/* THE LINE TO THE DATE: today's number, the pace carried to the goal date,
+   and the goal as a dashed line across. Where the two meet is the answer. */
+function PaceGraph({ p, date, show, tone }: { p: GoalPrediction; date: string; show: (value: number) => string; tone: string }) {
+  const race = p.better === 'lower';
+  const W = 320, H = 118, top = 22, bottom = 26, left = 6, right = 6;
+  const values = [p.start, p.typical, p.target];
+  const min = Math.min(...values), max = Math.max(...values);
+  const pad = Math.max((max - min) * 0.18, race ? 5 : 2);
+  const lo = min - pad, hi = max + pad;
+  /* Better is always up: a faster race time climbs like a heavier lift. */
+  const y = (value: number) => {
+    const share = (value - lo) / (hi - lo);
+    return top + (race ? share : 1 - share) * (H - top - bottom);
+  };
+  const x0 = left, x1 = W - right;
+  const goalY = y(p.target), startY = y(p.start), endY = y(p.typical);
+  const ends = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  /* Labels sit on the side away from the other line so they never overlap. */
+  const endAbove = endY <= goalY;
+  return <svg className={`gpc-graph tone-${tone}`} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`From ${show(p.start)} today to ${show(p.typical)} by ${ends}; goal ${show(p.target)}`}>
+    <path className="gpc-graph-area" d={`M${x0},${startY} L${x1},${endY} L${x1},${H - bottom} L${x0},${H - bottom} Z`} />
+    <line className="gpc-graph-goal" x1={x0} x2={x1} y1={goalY} y2={goalY} />
+    <text className="gpc-graph-goal-label" x={x0} y={goalY - 6}>Goal {show(p.target)}</text>
+    <line className="gpc-graph-line" x1={x0} x2={x1} y1={startY} y2={endY} />
+    <circle className="gpc-graph-dot start" cx={x0 + 3} cy={startY} r="3.5" />
+    <circle className="gpc-graph-dot" cx={x1 - 4} cy={endY} r="4.5" />
+    <text className="gpc-graph-end" x={x1} y={endAbove ? endY - 10 : endY + 18} textAnchor="end">{show(p.typical)}</text>
+    <line className="gpc-graph-base" x1={x0} x2={x1} y1={H - bottom} y2={H - bottom} />
+    <text className="gpc-graph-axis" x={x0} y={H - 8}>Today</text>
+    <text className="gpc-graph-axis" x={x1} y={H - 8} textAnchor="end">{ends}</text>
+  </svg>;
+}
+
+/* THE STEPPING STONE: a goal a few weeks out the athlete can actually hit,
+   added beside the big one, not instead of it. */
+function QuickWin({ win, onAdd }: { win: GoalSuggestion; onAdd: (win: GoalSuggestion) => void }) {
+  const [added, setAdded] = useState(false);
+  return <div className="goal-quickwin">
+    <span><b>Quick win · {win.label} by {win.dateLabel}</b>{win.how}</span>
+    {added ? <em className="goal-fix-done">Added</em> : <button type="button" className="button small" onClick={() => { onAdd(win); setAdded(true); }}>Add</button>}
+  </div>;
+}
+
+export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now, quickWin, onAddQuickWin }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean; now?: number | null; quickWin?: GoalSuggestion | null; onAddQuickWin?: (win: GoalSuggestion) => void }) {
   const model = verdict.prediction;
   if (!model) return null;
   /* Carried from the number the card above shows, so the two always agree. */
@@ -73,31 +123,24 @@ export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now }: { v
   const line = reach(p.start) ? 'Already there — hold it to the date.'
     : Math.round(gap) === 0 ? 'Lands right on the goal.'
     : reach(p.typical) ? <>Clears it by <b>{gapText}</b></> : <><b>{gapText}</b> short on the day</>;
-  /* One bar from zero (as on the goal card above it) to the further of the
-     goal and the best case:
-     the fill is where a typical block lands, the tick is the goal. */
-  const lo = race ? Math.max(p.start, p.target, p.ceiling, p.typical) : 0;
-  const hi = race ? Math.min(p.target, p.ceiling, p.typical) : Math.max(p.target, p.ceiling, p.typical);
-  const at = (value: number) => hi === lo ? 100 : Math.max(0, Math.min(100, ((value - lo) / (hi - lo)) * 100));
-  /* WHAT MATTERS ON THE PREDICTION: where the athlete lands by the date, how
-     far that is from the goal, and what to change. The path chart, the
-     paragraph restating it and the rules of the model were three more ways to
-     say the same number; the card that followed said it a fourth time. */
+  const weeks = weeksUntil(date);
+  const pace = paceOf(p, weeks);
+  const rateUnit = race ? 'sec/wk faster' : `${unit}/wk`;
+  const source = p.measured ? 'your pace' : p.measured === false ? 'typical pace' : '';
   return <section className={`goal-prediction compact tone-${tone}`} aria-label="Forge's prediction">
     <div className="gpc-head"><span>Projected by {shortDate(date)}</span><em>{label}</em></div>
     <div className="gpc-num"><b>{show(p.typical)}</b><span>{line}</span></div>
-    <button type="button" className="gpc-why" aria-expanded={open} aria-controls={rangeId} onClick={() => setOpen(value => !value)}>
-      {open ? 'Hide range' : 'See range'}
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-    </button>
-    {open && <div className="gpc-detail" id={rangeId}>
-      <div className="gpc-bar" aria-hidden="true"><i style={{ width: `${at(p.typical)}%` }} /><s style={{ left: `${at(p.target)}%` }} /></div>
-      <p className="gpc-meta"><span>Best case {show(p.ceiling)}</span><span>Goal {show(p.target)}</span></p>
-    </div>}
+    {weeks >= 1 && <p className="gpc-pace">
+      <b>{pace.per > 0 ? `${race ? '' : '+'}${fmtRate(pace.per)} ${rateUnit}` : 'Flat'}</b>
+      {source && <span>{source}</span>}
+      {!reach(p.start) && pace.need > 0 && <span className="gpc-need">· needs {race ? '' : '+'}{fmtRate(pace.need)}</span>}
+    </p>}
+    {weeks >= 1 && <PaceGraph p={p} date={date} show={show} tone={tone} />}
     {/* The estimate already clears the goal but the time actually run does
        not: the advice is to go and prove it, not "hold it". */}
     {reach(model.start) && !reach(p.start)
       ? <p className="goal-fix"><b>What to change</b>Your other {race ? 'runs' : 'sets'} put you at about {show(model.start)}. {race ? 'Race the distance' : 'Test a heavy single'} to prove it.</p>
       : <GoalFix verdict={verdict} />}
+    {quickWin && onAddQuickWin && <QuickWin win={quickWin} onAdd={onAddQuickWin} />}
   </section>;
 }

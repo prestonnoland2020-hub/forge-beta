@@ -127,7 +127,10 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   const completed=strengthResults(input.records);
   const lastCompletedByLift=completed.reduce<Record<string,string>>((map,result)=>{const key=canonicalLiftKey(result.lift);if(!map[key]||result.date>map[key])map[key]=result.date;return map},{});
   const strengthLibrary=input.exercises.filter(exercise=>exercise.enabled&&exercise.kind==='Strength'&&!/HYROX|CrossFit/i.test(exercise.detail));
-  const strengthGoals=input.goals.filter(goal=>goal.type==='Strength'&&goal.exercise);
+  /* TWO GOALS ON ONE LIFT — a quick win on the way to the big one — and the
+     plan chases the nearer first: the soonest goal still ahead wins the lift
+     (Map and reduce below keep the last one written, so it goes last). */
+  const strengthGoals=input.goals.filter(goal=>goal.type==='Strength'&&goal.exercise).sort((a,b)=>{const ahead=(goal:typeof a)=>!goal.date||goal.date>=input.date?0:1;return ahead(b)-ahead(a)||String(b.date||'9999').localeCompare(String(a.date||'9999'))});
   const goalByLift=new Map(strengthGoals.map(goal=>[normalized(goal.exercise||''),goal]));
   /* Keyed canonically: written raw, a "Squat" goal was invisible to a "Back
      Squat" template and the day fell back to "establish a baseline" on a lift
