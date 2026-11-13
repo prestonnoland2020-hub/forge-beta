@@ -118,3 +118,4 @@
 .goal-pace-pill.on-track, .goal-pace-pill.reached { background: color-mix(in oklch, var(--good, #3fbf7f) 18%, transparent); color: var(--good, #3fbf7f); }
 .goal-pace-pill.needs-work { background: color-mix(in oklch, var(--accent) 18%, transparent); color: var(--accent-text, var(--accent)); }
 .goal-pace-pill.off-track { background: color-mix(in oklch, #e5484d 18%, transparent); color: #ff7a7f; }
+

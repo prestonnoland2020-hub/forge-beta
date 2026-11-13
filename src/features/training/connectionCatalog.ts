@@ -27,6 +27,7 @@ export const connectionCatalog: CatalogConnection[] = [
   { id: 'coros', name: 'COROS', kind: 'watch', data: ['Activities', 'Sleep', 'Heart rate'], blocker: 'partner-approval' },
   { id: 'suunto', name: 'Suunto', kind: 'watch', data: ['Workouts', 'Sleep', 'Heart rate'], blocker: 'partner-approval' },
   { id: 'wahoo', name: 'Wahoo', kind: 'watch', data: ['Rides', 'Runs', 'Heart rate'], blocker: 'partner-approval' },
+  { id: 'concept2', name: 'Concept2', kind: 'watch', data: ['Rows', 'SkiErg', 'BikeErg'], blocker: 'self-serve-app' },
   { id: 'apple-health', name: 'Apple Health', kind: 'health', data: ['Sleep', 'HRV', 'Resting HR', 'Workouts', 'Body weight'], blocker: 'native-ios' },
   { id: 'health-connect', name: 'Health Connect', kind: 'health', data: ['Sleep', 'Resting HR', 'Exercise sessions', 'Body weight'], blocker: 'native-android' },
   { id: 'withings', name: 'Withings', kind: 'health', data: ['Body weight', 'Body composition', 'Sleep'], blocker: 'self-serve-app' },
