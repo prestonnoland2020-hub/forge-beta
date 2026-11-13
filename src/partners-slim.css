@@ -1,0 +1,28 @@
+/* PARTNERS, SLIM: one line to search, then the people. */
+.partners-slim { gap: 12px; }
+.ps-search { display: flex; align-items: center; gap: 8px; margin: 0; }
+.ps-search > :first-child { flex: 1; min-width: 0; }
+.ps-search input { height: 42px !important; min-height: 0 !important; font-size: 16px; }
+.ps-invite { flex: none; height: 42px; padding: 0 16px; border-radius: 21px; border: 1px solid var(--line); background: var(--surface-1); color: var(--ink); font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+.ps-list { display: grid; gap: 10px; }
+.ps-card { position: relative; padding: 14px 44px 14px 14px !important; }
+.ps-main { display: flex; gap: 12px; align-items: flex-start; text-decoration: none; color: inherit; }
+.ps-main > div { display: grid; gap: 3px; min-width: 0; }
+.ps-main strong { font-size: 17px; font-weight: 750; color: var(--ink); }
+.ps-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+.ps-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.ps-card.done .ps-status { color: var(--accent-text, var(--accent)); font-weight: 650; }
+.ps-workout { font-size: 14px; line-height: 1.35; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ps-x { position: absolute; top: 8px; right: 8px; width: 30px !important; height: 30px !important; min-height: 0 !important; min-width: 0 !important; padding: 0; border: 0; border-radius: 15px; background: transparent; color: var(--ink-3, var(--muted)); font-size: 20px; line-height: 1; cursor: pointer; box-shadow: none; }
+.ps-x:active { background: var(--surface-2); }
+.ps-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 4px; }
+.ps-foot strong { display: block; font-size: 14px; color: var(--ink); }
+.ps-foot small { display: block; font-size: 12.5px; color: var(--ink-2); }
+.ps-confirm-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: var(--scrim, rgb(0 0 0 / .5)); backdrop-filter: blur(6px); }
+.ps-confirm { width: min(340px, 100%); padding: 22px; border-radius: 18px; background: var(--surface-1); border: 1px solid var(--line); display: grid; gap: 10px; }
+.ps-confirm h3 { margin: 0; font-size: 18px; }
+.ps-confirm p { margin: 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.4; }
+.ps-confirm > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.ps-danger { background: #e5484d !important; color: #fff !important; border-color: #e5484d !important; }
+.ps-main .partner-mark { flex: none; width: 42px; height: 42px; display: grid; place-items: center; }
+.ps-foot { border: 0 !important; margin: 0 !important; }

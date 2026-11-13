@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { waveLabel } from '../components/PlanView';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { supabase } from '../lib/supabase';
@@ -8,10 +7,11 @@ import { isDemoMode } from '../lib/env';
 import {
   loadPartners, loadPartnerRequests, addPartner, declinePartner, removePartner,
   inviteLink, lastTrainedLabel, pendingInvite, clearPendingInvite, didToday,
-  searchAthletes, suggestAthletes, addPartnerById, loadDiscoverable, setDiscoverable, type AthleteResult, type SuggestedAthlete,
+  searchAthletes, suggestAthletes, addPartnerById, loadDiscoverable, setDiscoverable, loadPartnerRecent, type AthleteResult, type SuggestedAthlete, type PartnerDay,
   type Partner, type PartnerRequest, type AddResult,
 } from '../features/friends/partnerService';
-import { Icon } from '../components/Icon';
+import { localDayIso } from '../lib/time';
+import '../partners-slim.css';
 import { SearchField } from '../components/SearchField';
 
 const MESSAGES: Record<AddResult, string> = {
@@ -23,6 +23,15 @@ const MESSAGES: Record<AddResult, string> = {
   not_found: 'No athlete with that username.',
   blocked: 'That request cannot be sent.',
 };
+
+const DEMO_PARTNERS: Partner[] = [
+  { friendId: 'demo-a', username: 'jordan', displayName: 'Jordan Reyes', blockWeek: 2, blockWeeks: 10, waveSlot: 2, trainedToday: true, lastTrained: localDayIso(), topLift: 'Bench', topWeight: 225, topReps: 5, cardioSummary: null },
+  { friendId: 'demo-b', username: 'sam', displayName: 'Sam Patel', blockWeek: 2, blockWeeks: 10, waveSlot: 1, trainedToday: false, lastTrained: localDayIso(new Date(Date.now() - 3 * 86400000)), topLift: null, topWeight: null, topReps: null, cardioSummary: null },
+];
+const DEMO_DAYS = (): Record<string, PartnerDay[]> => ({
+  'demo-a': [{ date: localDayIso(), lifts: [{ name: 'Bench', weight: 225, reps: 5 }, { name: 'Barbell Row', weight: 185, reps: 8 }, { name: 'Incline DB Press', weight: 70, reps: 10 }], cardio: [{ name: 'Run', summary: 'Run · 3.1 mi · 26:40' }] }],
+  'demo-b': [{ date: localDayIso(new Date(Date.now() - 3 * 86400000)), lifts: [{ name: 'Squat', weight: 315, reps: 4 }, { name: 'Leg Press', weight: 450, reps: 10 }], cardio: [] }],
+});
 
 export function PartnersPage() {
   const { user } = useAuth();
@@ -44,7 +53,9 @@ export function PartnersPage() {
   const unit = setup?.units === 'Metric' ? 'kg' : 'lb';
 
   const refresh = useCallback(async () => {
-    if (isDemoMode || !user) return;
+    /* The preview build shows two made-up partners so the screen can be seen. */
+    if (isDemoMode) { setPartners(DEMO_PARTNERS); return; }
+    if (!user) return;
     const [rows, waiting] = await Promise.all([loadPartners(), loadPartnerRequests()]);
     setPartners(rows); setRequests(waiting);
   }, [user]);
@@ -113,7 +124,45 @@ export function PartnersPage() {
     } catch { /* the athlete cancelled the share sheet */ }
   };
 
-  return <div className="stack-xl partners-page">
+  /* THEIR DAY, NOT A DASHBOARD. Each partner's last four weeks, read once,
+     so a row can show the workout they did today — every lift, and the run —
+     or, if not today, their last session. */
+  const [days, setDays] = useState<Record<string, PartnerDay[]>>({});
+  useEffect(() => {
+    if (isDemoMode) { setDays(DEMO_DAYS()); return; }
+    if (!partners.length) return;
+    let live = true;
+    void Promise.all(partners.map(partner => loadPartnerRecent(partner.friendId).then(list => [partner.friendId, list] as const).catch(() => [partner.friendId, [] as PartnerDay[]] as const)))
+      .then(entries => { if (live) setDays(Object.fromEntries(entries)); });
+    return () => { live = false; };
+  }, [partners]);
+  const today = localDayIso();
+  const sessionLine = (day: PartnerDay) => [
+    ...day.lifts.slice(0, 3).map(lift => `${lift.name} ${lift.weight}×${lift.reps}`),
+    ...day.cardio.slice(0, 1).map(session => { const parts = session.summary.split(' · ').filter(Boolean); return parts.length > 1 ? `${session.name} ${parts[1]}` : session.name; }),
+    ...(day.lifts.length > 3 ? [`+${day.lifts.length - 3} more`] : []),
+  ].join(' · ');
+  const [removing, setRemoving] = useState<Partner | null>(null);
+  const searchingNow = username.trim().length >= 2;
+
+  return <div className="stack-xl partners-page partners-slim">
+    {/* ONE LINE: search, and invite beside it. */}
+    <form role="search" className="ps-search" onSubmit={event => { event.preventDefault(); if (results[0]?.relation === 'none') void pick(results[0]); }}>
+      <SearchField id="partner-username" value={username} onChange={setUsername} autoCapitalize="none"
+        placeholder="Find a partner" aria-label="Find a partner by name or username" />
+      {myUsername && <button type="button" className="ps-invite" onClick={() => void share()}>Invite</button>}
+    </form>
+    {message && <p className="partner-message">{message}</p>}
+
+    {searchingNow && <section className="card ps-results">
+      {results.map(result => <button type="button" className="partner-result" key={result.id}
+        disabled={busy || result.relation !== 'none'} onClick={() => void pick(result)}>
+        <span className="partner-mark" aria-hidden="true">{result.displayName.slice(0, 2).toUpperCase()}</span>
+        <span><strong>{result.displayName}</strong><small>@{result.username}</small></span>
+        <b>{result.relation === 'partner' ? 'Partner' : result.relation === 'requested' ? 'Requested' : result.relation === 'waiting' ? 'Asked you' : 'Add'}</b>
+      </button>)}
+      {!results.length && <p className="partner-message">{searching ? 'Searching…' : 'Nobody by that name. Their exact username always works.'}</p>}
+    </section>}
 
     {requests.length > 0 && <section className="card partner-requests">
       <h3>Waiting on you</h3>
@@ -126,76 +175,56 @@ export function PartnersPage() {
       </div>)}
     </section>}
 
-    <section className="card partner-add">
-      <h3>Add a partner</h3>
-      <form role="search" onSubmit={event => { event.preventDefault(); if (results[0]?.relation === 'none') void pick(results[0]); }}>
-        <SearchField id="partner-username" value={username} onChange={setUsername} autoCapitalize="none"
-          placeholder="Search by name or username" aria-label="Search by name or username" />
-      </form>
-      {/* Before typing: who Forge suggests, each a tap from added. */}
-      {username.trim().length < 2 && suggested.length > 0 && <div className="partner-results">
-        <small className="partner-results-label">Suggested</small>
-        {suggested.map(person => <button type="button" className="partner-result" key={person.id} disabled={busy} onClick={() => void pick(person)}>
-          <span className="partner-mark" aria-hidden="true">{person.displayName.slice(0, 2).toUpperCase()}</span>
-          <span><strong>{person.displayName}</strong><small>{person.mutuals ? `${person.mutuals} shared ${person.mutuals === 1 ? 'partner' : 'partners'}` : `@${person.username}`}</small></span>
-          <b>Add</b>
-        </button>)}
+    {!searchingNow && <section className="ps-list" aria-label="Your training partners">
+      {partners.length === 0 && <div className="card ps-empty">
+        <p>No partners yet. Training alongside one person is the difference between a plan and a habit.</p>
+        {suggested.length > 0 && <div className="partner-results">
+          <small className="partner-results-label">Suggested</small>
+          {suggested.map(person => <button type="button" className="partner-result" key={person.id} disabled={busy} onClick={() => void pick(person)}>
+            <span className="partner-mark" aria-hidden="true">{person.displayName.slice(0, 2).toUpperCase()}</span>
+            <span><strong>{person.displayName}</strong><small>{person.mutuals ? `${person.mutuals} shared ${person.mutuals === 1 ? 'partner' : 'partners'}` : `@${person.username}`}</small></span>
+            <b>Add</b>
+          </button>)}
+        </div>}
       </div>}
-      {/* Results, or the honest reason there are none. */}
-      {username.trim().length >= 2 && <div className="partner-results">
-        {results.map(result => <button type="button" className="partner-result" key={result.id}
-          disabled={busy || result.relation !== 'none'} onClick={() => void pick(result)}>
-          <span className="partner-mark" aria-hidden="true">{result.displayName.slice(0, 2).toUpperCase()}</span>
-          <span><strong>{result.displayName}</strong><small>@{result.username}</small></span>
-          <b>{result.relation === 'partner' ? 'Partner'
-            : result.relation === 'requested' ? 'Requested'
-            : result.relation === 'waiting' ? 'Asked you'
-            : 'Add'}</b>
-        </button>)}
-        {!results.length && <p className="partner-message">{searching ? 'Searching…' : 'Nobody by that name. Their exact username always works.'}</p>}
-      </div>}
-      {message && <p className="partner-message">{message}</p>}
-      {myUsername && <div className="partner-invite">
-        <div><strong>Your username is @{myUsername}</strong><small>Send someone the link and they arrive already connected to you.</small></div>
-        <button type="button" className="button ghost small-button" onClick={() => void share()}>Invite a friend</button>
-      </div>}
-      {/* Being findable is its own choice, and it is not the same as being
-          invitable — a username always works. */}
-      <div className="partner-discoverable">
-        <div><strong>Let people find me by name</strong><small>Off, and only someone with your exact username can add you.</small></div>
-        <input type="checkbox" aria-label="Let people find me by name" checked={discoverable} onChange={event => {
-          const next = event.target.checked; setDiscoverableState(next);
-          void setDiscoverable(next).catch(() => setDiscoverableState(!next));
-        }} />
-      </div>
-    </section>
+      {partners.map(partner => {
+        const recent = days[partner.friendId] || [];
+        const todays = recent.find(day => day.date === today);
+        const last = todays || recent[0];
+        const status = partner.trainedToday || todays ? 'Trained today' : lastTrainedLabel(partner.lastTrained);
+        const workout = last ? sessionLine(last) : partner.trainedToday ? didToday(partner, unit) : '';
+        return <article className={`card ps-card${partner.trainedToday || todays ? ' done' : ''}`} key={partner.friendId}>
+          <Link className="ps-main" to={`/partners/${partner.friendId}`} state={origin ? { origin, viaList: true } : undefined}>
+            <span className="partner-mark" aria-hidden="true">{(partner.displayName || partner.username).slice(0, 2).toUpperCase()}</span>
+            <div>
+              <strong>{partner.displayName}</strong>
+              <span className="ps-status">{(partner.trainedToday || todays) && <i aria-hidden="true" />}{status}</span>
+              {workout && <span className="ps-workout">{todays ? workout : `Last: ${workout}`}</span>}
+            </div>
+          </Link>
+          <button type="button" className="ps-x" aria-label={`Remove ${partner.displayName}`} onClick={() => setRemoving(partner)}>×</button>
+        </article>;
+      })}
+    </section>}
 
-    <section className="card pv-week partners-list">
-      <header><h3>Your partners</h3></header>
-      {partners.length === 0
-        ? <p className="partner-empty">No partners yet. Training alongside one person is the difference between a plan and a habit.</p>
-        : <div className="pv-week-rows">
-            {partners.map(partner => {
-              const block = partner.blockWeek && partner.blockWeeks
-                ? `Week ${partner.blockWeek} of ${partner.blockWeeks} · ${waveLabel(partner.waveSlot ?? 0)}`
-                : 'No block yet';
-              return <div className={`pv-row partner-full${partner.trainedToday ? ' done' : ''}`} key={partner.friendId}>
-                <Link className="partner-full-main" to={`/partners/${partner.friendId}`} state={origin ? { origin, viaList: true } : undefined}>
-                  <span className="partner-mark" aria-hidden="true">{(partner.displayName || partner.username).slice(0, 2).toUpperCase()}</span>
-                  <div>
-                    <strong>{partner.displayName}</strong>
-                    <small>{block}</small>
-                    <span className={partner.trainedToday ? 'partner-did' : 'partner-quiet'}>
-                      {partner.trainedToday ? didToday(partner, unit) : lastTrainedLabel(partner.lastTrained)}
-                    </span>
-                  </div>
-                  {partner.trainedToday && <b aria-label="Trained today"><Icon name="check" size={12} stroke={3}/></b>}
-                </Link>
-                <button type="button" className="text-button partner-remove"
-                  onClick={() => { if (window.confirm(`Remove ${partner.displayName} as a training partner?`)) void removePartner(partner.friendId).then(refresh); }}>Remove</button>
-              </div>;
-            })}
-          </div>}
-    </section>
+    {/* Being findable is its own choice; a username always works. */}
+    <div className="partner-discoverable ps-foot">
+      <div><strong>Find me by name</strong><small>{myUsername ? `@${myUsername} always works.` : 'Off: only your exact username can add you.'}</small></div>
+      <input type="checkbox" aria-label="Let people find me by name" checked={discoverable} onChange={event => {
+        const next = event.target.checked; setDiscoverableState(next);
+        void setDiscoverable(next).catch(() => setDiscoverableState(!next));
+      }} />
+    </div>
+
+    {removing && <div className="ps-confirm-backdrop" role="dialog" aria-modal="true" aria-label="Remove partner" onClick={() => setRemoving(null)}>
+      <div className="ps-confirm" onClick={event => event.stopPropagation()}>
+        <h3>Remove {removing.displayName}?</h3>
+        <p>You’ll stop seeing each other’s training. You can add them again any time.</p>
+        <div>
+          <button type="button" className="button ghost" onClick={() => setRemoving(null)}>Cancel</button>
+          <button type="button" className="button ps-danger" onClick={() => { const who = removing; setRemoving(null); void removePartner(who.friendId).then(refresh); }}>Remove</button>
+        </div>
+      </div>
+    </div>}
   </div>;
 }
