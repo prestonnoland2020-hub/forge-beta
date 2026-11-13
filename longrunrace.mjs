@@ -5,6 +5,7 @@
    marathon saved with mm:ss was read as three minutes fifteen. */
 import { goalFeasibility } from './src/lib/goalFeasibility.ts';
 import { goalClockSeconds } from './src/lib/time.ts';
+import { isLongRace, longRaceClock } from './src/features/goals/GoalsProvider.tsx';
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${ok ? '' : ` — ${detail}`}`); if (!ok) fails += 1; };
 const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
@@ -16,6 +17,11 @@ const recs = rows.map(([ago, miles, minutes], i) => run(ago, miles, minutes, i))
 console.log('\nReading the goal time');
 check('3:15 on a marathon is hours, whatever the unit says', goalClockSeconds('3:15', 'mm:ss', 26.2) === 11700);
 check('22:30 on a 5K stays minutes', goalClockSeconds('22:30', 'mm:ss', 3.1) === 1350);
+console.log('\nA marathon is never timed in minutes');
+check('marathon, half and 10-mile are long races', ['Full Marathon', 'Marathon', 'Half Marathon'].every(name => isLongRace({ type: 'Endurance', metric: 'Finish time', exercise: name })));
+check('a 5K is not', !isLongRace({ type: 'Endurance', metric: 'Finish time', exercise: '5K Run' }));
+check('"3:15" becomes 3:15:00', longRaceClock('3:15') === '3:15:00' && longRaceClock('3:15 mm:ss') === '3:15:00');
+check('a full time is left alone', longRaceClock('3:15:30') === '3:15:30');
 console.log('\nLong runs as the quality work');
 const goal = { type: 'Endurance', title: 'Full Marathon', exercise: 'Full Marathon', metric: 'Finish time', target: '3:15', unit: 'mm:ss', date: ahead(21) };
 const [v] = goalFeasibility([goal], recs);
