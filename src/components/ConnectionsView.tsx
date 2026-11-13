@@ -1,4 +1,3 @@
-import '../today-picks.css';
 import type { ReactElement } from 'react';
 import { BrandMark, hasLogo, hasWordmark } from '../features/training/brandLogos';
 import { connectionCatalog } from '../features/training/connectionCatalog';
@@ -44,13 +43,7 @@ const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString(
 /* A wordmark alone; a symbol with its name; a name alone where Forge has no
    artwork (Apple's rules bar its logo, and the others' official marks come
    from their brand kits). Never a tile or a box around any of them. */
-/* THE APP'S OWN ICON, as the athlete knows it from their home screen: a
-   PNG with its own rounded corners and nothing drawn around it. */
-const ICONS: Record<string, string> = { garmin: 'garmin', oura: 'oura', whoop: 'whoop', 'apple-health': 'apple-health', fitbit: 'google-health', concept2: 'concept2' };
-const iconFor = (id: string) => ICONS[id] ? `${import.meta.env.BASE_URL}brand-tiles/${ICONS[id]}.png` : '';
 function Name({ id, name }: { id: string; name: string }) {
-  const icon = iconFor(id);
-  if (icon) return <span className="cx-brand cx-app"><img src={icon} alt="" width={40} height={40} /><strong>{name}</strong></span>;
   if (hasWordmark(id)) return <span className="cx-brand" title={name}><BrandMark id={id} name={name} /><span className="cx-sr">{name}</span></span>;
   if (hasLogo(id)) return <span className="cx-brand"><BrandMark id={id} name={name} /><strong>{name}</strong></span>;
   return <span className="cx-brand cx-brand-text"><strong>{name}</strong></span>;
@@ -117,12 +110,8 @@ export function ConnectionsView({ garmin, garminBusy, garminMessage, onGarmin, s
     {available.length > 0 && <section className="cx-section" aria-labelledby="cx-available"><h3 id="cx-available">Available</h3><div className="cx-list">{available}</div></section>}
     <section className="cx-section" aria-labelledby="cx-soon">
       <h3 id="cx-soon">Coming soon</h3>
-      {/* The ones with an icon first, as a list; the rest stay a quiet grid. */}
-      <ul className="cx-apps">
-        {soon.filter(item => iconFor(item.id)).map(item => <li key={item.id}><Name id={item.id} name={item.name} /><span className="cx-soon">Soon</span></li>)}
-      </ul>
       <ul className="cx-grid">
-        {soon.filter(item => !iconFor(item.id)).map(item => <li key={item.id} title={`${item.name} — ${item.data.join(', ')}`}><Name id={item.id} name={item.name} /></li>)}
+        {soon.map(item => <li key={item.id} title={`${item.name} — ${item.data.join(', ')}`}><Name id={item.id} name={item.name} /></li>)}
       </ul>
       <p className="cx-foot">Forge reads your data and never writes to these services.</p>
     </section>

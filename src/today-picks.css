@@ -119,12 +119,3 @@
 .goal-pace-pill.needs-work { background: color-mix(in oklch, var(--accent) 18%, transparent); color: var(--accent-text, var(--accent)); }
 .goal-pace-pill.off-track { background: color-mix(in oklch, #e5484d 18%, transparent); color: #ff7a7f; }
 
-/* Connections: the app icon itself, no frame. */
-.cx-app { gap: 12px; }
-.cx-app img { width: 40px; height: 40px; flex: none; display: block; border-radius: 10px; }
-.cx-apps { list-style: none; margin: 0 0 12px; padding: 0; }
-.cx-apps li { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; align-items: center; column-gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
-.cx-apps li:first-child { border-top: 0; }
-.cx-apps li .cx-brand { grid-row: 1 / 3; }
-.cx-apps li small { display: none; }
-.cx-apps .cx-soon { grid-row: 1 / 3; grid-column: 2; font-size: 12.5px; font-weight: 700; color: var(--ink-3, var(--muted)); }
