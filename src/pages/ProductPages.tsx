@@ -1,4 +1,5 @@
 import '../today-picks.css';
+import { setEffort as saveEffort, type Effort } from '../lib/setEffort';
 import { markWorkoutOpen, markWorkoutDone } from '../lib/workoutOpen';
 import { readSwaps, swappedName, lastSet } from '../lib/todaySwaps';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -230,7 +231,7 @@ function WorkoutEditor() {
   const dismissPrCelebration=useCallback(()=>setPrCelebration(null),[]);
   const openTopSetSheet=()=>{interacted.current=true;setAddingTopSet(true)};
   const [saved,setSaved]=useState(false);
-  const [quickLoggedKeys,setQuickLoggedKeys]=useState<string[]>([]);const [quickLogMessage,setQuickLogMessage]=useState('');
+  const [quickLoggedKeys,setQuickLoggedKeys]=useState<string[]>([]);const [quickLogMessage,setQuickLogMessage]=useState('');const [feltLift,setFeltLift]=useState<{lift:string;chosen?:Effort}|null>(null);
   const [saveMessage,setSaveMessage]=useState('');
   /* NOBODY WANTS TO BE TOLD WHAT THEY WEIGH.
 
@@ -435,7 +436,7 @@ function WorkoutEditor() {
        recommendation. The athlete keeps logging sets and cardio freely. */
     /* The first set logged opens the workout until Finish; Today shows it in progress. */
     if(!editingRecord&&sessionIso===todayIso)markWorkoutOpen(sessionIso,window.location.hash.replace(/^#/,"")||"/workout");
-    setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`Saved ${set.lift} · ${set.weight} ${weightUnit} × ${set.reps}`);
+    setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`Saved ${set.lift} · ${set.weight} ${weightUnit} × ${set.reps}`);setFeltLift({lift:set.lift});
     /* UPGRADE MOMENTS (UpgradeSheet decides whether to show: once each, free
        athletes only, never two in a day). After the save, never instead of it. */
     const firstEver=!records.some(record=>(record.topSets||[]).length||record.lift);
@@ -633,7 +634,10 @@ function WorkoutEditor() {
     {addingTopSet&&<TopSetSheet unit={weightUnit} exercises={strengthCatalogue} suggested={allowedStrengthExercises.map(exercise=>exercise.name)} dayMuscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} existing={topSets.map(set=>set.lift).filter(Boolean)} onClose={()=>setAddingTopSet(false)} onSave={saveTopSetFromSheet} blockedReason={noDayReason}/>}
     {prCelebration&&<PrCelebration lift={prCelebration.lift} weight={prCelebration.weight} previous={prCelebration.previous} unit={weightUnit} onDone={dismissPrCelebration}/>}
     {topSets.length>0&&<TopSetCards askFor={planAskFor} planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={loggedTopSetKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={openTopSetSheet} onRemove={removeTopSet} onDeleteLogged={deleteLoggedTopSet} onCreateExercise={createExerciseForTopSet} blockedReason={noDayReason}/>}
-    {quickLogMessage&&<div className="quick-log-flash" role="status"><small>{quickLogMessage}</small></div>}
+    {quickLogMessage&&<div className="quick-log-flash" role="status"><small>{quickLogMessage}</small>
+      {/* ONE TAP: HOW DID IT FEEL. Reps left in the tank tell the coach what weight and reps cannot. */}
+      {feltLift&&<div className="felt" role="group" aria-label="How did that set feel?"><span>How did it feel?</span>{(['easy','good','hard'] as Effort[]).map(effort=><button type="button" key={effort} className={feltLift.chosen===effort?'on':''} onClick={()=>{saveEffort(sessionIso,feltLift.lift,effort);setFeltLift({...feltLift,chosen:effort})}}>{effort==='easy'?'Easy':effort==='good'?'Good':'Grinder'}</button>)}</div>}
+    </div>}
     <CardioBuilder tucked={!cardioOnlyDay&&topSets.length>0} onEntriesChange={(hasEntries,entries)=>{noteCardioRemovals(entries);setHasCardio(hasEntries);setCardioSessions(entries);persistCardio(entries)}} initialOpen={Boolean(searchParams.get('cardio'))} initialEntries={editingRecord?.cardioSessions??todayRecord?.cardioSessions} plannedSummary={written&&workoutSource==='blank'?written.summary:usingSplit&&chosenRecommendation?.cardio?.selected?chosenRecommendation.cardio.summary:undefined} plannedCircuit={written&&workoutSource==='blank'?{name:written.name,plan:written.plan}:usingSplit&&chosenRecommendation?.cardio?.selected&&chosenRecommendation.cardio.session.plan.structure==='Circuit'?{name:chosenRecommendation.cardio.title,plan:chosenRecommendation.cardio.session.plan}:undefined}/>
     <details className="card form-card session-details" open={Boolean(editingRecord&&(editingRecord.notes||editingRecord.effort||editingRecord.bodyWeight))}><summary><span><strong>Notes &amp; body weight</strong><small>Optional</small></span></summary><div className="field-grid session-context"><DialField label="Today's body weight" kind="bodyweight" unit={weightUnit} value={bodyWeight} onChange={setBodyWeight} hint={setup?.currentWeight?`Optional · last on file ${setup.currentWeight} ${weightUnit}`:'Optional'} /><label>Session effort<select value={effort} onChange={e=>setEffort(e.target.value)}><option value="">Not recorded</option><option>Easy</option><option>Moderate</option><option>Hard</option><option>Max effort</option></select></label></div><label>Workout notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4} placeholder="How did it feel?" /></label></details>
     {/* THE ONE ACTION THE SCREEN IS FOR, pinned where the thumb is, saying

@@ -14,6 +14,7 @@ import { guidedCoachContext, writeLive } from '../lib/guided/session';
 import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
 import { nativeVoice, type ScriptBeat } from '../lib/guided/nativeVoice';
 import { tickerEnd, tickerLive, tickerStart, tickerUpdate, type TickerState } from '../lib/liveActivity';
+import { weightsFromTopSets } from '../lib/guided/fromHistory';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
 import { isDemoMode } from '../lib/env';
@@ -402,7 +403,7 @@ export function GuidedPage() {
     if (!prefs) return;
     if (!isPro && freeLeft <= 0) { setPhase('locked'); return; }
     const today = { ...prefs, styles: [todayStyle, ...prefs.styles.filter(item => item !== todayStyle)] };
-    const plan = buildWorkout(today, chosenMinutes, chosenFocus, { seed: Date.now() % 100000, recent: last.moves || [], remembered: read<Record<string, number>>(WEIGHTS_KEY, {}), metric });
+    const plan = buildWorkout(today, chosenMinutes, chosenFocus, { seed: Date.now() % 100000, recent: last.moves || [], remembered: { ...read<Record<string, number>>(WEIGHTS_KEY, {}), ...weightsFromTopSets(records, metric) }, metric });
     setWorkout(plan); setPhase('preview');
     /* The first thing the coach will say, fetched while she reads the list. */
     coach.current?.prefetch(introLine(plan));
@@ -411,7 +412,7 @@ export function GuidedPage() {
     if (!prefs || !picks.length) return;
     if (!isPro && freeLeft <= 0) { setPhase('locked'); return; }
     write(CUSTOM_KEY, picks);
-    const plan = customWorkout(prefs, picks, todayStyle as Style, { remembered: read<Record<string, number>>(WEIGHTS_KEY, {}), metric });
+    const plan = customWorkout(prefs, picks, todayStyle as Style, { remembered: { ...read<Record<string, number>>(WEIGHTS_KEY, {}), ...weightsFromTopSets(records, metric) }, metric });
     setCustom(true); setWorkout(plan); setPhase('preview');
     coach.current?.prefetch(introLine(plan));
   };

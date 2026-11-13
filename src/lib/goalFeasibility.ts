@@ -4,6 +4,7 @@ import { weeklyRunVolume } from './cardioPrediction';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, localDayIso } from './time';
 import { calculateEstimatedOneRepMax } from './strength';
+import { effortOf, estimateWithEffort } from './setEffort';
 import { startingNumbers } from './startingNumbers';
 import { isRaceEvidence } from './runQuality';
 import { predictRaceFromLegacyMethod, raceEvidenceEfforts } from './cardioPrediction';
@@ -391,7 +392,8 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   const sets: Array<{ date: string; max: number; weight: number; reps: number }> = [];
   records.forEach(record => (record.topSets || []).forEach(set => {
     if (set.completed === false || !set.lift || !sameLift(set.lift, String(goal.exercise))) return;
-    const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
+    const effort = effortOf(record.date, set.lift);
+    const max = effort ? estimateWithEffort(set.weight, set.reps, effort) : set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
     if (max > 0) sets.push({ date: record.date, max, weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 });
   }));
   /* NOTHING LOGGED YET IS NOT NOTHING KNOWN. The best entered with the goal
