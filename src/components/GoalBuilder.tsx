@@ -201,13 +201,13 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 <label>Measurement<select value={metric} onChange={e=>setMetric(e.target.value)}><option>Resting heart rate</option><option>Repetition count</option><option>Daily steps</option><option>Sleep duration</option><option>Weekly completion</option><option>Session frequency</option><option>Distance</option><option>Duration</option><option>Body measurement</option><option>Yes/no milestone</option></select>
 </label>
 </div>}<div className="field-grid three">
-<label>Current<input value={current} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setCurrent(asTyped(e.target.value));if(fieldErrors.current)setFieldErrors(errors=>({...errors,current:undefined}))}} placeholder="Optional" />
-{fieldErrors.current&&<small className="field-error">{fieldErrors.current}</small>}
-</label>
 <label>Target<input value={target} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setTarget(asTyped(e.target.value));if(fieldErrors.target)setFieldErrors(errors=>({...errors,target:undefined}))}} placeholder={isPaceMetric(String(metric))?'8:30':isTimeUnit(unit)?(/hh/.test(unit)?'1:20:00':'22:30'):'315'} />
 {fieldErrors.target?<small className="field-error">{fieldErrors.target}</small>:isPaceMetric(String(metric))?<small>Minutes and seconds — 8:30 (8.5 also reads as 8:30).</small>:isTimeUnit(unit)?<small>A clock — 22:30. A bare number is minutes.</small>:null}
 </label>
 <label>Unit<select value={unit} onChange={e=>setUnit(e.target.value)}>{unitOptions.map(option=><option key={option}>{option}</option>)}</select>
+</label>
+<label>Current<input value={current} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setCurrent(asTyped(e.target.value));if(fieldErrors.current)setFieldErrors(errors=>({...errors,current:undefined}))}} placeholder="Optional" />
+{fieldErrors.current&&<small className="field-error">{fieldErrors.current}</small>}
 </label>
 </div>
 {/* No source picker: every goal reads from logged data, full stop. Wearable
