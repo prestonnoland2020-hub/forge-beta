@@ -5,8 +5,8 @@ import { useAuth } from '../features/auth/AuthProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { isDemoMode } from '../lib/env';
 import {
-  loadPartners, loadPartnerWeek, lastTrainedLabel,
-  type Partner, type PartnerWeek,
+  loadPartners, loadPartnerWeek, loadPartnerRecent, loadPartnerBests, lastTrainedLabel,
+  type Partner, type PartnerWeek, type PartnerDay, type PartnerBest,
 } from '../features/friends/partnerService';
 import { share } from '../lib/partnerStats';
 
@@ -37,12 +37,19 @@ export function PartnerDetailPage() {
   const { setup } = useProfileSetup();
   const [partner, setPartner] = useState<Partner | null>(null);
   const [week, setWeek] = useState<{ mine: PartnerWeek; theirs: PartnerWeek } | null>(null);
+  const [recent, setRecent] = useState<PartnerDay[]>([]);
+  const [bests, setBests] = useState<PartnerBest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
 
   useEffect(() => {
     if (isDemoMode || !user || !id) { setLoading(false); return; }
     let active = true;
+    /* Their recent days and bests load alongside; either failing leaves the
+       rest of the screen standing. */
+    void loadPartnerRecent(id).then(days => { if (active) setRecent(days); }).catch(() => undefined);
+    void loadPartnerBests(id).then(rows => { if (active) setBests(rows); }).catch(() => undefined);
     void Promise.all([loadPartners(), loadPartnerWeek(id)])
       .then(([partners, thisWeek]) => {
         if (!active) return;
@@ -132,5 +139,26 @@ export function PartnerDetailPage() {
       </footer>
     </section>}
 
+    {/* WHAT THEY HAVE BEEN DOING: each day of the last four weeks, every top
+        set and run on it. Tap a partner, see their training. */}
+    {recent.length > 0 && <section className="card partner-recent">
+      <header><h3>Recent training</h3><small>Last 4 weeks</small></header>
+      {recent.slice(0, showAll ? recent.length : 5).map(day => <div className="partner-day" key={day.date}>
+        <span className="partner-day-date">{new Date(`${day.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+        <div className="pv-lines">
+          {day.lifts.map((lift, index) => <div className="pv-line" key={`l${index}`}><span className="pv-line-name">{lift.name}</span><span className="pv-line-value">{lift.weight} <small>{weightUnit}</small> × {lift.reps}</span></div>)}
+          {day.cardio.map((session, index) => { const parts = session.summary.split(' · ').filter(Boolean); return <div className="pv-line" key={`c${index}`}><span className="pv-line-name">{session.name}</span><span className="pv-line-value">{parts.slice(parts[0] === session.name ? 1 : 0).join(' · ')}</span></div>; })}
+        </div>
+      </div>)}
+      {recent.length > 5 && <button type="button" className="ic-sessions-more" onClick={() => setShowAll(value => !value)}>{showAll ? 'Show less' : `Show all ${recent.length} days`}</button>}
+    </section>}
+
+    {/* THEIR BEST SETS, on the lifts they train most. */}
+    {bests.length > 0 && <section className="card partner-bests">
+      <header><h3>Best lifts</h3></header>
+      <div className="pv-lines">
+        {bests.map(best => <div className="pv-line" key={best.lift}><span className="pv-line-name">{best.lift}<small className="partner-best-date">{new Date(`${best.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small></span><span className="pv-line-value">{best.weight} <small>{weightUnit}</small> × {best.reps}</span></div>)}
+      </div>
+    </section>}
   </div>;
 }

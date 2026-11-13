@@ -1,10 +1,7 @@
-import { useCallback, useMemo, useState, type CSSProperties } from 'react';
-import { useWorkoutHistory, type WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
+import { useMemo, useState, type CSSProperties } from 'react';
+import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
-import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
-import { isCardioMovement } from '../lib/muscleGroups';
-import { primaryMusclesFor } from '../lib/liftAliases';
-import { cardioMiles, summarizeCardioDraft, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
+import { cardioMiles, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import '../today-picks.css';
 import { Icon } from './Icon';
@@ -19,53 +16,11 @@ const isoOf = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 
    labelled a week early and Monday sessions landed in the prior week's bar. */
 const weekStartIso = (iso: string) => { const day = new Date(`${iso}T12:00:00`); day.setDate(day.getDate() - ((day.getDay() + 6) % 7)); return isoOf(day); };
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-const isStrengthSession = (record: WorkoutRecord) => (record.topSets || []).some(set => set.completed !== false) || (record.muscles || []).some(muscle => !['cardio', 'rest', 'none'].includes(muscle.trim().toLowerCase()));
-const hasCardioSession = (record: WorkoutRecord) => (record.cardioSessions || []).length > 0;
-/* WHAT COUNTS AS TRAINING A MUSCLE.
-
-   The record keeps everything a cardio movement uses — rowing is tagged Back,
-   Quads, Hamstrings, Glutes, and that is how Forge knows a hard row leaves the
-   back tired. Recovery and fatigue are entitled to it. The frequency chart is
-   not: it answers "what have I neglected", and crediting a 2k row as a back
-   session is how that question gets the opposite of the right answer.
-
-   So this SUBTRACTS rather than gates. A muscle drops out of the count when
-   nothing but cardio put it there on that day; a muscle a lift also trained
-   stays.
-
-   IT USED TO GATE AS WELL, AND THE GATE WAS EATING REAL TRAINING. "No lifted
-   top set on this day, so the day trained no muscle group" sounds right and is
-   not: Forge only knows the ONE top set per lift that somebody bothered to
-   record, and a day can be a full leg session with none of them typed in.
-   Preston's chart said he had trained quads 11 times in three months. He had
-   trained them 23 times. The twelve it dropped are days tagged Quads +
-   Hamstrings + Glutes, several of them titled "Evening Weight Training" by
-   Strava, that happened to have a run logged and no top set — so a cardio
-   session on a lifting day silently deleted the lifting.
-
-   The day's muscle list is the athlete's own statement about what they
-   trained. The only thing a chart may take off it is what a CARDIO movement
-   put there, which is exactly what fromCardioOnly does and all it needs to
-   do. A day with nothing on it but a run carries ['Cardio'] and still counts
-   nothing, because that is the whole list. */
-const musclesTrainedOn = (record: WorkoutRecord, isCardioLift: (name: string) => boolean, musclesOf: (lift: string) => string[]) => {
-  const completed = (record.topSets || []).filter(set => set.completed !== false && set.lift);
-  const lifted = completed.filter(set => !isCardioLift(set.lift));
-  const fromLifts = new Set(lifted.flatMap(set => musclesOf(set.lift)));
-  const fromCardioOnly = new Set(completed.filter(set => isCardioLift(set.lift))
-    .flatMap(set => musclesOf(set.lift)).filter(muscle => !fromLifts.has(muscle)));
-  return (record.muscles || []).filter(muscle => muscle !== 'Cardio' && !fromCardioOnly.has(muscle));
-};
 
 export function InsightsClassic() {
   const { records } = useWorkoutHistory();
   const { setup } = useProfileSetup();
-  const { exercises } = useTrainingLibrary();
-  const isCardioLift = useCallback((name: string) => isCardioMovement(exercises.find(exercise => exercise.name === name)), [exercises]);
-  const musclesOf = useCallback((lift: string) => primaryMusclesFor(lift, exercises.find(exercise => exercise.name === lift)?.muscles || [])
-    .filter(muscle => muscle !== 'Cardio'), [exercises]);
   const unit = setup?.units === 'Metric' ? 'kg' : 'lb';
-  const todayIso = isoOf(new Date());
 
   /* One range, every card. The 3M/6M/1Y/All chips used to steer only the two
      charts while the tiles kept private windows — KPIs at 30 days, frequency
@@ -75,38 +30,8 @@ export function InsightsClassic() {
   const rangeDays: Record<'3m' | '6m' | '1y' | 'all', number> = { '3m': 90, '6m': 182, '1y': 365, all: 3650 };
   const rangeCutoffIso = useMemo(() => { const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - rangeDays[prRange]); return isoOf(cutoff); }, [prRange]);
   /* ------------------------------------------------ KPI tiles (follow the range) */
-  const kpi = useMemo(() => {
-    const window = records.filter(record => record.date >= rangeCutoffIso);
-    /* % logged is honest about the denominator: the range's day count, but
-       never before the athlete's first record — 87% of a real span, not 3%
-       of a decade they weren't logging. */
-    const firstIso = records.length ? records[records.length - 1].date : todayIso;
-    const spanStart = firstIso > rangeCutoffIso ? firstIso : rangeCutoffIso;
-    const spanDays = Math.max(1, Math.round((new Date(`${todayIso}T12:00:00`).getTime() - new Date(`${spanStart}T12:00:00`).getTime()) / 86400000) + 1);
-    const liftDays = new Set(window.filter(isStrengthSession).map(record => record.date)).size;
-    const cardioDays = new Set(window.filter(hasCardioSession).map(record => record.date)).size;
-    const miles = window.reduce((total, record) => total + (record.cardioSessions || []).reduce((sum, session) => sum + cardioMiles(session), 0), 0);
-    const weights = window.filter(record => typeof record.bodyWeight === 'number' && record.bodyWeight! > 0).sort((a, b) => a.date.localeCompare(b.date));
-    const weightEnd = weights.length ? weights[weights.length - 1].bodyWeight! : null;
-    const weightChange = weights.length >= 2 ? weights[weights.length - 1].bodyWeight! - weights[0].bodyWeight! : null;
-    const daysLogged = new Set(window.map(record => record.date)).size;
-    return { liftDays, cardioDays, miles, weightEnd, weightChange, adherence: Math.min(100, Math.round(daysLogged / spanDays * 100)), sessions: window.length };
-  }, [records, rangeCutoffIso, todayIso]);
 
   /* --------------------------------------------------- 8-week consistency */
-  const weeks = useMemo(() => {
-    const thisWeek = weekStartIso(todayIso);
-    return Array.from({ length: 8 }, (_, index) => {
-      const start = new Date(`${thisWeek}T12:00:00`); start.setDate(start.getDate() - (7 - index) * 7);
-      /* Local, for the same reason weekStartIso is: these dates are compared
-         against record.date, which is a local calendar day. */
-      const startIso = isoOf(start);
-      const end = new Date(start); end.setDate(end.getDate() + 6);
-      const endIso = isoOf(end);
-      const inWeek = records.filter(record => record.date >= startIso && record.date <= endIso);
-      return { startIso, lift: inWeek.filter(isStrengthSession).length, cardio: inWeek.filter(hasCardioSession).length };
-    });
-  }, [records, todayIso]);
   /* `weekPeak`, `activeWeeks`, `perWeek`, a month-of-body-weight series and a
      month-history table were all computed here and never rendered — the JSX
      for them does not exist. tsconfig has no noUnusedLocals, so it compiled
@@ -116,21 +41,6 @@ export function InsightsClassic() {
      for no one. */
 
   /* --------------------------------------- frequency (follows the range) */
-  const frequency = useMemo(() => {
-    const window = records.filter(record => record.date >= rangeCutoffIso);
-    const muscles = new Map<string, number>();
-    window.forEach(record => musclesTrainedOn(record, isCardioLift, musclesOf)
-      .forEach(muscle => muscles.set(muscle, (muscles.get(muscle) || 0) + 1)));
-    const cardioTypes = new Map<string, number>();
-    window.forEach(record => (record.cardioSessions || []).forEach(session => { const type = session.activity || 'Cardio'; cardioTypes.set(type, (cardioTypes.get(type) || 0) + 1); }));
-    return {
-      /* "NONE" IS NOT A MUSCLE GROUP. The CSV import wrote it as the muscle
-         on days it could not classify, and it then sat in the frequency chart
-         between Glutes and Shoulders as if it were one. */
-      muscles: [...muscles.entries()].filter(([muscle]) => muscle && muscle !== 'None').sort((a, b) => b[1] - a[1]).slice(0, 8),
-      cardio: [...cardioTypes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
-    };
-  }, [records, rangeCutoffIso, isCardioLift, musclesOf]);
 
   /* ------------------------------------------------------ PRs (all time) */
   const bestByLift = useMemo(() => {
@@ -145,16 +55,6 @@ export function InsightsClassic() {
   /* The Personal Records card shows the best set INSIDE the selected range;
      the lift picker below keeps the all-time list so no lift disappears from
      the chart dropdown when the window narrows. */
-  const rangedBestByLift = useMemo(() => {
-    const best = new Map<string, { weight: number; reps: number; date: string }>();
-    records.forEach(record => { if (record.date < rangeCutoffIso) return; (record.topSets || []).forEach(set => {
-      if (set.completed === false || !set.lift || !set.weight) return;
-      const current = best.get(set.lift);
-      if (!current || set.weight > current.weight) best.set(set.lift, { weight: set.weight, reps: set.reps, date: record.date });
-    }); });
-    return best;
-  }, [records, rangeCutoffIso]);
-  const prTiles = [...rangedBestByLift.entries()].sort((a, b) => b[1].weight - a[1].weight).slice(0, 4);
 
   /* --------------------------------------------------------- PR progress */
   const lifts = useMemo(() => [...bestByLift.keys()].sort(), [bestByLift]);
@@ -296,7 +196,7 @@ export function InsightsClassic() {
         <path className="chart-line" d={lineD} pathLength={1} />
         {!dense && pts.slice(0, -1).map((point, index) => <circle className="chart-point" key={index} cx={point.x} cy={point.y} r="3" style={{ '--i': index } as CSSProperties} />)}
         {/* Reps over each top set, when there is room to read them. */}
-        {pts.length <= 12 && points.map((point, index) => point.label ? <text className="chart-axis chart-reps" key={`r${index}`} x={pts[index].x} y={Math.max(PT + 2, pts[index].y - 7)} fontSize="8.5" textAnchor={index === 0 ? 'start' : index === pts.length - 1 ? 'end' : 'middle'}>{point.label}</text> : null)}
+        {pts.length <= 12 && points.map((point, index) => point.label ? <text className="chart-axis chart-reps" key={`r${index}`} x={index === pts.length - 1 ? pts[index].x - 9 : pts[index].x} y={Math.max(PT + 2, pts[index].y - 7)} fontSize="8.5" textAnchor={index === 0 ? 'start' : index === pts.length - 1 ? 'end' : 'middle'}>{point.label}</text> : null)}
         <circle className="chart-halo" cx={last.x} cy={last.y} r="5" />
         <circle className="chart-now" cx={last.x} cy={last.y} r="5" />
       </svg>
@@ -324,9 +224,9 @@ export function InsightsClassic() {
       <div className="ic-toggle" role="group" aria-label="PR metric">{([['top', 'Top set'], ['calc', 'Est. 1RM'], ['1rm', 'True 1RM']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
       <div className="ic-range" role="group" aria-label="Date range">{([['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', 'All']] as const).map(([value, label]) => <button type="button" key={value} className={prRange === value ? 'active' : ''} onClick={() => setPrRange(value)}>{label}</button>)}</div>
       {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in this range. Try “Estimated 1RM” to include multi-rep sets.` : `Not enough ${selectedLift} sets in this range to chart.`}</p>}
-      {prStats.best && <div className="kpi-grid ic-chart-kpis">
+      {prStats.best && prMode !== 'top' && <div className="kpi-grid ic-chart-kpis">
         <div className="kpi-tile"><b>{prStats.best.weight} {unit}</b><span>Weight lifted</span><small>{prStats.best.reps > 1 ? `×${prStats.best.reps} reps · ` : ''}{shortDate(prStats.best.date)}</small></div>
-        <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === 'top' ? 'Heaviest top set' : prMode === '1rm' ? '1RM' : 'Estimated 1RM'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
+        <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === '1rm' ? '1RM' : 'Estimated 1RM'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
       </div>}
       {/* EVERY TOP SET, AS A LIST. The chart shows the shape; this says the
           numbers, newest first, each against the session before it. */}
@@ -354,28 +254,9 @@ export function InsightsClassic() {
       </div>}
     </section>
 
-    <div className="kpi-grid">
-      <div className="kpi-tile"><b>{kpi.liftDays}</b><span>Lift days</span></div>
-      <div className="kpi-tile"><b>{kpi.cardioDays}</b><span>Cardio days</span></div>
-      <div className="kpi-tile"><b>{kpi.miles.toFixed(1)}</b><span>Total miles</span></div>
-      <div className="kpi-tile"><b>{kpi.weightEnd === null ? '—' : kpi.weightEnd.toFixed(1)}</b><span>Weight</span><small>{kpi.weightChange === null ? 'No weight logged' : kpi.weightChange === 0 ? 'No change' : `${kpi.weightChange > 0 ? '+' : ''}${kpi.weightChange.toFixed(1)} ${unit}`}</small></div>
-      <div className="kpi-tile"><b>{kpi.adherence}%</b><span>Days logged</span></div>
-      <div className="kpi-tile"><b>{kpi.sessions}</b><span>Total sessions</span></div>
-    </div>
-
-    <section className="card ic-card">
-      <header className="ic-head"><i /><h3>Muscle group frequency</h3></header>
-      {frequency.muscles.length ? <div className="ic-freq">{frequency.muscles.map(([muscle, count]) => { const peak = frequency.muscles[0][1]; return <div key={muscle}><span>{muscle}</span><div className="ic-track"><i style={{ width: `${count / peak * 100}%` }} /></div><b>{count}</b></div>; })}</div> : <p className="ic-empty">No strength sessions in this range.</p>}
-    </section>
-
-    <section className="card ic-card">
-      <header className="ic-head"><i /><h3>Cardio type frequency</h3></header>
-      {frequency.cardio.length ? <div className="ic-freq muted">{frequency.cardio.map(([type, count]) => { const peak = frequency.cardio[0][1]; return <div key={type}><span>{type}</span><div className="ic-track"><i style={{ width: `${count / peak * 100}%` }} /></div><b>{count}</b></div>; })}</div> : <p className="ic-empty">No cardio in this range.</p>}
-    </section>
-
-    {prTiles.length > 0 && <section className="card ic-card">
-      <header className="ic-head"><i /><h3>Personal records</h3></header>
-      <div className="ic-pr-grid">{prTiles.map(([lift, best]) => <div key={lift}><b>{best.weight} {unit} ×{best.reps}</b><span>{lift}</span><small>{shortDate(best.date)}</small></div>)}</div>
-    </section>}
+    {/* PROGRESS IS TWO QUESTIONS: are my lifts going up, and is my running.
+        The six count tiles, the frequency bars and the PR grid answered
+        questions nobody opened this screen to ask; muscle frequency still
+        feeds the coach, it just is not drawn here. */}
   </div>;
 }

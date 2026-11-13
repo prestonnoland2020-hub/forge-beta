@@ -100,7 +100,7 @@ const logger = readFileSync('src/pages/ProductPages.tsx', 'utf8');
 const insights = readFileSync('src/components/InsightsClassic.tsx', 'utf8');
 const strava = readFileSync('src/components/StravaReviewModal.tsx', 'utf8');
 check('the logger still writes what the movement uses', !/liftIsCardio/.test(logger));
-check('the frequency chart subtracts what only cardio put there', /fromCardioOnly/.test(insights));
+check('Progress no longer draws muscle frequency (the coach still reads it)', !/Muscle group frequency/.test(insights));
 check('and it is the only place that does', !/isCardioMovement/.test(strava));
 
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');

@@ -135,6 +135,10 @@ function WorkoutEditor() {
   /* A session Forge wrote for a day outside the split — see ForgeWritesIt. */
   const [written,setWritten]=useState<WrittenSession|null>(null);
   const [cardioSessions,setCardioSessions]=useState<CardioLogDraft[]>(editingRecord?.cardioSessions??[]);
+  /* BUILD MY WORKOUT sends its accessories along as rows after the plan, reps
+     filled and the weight box empty. No prescription on them: progression
+     reads accessories from what was lifted. */
+  const queryExtras=(()=>{try{const parsed=JSON.parse(searchParams.get('extra')||'[]');return Array.isArray(parsed)?parsed:[]}catch{return []}})() as Array<{muscle:string;lift:string;weight:number;reps:number}>;
   const queryTopSets=(()=>{try{const parsed=JSON.parse(searchParams.get('topSets')||'[]');return Array.isArray(parsed)?parsed:[]}catch{return []}})() as Array<{muscle:string;lift:string;weight:number|string;reps:number|string}>;
   /* CHOOSING A SPLIT DAY GETS THE REAL PRESCRIPTION, NOT A BLANK ONE.
 
@@ -208,7 +212,9 @@ function WorkoutEditor() {
     const savedToday=(records.find(record=>record.date===sessionIso)?.topSets||[]).filter(set=>set.completed!==false);
     const doneLifts=new Set(savedToday.map(set=>canonicalLiftKey(set.lift)));
     const planned=(workoutSource==='plan'&&recommendationTopSets.length?recommendationTopSets:usingSplit?splitDayTopSets:[]).filter(set=>!doneLifts.has(canonicalLiftKey(set.lift)));
-    return [...savedToday,...planned];
+    const plannedKeys=new Set([...savedToday,...planned].map(set=>canonicalLiftKey(set.lift)));
+    const extras:LoggedTopSet[]=queryExtras.filter(set=>set.lift&&!plannedKeys.has(canonicalLiftKey(set.lift))).map(set=>({muscle:set.muscle||'Primary',lift:set.lift,weight:0,reps:Number(set.reps)||0,completed:true}));
+    return [...savedToday,...planned,...extras];
   })()));
   const [topSets,setTopSets]=useState<LoggedTopSet[]>(initialTopSets);
   /* One way to add a top set: the sheet. */

@@ -134,12 +134,14 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
      number on the card, and the worse of the two readings wins. */
   if (!reached && current && verdict?.prediction && (tone === 'on-track' || tone === 'needs-work')) {
     const fromNow = predictionTone(predictionFromNow(verdict.prediction, current));
-    if (fromNow === 'off-track') tone = 'off-track';
+    /* A close call with nothing tested is "test it", never red. */
+    if (fromNow === 'off-track' && verdict.verdict !== 'needs-more') tone = 'off-track';
+    else if (fromNow === 'off-track') tone = 'needs-work';
     else if (fromNow === 'needs-work') tone = 'needs-work';
   }
   /* A HYROX goal is not timed by runs: logged running does not start it, so
      it must not say "first run" to someone with months of runs on file. */
   const hyrox = goal.type === 'Endurance' && /hyrox/i.test(`${goal.exercise || ''} ${goal.title}`);
-  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? (hyrox ? 'No HYROX time yet' : 'No tested time yet') : 'No tested max yet') : hyrox ? 'No HYROX time yet' : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : 'Needs more work';
+  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? (hyrox ? 'No HYROX time yet' : 'No tested time yet') : 'No tested max yet') : hyrox ? 'No HYROX time yet' : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : verdict?.verdict === 'needs-more' && goal.type === 'Strength' ? 'Close — test it' : 'Needs more work';
   return { share, current, currentText: current ? show(current) : '—', targetText: target ? show(target) : String(goal.target || ''), tone, label };
 }
