@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { isLongRace, longRaceClock } from '../features/goals/GoalsProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { coreFirst, coreOnly, isCoreLift, isWeightedBodyweight, CORE_LIFT_LABELS } from '../lib/coreLifts';
@@ -109,7 +110,11 @@ const [exercise,setExercise]=useState(initialGoal?.type==='Body Composition'?'':
     'Repetitions':['reps','rounds','lengths','flights'],
     'Completion':['yes/no','events completed']
   };
-  const unitOptions=useMemo(()=>type==='strength'?['lb','kg','reps','seconds']:type==='endurance'?(enduranceUnits[metric] ?? ['minutes']):type==='muscle'?['inches','centimeters','lb lean mass','kg lean mass','photo check-in']:type==='body'?['lb','kg']:type==='consistency'?['sessions/week','workouts/month','days/week','days streak','minutes/week']:['bpm','reps','steps/day','calories/day','hours/night','nights/week','sessions/week','days/week','minutes','seconds','miles','kilometers','meters','yards','lb','kg','inches','centimeters','percent','yes/no'],[type,metric]);
+  /* HALF MARATHON AND UP IS TIMED IN HOURS — the only choice offered, so a
+     "3:15" marathon can never be saved as three minutes fifteen. */
+  const longRace=isLongRace({type:'Endurance',metric,exercise});
+  useEffect(()=>{if(type==='endurance'&&longRace&&unit!=='hh:mm:ss')setUnit('hh:mm:ss');},[type,longRace,unit]);
+  const unitOptions=useMemo(()=>type==='endurance'&&longRace?['hh:mm:ss']:type==='strength'?['lb','kg','reps','seconds']:type==='endurance'?(enduranceUnits[metric] ?? ['minutes']):type==='muscle'?['inches','centimeters','lb lean mass','kg lean mass','photo check-in']:type==='body'?['lb','kg']:type==='consistency'?['sessions/week','workouts/month','days/week','days streak','minutes/week']:['bpm','reps','steps/day','calories/day','hours/night','nights/week','sessions/week','days/week','minutes','seconds','miles','kilometers','meters','yards','lb','kg','inches','centimeters','percent','yes/no'],[type,metric]);
   /* The banner is a preview, and a preview of an empty form should say so
    rather than printing the punctuation between the blanks. */
 const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${CORE_LIFT_LABELS[exercise]||exercise}`:`${CORE_LIFT_LABELS[exercise]||exercise||'Pick a lift'} — set a target`):type==='endurance'?`${exercise} · ${target} ${unit}`:type==='muscle'?`Develop ${muscles.join(', ')}`:type==='body'?`${target} ${unit} body-weight goal`:type==='consistency'?`${target} sessions per week`:`${exercise}: ${target} ${unit}`;
@@ -219,7 +224,7 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 </label>
 {!inline&&<small className="goal-rule">Historical workouts remain unchanged if this goal is edited later.</small>}
 </div>);
-  const saveGoal=(values:{target:string;current:string}={target,current})=>onSave({type:selectedType.label,title:titleFor(values.target),target:`${values.target} ${unit}`.trim(),date:targetDate,connection:inline?(type==='endurance'?'Cardio only':'No fixed day'):connection,exercise,metric,current:values.current,unit,trackingSource:'Workout history',checkInFrequency:'Automatic',reminderEnabled:false,eventTemplate:exercise==='HYROX'?'hyrox-standard':isCustomRun?'custom-running-event':undefined,eventDivision:exercise==='HYROX'?eventDivision:undefined,eventDistance:isCustomRun?eventDistance:undefined,eventDistanceUnit:isCustomRun?eventDistanceUnit:undefined,eventSurface:isCustomRun?eventSurface:undefined});
+  const saveGoal=(raw:{target:string;current:string}={target,current})=>{const values=type==='endurance'&&longRace?{target:longRaceClock(raw.target),current:raw.current?longRaceClock(raw.current):raw.current}:raw;return onSave({type:selectedType.label,title:titleFor(values.target),target:`${values.target} ${unit}`.trim(),date:targetDate,connection:inline?(type==='endurance'?'Cardio only':'No fixed day'):connection,exercise,metric,current:values.current,unit,trackingSource:'Workout history',checkInFrequency:'Automatic',reminderEnabled:false,eventTemplate:exercise==='HYROX'?'hyrox-standard':isCustomRun?'custom-running-event':undefined,eventDivision:exercise==='HYROX'?eventDivision:undefined,eventDistance:isCustomRun?eventDistance:undefined,eventDistanceUnit:isCustomRun?eventDistanceUnit:undefined,eventSurface:isCustomRun?eventSurface:undefined});};
   const canSave=Boolean(target.trim()&&targetDate&&(type==='body'||exercise.trim()));
   if(inline)return <section className="goal-builder goal-builder-inline">
     <div className="goal-type-chips" role="radiogroup" aria-label="Goal type">{goalTypes.map(item=><button type="button" role="radio" aria-checked={type===item.id} className={type===item.id?'active':''} onClick={()=>chooseType(item.id)} key={item.id}>{item.label}</button>)}</div>

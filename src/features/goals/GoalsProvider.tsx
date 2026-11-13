@@ -1,4 +1,4 @@
-import { createContext,useContext,useEffect,useState,type ReactNode } from 'react';
+import { useMemo, createContext,useContext,useEffect,useState,type ReactNode } from 'react';
 import type { CreatedGoal } from '../../components/GoalBuilder';
 import { isDemoMode } from '../../lib/env';
 import { normalizeMuscleGroups } from '../../lib/muscleGroups';
@@ -51,6 +51,14 @@ const metricFromAccount=async(userId:string)=>{const {data}=await supabase.from(
 
    It is a row now, like the rest. athlete_settings keeps its copy so an older
    build on another device does not lose it. */
+/* HALF MARATHON AND UP, FINISH TIME IS HOURS. */
+export const isLongRace=(goal:{type?:string;metric?:string;exercise?:string;title?:string})=>goal.type==='Endurance'&&String(goal.metric||'Finish time').toLowerCase().includes('time')&&raceMiles(String(goal.exercise||goal.title||''))>=10;
+export const longRaceClock=(value:string)=>{const text=String(value||'').trim().replace(/\s*(hh:mm:ss|mm:ss)$/i,'');return /^\d{1,2}:\d{2}$/.test(text)?`${text}:00`:text;};
+const asLongRaceTime=(goal:CreatedGoal):CreatedGoal=>{
+  if(!isLongRace(goal)||String(goal.unit)==='hh:mm:ss')return goal;
+  const target=longRaceClock(goal.target);const current=goal.current?longRaceClock(goal.current):goal.current;
+  return {...goal,unit:'hh:mm:ss',target:`${target} hh:mm:ss`,current};
+};
 const importGoalRow=(row:GoalRow,metric:boolean):CreatedGoal=>{const body=row.type==='bodyweight';const strength=row.type==='lift';const value=Number(row.target_value);const unit=metric?'kg':'lb';const connection=normalizeMuscleGroups([row.muscle_group]).join(', ')||'No fixed day';
   if(body)return{type:'Body Composition',title:`${value} ${unit} body-weight goal`,target:`${value} ${unit}`,date:row.target_date||'',connection,exercise:'',metric:'Body weight',unit,trackingSource:'Workout history'} as CreatedGoal;
   return{type:strength?'Strength':'Endurance',title:strength?`${value} ${unit} ${row.name}`:`${row.name} goal`,target:strength?`${value} ${unit}`:decimalMinutesToClock(value),date:row.target_date||'',connection,exercise:row.name,metric:strength?'Real 1RM':'Finish time',unit:strength?unit:'mm:ss',trackingSource:'Workout history',minWeeklyMileage:row.min_weekly_mileage==null?undefined:String(row.min_weekly_mileage),peakWeeklyMileage:row.peak_weekly_mileage==null?undefined:String(row.peak_weekly_mileage)} as CreatedGoal};
@@ -171,6 +179,9 @@ export function GoalsProvider({children}:{children:ReactNode}){
       return;
     }
     const isTime=goal.type==='Endurance'&&String(goal.metric).toLowerCase().includes('time');const numericTarget=isTime?goalClockSeconds(goal.target,goal.unit,raceMiles(String(goal.exercise||goal.title||'')))/60:Number.parseFloat(goal.target);const type=goal.type==='Endurance'?'race':'lift';void supabase.from('goals').upsert({owner_id:user.id,type,name:goal.exercise||goal.title,target_value:Number.isFinite(numericTarget)?numericTarget:0,muscle_group:normalizeMuscleGroups([goal.connection]).join(', ')||null,target_date:goal.date||null},{onConflict:'owner_id,type,name'}).then(({error})=>{setSyncError(error?`This goal is saved on this device but did not reach your account (${error.message}). It may not appear on your other devices.`:null)})};
-  return <GoalsContext.Provider value={{goals,saveGoal,deleteGoal,hydrated,syncError}}>{children}</GoalsContext.Provider>;
+  /* A long race is never timed in minutes: goals saved before this was
+     enforced are read as h:mm:ss, so "3:15" on a marathon is 3:15:00. */
+  const shown=useMemo(()=>goals.map(asLongRaceTime),[goals]);
+  return <GoalsContext.Provider value={{goals:shown,saveGoal,deleteGoal,hydrated,syncError}}>{children}</GoalsContext.Provider>;
 }
 export function useGoals(){const context=useContext(GoalsContext);if(!context)throw new Error('useGoals must be used inside GoalsProvider');return context}
