@@ -1,3 +1,6 @@
+import '../today-picks.css';
+import { markWorkoutOpen, markWorkoutDone } from '../lib/workoutOpen';
+import { readSwaps, swappedName, lastSet } from '../lib/todaySwaps';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageIntro, Metric } from '../components/AppShell';
@@ -211,7 +214,11 @@ function WorkoutEditor() {
        follow for lifts not yet done. */
     const savedToday=(records.find(record=>record.date===sessionIso)?.topSets||[]).filter(set=>set.completed!==false);
     const doneLifts=new Set(savedToday.map(set=>canonicalLiftKey(set.lift)));
-    const planned=(workoutSource==='plan'&&recommendationTopSets.length?recommendationTopSets:usingSplit?splitDayTopSets:[]).filter(set=>!doneLifts.has(canonicalLiftKey(set.lift)));
+    /* A lift swapped on Today comes in as its stand-in: the new name, the
+       weight it was last done at as the ask, and no tie to the original's
+       prescription so the original's wave is not marked answered. */
+    const swaps=readSwaps(sessionIso);
+    const planned=(workoutSource==='plan'&&recommendationTopSets.length?recommendationTopSets:usingSplit?splitDayTopSets:[]).map(set=>{const to=swappedName(swaps,set.lift);if(!to)return set;const last=lastSet(records,to);return {...set,lift:to,weight:0,reps:last?.reps||8,prescribedWeight:last?.weight||undefined,prescribedReps:undefined,recommendationTopSetId:undefined};}).filter(set=>!doneLifts.has(canonicalLiftKey(set.lift)));
     const plannedKeys=new Set([...savedToday,...planned].map(set=>canonicalLiftKey(set.lift)));
     const extras:LoggedTopSet[]=queryExtras.filter(set=>set.lift&&!plannedKeys.has(canonicalLiftKey(set.lift))).map(set=>({muscle:set.muscle||'Primary',lift:set.lift,weight:0,reps:Number(set.reps)||0,completed:true}));
     return [...savedToday,...planned,...extras];
@@ -426,6 +433,8 @@ function WorkoutEditor() {
     const result=addRecord({date:sessionIso,title:dayName||`Top set · ${set.lift}`,muscles:Array.from(new Set([...dayMuscles,...(primary.length?primary:[set.muscle])])),topSets:[completed],lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:completed.calculatedMax,hasCardio:false,...recommendationMetadata,selectedRecommendationTopSetIds:set.recommendationTopSetId?[set.recommendationTopSetId]:[]});if(!result.ok){setQuickLogMessage('That exact top set is already saved.');return}
     /* Saving a set keeps the session OPEN — only "Finish Day" completes the
        recommendation. The athlete keeps logging sets and cardio freely. */
+    /* The first set logged opens the workout until Finish; Today shows it in progress. */
+    if(!editingRecord&&sessionIso===todayIso)markWorkoutOpen(sessionIso,window.location.hash.replace(/^#/,"")||"/workout");
     setQuickLoggedKeys(current=>[...current,topSetKey(set)]);setQuickLogMessage(`Saved ${set.lift} · ${set.weight} ${weightUnit} × ${set.reps}`);
     /* UPGRADE MOMENTS (UpgradeSheet decides whether to show: once each, free
        athletes only, never two in a day). After the save, never instead of it. */
@@ -591,7 +600,7 @@ function WorkoutEditor() {
     if(!result.ok){setSaveMessage(editingRecord?'This workout could not be found. Return to History and try again.':'This exact workout is already in your history. Nothing was saved twice.');return}
     // Only real training closes out the day's recommendation. A body-weight
     // check-in or a note must not consume the workout you still owe.
-    if(!editingRecord&&!requestedDate&&workoutSource==='plan'&&!contentMismatch&&(savedTopSets.length>0||savedTopSetKeys.length>0||hasCardio||quickLoggedKeys.length>0))markCompleted();setSaved(true);navigate(editingRecord?'/history':'/');
+    if(!editingRecord&&!requestedDate&&workoutSource==='plan'&&!contentMismatch&&(savedTopSets.length>0||savedTopSetKeys.length>0||hasCardio||quickLoggedKeys.length>0))markCompleted();markWorkoutDone(sessionIso);setSaved(true);navigate(editingRecord?'/history':'/');
   };
   const removeWorkout=async()=>{if(!editingRecord||!window.confirm(`Delete the workout record for ${todayShort}? This permanently removes it from History and Insights.`))return;setSaveMessage('');const removed=await deleteRecord(editingRecord.id);if(removed)navigate('/history');else setSaveMessage('The workout could not be deleted. Check the sync message and try again.')};
   if(editId&&!editingRecord)return <div className="narrow stack-xl"><PageIntro eyebrow="WORKOUT HISTORY" title="Workout not found" copy="This workout may have been removed from this device."/><section className="card"><Link className="button" to="/history">Return to History</Link></section></div>;
@@ -630,7 +639,7 @@ function WorkoutEditor() {
     {/* THE ONE ACTION THE SCREEN IS FOR, pinned where the thumb is, saying
         how much of the day is done — on a bar of its own, so it never sits on
         top of a set's Save button. */}
-    <div className="workout-finish-bar">{saveMessage&&<div className={saved?'save-confirmation':'save-confirmation save-warning'} role="status">{saveMessage}{saved&&<> <Link to="/history">View in Activities <Icon name="arrow" size={14}/></Link></>}</div>}{(()=>{const done=topSets.filter(set=>set.lift&&loggedTopSetKeys.includes(set.id||`${set.muscle}::${set.lift}::${set.weight}::${set.reps}`)).length;return <button className="button wide save-workout" onClick={saveWorkout}>{saved?<>Workout saved <Icon name="check"/></>:<>Finish workout{topSets.length>0&&<small>{done} of {topSets.length} {topSets.length===1?'lift':'lifts'} done</small>}</>}</button>})()}</div></div>;
+    <div className="workout-finish-bar">{saveMessage&&<div className={saved?'save-confirmation':'save-confirmation save-warning'} role="status">{saveMessage}{saved&&<> <Link to="/history">View in Activities <Icon name="arrow" size={14}/></Link></>}</div>}{(()=>{const done=topSets.filter(set=>set.lift&&loggedTopSetKeys.includes(set.id||`${set.muscle}::${set.lift}::${set.weight}::${set.reps}`)).length;return <>{!saved&&!editingRecord&&done>0&&<button type="button" className="button secondary wide pause-workout" onClick={()=>{markWorkoutOpen(sessionIso,window.location.hash.replace(/^#/,"")||"/workout");navigate('/')}}>Pause workout<small>Saved so far · resume from Today</small></button>}<button className="button wide save-workout" onClick={saveWorkout}>{saved?<>Workout saved <Icon name="check"/></>:<>Finish workout{topSets.length>0&&<small>{done} of {topSets.length} {topSets.length===1?'lift':'lifts'} done</small>}</>}</button></>})()}</div></div>;
 }
 
 export function InsightsPage() {

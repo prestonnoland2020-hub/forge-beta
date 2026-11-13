@@ -31,7 +31,7 @@ type Value={recommendation:DailyRecommendation|null;loading:boolean;syncError:st
      cycle does not currently owe. */
   recommendationFor:(position:number,name?:string)=>DailyRecommendation|null;
   /* The split's days, in order: the chips on Today pick from these. */
-  splitDays:Array<{position:number;name:string;type:string}>;
+  splitDays:Array<{position:number;name:string;type:string;muscles:string[]}>;
   /* The calendar date recommendation.splitDay belongs to — today, or tomorrow
      when today has already been trained. */
   anchorDate:string;
@@ -461,7 +461,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      blank behind "Forge hit a snag". Fall back to the freshly built one rather
      than handing the app a recommendation with a hole in it. */
   const recommendation=(stored?.splitDay?stored:null)||generated;
-  const value=useMemo<Value>(()=>({recommendation,loading,syncError,recommendationFor,splitDays:days.map(day=>({position:day.position,name:day.name,type:String(day.type)})),anchorDate,anchorPosition:duePosition,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist,recommendationFor,days,anchorDate,duePosition]);
+  const value=useMemo<Value>(()=>({recommendation,loading,syncError,recommendationFor,splitDays:days.map(day=>({position:day.position,name:day.name,type:String(day.type),muscles:day.muscles||[]})),anchorDate,anchorPosition:duePosition,toggleTopSet:id=>{if(!recommendation)return;persist({...recommendation,topSets:recommendation.topSets.map(set=>set.id===id?{...set,selected:!set.selected}:set)})},setCardioSelected:selected=>{if(!recommendation?.cardio)return;persist({...recommendation,cardio:{...recommendation.cardio,selected}})},markCompleted:()=>{if(recommendation)setStored({...recommendation,status:'completed'})},refresh:()=>{forceRegenerate.current=true;setStored(null);setRefreshKey(key=>key+1)}}),[recommendation,loading,syncError,persist,recommendationFor,days,anchorDate,duePosition]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
