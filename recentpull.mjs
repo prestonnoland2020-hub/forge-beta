@@ -37,5 +37,18 @@ console.log('\nOld sets only');
 const stale = ask([[90, 230, 3], [80, 225, 4]], 2);
 check('nothing in eight weeks: the plan stands', stale.now === stale.plan, `${stale.plan} -> ${stale.now}`);
 
+console.log('\nTwo weeks of lighter weights and grinders');
+const hardDays = [[60, 235, 4], [50, 240, 4], [12, 225, 4], [5, 225, 4]];
+const normal = ask(hardDays, 2).now;
+setEffort(iso(12), 'Bench', 'hard'); setEffort(iso(5), 'Bench', 'hard');
+const dialed = ask(hardDays, 2).now;
+check('dials it back below the lighter sets', dialed < 225 && dialed < normal, `${normal} -> ${dialed}`);
+
+console.log('\nTwo months with no new best');
+const stalled = ask([[200, 250, 4], [55, 235, 4], [40, 235, 4], [26, 230, 4], [12, 235, 4]], 2);
+check('restarts below the old best, from the last two months', stalled.now < stalled.plan && stalled.now <= 235, `${stalled.plan} -> ${stalled.now}`);
+const fresh = ask([[200, 250, 4], [55, 240, 4], [40, 245, 4], [26, 250, 4], [12, 255, 4]], 2);
+check('a new best in those months: no restart', fresh.now >= fresh.plan, `${fresh.plan} -> ${fresh.now}`);
+
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
 console.log('\nall passed');

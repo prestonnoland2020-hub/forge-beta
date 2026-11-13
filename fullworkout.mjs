@@ -45,7 +45,7 @@ const [verdict] = goalFeasibility([goal], bench);
 check('it is a question, not out of reach', verdict.verdict === 'needs-more', verdict.verdict);
 check('and says to test a heavy single', /heavy single/.test(verdict.change || ''), verdict.change);
 const pill = goalProgress(goal, bench, verdict, null, 'calculated');
-check('the pill is not red', pill.tone !== 'off-track' && pill.label === 'Close — test it', `${pill.tone} ${pill.label}`);
+check('with recent sets falling, calc max drives the pill: behind pace, with the reason', pill.label === 'Behind pace' && /lb\/week/.test(pill.trend || ''), `${pill.tone} ${pill.label} ${pill.trend}`);
 const tested = [...bench, { id: 's', date: iso(3), title: 'x', muscles: [], topSets: [{ lift: 'Bench', weight: 240, reps: 1, completed: true }] }];
 const [after] = goalFeasibility([goal], tested);
 check('a recent heavy single settles it', after.verdict !== 'needs-more', after.verdict);

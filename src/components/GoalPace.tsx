@@ -44,7 +44,7 @@ export function GoalPace() {
     {rows.map(row => <div className="goal-pace-row" key={row.id}>
       <div>
         <b>{row.name}</b>
-        <small>{row.progress.currentText ? `${row.progress.currentText} now` : 'Nothing logged yet'}{row.progress.targetText ? ` · goal ${row.progress.targetText}` : ''}{row.moved !== null ? ` · ${row.moved > 0 ? '+' : ''}${row.moved} ${unit} in 6 weeks` : ''}</small>
+        <small>{row.progress.trend || <>{row.progress.currentText ? `${row.progress.currentText} now` : 'Nothing logged yet'}{row.progress.targetText ? ` · goal ${row.progress.targetText}` : ''}{row.moved !== null ? ` · ${row.moved > 0 ? '+' : ''}${row.moved} ${unit} in 6 weeks` : ''}</>}</small>
       </div>
       <span className={`goal-pace-pill ${row.progress.tone}`}>{row.progress.label}</span>
     </div>)}

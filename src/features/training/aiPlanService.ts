@@ -379,7 +379,14 @@ export function bestsFromHistory(
     const repSlot = Math.min(Math.max(Math.round(askedReps), 1), PRESCRIPTION_REP_CAP);
     const settledKey = `${key}|${repSlot}`;
     const cameUpShort = Boolean(set.prescribedReps) && !answeredThePlan(set.prescribedReps!, set.reps) && set.reps < set.prescribedReps!;
+    const ageDays = record.date ? (new Date(`${todayIso}T12:00:00`).getTime() - new Date(`${record.date}T12:00:00`).getTime()) / 86400000 : Infinity;
     if (set.completed === false || cameUpShort) {
+      /* A miss is recent evidence too: it says the bar was too heavy. */
+      if (record.date && ageDays >= 0 && ageDays <= RECENT_DAYS) {
+        const list = latest.get(key) || [];
+        list.push({ date: record.date, weight: set.weight, reps: set.reps, lift: set.lift, ageDays, missed: true });
+        latest.set(key, list);
+      }
       if (!settled.has(settledKey)) {
         const byReps = misses.get(key) || new Map<number, number>();
         byReps.set(repSlot, (byReps.get(repSlot) || 0) + 1);
@@ -391,7 +398,6 @@ export function bestsFromHistory(
     /* The newest completed set of the lift, whatever its reps: what the athlete
        can do NOW, which the heaviest-ever anchors cannot say. */
     if (record.date) {
-      const ageDays = (new Date(`${todayIso}T12:00:00`).getTime() - new Date(`${record.date}T12:00:00`).getTime()) / 86400000;
       if (ageDays >= 0 && ageDays <= RECENT_DAYS) {
         const list = latest.get(key) || [];
         list.push({ date: record.date, weight: set.weight, reps: set.reps, lift: set.lift, ageDays });
@@ -1054,11 +1060,25 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
    drawn one step heavier per pass, which is exactly what will happen if the
    athlete hits them. It is a projection and it says so; miss a week and the
    weeks after it recompute from what was really done. */
-export type LatestSet = { date: string; weight: number; reps: number; lift?: string; ageDays?: number };
+export type LatestSet = { date: string; weight: number; reps: number; lift?: string; ageDays?: number; missed?: boolean };
 /* How far a lifter's recent sets pull the plan down when they sit below it:
    two-thirds of the way. Recent work counts twice as much as old bests. */
 export const RECENT_DAYS = 56;
 export const RECENT_PULL = 2 / 3;
+/* A RUN OF HARD DAYS. When every set of a lift in the last SLUMP_DAYS came in
+   below the lifter's usual strength (under SLUMP_BELOW of their working max)
+   and at least half of them were grinders or misses, the lift is dialed back:
+   SLUMP_EASE below what those sets imply, with no step on top. */
+export const SLUMP_DAYS = 14;
+export const SLUMP_BELOW = 0.97;
+export const SLUMP_EASE = 0.95;
+/* A STALL. When two months of a lift's sets (at least three, spanning six
+   weeks or more) have not produced a new best estimate, the plan stops being
+   written from the old best and restarts from STALL_EASE of the best of those
+   two months, then climbs again from there. */
+export const STALL_MIN_SETS = 3;
+export const STALL_MIN_SPAN_DAYS = 42;
+export const STALL_EASE = 0.95;
 export type WaveOptions = {
   /* The lift's completed sets from the last eight weeks. A rep week never
      asks for more than one plate over what the nearest of them implies at its
@@ -1239,7 +1259,7 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
     if (!latest?.length || projectSteps > 0) return 0;
     const day = (iso: string) => new Date(`${iso}T12:00:00`).getTime();
     const newestDay = Math.max(...latest.map(set => day(set.date)));
-    const pool = latest.filter(set => Math.abs(set.reps - count) <= 3 && (set.ageDays ?? 0) <= 56);
+    const pool = latest.filter(set => !set.missed && Math.abs(set.reps - count) <= 3 && (set.ageDays ?? 0) <= 56);
     if (!pool.length) return 0;
     const fresh = pool.filter(set => newestDay - day(set.date) <= 28 * 86400000);
     /* Through the same curve both ways, so a set at these reps gives back its own weight. */
@@ -1251,15 +1271,51 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
     const implied = Math.max(...(fresh.length ? fresh : pool).map(impliedBy));
     return Math.max(plateStep, Math.floor(implied / plateStep + 0.001) * plateStep + stepFor(count));
   };
+  /* DIAL IT BACK after two weeks of lighter weights and grinders. */
+  const slumpLoad = (count: number) => {
+    if (!latest?.length || projectSteps > 0 || !(best > 0)) return 0;
+    const lately = latest.filter(set => (set.ageDays ?? Infinity) <= SLUMP_DAYS);
+    if (!lately.length) return 0;
+    const maxOf = (set: LatestSet) => estimateWithEffort(set.weight, set.reps, effortOf(set.date, set.lift));
+    /* Lower than usual: under the heaviest the lifter has done at those reps,
+       or, with nothing at those reps, under their working max. Misses are not
+       "lower weight" — a miss at the plan's bar is the three-miss rule's job —
+       so a run of hard days needs completed sets that came in light. */
+    const done = lately.filter(set => !set.missed);
+    if (!done.length) return 0;
+    const lower = (set: LatestSet) => {
+      const usual = anchors?.get(Math.min(Math.max(Math.round(set.reps), 1), REP_MAX_CAP));
+      return usual ? set.weight < usual : maxOf(set) < best * SLUMP_BELOW;
+    };
+    const hard = lately.filter(set => set.missed || effortOf(set.date, set.lift) === 'hard').length;
+    if (!done.every(lower) || hard * 2 < lately.length) return 0;
+    /* What the completed sets imply at these reps; with only misses, the
+       heaviest miss's weight is the bar that beat them. */
+    const here = (set: LatestSet) => { const factor = calculateEstimatedOneRepMax(set.weight, count) || 0; return factor ? set.weight * maxOf(set) / factor : weightForReps(maxOf(set), count); };
+    const base = done.length ? Math.max(...done.map(here)) : weightForReps(Math.max(...lately.map(set => calculateEstimatedOneRepMax(set.weight, Math.max(1, set.reps - 1)) || 0)), count);
+    return Math.max(plateStep, Math.floor(base * SLUMP_EASE / plateStep + 0.001) * plateStep);
+  };
   const towardRecent = (planned: number, count: number) => {
+    const slump = slumpLoad(count);
+    if (slump) return Math.min(planned, slump);
     const recent = recentLoad(count);
     if (!recent || recent >= planned) return planned;
     return Math.max(plateStep, Math.round((planned - RECENT_PULL * (planned - recent)) / plateStep) * plateStep);
   };
+  const stalledMax = (() => {
+    if (!latest?.length || projectSteps > 0 || !(best > 0)) return 0;
+    const done = latest.filter(set => !set.missed);
+    if (done.length < STALL_MIN_SETS) return 0;
+    if (Math.max(...done.map(set => set.ageDays ?? 0)) < STALL_MIN_SPAN_DAYS) return 0;
+    const recentBest = Math.max(...done.map(set => estimateWithEffort(set.weight, set.reps, effortOf(set.date, set.lift))));
+    return recentBest < best ? recentBest * STALL_EASE : 0;
+  })();
   const loadFor = (count: number) => {
     const held = backedOff(count) ? completedAt(count) : 0;
     if (held) return Math.max(plateStep, Math.floor(held / plateStep) * plateStep);
-    const planned = Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
+    const planned = stalledMax
+      ? Math.max(plateStep, Math.ceil(weightForReps(stalledMax, count) / plateStep) * plateStep)
+      : Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
     return Math.min(towardRecent(planned, count), testedCeiling(count));
   };
   /* THE ATTEMPT SITS ABOVE THE DOUBLE. The rep weeks are written from the
