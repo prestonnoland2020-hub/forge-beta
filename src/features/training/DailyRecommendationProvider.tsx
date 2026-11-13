@@ -315,7 +315,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
     /* Shared builder. This was a fourth copy, and its bare Epley read a logged
        405x1 as a 419 max — inflating a true single by 3.3% and prescribing off
        the inflated number. */
-    const {bests:liveBests,singles:liveSingles,anchors:liveAnchors,sessions:liveSessions,misses:liveMisses,lastAt:liveLastAt}=bestsFromHistory(records);
+    const {bests:liveBests,singles:liveSingles,anchors:liveAnchors,sessions:liveSessions,misses:liveMisses,lastAt:liveLastAt,latest:liveLatest}=bestsFromHistory(records);
     /* ONE ATTEMPT PER LIFT PER WEEK, THE SAME ONE THE PLAN TAB PICKS. A
        rolling split shorter than seven days hits the same day twice inside a
        week; the Plan tab demoted the second exposure to the heavy double and
@@ -343,7 +343,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
           const key=canonicalLiftKey(set.exercise);
           const best=liveBests.get(key)||0;
           const setTests=testsOneRepMax(set.exercise,goalLifts);
-          const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX}):null;
+          const live=best?wavePrescription(best,waveIdx,{metric,bestSingle:liveSingles.get(key)||0,tests:setTests,anchors:liveAnchors.get(key),accessory:!setTests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),latest:liveLatest.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX}):null;
           return{exercise:set.exercise,reps:live?.reps,hasHold:Boolean(live?.isMax)};
         }),
         cost:(index===longIndex?2:0)+(index===qualityIndex?3:0)+(easySet.has(index)?1:0),
@@ -386,7 +386,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
          with high strength fatigue) the lift holds what it already did. */
       const lowReadiness=recovery.confidence!=='Low'&&recovery.readiness<55;
       const recovering=recovery.confidence!=='Low'&&(recovery.readiness<65||recovery.strengthFatigue==='High');
-      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness&&!raceOwnsWeek(tests),holding:recovering||lastEffort(records,exercise)==='hard',anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
+      const prescription=wavePrescription(live.best,waveIdx,{metric,bestSingle:live.single,tests:tests&&todayHoldsTheAttempt&&!lowReadiness&&!raceOwnsWeek(tests),holding:recovering||lastEffort(records,exercise)==='hard',anchors:liveAnchors.get(key),accessory:!tests,sessions:liveSessions.get(key)||0,misses:liveMisses.get(key),lastAt:liveLastAt.get(key),latest:liveLatest.get(key),ramped:(liveSessions.get(key)||0)>=EXPOSURES_BEFORE_MAX});
       const accessorySessions=liveSessions.get(key)||0;
       /* No session yet means the best is the starting number from setup, and the card says so. */
       const fromWhat=accessorySessions?`your best calc max ${live.best}`:`the starting number you gave (calc max ${live.best}) — your first logged set replaces it`;
