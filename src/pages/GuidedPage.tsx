@@ -15,6 +15,7 @@ import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
 import { nativeVoice, type ScriptBeat } from '../lib/guided/nativeVoice';
 import { tickerEnd, tickerLive, tickerStart, tickerUpdate, type TickerState } from '../lib/liveActivity';
 import { weightsFromTopSets } from '../lib/guided/fromHistory';
+import { setEffort } from '../lib/setEffort';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
 import { isDemoMode } from '../lib/env';
@@ -516,6 +517,11 @@ export function GuidedPage() {
       const result = addRecord({ date: todayIso(), title: fromPlan ? workout.title : custom ? 'Guided · My workout' : `Guided · ${workout.focus}`, muscles, hasCardio: false, notes, durationMinutes: minutesTaken,
         ...(fromPlan ? { recommendationId: link.recommendationId as string | undefined, splitId: link.splitId as string | undefined, splitDayId: link.splitDayId as string | undefined, splitPosition: link.splitPosition as number | undefined, selectedRecommendationTopSetIds: Object.values(planSetIds) } : {}),
         topSets: [...best.values()].map(item => ({ muscle: item.muscles[0] || 'Full body', lift: item.name, weight: item.weight as number, reps: item.reps, completed: true, ...(planSetIds[item.name] ? { recommendationTopSetId: planSetIds[item.name] } : {}) })) });
+      /* HOW EACH TOP SET FELT, carried over: the coach's easy and right are
+         the log's Easy and Good. Its "hard" is not carried: in a guided set it
+         can mean form or general tiredness as much as a grinder, and the
+         coach already lightened the next set for it. */
+      for (const item of best.values()) if (item.feel === 'easy' || item.feel === 'right') setEffort(todayIso(), item.name, item.feel === 'right' ? 'good' : 'easy');
       setSavedNote(result.ok ? 'Saved to your log.' : 'Already in your log.');
       write(COUNT_KEY, read<number>(COUNT_KEY, 0) + 1);
       if (!fromPlan && !custom) write(LAST_KEY, { focus: workout.focus, moves: workout.steps.map(item => item.move.id) });

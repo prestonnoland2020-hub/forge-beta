@@ -1,3 +1,4 @@
+import { liftTrend } from './liftTrend';
 import type { CreatedGoal } from '../components/GoalBuilder';
 import { startingNumbers } from './startingNumbers';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
@@ -42,6 +43,8 @@ export type GoalProgress = {
   targetText: string;
   tone: GoalTone;
   label: string;
+  /* "Calc max 254 lb, +1.2 lb/week over 8 weeks. At this pace: 262 by Dec 31 — 13 short of 275." */
+  trend?: string;
 };
 
 const numeric = (value?: string) => Number(String(value ?? '').replace(/[^0-9.]/g, '')) || 0;
@@ -139,9 +142,15 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
     else if (fromNow === 'off-track') tone = 'needs-work';
     else if (fromNow === 'needs-work') tone = 'needs-work';
   }
+  /* CALC MAX DRIVES A STRENGTH GOAL. When the lift has enough recent sets to
+     draw a line through (see liftTrend), its pace to the goal date decides the
+     pill: on pace, within 2%, or behind. The same calculated max writes the
+     plan, so the plan and the goal now read one number. */
+  const trend = goal.type === 'Strength' && goal.exercise && mode === 'calculated' && !reached && target ? liftTrend(String(goal.exercise), records, target, goal.date) : null;
+  if (trend) tone = trend.status === 'on-track' ? 'on-track' : trend.status === 'close' ? 'needs-work' : 'off-track';
   /* A HYROX goal is not timed by runs: logged running does not start it, so
      it must not say "first run" to someone with months of runs on file. */
   const hyrox = goal.type === 'Endurance' && /hyrox/i.test(`${goal.exercise || ''} ${goal.title}`);
-  const label = reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? (hyrox ? 'No HYROX time yet' : 'No tested time yet') : 'No tested max yet') : hyrox ? 'No HYROX time yet' : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : verdict?.verdict === 'needs-more' && goal.type === 'Strength' ? 'Close — test it' : 'Needs more work';
-  return { share, current, currentText: current ? show(current) : '—', targetText: target ? show(target) : String(goal.target || ''), tone, label };
+  const label = trend && !reached ? (trend.status === 'on-track' ? 'On track' : trend.status === 'close' ? 'Close' : 'Behind pace') : reached ? 'Reached' : tone === 'on-track' ? 'On track' : tone === 'off-track' ? 'Out of reach' : tone === 'unknown' ? (mode === 'tested' && ((goal.type === 'Strength' && goal.unit !== 'reps') || (goal.type === 'Endurance' && time)) ? (goal.type === 'Endurance' ? (hyrox ? 'No HYROX time yet' : 'No tested time yet') : 'No tested max yet') : hyrox ? 'No HYROX time yet' : 'Log it to start') : verdict?.reason === 'evidence' ? 'Too early to tell' : verdict?.verdict === 'needs-more' && goal.type === 'Strength' ? 'Close — test it' : 'Needs more work';
+  return { share, current, currentText: current ? show(current) : '—', targetText: target ? show(target) : String(goal.target || ''), tone, label, trend: trend?.sentence };
 }

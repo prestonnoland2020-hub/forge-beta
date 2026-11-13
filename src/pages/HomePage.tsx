@@ -22,6 +22,7 @@ import { sameLift } from '../lib/liftAliases';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { openWorkout } from '../lib/workoutOpen';
 import { goalFeasibility } from '../lib/goalFeasibility';
+import { liftTrend } from '../lib/liftTrend';
 import { readSwaps, writeSwap, swappedName, lastSet, swapOptions } from '../lib/todaySwaps';
 import { buildFullWorkout, todaysObjective, warmupRamp } from '../lib/fullWorkout';
 import '../today-picks.css';
@@ -176,6 +177,8 @@ export function HomePage() {
     const target = goal ? `${String(goal.target).replace(/[^0-9.]/g, '')} ${weightUnit}` : '';
     const by = goal?.date ? new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
     const lastText = last ? `Last time ${last.weight} × ${last.reps}${last.date === currentDate ? ' (today)' : ''}.` : 'First time on this lift.';
+    const trend = goal ? liftTrend(objective.exercise, records, Number(String(goal.target).replace(/[^0-9.]/g, '')), goal.date, weightUnit) : null;
+    if (trend) return `${lastText} ${trend.status === 'on-track' ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — on track for ${target}${by ? ` by ${by}` : ''}.` : trend.perWeek > 0 ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — ${by ? `by ${by} ` : ''}that’s ${trend.projected}, short of ${target}.` : `Your calc max has been flat — today is about getting it moving toward ${target}.`}`;
     const goalText = !goal ? 'The next step up your rep wave.'
       : verdict?.verdict === 'reachable' ? `Keeps you on pace for ${target}${by ? ` by ${by}` : ''}.`
       : verdict?.verdict === 'needs-more' && /heavy single/.test(verdict.change || '') ? `You’re close to ${target} — a heavy single soon will show where you stand.`

@@ -1,3 +1,4 @@
+import { calculateEstimatedOneRepMax } from './src/lib/strength.ts';
 /* CALCULATED OR TESTED, AND THE GOALS PAGE SAYS WHICH.
 
    Every strength goal on the page read its calculated max — the estimate
@@ -15,7 +16,7 @@ const records = [{ date: '2026-10-20', topSets: [{ lift: 'Bench Press', weight: 
 const verdict = { verdict: 'needs-more' };
 
 console.log('\nThe two maxes');
-check('calculated is the best estimate from any set', goalProgress(goal, records, verdict, null, 'calculated').current === 208);
+check('calculated is the best estimate from any set', goalProgress(goal, records, verdict, null, 'calculated').current === calculateEstimatedOneRepMax(185, 5));
 check('tested is the heaviest completed single', goalProgress(goal, records, verdict, null, 'tested').current === 195);
 check('a failed single does not count', goalProgress(goal, [{ date: '2026-10-21', topSets: [{ lift: 'Bench Press', weight: 225, reps: 1, completed: false }] }], verdict, null, 'tested').current === null);
 check('a starting 1RM entered on the goal counts as tested', goalProgress({ ...goal, current: '200' }, [], verdict, null, 'tested').current === 200);

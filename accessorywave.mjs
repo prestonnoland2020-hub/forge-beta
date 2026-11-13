@@ -136,7 +136,7 @@ for (const [w, r] of press) if (w > (pressAnchors.get(r) || 0)) pressAnchors.set
 const pressMax = Math.max(...press.map(([w, r]) => calculateEstimatedOneRepMax(w, r)));
 const pressRung = (sessions) => wavePrescription(pressMax, 0, { accessory: true, sessions, anchors: pressAnchors });
 const sixRep = pressRung(11);
-check('his calculated max is 292, off a 235 x 8', pressMax === 292, String(pressMax));
+check('his calculated max comes off his 235 x 8 (softened curve: 279)', pressMax === calculateEstimatedOneRepMax(235, 8), String(pressMax));
 check('the six-rep rung no longer asks for 265', sixRep.weight < 265, `${sixRep.weight} × ${sixRep.reps}`);
 check('it asks for a real personal best rather than a fictional one',
   calculateEstimatedOneRepMax(sixRep.weight, sixRep.reps) > pressMax

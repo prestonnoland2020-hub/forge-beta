@@ -26,7 +26,15 @@ export const REP_MAX_CAP = 10;
 export const PRESCRIPTION_REP_CAP = 12;
 export function repMaxCoefficient(reps: number, cap: number = REP_MAX_CAP): number {
   const capped = Math.min(Math.max(Math.round(reps), 1), cap);
-  return capped === 1 ? 1 : 36 / (37 - capped);
+  if (capped === 1) return 1;
+  /* SOFTENED ABOVE THREE REPS. Plain Brzycki runs high as the reps climb:
+     315 x 9 read 405 against a lifter who knew 380-390 was nearer. From four
+     reps up it is eased 0.85% a rep, to at most 6% at ten and beyond — 315 x 9
+     now reads 384. Singles to triples are exact already and untouched. The
+     same coefficient writes loads, so a set converted to a max and back is
+     still itself. */
+  const soften = capped <= 3 ? 0 : Math.min(0.06, (capped - 3) * 0.0085);
+  return (36 / (37 - capped)) * (1 - soften);
 }
 
 export function calculateEstimatedOneRepMax(weight: number, reps: number) {

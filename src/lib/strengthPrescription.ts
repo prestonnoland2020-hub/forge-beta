@@ -1,4 +1,4 @@
-import { WAVE_REPS, waveSlot, wavePrescription, ACCESSORY_REPS, ACCESSORY_SESSIONS_PER_RAISE, FAILURES_BEFORE_BACKOFF } from '../features/training/aiPlanService';
+import { WAVE_REPS, waveSlot, wavePrescription, ACCESSORY_REPS, ACCESSORY_SESSIONS_PER_RAISE, FAILURES_BEFORE_BACKOFF, type LatestSet } from '../features/training/aiPlanService';
 import { calculateEstimatedOneRepMax } from './strength';
 
 /* THIS FILE IS AN ADAPTER, NOT A PROGRAM. It used to run its own sequence —
@@ -10,7 +10,7 @@ import { calculateEstimatedOneRepMax } from './strength';
 export const TOP_SET_SEQUENCE = WAVE_REPS;
 export type TopSetStage = { reps: number; label: string; weight: number; calculatedMax: number; targetCalculatedMax: number; percentOfGoal: number; isTest: boolean; rationale: string };
 
-export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = false, readiness = 100, highFatigue = false, allowTest = false, bestSingle = 0, metric = false, anchors, accessory = false, sessions = 0, misses, lastAt }: {
+export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = false, readiness = 100, highFatigue = false, allowTest = false, bestSingle = 0, metric = false, anchors, accessory = false, sessions = 0, misses, lastAt, latest }: {
   /* `holding` is the caller saying the evidence does not support a step this
      time. It used to be a `progress` number that was typed, computed, passed —
      and never destructured, so it did nothing at all. The rationale said
@@ -34,13 +34,15 @@ export function prescribeTopSet({ baselineMax, goalMax, weekIndex, holding = fal
   misses?: Map<number, number>;
   /* The last load actually completed at each rep count. */
   lastAt?: Map<number, number>;
+  /* The lift's newest completed set: the rep weeks stay one step from it. */
+  latest?: LatestSet[];
 }): TopSetStage {
   /* `allowTest` is now the ONLY gate, and its callers pass the goal-lift
      answer from `testsOneRepMax`. Readiness can reduce a load; it can never
      grant or withhold a max attempt, because the rule is about goals. */
   /* No step when the evidence has not moved: one session with this lift, or a
      latest result that did not hold up against the best of the window. */
-  const wave = wavePrescription(baselineMax, weekIndex, { metric, bestSingle, tests: allowTest, anchors, holding, accessory, sessions, misses, lastAt });
+  const wave = wavePrescription(baselineMax, weekIndex, { metric, bestSingle, tests: allowTest, anchors, holding, accessory, sessions, misses, lastAt, latest });
   /* Three misses at these reps is the one thing that takes a rung off the
      calculated-max ladder, so the card has to say so rather than claiming the
      max wrote a number it did not. */

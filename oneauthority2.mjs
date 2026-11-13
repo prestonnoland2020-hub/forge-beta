@@ -28,9 +28,9 @@ const logger = exposures => buildTrainingIntelligence({ records: ADAM, recovery,
 
 console.log('\n  the ten-rep set is still the highest estimate in his history');
 const { bests, anchors } = bestsFromHistory(ADAM, '2026-09-03');
-check('225 x 10 estimates 300', calculateEstimatedOneRepMax(225, 10) === 300);
+check('225 x 10 estimates 282 on the softened curve (300 before)', calculateEstimatedOneRepMax(225, 10) === 282);
 check('his double estimates 262', calculateEstimatedOneRepMax(255, 2) === 262);
-check('and 300 is what a single number would call his max', bests.get('squat') === 300, String(bests.get('squat')));
+check('and that is what a single number would call his max', bests.get('squat') === 282, String(bests.get('squat')));
 
 console.log('\n  the logger no longer divides that estimate back down');
 const set = logger(3);
