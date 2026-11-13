@@ -390,10 +390,13 @@ export function bestsFromHistory(
     settled.add(settledKey);
     /* The newest completed set of the lift, whatever its reps: what the athlete
        can do NOW, which the heaviest-ever anchors cannot say. */
-    if (record.date && (new Date(`${todayIso}T12:00:00`).getTime() - new Date(`${record.date}T12:00:00`).getTime()) / 86400000 <= 56) {
-      const list = latest.get(key) || [];
-      list.push({ date: record.date, weight: set.weight, reps: set.reps, lift: set.lift });
-      latest.set(key, list);
+    if (record.date) {
+      const ageDays = (new Date(`${todayIso}T12:00:00`).getTime() - new Date(`${record.date}T12:00:00`).getTime()) / 86400000;
+      if (ageDays >= 0 && ageDays <= RECENT_DAYS) {
+        const list = latest.get(key) || [];
+        list.push({ date: record.date, weight: set.weight, reps: set.reps, lift: set.lift, ageDays });
+        latest.set(key, list);
+      }
     }
     const dayKey = record.date || `#${order}`;
     /* Walking newest first, the first completed set at a rep count is the
@@ -1051,7 +1054,11 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
    drawn one step heavier per pass, which is exactly what will happen if the
    athlete hits them. It is a projection and it says so; miss a week and the
    weeks after it recompute from what was really done. */
-export type LatestSet = { date: string; weight: number; reps: number; lift?: string };
+export type LatestSet = { date: string; weight: number; reps: number; lift?: string; ageDays?: number };
+/* How far a lifter's recent sets pull the plan down when they sit below it:
+   two-thirds of the way. Recent work counts twice as much as old bests. */
+export const RECENT_DAYS = 56;
+export const RECENT_PULL = 2 / 3;
 export type WaveOptions = {
   /* The lift's completed sets from the last eight weeks. A rep week never
      asks for more than one plate over what the nearest of them implies at its
@@ -1213,37 +1220,47 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
     const supported = count <= 1 ? bestSingle * headroom : weightForReps(bestSingle * headroom, count);
     return Math.max(plateStep, Math.floor(supported / plateStep) * plateStep);
   };
-  /* ONE STEP FROM WHAT YOU JUST DID. Adam's last bench was 215 x 3 and the
-     four-rep week asked for 225 x 4 — read off his heaviest four, from August.
-     The newest set, if it is recent (eight weeks) and near this rep count,
-     caps the ask at what it implies here plus one plate. Reps left in the
-     tank, when tapped, count. A projected week ahead is not capped. */
-  const recentCeiling = (count: number) => {
-    if (!latest?.length || projectSteps > 0) return Infinity;
-    /* Sets within three reps of this count. What the athlete did in the four
-       weeks up to their latest session speaks for them; older sets only when
-       there is nothing that fresh. The best of those, so one lighter day does
-       not pull the ask down. */
+  /* YOUR PLAN, PULLED TOWARD WHAT YOU'VE DONE LATELY. Every lifter, every
+     lift, the same rule:
+
+       plan    — the wave's number for these reps, from the best sets on file;
+       recent  — one plate step over what the lifter's sets from the last four
+                 weeks (eight, if nothing fresher; within three reps of this
+                 week's) imply at these reps — the best of them, so one light
+                 day does not decide it;
+       ask     — the plan when recent says as much or more; otherwise the plan
+                 pulled RECENT_PULL of the way down toward recent.
+
+     A lifter who is moving up is never held back by it; one whose recent sets
+     sit below their old bests is asked for a number between the two, nearer
+     the recent one. Reps left in the tank (Easy / Good / Grinder) count. Weeks
+     projected ahead have no recent sets and keep the plan. */
+  const recentLoad = (count: number) => {
+    if (!latest?.length || projectSteps > 0) return 0;
     const day = (iso: string) => new Date(`${iso}T12:00:00`).getTime();
     const newestDay = Math.max(...latest.map(set => day(set.date)));
-    const pool = latest.filter(set => Math.abs(set.reps - count) <= 3);
-    if (!pool.length) return Infinity;
+    const pool = latest.filter(set => Math.abs(set.reps - count) <= 3 && (set.ageDays ?? 0) <= 56);
+    if (!pool.length) return 0;
     const fresh = pool.filter(set => newestDay - day(set.date) <= 28 * 86400000);
+    /* Through the same curve both ways, so a set at these reps gives back its own weight. */
     const impliedBy = (set: LatestSet) => {
-      /* Through the same curve both ways, so the same rep count gives back
-         the same weight exactly. */
       const here = calculateEstimatedOneRepMax(set.weight, count) || 0;
       const est = estimateWithEffort(set.weight, set.reps, effortOf(set.date, set.lift));
       return here ? set.weight * est / here : weightForReps(est, count);
     };
     const implied = Math.max(...(fresh.length ? fresh : pool).map(impliedBy));
-    return Math.max(plateStep, Math.floor(implied / plateStep + 0.001) * plateStep + (holding ? 0 : plateStep));
+    return Math.max(plateStep, Math.floor(implied / plateStep + 0.001) * plateStep + stepFor(count));
+  };
+  const towardRecent = (planned: number, count: number) => {
+    const recent = recentLoad(count);
+    if (!recent || recent >= planned) return planned;
+    return Math.max(plateStep, Math.round((planned - RECENT_PULL * (planned - recent)) / plateStep) * plateStep);
   };
   const loadFor = (count: number) => {
     const held = backedOff(count) ? completedAt(count) : 0;
     if (held) return Math.max(plateStep, Math.floor(held / plateStep) * plateStep);
-    const asked = Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
-    return Math.min(asked, testedCeiling(count), recentCeiling(count));
+    const planned = Math.max(plateStep, Math.ceil((loadFromAnchors(anchors, best, count, stepFor(count)) + projection) / plateStep) * plateStep);
+    return Math.min(towardRecent(planned, count), testedCeiling(count));
   };
   /* THE ATTEMPT SITS ABOVE THE DOUBLE. The rep weeks are written from the
      calculated max (what the athlete's best rep work proves); the attempt was
