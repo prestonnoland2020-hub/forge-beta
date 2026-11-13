@@ -58,3 +58,44 @@
 .tp-full li.accessory span { font-weight: 600; }
 .tp-full-head { margin: 6px 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
 .tp-week { display: block; margin-top: 10px; padding: 8px; text-align: center; color: var(--ink-2); font-size: 14px; font-weight: 600; text-decoration: none; }
+
+/* THE DAY SLIDER: one day card centred, the neighbours peeking either side. */
+.tp-ask { display: flex; justify-content: space-between; align-items: baseline; }
+.tp-ask span { font-size: 12px; font-weight: 500; color: var(--ink-3); }
+.tp-days { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -18px; padding: 2px 18px 4px; scroll-padding: 0 18px; }
+.tp-days::-webkit-scrollbar { display: none; }
+.tp-day { flex: 0 0 72%; scroll-snap-align: center; display: grid; gap: 2px; text-align: left; padding: 14px 16px; border-radius: 16px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; cursor: pointer; transition: border-color .2s, background .2s, opacity .2s; opacity: .55; }
+.tp-day.on { border-color: var(--accent); opacity: 1; }
+.tp-day small { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.tp-day.on small { color: var(--accent-text, var(--accent)); }
+.tp-day b { font-size: 20px; font-weight: 800; line-height: 1.2; }
+.tp-day span { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-dots { display: flex; justify-content: center; gap: 6px; margin: 10px 0 14px; }
+.tp-dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--line-strong, var(--ink-3)); opacity: .5; transition: width .2s, opacity .2s, background .2s; }
+.tp-dots i.on { width: 18px; background: var(--accent); opacity: 1; }
+
+/* SWAP, for today only. */
+.tp-row-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -2px 0 10px 34px; }
+.tp-row-foot .tp-wave { margin: 0; }
+.tp-full .tp-row-foot { margin: 6px 0 0; }
+.tp-swap { flex: none; min-height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.tp-swap.did { border-color: var(--accent); color: var(--accent-text, var(--accent)); }
+.tp-swap-list { display: grid; gap: 6px; margin: 0 0 12px 34px; padding: 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+.tp-full .tp-swap-list { margin: 8px 0 0; }
+.tp-swap-list p { margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.tp-swap-list button { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; min-height: 42px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--surface-1); color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer; }
+.tp-swap-list button small { font-size: 12.5px; font-weight: 500; color: var(--ink-3); white-space: nowrap; }
+.tp-swap-list button.back { color: var(--accent-text, var(--accent)); }
+.tp-swap-list button.cancel { justify-content: center; background: transparent; color: var(--ink-2); font-size: 14px; }
+.tp-swap-list .none { color: var(--ink-3); font-size: 13px; padding: 4px 2px; }
+.td-card .tp-swap { height: 30px !important; min-height: 0 !important; min-width: 0; padding: 0 12px; line-height: 1; display: inline-flex; align-items: center; box-shadow: none; }
+.tp-row-foot .tp-wave em { white-space: nowrap; }
+.td-card .tp-swap-list button { align-items: center; height: auto; min-height: 44px; padding: 10px 12px; box-shadow: none; }
+
+/* In progress: an accent chip with a pulsing dot, until Finish. */
+.app-frame .td-chip.live, .today .td-chip.live { color: var(--accent-text, var(--accent)) !important; gap: 7px; }
+.td-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: td-live 1.6s ease-in-out infinite; }
+@keyframes td-live { 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .td-live-dot { animation: none; } }
+.workout-finish-bar .pause-workout { margin-bottom: 8px; flex-direction: column; gap: 2px; }
+.workout-finish-bar .pause-workout small { font-size: 12px; font-weight: 500; opacity: .75; }
