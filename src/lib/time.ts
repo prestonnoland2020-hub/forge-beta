@@ -41,6 +41,21 @@ export function clockToSeconds(value:string,hoursFirst=false){
   return Number.isFinite(decimal)?decimal*60:0;
 }
 
+/* A RACE TIME, READ THE WAY THE RUNNER MEANT IT. "3:15" on a marathon is
+   three hours fifteen, not three minutes fifteen — but a goal saved with the
+   unit mm:ss read it as 195 seconds, and Adam's 3:15 marathon showed as out
+   of reach while Forge itself put him at about 3:07. A two-part time that
+   would mean running faster than 3:00 a mile over the distance is read as
+   hours and minutes instead. */
+export function goalClockSeconds(target:string,unit:string|undefined,miles=0){
+  const text=String(target||'').trim();
+  const hoursFirst=/hh/i.test(String(unit||''));
+  const seconds=clockToSeconds(text,hoursFirst);
+  const twoPart=/\d+:\d+/.test(text)&&!/\d+:\d+:\d+/.test(text);
+  if(!hoursFirst&&twoPart&&miles>0&&seconds>0&&seconds/miles<180)return clockToSeconds(text,true);
+  return seconds;
+}
+
 export function formatGoalTarget(target:string,metric?:string,unit?:string){
   /* A PACE IS READ AS MINUTES AND SECONDS, NEVER AS A DECIMAL. An athlete who
      typed 8.5 for a min/mi goal meant eight-and-a-half minutes — showing

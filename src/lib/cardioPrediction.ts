@@ -231,7 +231,15 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   const raw = [vo2Raw, heartRaw, curveRaw].filter((value): value is number => Boolean(value && value > 0));
   if (!raw.length) return null;
   const provisional = Math.exp(raw.reduce((sum, value) => sum + Math.log(value), 0) / raw.length);
-  const shortfall = volumeShortfallFor(provisional / goalMiles, weeklyMiles);
+  /* THE LONG RUN IS THE MILEAGE QUESTION ANSWERED. The volume correction
+     exists because a fast 5K off thirteen miles a week says nothing about
+     lasting 26. An athlete who ran 18 miles at 7:28 last week has answered
+     it: endurance at the distance is shown, whatever the weekly total. So for
+     a race past 10K, a recent continuous run of 70% of the distance or more
+     removes the correction, and shorter long runs remove it in proportion. */
+  const longest = Math.max(0, ...runs.filter(run => daysAgo(run.date) <= 56).map(run => run.miles));
+  const enduranceShown = goalMiles > 6.3 ? Math.min(1, longest / (0.7 * goalMiles)) : 0;
+  const shortfall = volumeShortfallFor(provisional / goalMiles, weeklyMiles) * (1 - enduranceShown);
   const vo2Seconds = vo2Raw ? Math.round(goalMiles > FIVE_K ? vo2Raw * Math.pow(goalMiles / FIVE_K, (RIEGEL_UNDERTRAINED - RIEGEL) * shortfall) : vo2Raw) : null;
   const heartSeconds = heart && heartRaw ? Math.round(equivalentSeconds(heart.seconds, heart.miles, goalMiles, shortfall)) : null;
   const fresh = curve ? predictFromCurve(curve, goalMiles, shortfall) : null;

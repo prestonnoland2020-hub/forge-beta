@@ -3,7 +3,7 @@ import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider'
 import { calculateEstimatedOneRepMax } from './strength';
 import { sameLift } from './liftAliases';
 import { predictRaceFromLegacyMethod } from './cardioPrediction';
-import { clockToSeconds, localDayIso } from './time';
+import { clockToSeconds, goalClockSeconds, localDayIso } from './time';
 import { weeklyMilesFrom } from './runVolume';
 import { runLines, longestRun } from './stats';
 
@@ -219,7 +219,7 @@ function strengthTrajectory(goal: CreatedGoal, records: WorkoutRecord[]): GoalTr
 
 function raceTrajectory(goal: CreatedGoal, records: WorkoutRecord[], excluded: string[] = []): GoalTrajectory {
   const miles = raceMiles(goal);
-  const targetSeconds = clockToSeconds(String(goal.target || '')) || Number(goal.target) * 60 || 0;
+  const targetSeconds = goalClockSeconds(String(goal.target || ''), goal.unit, miles || 0) || Number(goal.target) * 60 || 0;
   const weeks = weeksUntil(goal.date);
   const model = miles ? predictRaceFromLegacyMethod(records, miles, excluded) : null;
   const base = {

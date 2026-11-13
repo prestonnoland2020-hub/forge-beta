@@ -1,3 +1,4 @@
+import { raceMiles } from './goalFeasibility';
 import { liftTrend } from './liftTrend';
 import type { CreatedGoal } from '../components/GoalBuilder';
 import { startingNumbers } from './startingNumbers';
@@ -5,7 +6,7 @@ import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider'
 import type { Feasibility } from './goalFeasibility';
 import { calculateEstimatedOneRepMax } from './strength';
 import { sameLift } from './liftAliases';
-import { clockToSeconds } from './time';
+import { clockToSeconds, goalClockSeconds } from './time';
 import { predictionFromNow, predictionTone } from './predictionFromNow';
 
 /* HOW FAR ALONG A GOAL IS, AS ONE NUMBER AND ONE COLOUR.
@@ -102,7 +103,7 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
   const unit = goal.unit || String(goal.target || '').split(' ').slice(1).join(' ');
   const time = isTime(unit);
   const hoursFirst = /hh/i.test(unit);
-  const target = time ? clockToSeconds(String(goal.target).split(' ')[0], hoursFirst) : numeric(goal.target);
+  const target = time ? goalClockSeconds(String(goal.target).split(' ')[0], unit, goal.type === 'Endurance' ? raceMiles(String(goal.exercise || goal.title || '')) : 0) : numeric(goal.target);
   const show = (value: number) => time ? clock(value) : `${Math.round(value * 10) / 10}${unit && unit !== 'reps' ? ` ${unit}` : unit === 'reps' ? ' reps' : ''}`;
 
   let current: number | null = null;
@@ -116,14 +117,18 @@ export function goalProgress(goal: CreatedGoal, records: WorkoutRecord[], verdic
     current = Number(weighed.at(-1)?.bodyWeight) || numeric(setup?.currentWeight) || start || null;
     if (current && start && target) share = start === target ? 1 : clamp01((start - current) / (start - target));
   } else {
-    const entered = time ? clockToSeconds(goal.current || '', hoursFirst) : numeric(goal.current);
+    const entered = time ? goalClockSeconds(goal.current || '', unit, goal.type === 'Endurance' ? raceMiles(String(goal.exercise || goal.title || '')) : 0) : numeric(goal.current);
     /* For a time goal the predictor wins over a typed starting time — it is
        built from what was actually run, and the goal detail already shows it
        as CURRENT. A typed time stays the fallback when nothing is logged. */
     /* TESTED, for a time goal, is a time actually run at the distance (the
        page hands it over as enduranceNow) or a time typed on the goal — never
        the prediction. With neither there is no bar, and it says why. */
-    current = (time && enduranceNow ? enduranceNow : entered) || null;
+    /* In calculated mode with no time handed over, the predictor's own "worth
+       today" from the verdict is the current — Progress read "Log it to
+       start" over a marathon with eighteen-mile runs on file. */
+    const predicted = mode === 'calculated' && time && verdict?.prediction?.better === 'lower' ? verdict.prediction.start : 0;
+    current = (time && enduranceNow ? enduranceNow : entered || predicted) || null;
     if (current && target) share = clamp01(time ? target / current : current / target);
   }
 
