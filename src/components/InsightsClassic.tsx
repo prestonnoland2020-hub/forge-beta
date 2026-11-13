@@ -4,7 +4,6 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioMiles, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
 import '../today-picks.css';
-import { GoalPace } from './GoalPace';
 import { Icon } from './Icon';
 
 /* Insights rebuilt on the original Forge web app's structure: KPI tiles,
@@ -219,7 +218,6 @@ export function InsightsClassic() {
   </div>;
 
   return <div className="insights-classic">
-    <GoalPace />
     {lifts.length > 0 && <section className="card ic-card">
       <header className="ic-head"><i /><h3>Lift progress</h3></header>
       <select value={selectedLift} onChange={event => setPrLift(event.target.value)}>{lifts.map(lift => <option key={lift}>{lift}</option>)}</select>

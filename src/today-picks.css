@@ -107,15 +107,4 @@
 .quick-log-flash .felt button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #0b100e); }
 .tp-goal .tp-why { margin: -4px 0 10px; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
 
-/* Your goals, on Progress: one line each and a pace pill. */
-.goal-pace header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-.goal-pace header a { font-size: 14px; font-weight: 600; color: var(--ink-2); text-decoration: none; }
-.goal-pace-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
-.goal-pace-row:first-of-type { border-top: 0; }
-.goal-pace-row b { display: block; font-size: 16px; color: var(--ink); }
-.goal-pace-row small { display: block; margin-top: 2px; font-size: 13px; color: var(--ink-2); }
-.goal-pace-pill { flex: none; padding: 5px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
-.goal-pace-pill.on-track, .goal-pace-pill.reached { background: color-mix(in oklch, var(--good, #3fbf7f) 18%, transparent); color: var(--good, #3fbf7f); }
-.goal-pace-pill.needs-work { background: color-mix(in oklch, var(--accent) 18%, transparent); color: var(--accent-text, var(--accent)); }
-.goal-pace-pill.off-track { background: color-mix(in oklch, #e5484d 18%, transparent); color: #ff7a7f; }
 
