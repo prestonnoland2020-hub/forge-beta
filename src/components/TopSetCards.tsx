@@ -30,6 +30,9 @@ type Props = {
   onDeleteLogged: (index: number, set: LoggedTopSet) => void;
   onCreateExercise: (name: string, muscles: string[]) => void;
   planLabel?: string;
+  /* The plan's ask for a lift that is not on today's card (it lives on
+     another split day), so a lifter who trains out of order still sees it. */
+  askFor?: (lift: string) => { prescribedReps?: number; prescribedWeight?: number };
   /* Set when the day has no label yet: a top set has nothing to attach to. */
   blockedReason?: string;
 };
@@ -71,7 +74,7 @@ const PrBadge = ({ record, unit, fresh }: { record: RecordResult; unit: string; 
    A set that is saved collapses to what it is — the lift, the load, the max —
    and opens on a tap when it needs correcting. A set still being entered is
    open, because it is the question on the screen. */
-export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onDeleteLogged, onCreateExercise, planLabel, blockedReason = '' }: Props) {
+export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onDeleteLogged, onCreateExercise, planLabel, askFor, blockedReason = '' }: Props) {
   /* Keyed, not indexed: rows are added and removed under this state. */
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [closedKeys, setClosedKeys] = useState<string[]>([]);
@@ -198,9 +201,10 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
 
       /* WHAT THE PLAN ASKED FOR IS PRINTED, NOT PRE-TYPED. The weight dial
          opens empty on an unlogged set; the ask reads as an ask. */
-      const askReps = logged ? 0 : displayedSet.prescribedReps || 0;
-      const askWeight = logged ? 0 : displayedSet.prescribedWeight || 0;
-      const askText = askReps ? (askWeight ? `${askWeight} ${unit} ×${askReps}` : `×${askReps}`) : '';
+      const elsewhere = !logged && !displayedSet.prescribedReps && displayedSet.lift ? askFor?.(displayedSet.lift) : undefined;
+      const askReps = logged ? 0 : displayedSet.prescribedReps || elsewhere?.prescribedReps || 0;
+      const askWeight = logged ? 0 : displayedSet.prescribedWeight || elsewhere?.prescribedWeight || 0;
+      const askText = askReps ? (askWeight ? `${askWeight} ${unit} × ${askReps} reps` : `${askReps} reps`) : '';
 
       /* Closed: the whole set is one line of text — saved sets read as their
          result, still-to-log sets read as the prescription with LOG waiting. */

@@ -36,27 +36,23 @@ await p.waitForTimeout(2400);
 
 check('no dead button is left on the screen', !(await p.$('.today-regen')));
 
-const link = await p.evaluate(() => {
-  const el = [...document.querySelectorAll('.today-focus-card .feed-card-header a')][0];
-  if (!el) return null;
-  const rect = el.getBoundingClientRect();
-  const header = document.querySelector('.today-focus-card .feed-card-header').getBoundingClientRect();
-  return { text: el.textContent.trim(), href: el.getAttribute('href'), tall: Math.round(rect.height), rightAligned: Math.abs(rect.right - (header.right - 22)) < 12 };
+const chips = await p.evaluate(() => {
+  const ask = document.querySelector('.today-focus-card .tp-ask');
+  const els = [...document.querySelectorAll('.today-focus-card .tp-chips button')];
+  return { ask: ask?.textContent.trim(), names: els.map(e => e.textContent.trim()), tall: Math.min(...els.map(e => Math.round(e.getBoundingClientRect().height))), on: els.findIndex(e => e.getAttribute('aria-checked') === 'true') };
 });
-check('the header offers an action in that slot', Boolean(link), 'none found');
-check('it says what it does', link?.text === 'Change day', link?.text);
-check('it goes where the athlete picks a split day', link?.href === '#/workout?source=split', link?.href);
-check('it is a tap target, not a 30px sliver', (link?.tall || 0) >= 40, `${link?.tall}px`);
-check('it sits at the end of the header, like Edit does', link?.rightAligned === true);
+check('the card asks what you are training', chips.ask === 'What are you training today?', chips.ask);
+check('every split day is a chip', chips.names.length >= 2, JSON.stringify(chips.names));
+check('the suggested day comes first and is picked', chips.on === 0 && /Suggested/.test(chips.names[0] || ''), JSON.stringify(chips));
+check('chips are tap targets', chips.tall >= 32, `${chips.tall}px`);
 
-/* And the destination really is the day picker. */
-await p.evaluate(() => [...document.querySelectorAll('.today-focus-card .feed-card-header a')][0].click());
-await p.waitForTimeout(2200);
-check('the log opens on From Split', /source=split/.test(p.url()), p.url());
-const modes = await p.evaluate(() => [...document.querySelectorAll('.source-mode, .workout-source button, .source-modes button')].map(el => el.textContent.trim()));
-const text = await p.evaluate(() => document.body.innerText);
-check('and the split day chooser is what is showing', /split/i.test(text), JSON.stringify(modes).slice(0, 120));
-
+/* Tap the other day, then start: the log opens on that day. */
+await p.evaluate(() => document.querySelectorAll('.today-focus-card .tp-chips button')[1].click());
+await p.waitForTimeout(600);
+const picked = await p.evaluate(() => [...document.querySelectorAll('.today-focus-card .tp-chips button')].findIndex(e => e.getAttribute('aria-checked') === 'true'));
+check('one tap switches the day', picked === 1, String(picked));
+const start = await p.evaluate(() => { const a = [...document.querySelectorAll('.today-focus-card a')].find(e => /source=split/.test(e.getAttribute('href') || '')); return a?.getAttribute('href'); });
+check('start goes to that split day', /source=split&day=\d+&dayName=/.test(start || ''), start);
 await b.close();
 console.log(fails ? `\n${fails} FAILURES` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

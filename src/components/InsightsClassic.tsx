@@ -6,6 +6,7 @@ import { isCardioMovement } from '../lib/muscleGroups';
 import { primaryMusclesFor } from '../lib/liftAliases';
 import { cardioMiles, summarizeCardioDraft, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
+import '../today-picks.css';
 import { Icon } from './Icon';
 
 /* Insights rebuilt on the original Forge web app's structure: KPI tiles,
@@ -158,7 +159,11 @@ export function InsightsClassic() {
   /* --------------------------------------------------------- PR progress */
   const lifts = useMemo(() => [...bestByLift.keys()].sort(), [bestByLift]);
   const [prLift, setPrLift] = useState('');
-  const [prMode, setPrMode] = useState<'1rm' | 'calc'>('calc');
+  /* 'top' is the default: the weight actually on the bar each session, with
+     its reps — what a lifter means by "my top sets over time". The estimated
+     max is one tap away. */
+  const [prMode, setPrMode] = useState<'top' | '1rm' | 'calc'>('top');
+  const [allSessions, setAllSessions] = useState(false);
   /* Endurance, weekly and readable: miles per week, or the week's best pace. */
   const [endMetric, setEndMetric] = useState<'miles' | 'pace'>('miles');
   const enduranceSeries = useMemo(() => {
@@ -185,15 +190,17 @@ export function InsightsClassic() {
   }, [records, rangeCutoffIso, endMetric]);
   const selectedLift = prLift || lifts[0] || '';
   const prSeries = useMemo(() => {
-    const byDay = new Map<string, number>();
+    const byDay = new Map<string, { value: number; reps: number }>();
     records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.topSets || []).forEach(set => {
       if (set.completed === false || set.lift !== selectedLift || !set.weight) return;
       if (prMode === '1rm' && set.reps !== 1) return;
-      const value = prMode === '1rm' ? set.weight : (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0);
+      const value = prMode === 'calc' ? (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0) : set.weight;
       if (!value) return;
-      byDay.set(record.date, Math.max(byDay.get(record.date) || 0, value));
+      const held = byDay.get(record.date);
+      /* The day's heaviest set; at the same weight, the one with more reps. */
+      if (!held || value > held.value || (value === held.value && set.reps > held.reps)) byDay.set(record.date, { value, reps: set.reps });
     }));
-    return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, value }));
+    return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, entry]) => ({ date, value: entry.value, label: prMode === 'top' ? `×${entry.reps}` : undefined }));
   }, [records, selectedLift, prMode, rangeCutoffIso]);
   /* Old-app parity: the chart is accompanied by the actual numbers — the best
      entry in the window (raw weight ×reps, and its 1RM/calculated value) plus
@@ -205,7 +212,7 @@ export function InsightsClassic() {
     records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.topSets || []).forEach(set => {
       if (set.completed === false || set.lift !== selectedLift || !set.weight) return;
       if (prMode === '1rm' && set.reps !== 1) return;
-      const value = prMode === '1rm' ? set.weight : (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0);
+      const value = prMode === 'calc' ? (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0) : set.weight;
       if (!value) return;
       entries.push({ date: record.date, value });
       if (!best || value > best.value) best = { weight: set.weight, reps: set.reps, date: record.date, value };
@@ -227,7 +234,7 @@ export function InsightsClassic() {
      smoothing through every point (straight when dense), vertical gradient area fill, 2px round
      stroke, 2.4px dots with a haloed endpoint, nice ticks, and a three-date
      strip under a hairline. viewBox 280x130 stretched to 150px tall. */
-  const lineChart = (points: Array<{ date: string; value: number }>, id: string) => {
+  const lineChart = (points: Array<{ date: string; value: number; label?: string }>, id: string) => {
     if (points.length < 2) return null;
     const W = 280, H = 130, PL = 30, PR = 5, PT = 8, PB = 8;
     const ts = points.map(point => new Date(`${point.date}T12:00:00`).getTime());
@@ -288,6 +295,8 @@ export function InsightsClassic() {
         <path className="chart-area" d={areaD} />
         <path className="chart-line" d={lineD} pathLength={1} />
         {!dense && pts.slice(0, -1).map((point, index) => <circle className="chart-point" key={index} cx={point.x} cy={point.y} r="3" style={{ '--i': index } as CSSProperties} />)}
+        {/* Reps over each top set, when there is room to read them. */}
+        {pts.length <= 12 && points.map((point, index) => point.label ? <text className="chart-axis chart-reps" key={`r${index}`} x={pts[index].x} y={Math.max(PT + 2, pts[index].y - 7)} fontSize="8.5" textAnchor={index === 0 ? 'start' : index === pts.length - 1 ? 'end' : 'middle'}>{point.label}</text> : null)}
         <circle className="chart-halo" cx={last.x} cy={last.y} r="5" />
         <circle className="chart-now" cx={last.x} cy={last.y} r="5" />
       </svg>
@@ -310,15 +319,29 @@ export function InsightsClassic() {
 
   return <div className="insights-classic">
     {lifts.length > 0 && <section className="card ic-card">
-      <header className="ic-head"><i /><h3>PR progress</h3></header>
+      <header className="ic-head"><i /><h3>Lift progress</h3></header>
       <select value={selectedLift} onChange={event => setPrLift(event.target.value)}>{lifts.map(lift => <option key={lift}>{lift}</option>)}</select>
-      <div className="ic-toggle" role="group" aria-label="PR metric">{([['1rm', '1RM'], ['calc', 'Estimated 1RM']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
+      <div className="ic-toggle" role="group" aria-label="PR metric">{([['top', 'Top set'], ['calc', 'Est. 1RM'], ['1rm', 'True 1RM']] as const).map(([value, label]) => <button type="button" key={value} className={prMode === value ? 'active' : ''} onClick={() => setPrMode(value)}>{label}</button>)}</div>
       <div className="ic-range" role="group" aria-label="Date range">{([['3m', '3M'], ['6m', '6M'], ['1y', '1Y'], ['all', 'All']] as const).map(([value, label]) => <button type="button" key={value} className={prRange === value ? 'active' : ''} onClick={() => setPrRange(value)}>{label}</button>)}</div>
       {prSeries.length >= 2 ? lineChart(prSeries, 'pr') : <p className="ic-empty">{prMode === '1rm' ? `No true 1-rep-max entries for ${selectedLift} in this range. Try “Estimated 1RM” to include multi-rep sets.` : `Not enough ${selectedLift} sets in this range to chart.`}</p>}
       {prStats.best && <div className="kpi-grid ic-chart-kpis">
         <div className="kpi-tile"><b>{prStats.best.weight} {unit}</b><span>Weight lifted</span><small>{prStats.best.reps > 1 ? `×${prStats.best.reps} reps · ` : ''}{shortDate(prStats.best.date)}</small></div>
-        <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === '1rm' ? '1RM' : 'Estimated 1RM'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
+        <div className="kpi-tile gold"><b>{Math.round(prStats.best.value * 10) / 10} {unit}</b><span>{prMode === 'top' ? 'Heaviest top set' : prMode === '1rm' ? '1RM' : 'Estimated 1RM'}</span><small>{shortDate(prStats.best.date)}</small>{prStats.delta !== null && <small className={prStats.delta > 0 ? 'ic-delta up' : prStats.delta < 0 ? 'ic-delta down' : 'ic-delta'}>{prStats.delta === 0 ? 'No change' : `${prStats.delta > 0 ? '+' : ''}${prStats.delta} ${unit}`} · {rangeLabels[prRange]}</small>}</div>
       </div>}
+      {/* EVERY TOP SET, AS A LIST. The chart shows the shape; this says the
+          numbers, newest first, each against the session before it. */}
+      {prMode === 'top' && prSeries.length > 0 && (() => {
+        const rows = prSeries.map((point, index) => ({ ...point, change: index ? point.value - prSeries[index - 1].value : null })).reverse();
+        const shown = allSessions ? rows : rows.slice(0, 5);
+        return <div className="ic-sessions">
+          {shown.map(row => <div key={row.date} className="ic-session">
+            <span>{new Date(`${row.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+            <b>{row.value} {unit} {row.label}</b>
+            <small className={row.change === null || row.change === 0 ? '' : row.change > 0 ? 'up' : 'down'}>{row.change === null ? 'First' : row.change === 0 ? 'Same' : `${row.change > 0 ? '+' : '−'}${Math.abs(Math.round(row.change * 10) / 10)}`}</small>
+          </div>)}
+          {rows.length > 5 && <button type="button" className="ic-sessions-more" onClick={() => setAllSessions(value => !value)}>{allSessions ? 'Show less' : `Show all ${rows.length}`}</button>}
+        </div>;
+      })()}
     </section>}
 
     <section className="card ic-card">

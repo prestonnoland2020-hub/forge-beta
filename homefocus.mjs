@@ -44,7 +44,7 @@ check('nothing is left rendering the grid', !(await p.$('.feed-support-grid')));
 check("today's card survived", Boolean(await p.$('.today-focus-card')));
 check('the greeting survived', /Good (morning|afternoon|evening)/.test(text), text.slice(0, 80));
 check('starting the workout survived', /Start workout|Open workout/.test(text));
-check('Change day survived', /Change day/.test(text));
+check('day chips survived', /What are you training today\?/.test(text));
 
 /* And the two tabs that own this material are still one tap away. */
 const nav = await p.evaluate(() => [...document.querySelectorAll('.bottom-nav a')].map(a => a.getAttribute('href')));

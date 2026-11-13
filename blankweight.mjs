@@ -44,9 +44,9 @@ check('the no-history fallback is blank too',
 
 console.log('\nThe ask is printed where the athlete can read it');
 check('an unlogged row derives the ask from the prescription',
-  /const askReps = logged \? 0 : displayedSet\.prescribedReps \|\| 0;/.test(cards));
+  /const askReps = logged \? 0 : displayedSet\.prescribedReps \|\| elsewhere\?\.prescribedReps \|\| 0;/.test(cards));
 check('a logged row prints its result, never an ask',
-  /const askWeight = logged \? 0 : displayedSet\.prescribedWeight \|\| 0;/.test(cards));
+  /const askWeight = logged \? 0 : displayedSet\.prescribedWeight \|\| elsewhere\?\.prescribedWeight \|\| 0;/.test(cards) && /const elsewhere = !logged && /.test(cards));
 check('the closed row says what was asked', /<small>Today \{askText\}<\/small>/.test(cards));
 check("the open row labels it as today's ask", /Today: <strong>\{askText\}<\/strong>/.test(cards));
 check('and says whose number goes in the dial', /Log what you actually lifted\./.test(cards));

@@ -123,7 +123,7 @@ const between = (t, a, len) => { const i = t.indexOf(a); return i < 0 ? '' : t.s
   await p.evaluate(() => { location.hash = '#/split'; }); await p.waitForTimeout(1800);
   await tapText(p, 'Quality Cardio'); await p.waitForTimeout(500); await tapText(p, 'Forge writes the race session'); await p.waitForTimeout(700);
   await p.evaluate(() => { location.hash = '#/'; }); await p.waitForTimeout(1200);
-  await tapText(p, 'Change day'); await p.waitForTimeout(1800);
+  await p.evaluate(() => { location.hash = '#/workout?source=split'; }); await p.waitForTimeout(1800);
   for (const s of await p.$$('select')) { if (!(await s.isVisible())) continue; const opts = await s.evaluate(e => [...e.options].map(o => o.text)); const o = opts.find(x => /Quality Cardio/.test(x)); if (o) { await s.selectOption({ label: o }); break; } }
   await p.waitForTimeout(1800);
   t = await text(p);
