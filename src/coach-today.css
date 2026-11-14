@@ -15,3 +15,5 @@
 .ct-more { align-self: center; border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; padding: 6px; cursor: pointer; }
 .td-coach-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin-top: 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; font-weight: 650; font-size: 15px; cursor: pointer; }
 .td-coach-btn svg { color: var(--accent-strong, var(--accent)); }
+/* Why the coach picked it, in one line, above the details. */
+.ct-why { margin: 2px 0 0; font-size: 15px; line-height: 1.4; color: var(--ink); font-weight: 600; text-wrap: pretty; }

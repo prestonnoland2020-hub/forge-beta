@@ -439,7 +439,10 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
       :bodyLog.pregnant&&eased!==built?'Pregnancy · moderate loads, no max attempts, easy cardio. Your clinician’s advice comes first.'
       :bodyLog.postpartum&&eased!==built?'Postpartum · lighter loads, no running or impact until you’re cleared. Tell Forge when you are.'
       :partialNote?partialNote
-      :eased!==built?`Easing back in · ${EASE_PERCENT}% lighter today`:undefined;
+      /* Only when something was actually taken down. easeRecommendation always
+         returns a new object, so on a rest day — nothing to lighten — this
+         still read "10% lighter today". */
+      :eased!==built&&(eased.topSets.some((set,index)=>set.weight!==built.topSets[index]?.weight)||eased.cardio!==built.cardio)?`Easing back in · ${EASE_PERCENT}% lighter today`:undefined;
     if(!coachOverride)return bodyNote?{...eased,coachNote:bodyNote}:eased;
     const fitted=coachOverride.minutes&&!coachRest?shortenRecommendation(eased,coachOverride.minutes):eased;
     return{...fitted,coachNote:bodyNote||coachOverride.note||undefined};
