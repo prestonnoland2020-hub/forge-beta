@@ -42,17 +42,34 @@ const lastWeight = (records: HistoryLike[], name: string) => {
   return best?.weight || 0;
 };
 
-export function buildFullWorkout(input: { topSets: TopLine[]; dayMuscles: string[]; library: LibraryLike[]; records: HistoryLike[]; metric: boolean; unit: string }): WorkoutBlock[] {
+/* `plateaus`: lifts the plan has found stuck (lib/plateau), each with the
+   variation chosen to break it, if the library has one. */
+export function buildFullWorkout(input: { topSets: TopLine[]; dayMuscles: string[]; library: LibraryLike[]; records: HistoryLike[]; metric: boolean; unit: string; plateaus?: Map<string, string | null> }): WorkoutBlock[] {
   const { topSets, library, records, metric, unit } = input;
+  const plateaus = input.plateaus || new Map<string, string | null>();
   const used = new Set(topSets.map(set => canonicalLiftKey(set.exercise)));
   const blocks: WorkoutBlock[] = topSets.map(set => {
+    const stuck = plateaus.has(canonicalLiftKey(set.exercise));
     /* A high-rep top set is already volume: two more of the same, not a
        lighter set of fourteen. */
-    if ((set.reps || 5) >= 10) return { exercise: set.exercise, muscle: set.muscle, kind: 'top', weight: set.weight, reps: set.reps, plan: `Then 2 more sets of ${set.reps}` };
+    if ((set.reps || 5) >= 10) return { exercise: set.exercise, muscle: set.muscle, kind: 'top', weight: set.weight, reps: set.reps, plan: `Then ${stuck ? 3 : 2} more sets of ${set.reps}${stuck ? ' (plateau plan)' : ''}` };
+    /* A STUCK LIFT GETS ONE MORE BACK-OFF SET: more work at the weight that
+       matters is the first thing a coach changes. */
     const back = backOff(set.weight, set.reps || 5, metric);
+    const sets = stuck ? back.sets + 1 : back.sets;
     return { exercise: set.exercise, muscle: set.muscle, kind: 'top', weight: set.weight, reps: set.reps,
-      plan: back.weight ? `Then ${back.sets} × ${back.reps} @ ${back.weight} ${unit}` : `Then ${back.sets} × ${back.reps} a little lighter` };
+      plan: `${back.weight ? `Then ${sets} × ${back.reps} @ ${back.weight} ${unit}` : `Then ${sets} × ${back.reps} a little lighter`}${stuck ? ' (plateau plan)' : ''}` };
   });
+  /* AND A VARIATION THAT TRAINS THE STICKING POINT, first among the
+     accessories, heavier than the rest: 3 × 6–8. */
+  for (const set of topSets) {
+    const variation = plateaus.get(canonicalLiftKey(set.exercise));
+    if (!variation || used.has(canonicalLiftKey(variation)) || blocks.filter(block => block.kind === 'accessory').length >= MAX_ACCESSORIES) continue;
+    used.add(canonicalLiftKey(variation));
+    const weight = lastWeight(records, variation);
+    blocks.push({ exercise: variation, muscle: set.muscle, kind: 'accessory', weight, reps: 8,
+      plan: `Plateau breaker for ${set.exercise} · 3 × 6–8${weight ? ` @ ${weight} ${unit}` : ' · a weight you could do 10 times'}` });
+  }
   /* Every muscle the day names, plus the top sets' own, each gets one
      accessory — the ones the top sets do not lead come first. */
   const muscles = [...new Set([...input.dayMuscles, ...topSets.map(set => set.muscle)])].filter(muscle => muscle && muscle !== 'Cardio' && muscle !== 'Primary');

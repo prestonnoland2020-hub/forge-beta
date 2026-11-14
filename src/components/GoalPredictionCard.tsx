@@ -102,7 +102,7 @@ function PaceGraph({ p, date, show, tone }: { p: GoalPrediction; date: string; s
 function QuickWin({ win, onAdd }: { win: GoalSuggestion; onAdd: (win: GoalSuggestion) => void }) {
   const [added, setAdded] = useState(false);
   return <div className="goal-quickwin">
-    <span><b>Quick win · {win.label} by {win.dateLabel}</b>{win.how}</span>
+    <span><b>{win.name} · {win.label} by {win.dateLabel}</b>{win.how}</span>
     {added ? <em className="goal-fix-done">Added</em> : <button type="button" className="button small" onClick={() => { onAdd(win); setAdded(true); }}>Add</button>}
   </div>;
 }
