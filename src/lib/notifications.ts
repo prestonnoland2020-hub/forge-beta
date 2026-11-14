@@ -1,4 +1,5 @@
 import { localDayIso } from './time';
+import { isNativeApp, nativePermission, requestNativePermission } from './nativePush';
 /* Notification preferences and best-effort delivery. System notifications on
    the web fire while Forge is open (or installed) and permission is granted;
    the Coach tab is the always-reliable in-app surface for the same messages. */
@@ -9,16 +10,18 @@ const sentKey = 'forge-notifications-sent-v1';
 
 /* The sync push is on by default on the server for every device already
    registered, so the switch reads on wherever notifications are allowed. */
-const syncDefault = () => typeof Notification !== 'undefined' && Notification.permission === 'granted';
+const syncDefault = () => isNativeApp() ? nativePermission() === 'granted' : typeof Notification !== 'undefined' && Notification.permission === 'granted';
 export const loadNotificationPrefs = (): NotificationPrefs => {
   try { return { morningWorkout: false, injuryFollowUp: false, partnerTrained: false, watchSynced: syncDefault(), ...JSON.parse(localStorage.getItem(prefsKey) || '{}') }; }
   catch { return { morningWorkout: false, injuryFollowUp: false, partnerTrained: false, watchSynced: syncDefault() }; }
 };
 export const saveNotificationPrefs = (prefs: NotificationPrefs) => localStorage.setItem(prefsKey, JSON.stringify(prefs));
 
-export const notificationsSupported = () => typeof Notification !== 'undefined';
-export const notificationPermission = () => notificationsSupported() ? Notification.permission : 'denied';
-export const requestNotificationPermission = async () => notificationsSupported() ? Notification.requestPermission() : 'denied';
+/* The iPhone app has no `Notification` (a WebView), but it has real native
+   notifications (lib/nativePush), so it answers for itself. */
+export const notificationsSupported = () => isNativeApp() || typeof Notification !== 'undefined';
+export const notificationPermission = (): NotificationPermission => isNativeApp() ? nativePermission() : typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+export const requestNotificationPermission = async (): Promise<NotificationPermission> => isNativeApp() ? requestNativePermission() : typeof Notification !== 'undefined' ? Notification.requestPermission() : 'denied';
 
 const todayIso = () => localDayIso();
 const alreadySent = (tag: string) => {
@@ -29,7 +32,7 @@ const markSent = (tag: string) => {
 };
 
 const show = (tag: string, title: string, body: string) => {
-  if (!notificationsSupported() || Notification.permission !== 'granted' || alreadySent(tag)) return;
+  if (isNativeApp() || typeof Notification === 'undefined' || Notification.permission !== 'granted' || alreadySent(tag)) return;
   try { new Notification(title, { body, tag: `forge-${tag}`, icon: './forge-icon-192.png' }); markSent(tag); } catch { /* some platforms need a service worker; the in-app card still shows */ }
 };
 

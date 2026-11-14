@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { env, isDemoMode } from './env';
+import { disableNativePush, isNativeApp, syncNativePush } from './nativePush';
 
 /* REAL PUSH, THE ONE WAY IOS ALLOWS IT.
 
@@ -35,17 +36,17 @@ async function applicationServerKey(): Promise<string | null> {
   return resolvedKey;
 }
 
-export const pushSupported = () =>
+export const pushSupported = () => isNativeApp() || (
   typeof navigator !== 'undefined' && 'serviceWorker' in navigator
-  && typeof window !== 'undefined' && 'PushManager' in window;
+  && typeof window !== 'undefined' && 'PushManager' in window);
 
 /* On iOS the API exists only inside the installed app, so the honest question
    is not "can this browser push" but "is this athlete in a position to be
    pushed to". A Safari tab is not. */
-export const installedToHomeScreen = () =>
+export const installedToHomeScreen = () => isNativeApp() || (
   typeof window !== 'undefined'
   && (window.matchMedia?.('(display-mode: standalone)').matches
-    || (window.navigator as { standalone?: boolean }).standalone === true);
+    || (window.navigator as { standalone?: boolean }).standalone === true));
 
 const urlBase64ToUint8Array = (base64: string) => {
   const padded = (base64 + '='.repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
@@ -56,7 +57,7 @@ const keyToBase64 = (key: ArrayBuffer | null) =>
   key ? btoa(String.fromCharCode(...new Uint8Array(key))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : '';
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  if (!pushSupported()) return null;
+  if (isNativeApp() || !pushSupported()) return null;
   try {
     /* The worker needs to reach the database on its own when the push service
        rotates an endpoint, and it has no bundler and no session to get there
@@ -80,6 +81,8 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
    still drew the switches as on. */
 export async function syncPushSubscription(prefs?: { morningWorkout: boolean; partnerTrained: boolean; watchSynced?: boolean }): Promise<boolean> {
   if (isDemoMode || !pushSupported()) return false;
+  /* The iPhone app registers with Apple instead (lib/nativePush). */
+  if (isNativeApp()) return syncNativePush(prefs);
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
   const vapidPublic = await applicationServerKey();
   if (!vapidPublic) return false;
@@ -125,6 +128,7 @@ export async function syncPushSubscription(prefs?: { morningWorkout: boolean; pa
 }
 
 export async function disablePush(): Promise<void> {
+  if (isNativeApp()) return disableNativePush();
   if (!pushSupported()) return;
   try {
     const registration = await navigator.serviceWorker.ready;
@@ -167,6 +171,9 @@ export async function sendTestPush(): Promise<string> {
     const last = (Array.isArray(rows) ? rows[0] : rows) as { outcome?: string; status?: number; delivered?: boolean; note?: string } | undefined;
     if (!last) continue;
     if (last.delivered) return 'Delivered — that one reached your phone.';
+    /* The iPhone app has no worker to confirm arrival; Apple taking it is
+       as far as Forge can see. */
+    if (isNativeApp() && last.outcome === 'sent') return 'Sent through Apple — it should be on your phone now.';
     if (last.outcome === 'retired') return 'Your install is no longer registered with Apple. Delete Forge from your Home Screen, add it again, and allow notifications.';
     if (last.outcome === 'failed') return `Forge could not send it${last.status ? ` (${last.status})` : ''}. ${last.note || ''}`.trim();
   }

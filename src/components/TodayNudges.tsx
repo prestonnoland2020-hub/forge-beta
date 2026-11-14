@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import { isDemoMode } from '../lib/env';
 import { loadNotificationPrefs, notificationPermission, notificationsSupported, requestNotificationPermission, saveNotificationPrefs } from '../lib/notifications';
 import { installedToHomeScreen, pushSupported, readPushHealth, syncPushSubscription } from '../lib/push';
+import { refreshNativePermission } from '../lib/nativePush';
 import { isNative } from '../features/billing/platform';
 
 /* NOTIFICATIONS ARE WHAT MAKE FORGE WORK WITHOUT BEING OPENED.
@@ -31,9 +32,14 @@ const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.
    a Safari tab, where push exists only once Forge is on the Home Screen. */
 type NotifyState = 'ask' | 'blocked' | 'install' | null;
 async function notifyState(): Promise<NotifyState> {
-  /* The native shell's web view has no web push; it needs Apple's own push
-     service, which is not wired yet. Asking there would promise nothing. */
-  if (isDemoMode || isNative() || snoozed('notifications')) return null;
+  if (isDemoMode || snoozed('notifications')) return null;
+  /* THE IPHONE APP ASKS FOR ITSELF. It registers with Apple (lib/nativePush),
+     and a web subscription on some other device says nothing about whether
+     this phone will buzz — so it is judged on its own permission. */
+  if (isNative()) {
+    const permission = await refreshNativePermission().catch(() => 'default' as const);
+    return permission === 'granted' ? null : permission === 'denied' ? 'blocked' : 'ask';
+  }
   /* Another device of theirs already gets the morning workout; nagging the
      laptop as well would be noise. */
   const health = await readPushHealth();

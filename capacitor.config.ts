@@ -44,6 +44,9 @@ const config: CapacitorConfig = {
   },
 
   plugins: {
+    /* A notification that arrives while Forge is open still shows as a
+       banner — "Garmin synced" usually lands with the app in hand. */
+    PushNotifications: { presentationOptions: ['badge', 'sound', 'alert'] },
     SplashScreen: {
       launchShowDuration: 900,
       backgroundColor: '#0b100e',
