@@ -99,15 +99,19 @@ function PaceGraph({ p, date, show, tone }: { p: GoalPrediction; date: string; s
 
 /* THE STEPPING STONE: a goal a few weeks out the athlete can actually hit,
    added beside the big one, not instead of it. */
-function QuickWin({ win, onAdd }: { win: GoalSuggestion; onAdd: (win: GoalSuggestion) => void }) {
-  const [added, setAdded] = useState(false);
+/* A STEPPING STONE IS ITS OWN GOAL. "Add" read as "change my goal", and
+   the goal did not change. It now says what it does: a second, nearer goal
+   on the way, and the big one stays as it is. */
+function QuickWin({ win, onAdd, keeps }: { win: GoalSuggestion & { added?: boolean }; onAdd: (win: GoalSuggestion) => void; keeps: string }) {
+  const [tapped, setAdded] = useState(false);
+  const added = tapped || Boolean(win.added);
   return <div className="goal-quickwin">
-    <span><b>{win.name} · {win.label} by {win.dateLabel}</b>{win.how}</span>
-    {added ? <em className="goal-fix-done">Added</em> : <button type="button" className="button small" onClick={() => { onAdd(win); setAdded(true); }}>Add</button>}
+    <span><b>{win.name} · {win.label} by {win.dateLabel}</b>{win.how}<small>{added ? `Added as its own goal. Your ${keeps} goal stays.` : `A step on the way. Adds it as a second goal — your ${keeps} goal stays.`}</small></span>
+    {added ? <em className="goal-fix-done">Added</em> : <button type="button" className="button small" onClick={() => { onAdd(win); setAdded(true); }}>Add step</button>}
   </div>;
 }
 
-export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now, quickWin, onAddQuickWin }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean; now?: number | null; quickWin?: GoalSuggestion | null; onAddQuickWin?: (win: GoalSuggestion) => void }) {
+export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now, quickWin, onAddQuickWin }: { verdict: Feasibility; date: string; unit: string; hoursFirst: boolean; now?: number | null; quickWin?: (GoalSuggestion & { added?: boolean }) | null; onAddQuickWin?: (win: GoalSuggestion) => void }) {
   const model = verdict.prediction;
   if (!model) return null;
   /* Carried from the number the card above shows, so the two always agree. */
@@ -117,7 +121,10 @@ export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now, quick
   /* Progress reads left to right whichever way the number goes. */
   const reach = (value: number) => race ? value <= p.target : value >= p.target;
   const tone = reach(p.typical) ? 'good' : reach(p.ceiling) ? 'stretch' : 'hard';
-  const label = reach(p.start) ? 'Reached' : tone === 'good' ? 'Realistic' : tone === 'stretch' ? 'Ambitious' : race ? 'Too fast' : 'Too steep';
+  /* The sets already reach the goal; only the tested number is short. One
+     heavy single settles it, so that is what the card says. */
+  const ready = reach(model.start) && !reach(p.start);
+  const label = ready ? 'Ready to test' : reach(p.start) ? 'Reached' : tone === 'good' ? 'Realistic' : tone === 'stretch' ? 'Ambitious' : race ? 'Too fast' : 'Too steep';
   const gap = Math.abs(p.typical - p.target);
   const gapText = race ? secondsToClock(gap, hoursFirst || gap >= 3600) : `${Math.round(gap)} ${unit}`;
   const line = reach(p.start) ? 'Already there — hold it to the date.'
@@ -127,20 +134,21 @@ export function GoalPredictionCard({ verdict, date, unit, hoursFirst, now, quick
   const pace = paceOf(p, weeks);
   const rateUnit = race ? 'sec/wk faster' : `${unit}/wk`;
   const source = p.measured ? 'your pace' : p.measured === false ? 'typical pace' : '';
-  return <section className={`goal-prediction compact tone-${tone}`} aria-label="Forge's prediction">
-    <div className="gpc-head"><span>Projected by {shortDate(date)}</span><em>{label}</em></div>
-    <div className="gpc-num"><b>{show(p.typical)}</b><span>{line}</span></div>
-    {weeks >= 1 && <p className="gpc-pace">
+  return <section className={`goal-prediction compact tone-${ready ? 'stretch' : tone}`} aria-label="Forge's prediction">
+    <div className="gpc-head"><span>{ready ? `Test it before ${shortDate(date)}` : `Projected by ${shortDate(date)}`}</span><em>{label}</em></div>
+    {ready ? <div className="gpc-num"><b>{show(model.start)}</b><span>{race ? 'what your runs say you can do' : 'what your sets say you can lift'}</span></div>
+    : <div className="gpc-num"><b>{show(p.typical)}</b><span>{line}</span></div>}
+    {!ready && weeks >= 1 && <p className="gpc-pace">
       <b>{pace.per > 0 ? `${race ? '' : '+'}${fmtRate(pace.per)} ${rateUnit}` : 'Flat'}</b>
       {source && <span>{source}</span>}
       {!reach(p.start) && pace.need > 0 && <span className="gpc-need">· needs {race ? '' : '+'}{fmtRate(pace.need)}</span>}
     </p>}
-    {weeks >= 1 && <PaceGraph p={p} date={date} show={show} tone={tone} />}
+    {!ready && weeks >= 1 && <PaceGraph p={p} date={date} show={show} tone={tone} />}
     {/* The estimate already clears the goal but the time actually run does
        not: the advice is to go and prove it, not "hold it". */}
     {reach(model.start) && !reach(p.start)
-      ? <p className="goal-fix"><b>What to change</b>Your other {race ? 'runs' : 'sets'} put you at about {show(model.start)}. {race ? 'Race the distance' : 'Test a heavy single'} to prove it.</p>
+      ? <p className="goal-fix"><b>Next step</b>Your other {race ? 'runs' : 'sets'} put you at about {show(model.start)}. {race ? 'Race the distance' : 'Test a heavy single'} to prove it.</p>
       : <GoalFix verdict={verdict} />}
-    {quickWin && onAddQuickWin && <QuickWin win={quickWin} onAdd={onAddQuickWin} />}
+    {quickWin && onAddQuickWin && <QuickWin win={quickWin} onAdd={onAddQuickWin} keeps={show(p.target)} />}
   </section>;
 }
