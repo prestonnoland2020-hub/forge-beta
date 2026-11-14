@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { serverSession } from '../_shared/activitySession.ts';
 import { ACTIVITY_KINDS, HEALTH_KINDS, activityRow, freshAccessToken, healthRows, isMultisportParent, rpc, type GarminConnection } from '../_shared/garmin.ts';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
@@ -102,6 +103,24 @@ async function process(payload: Record<string, unknown>) {
           for (let start = 0; start < rows.length; start += 200) {
             const { error } = await admin.from('external_activities').upsert(rows.slice(start, start + 200), { onConflict: 'owner_id,provider,external_id' });
             if (error) throw new Error(error.message);
+          }
+          /* STRAIGHT INTO THE LOG. A fresh run on a day with nothing logged
+             goes in now, so it is in the athlete's history — and on their
+             partners' screens — without waiting for the app to be opened.
+             Days that already hold something stay the app's to merge. Only
+             the last few days: a history backfill is the app's job. */
+          const fresh = Date.now() - 4 * 86_400_000;
+          for (const row of rows) {
+            if (new Date(row.started_at).getTime() < fresh) continue;
+            const mapped = serverSession(row);
+            if (!mapped) continue;
+            try {
+              const { data: outcome } = await admin.rpc('forge_server_import_activity', {
+                p_owner: owner.owner_id, p_provider: row.provider, p_external_id: row.external_id,
+                p_date: mapped.date, p_title: mapped.title, p_session: mapped.session,
+              });
+              console.log(`garmin-webhook import ${row.external_id}: ${outcome}`);
+            } catch (error) { console.error('garmin-webhook import', error instanceof Error ? error.message : error); }
           }
         } else {
           const rows = healthRows(kind, owner.owner_id, summaries);
