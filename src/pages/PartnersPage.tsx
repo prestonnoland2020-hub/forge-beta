@@ -225,7 +225,7 @@ export function PartnersPage() {
         const status = partner.trainedToday || todays ? 'Trained today' : lastTrainedLabel(last?.date || partner.lastTrained);
         const fallback = !last && partner.trainedToday ? didToday(partner, unit) : '';
         const notes = insights(partner, recent);
-        return <article className={`card ps-card${partner.trainedToday || todays ? ' done' : status === 'Trained yesterday' ? ' recent' : ''}`} key={partner.friendId}>
+        return <article className={`card ps-card${partner.trainedToday || todays ? ' done' : ''}`} key={partner.friendId}>
           <Link className="ps-main" to={`/partners/${partner.friendId}`} state={origin ? { origin, viaList: true } : undefined}>
             <span className="partner-mark" aria-hidden="true">{(partner.displayName || partner.username).slice(0, 2).toUpperCase()}</span>
             <div>
