@@ -26,6 +26,8 @@ import { liftTrend } from '../lib/liftTrend';
 import { readSwaps, writeSwap, swappedName, lastSet, swapOptions } from '../lib/todaySwaps';
 import { buildFullWorkout, todaysObjective, warmupRamp } from '../lib/fullWorkout';
 import { plateauLine, plateausFor } from '../lib/plateau';
+import { bodyLogState } from '../lib/bodyLog';
+import { primaryMusclesFor } from '../lib/liftAliases';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import '../today-picks.css';
 
@@ -207,6 +209,17 @@ export function HomePage() {
   })();
 
   /* COACH ME gets the same day, written whole, to walk through with videos. */
+  /* COACH ME, ON A DAY WITHOUT A PLAN: picked from what has rested longest,
+     kept off anything the body log flags, pulled toward the goals' muscles
+     (lib/guided/pickFocus). On the plan's rest day it says rest. */
+  const body = bodyLogState(notes, currentDate);
+  const coachContext = {
+    records, todayIso: currentDate,
+    avoid: [...body.blockedMuscles, ...(body.easeMuscles || [])],
+    goalMuscles: goals.filter(goal => goal.type === 'Strength' && goal.exercise).flatMap(goal => primaryMusclesFor(String(goal.exercise))),
+    rest: dayType === 'rest' && !recommendedSets.length,
+    easeLifting: Boolean(body.easeLifting || (body.easing && !body.easeRunning)),
+  };
   const coachPlan = recommendedSets.length ? {
     title: recommendation.splitDay.name,
     count: full.length,
@@ -256,7 +269,7 @@ export function HomePage() {
         the nudges and the first-week checklist made this a feed to scroll
         past before the one thing it is for. */}
     {!completedToday && <TodayModeSwitch mode={mode} onChange={chooseMode} />}
-    {!completedToday && mode === 'coach' && <CoachToday plan={coachPlan} />}
+    {!completedToday && mode === 'coach' && <CoachToday plan={coachPlan} context={coachContext} />}
 
     {/* IN PROGRESS UNTIL FINISHED. Sets save as they are logged, so a saved
         day is not a finished one: until Finish, the card says so and offers

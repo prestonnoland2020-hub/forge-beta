@@ -154,7 +154,9 @@ export function GuidedPage() {
   /* TODAY'S KIND OF WORKOUT. Setup says what she likes; this says what she
      wants today, defaulting to her first pick. It only changes today. */
   const [todayStyle, setTodayStyle] = useState<Style>(() => prefs?.styles[0] || 'Strength');
-  const [focus, setFocus] = useState<Focus>(() => prefs ? suggestFocus(last.focus, prefs) : 'Full body');
+  /* Today's Coach me card picks the focus from the athlete's data and passes
+     it here, so the workout built is the one the card explained. */
+  const [focus, setFocus] = useState<Focus>(() => { const asked = params.get('focus') as Focus | null; return asked && FOCUSES.includes(asked) ? asked : prefs ? suggestFocus(last.focus, prefs) : 'Full body'; });
   const [workout, setWorkout] = useState<Workout | null>(() => fromPlan ? planWorkout(fromPlan.title, fromPlan.lifts, setup?.units === 'Metric') : null);
   const [phase, setPhase] = useState<Phase>(fromPlan ? 'preview' : prefs ? 'today' : 'setup');
   const [stepIndex, setStepIndex] = useState(0);
