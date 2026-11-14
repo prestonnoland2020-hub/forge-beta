@@ -33,3 +33,18 @@
 .ps-session li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ps-session li b { flex: none; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
 .ps-insights { display: grid; gap: 4px; margin: 10px -30px 0 0; padding: 9px 11px; border-radius: 10px; background: var(--surface-2); font-size: 13px; line-height: 1.35; color: var(--ink-2); }
+
+/* TRAINED TODAY, IN THE BRAND LIME, LIGHTLY: a thin lime edge, a faint
+   tint, lime initials and status. The numbers stay plain, and any other
+   day stays plain too. Written more specifically than .app-frame
+   :is(.card…), which forces every card's border and background. */
+.app-frame .partners-slim .ps-card.done, .partners-slim .ps-card.done {
+  border-color: color-mix(in oklch, var(--accent) 45%, transparent) !important;
+  background-color: color-mix(in oklch, var(--accent) 5%, var(--surface-1)) !important;
+}
+.ps-card.done .partner-mark { background: color-mix(in oklch, var(--accent) 14%, var(--surface-2)); color: var(--accent); }
+.ps-card.done .ps-status { color: var(--accent); font-weight: 700; }
+.ps-card.done .ps-status i { width: 8px; height: 8px; background: var(--accent); }
+/* Lime on white is a smudge: light mode reads the darker brand text colour. */
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .ps-card.done :is(.partner-mark, .ps-status) { color: var(--accent-text); } }
+:root[data-theme="light"] .ps-card.done :is(.partner-mark, .ps-status) { color: var(--accent-text); }
