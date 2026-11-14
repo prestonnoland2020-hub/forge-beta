@@ -62,7 +62,12 @@
 /* THE DAY SLIDER: one day card centred, the neighbours peeking either side. */
 .tp-ask { display: flex; justify-content: space-between; align-items: baseline; }
 .tp-ask span { font-size: 12px; font-weight: 500; color: var(--ink-3); }
-.tp-days { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -18px; padding: 2px 18px 4px; scroll-padding: 0 18px; }
+/* EVERY DAY CAN SIT IN THE MIDDLE. With 18px of padding the first and last
+   cards could not scroll to centre (the strip ran out), so Rest at the end
+   sat hard right. A spacer each side of (100% − card) / 2 lets any card
+   centre, the ends included. */
+.tp-days { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -18px; padding: 2px 0 4px; }
+.tp-days::before, .tp-days::after { content: ''; flex: 0 0 calc(14% - 10px); }
 .tp-days::-webkit-scrollbar { display: none; }
 .tp-day { flex: 0 0 72%; scroll-snap-align: center; display: grid; gap: 2px; text-align: left; padding: 14px 16px; border-radius: 16px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; cursor: pointer; transition: border-color .2s, background .2s, opacity .2s; opacity: .55; }
 .tp-day.on { border-color: var(--accent); opacity: 1; }
