@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { sendPush, type PushTarget } from './webpush.ts';
+import { sendApns, type ApnsConfig } from './apns.ts';
 
 /* THE SENDER. Called by the database — never by a browser — for the things
    worth interrupting someone's day with:
@@ -33,7 +34,7 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession:
    presents EITHER secret. The database and the function cannot disagree about
    the database's own secret. Environment variables still win when set, so an
    operator who prefers the dashboard keeps it. */
-type Config = { vapidPublic: string; vapidPrivate: string; vapidSubject: string; secrets: string[] };
+type Config = { vapidPublic: string; vapidPrivate: string; vapidSubject: string; secrets: string[]; apns: ApnsConfig | null };
 /* Cached, but not for the life of the instance: an edge instance stays warm
    for a long time, and a key added a minute ago must not have to wait out a
    cold start to take effect. A minute is short enough to make a config change
@@ -51,6 +52,13 @@ async function config(): Promise<Config> {
     vapidPrivate: Deno.env.get('VAPID_PRIVATE_KEY') || data?.vapid_private || '',
     vapidSubject: Deno.env.get('VAPID_SUBJECT') || data?.vapid_subject || 'mailto:prestonnoland2020@gmail.com',
     secrets: [envSecret, data?.push_secret].filter((value): value is string => Boolean(value)),
+    /* Apple's push, for the iPhone app (./apns.ts). Off until the key is in. */
+    apns: (() => {
+      const key = Deno.env.get('APNS_KEY_P8') || data?.apns_key_p8 || '';
+      const keyId = Deno.env.get('APNS_KEY_ID') || data?.apns_key_id || '';
+      const teamId = Deno.env.get('APNS_TEAM_ID') || data?.apns_team_id || '';
+      return key && keyId && teamId ? { key, keyId, teamId, topic: Deno.env.get('APNS_TOPIC') || data?.apns_topic || 'com.forgetraining.forge' } : null;
+    })(),
   };
   cachedAt = Date.now();
   return cached;
@@ -275,6 +283,7 @@ Deno.serve(async request => {
       hasVapidPrivate: Boolean(settings.vapidPrivate),
       vapidSubject: settings.vapidSubject,
       acceptedSecrets: settings.secrets.length,
+      apns: settings.apns ? { keyId: settings.apns.keyId, teamId: settings.apns.teamId, topic: settings.apns.topic } : null,
       source: {
         vapidPublic: Deno.env.get('VAPID_PUBLIC_KEY') ? 'env' : 'database',
         vapidPrivate: Deno.env.get('VAPID_PRIVATE_KEY') ? 'env' : 'database',
@@ -499,6 +508,12 @@ Deno.serve(async request => {
 
   const results = await Promise.all(messages.map(async ({ row, payload, date }) => {
     try {
+      /* The iPhone app's rows go to Apple; everything else is Web Push. */
+      if (row.endpoint.startsWith('apns:')) {
+        if (!settings.apns) return { endpoint: row.endpoint, status: 0, gone: false, owner_id: row.owner_id, date, note: 'apns not configured' as string | undefined };
+        const result = await sendApns(row.endpoint, payload, settings.apns);
+        return { ...result, owner_id: row.owner_id, date, note: result.note };
+      }
       const result = await sendPush(row as PushTarget, payload, vapid);
       return { ...result, owner_id: row.owner_id, date, note: undefined as string | undefined };
     } catch (error) {
