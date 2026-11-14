@@ -175,8 +175,14 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     if (!item || item.tone === 'reached' || (!plateau && item.tone !== 'off-track' && item.tone !== 'needs-work') || !verdicts[index]?.prediction) return null;
     const win = quickWinFor(goal, judge, undefined, plateau);
     if (!win) return null;
+    /* A step is nearer than the goal it leads to: never the goal itself (a
+       "test it" win on a goal that is ready to test) or past it. */
+    const own = Number.parseFloat(String(goal.target)) || 0;
+    const step = Number.parseFloat(win.targetText.replace(/:/g, '')) || 0;
+    if (item.label === 'Ready to test' || win.targetText === String(goal.target).split(' ')[0] || (goal.type === 'Strength' && own && step >= own)) return null;
     const exists = goals.some(other => other.type === win.goal.type && other.exercise === win.goal.exercise && String(other.target).split(' ')[0] === win.targetText);
-    return exists ? null : win;
+    /* Already added: still shown, saying so, so the row does not just vanish. */
+    return { ...win, added: exists };
   }), [goals, progress, verdicts, judge, plateauOf]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
   const hasRunTime = goals.some(goal => goal.type === 'Endurance' && /mm:ss|hh:mm/i.test(String(goal.unit || goal.target || '')) && expectedRunMiles(goal) !== null);

@@ -312,3 +312,4 @@
 .goal-quickwin span { display: grid; gap: 3px; font-size: var(--fs-small); color: var(--ink-2); }
 .goal-quickwin span b { color: var(--ink); font-weight: 800; font-size: .95rem; }
 .goal-quickwin .button.small { padding: 8px 14px; font-size: .9rem; }
+.goal-quickwin span small { font-size: .78rem; color: var(--ink-3); }
