@@ -75,7 +75,10 @@ export type Feasibility = {
      race lower is better, for a lift higher. */
   prediction?: GoalPrediction;
 };
-export type GoalPrediction = { start: number; typical: number; ceiling: number; target: number; better: 'higher' | 'lower'; weeks: number };
+export type GoalPrediction = { start: number; typical: number; ceiling: number; target: number; better: 'higher' | 'lower'; weeks: number;
+  /* True when the pace is the athlete's own gain over recent months, false
+     when it is the typical rate (not enough history yet). */
+  measured?: boolean };
 /* Bumped whenever a rate changes, so each prediction is scored against the
    model that made it. */
 export const GOAL_MODEL_VERSION = '2026-11-01';
@@ -444,14 +447,14 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
          in Estimated mode and wrong in Actual: carried to a tested 490 they
          said he would still be at 490 on the date, so a 500 squat seven weeks
          out read "Out of reach" at 98%. */
-      prediction: { start: Math.round(best), typical: Math.round(liftTypical(best, weeks, measuredLiftRate(sets))), ceiling: Math.round(liftCeiling(best, weeks)), target, better: 'higher', weeks: Math.max(0, Math.round(weeksUntil(goal.date))) } };
+      prediction: { start: Math.round(best), typical: Math.round(liftTypical(best, weeks, measuredLiftRate(sets))), ceiling: Math.round(liftCeiling(best, weeks)), target, better: 'higher', weeks: Math.max(0, Math.round(weeksUntil(goal.date))), measured: measuredLiftRate(sets) !== undefined } };
   }
   /* An entered best is a lift they already know, not one they are learning. */
   const newLift = sets.length > 0 && new Set(sets.map(set => set.date)).size < NEW_LIFT_SESSIONS;
   const ceiling = liftCeiling(best, weeks, newLift);
   const measured = measuredLiftRate(sets);
   const typical = liftTypical(best, weeks, measured);
-  const predicted: GoalPrediction = { start: Math.round(best), typical: Math.round(typical), ceiling: Math.round(ceiling), target, better: 'higher', weeks: Math.round(weeks) };
+  const predicted: GoalPrediction = { start: Math.round(best), typical: Math.round(typical), ceiling: Math.round(ceiling), target, better: 'higher', weeks: Math.round(weeks), measured: measured !== undefined };
   const needed = (target - best) / best;
   const by = new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   /* CLOSE, AND NOTHING HEAVY ON FILE, IS A QUESTION, NOT A VERDICT. The

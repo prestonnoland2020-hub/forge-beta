@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { GoalBuilder, type CreatedGoal } from '../components/GoalBuilder';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { buildGoalRoadmaps } from '../lib/goalPlanEngine';
@@ -14,6 +14,10 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { MileageCheckOnGoal } from '../components/MileageGate';
 import { land, rise, tap } from '../lib/haptics';
 import { Icon } from '../components/Icon';
+import { predictionFromNow } from '../lib/predictionFromNow';
+import { quickWinFor, suggestGoals, type GoalDraft, type GoalJudge, type GoalSuggestion } from '../lib/goalSuggestions';
+import { CORE_LIFTS } from '../lib/coreLifts';
+import { canonicalLiftKey } from '../lib/liftAliases';
 
 /* THE GOALS PAGE IS THE CRUX, SO IT READS LIKE A SCOREBOARD.
 
@@ -96,6 +100,68 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     return maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || [], estimate) : estimate;
   }), [goals, records, setup?.excludedEfforts, workouts, vo2Version, maxMode]);
   const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<number | null>(null);
+  /* THE COACH'S EYE ON A GOAL THAT DOES NOT EXIST YET: the number its card
+     would show today and the prediction it would draw, from exactly the same
+     code the cards use — so a suggested goal reads on its card the way the
+     suggestion said it would. Race predictions are the slow part and are
+     remembered per distance. */
+  const judge = useMemo<GoalJudge>(() => {
+    const cap = { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts };
+    const raceNow = new Map<number, number | null>();
+    const verdictCache = new Map<string, ReturnType<typeof goalFeasibility>[number] | undefined>();
+    return (goal: CreatedGoal) => {
+      const key = `${goal.type}|${goal.exercise}|${goal.target}|${goal.date}|${goal.current}|${goal.unit}`;
+      if (!verdictCache.has(key)) verdictCache.set(key, goalFeasibility([goal], records, cap)[0]);
+      const verdict = verdictCache.get(key);
+      let endurance: number | null = null;
+      if (goal.type === 'Endurance') {
+        const miles = expectedRunMiles(goal);
+        if (miles) {
+          if (!raceNow.has(miles)) {
+            const estimate = predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
+            raceNow.set(miles, maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || [], estimate) : estimate);
+          }
+          endurance = raceNow.get(miles) ?? null;
+        }
+      }
+      const model = verdict?.prediction;
+      const now = goalProgress(goal, records, verdict, setup, maxMode, endurance).current ?? model?.start ?? null;
+      return { now, model, p: model ? predictionFromNow(model, now) : undefined };
+    };
+  }, [records, setup, workouts, maxMode, vo2Version]);
+  const coach = useCallback((draft: GoalDraft) => suggestGoals(draft, judge), [judge]);
+  /* HAVE YOU THOUGHT ABOUT THIS ONE? Before a type is even chosen, the coach
+     offers the goals it would set: the attainable target on each main lift the
+     athlete trains and has no goal on yet, and a 5K when they run. */
+  const weightUnit = setup?.units === 'Metric' ? 'kg' : 'lb';
+  const picks = useMemo<GoalSuggestion[]>(() => {
+    if (!open || editing !== null) return [];
+    const has = (lift: string) => goals.some(goal => goal.exercise && canonicalLiftKey(goal.exercise) === canonicalLiftKey(lift));
+    const trained = (lift: string) => records.some(record => (record.topSets || []).some(set => set.lift && canonicalLiftKey(set.lift) === canonicalLiftKey(lift) && set.completed !== false));
+    const out: GoalSuggestion[] = [];
+    for (const lift of CORE_LIFTS) {
+      if (lift === 'Pull Ups' || has(lift) || !trained(lift)) continue;
+      const pick = suggestGoals({ type: 'Strength', exercise: lift, unit: weightUnit }, judge).find(item => item.tier === 'attainable');
+      if (pick) out.push(pick);
+    }
+    if (!goals.some(goal => goal.type === 'Endurance')) {
+      const run = suggestGoals({ type: 'Endurance', exercise: '5K Run', unit: 'mm:ss', metric: 'Finish time' }, judge).find(item => item.tier === 'attainable');
+      if (run) out.push(run);
+    }
+    return out.slice(0, 3);
+  }, [open, editing, goals, records, judge, weightUnit]);
+  /* A SLIPPING GOAL GETS A STEPPING STONE: something the athlete can hit in
+     the next few weeks, offered on the card. The big goal stays. */
+  const quickWins = useMemo(() => goals.map((goal, index) => {
+    const item = progress[index];
+    if (!item || (item.tone !== 'off-track' && item.tone !== 'needs-work') || !verdicts[index]?.prediction) return null;
+    const win = quickWinFor(goal, judge);
+    if (!win) return null;
+    const exists = goals.some(other => other.type === win.goal.type && other.exercise === win.goal.exercise && String(other.target).split(' ')[0] === win.targetText);
+    return exists ? null : win;
+  }), [goals, progress, verdicts, judge]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
   const hasRunTime = goals.some(goal => goal.type === 'Endurance' && /mm:ss|hh:mm/i.test(String(goal.unit || goal.target || '')) && expectedRunMiles(goal) !== null);
   /* The bars start empty and fill one frame after the page mounts, so the
@@ -104,8 +170,6 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   /* Both frames are cancelled on cleanup and nothing guards a second run, so
      StrictMode's mount-unmount-mount still ends with the bars filled. */
   useEffect(() => { let inner = 0; const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setFilled(true)); }); return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); }; }, []);
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<number | null>(null);
   /* Every goal's full read-out used to be open on the first goal the moment
      the page loaded, with no way to shut it again. Nothing is expanded on
      arrival now, and tapping an open goal closes it. */
@@ -126,6 +190,8 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
 
   return <div className={embedded ? 'stack-xl goals-workspace goals-single-page embedded' : 'stack-xl goals-workspace goals-single-page'}>
     {open && <GoalBuilder
+      coach={coach}
+      picks={picks}
       initialGoal={editing === null ? undefined : goals[editing]}
       onClose={() => setOpen(false)}
       onSave={goal => {
@@ -212,7 +278,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
               </span>
               <span className="gx-foot"><b>{item.share === null ? (goal.type === 'Strength' ? 'Starts with your first set' : goal.type === 'Body Composition' ? 'Starts with a weigh-in' : /hyrox/i.test(`${goal.exercise || ''} ${goal.title}`) ? 'Starts with a HYROX time' : expectedRunMiles(goal) === null ? 'Starts with your first logged time' : 'Starts with your first run') : <><CountUp to={pct * 100} delay={delay} />%</>}</b><small>{dueText(goal.date)}</small></span>
             </button>
-            {isOpen && verdicts[index]?.prediction && <GoalPredictionCard verdict={verdicts[index]} date={goal.date} unit={setup?.units === 'Metric' ? 'kg' : 'lb'} hoursFirst={String(goal.unit || '').includes('hh:mm:ss')} now={item.current} />}
+            {isOpen && verdicts[index]?.prediction && <GoalPredictionCard verdict={verdicts[index]} date={goal.date} unit={setup?.units === 'Metric' ? 'kg' : 'lb'} hoursFirst={String(goal.unit || '').includes('hh:mm:ss')} now={item.current} quickWin={quickWins[index]} onAddQuickWin={win => saveGoal(win.goal, null)} />}
             {/* With a prediction, the card above already says where the goal lands;
                the roadmap card is for goals the model cannot predict. */}
             {isOpen && roadmaps[index] && !verdicts[index]?.prediction && <div className="goal-card-detail"><GoalProgressCard goal={goal} roadmap={roadmaps[index]} /></div>}

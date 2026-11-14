@@ -409,3 +409,21 @@ body { background: var(--bg) !important; }
 .app-frame .adjust-panel .ss-mileage { padding-top: 12px; border-top: 1px solid var(--hairline); }
 @keyframes adjust-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .app-frame .adjust-panel { animation: none; } }
+
+/* Goal pace: the why under the projection, and the line to the goal date. */
+.goal-prediction.compact .gpc-pace { display: flex; align-items: baseline; gap: 4px 6px; flex-wrap: wrap; margin: 0; font-size: 14px; color: var(--ink-3); }
+.goal-prediction.compact .gpc-pace b { font-family: var(--num); font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.goal-prediction.compact .gpc-pace .gpc-need { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.goal-prediction.compact .gpc-graph { display: block; width: 100%; height: auto; overflow: visible; }
+.gpc-graph { --gpc-c: var(--good); }
+.gpc-graph.tone-stretch { --gpc-c: var(--warn); }
+.gpc-graph.tone-hard { --gpc-c: var(--bad); }
+.gpc-graph-area { fill: color-mix(in oklch, var(--gpc-c) 12%, transparent); }
+.gpc-graph-line { stroke: var(--gpc-c); stroke-width: 3; stroke-linecap: round; }
+.gpc-graph-dot { fill: var(--gpc-c); }
+.gpc-graph-dot.start { fill: var(--ink-3); }
+.gpc-graph-goal { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 5 5; }
+.gpc-graph-base { stroke: var(--line, color-mix(in oklch, var(--ink) 12%, transparent)); stroke-width: 1; }
+.gpc-graph text { font-family: var(--num); font-size: 12px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+.gpc-graph .gpc-graph-goal-label { fill: var(--ink-2); font-weight: 600; }
+.gpc-graph .gpc-graph-end { fill: var(--ink); font-weight: 700; font-size: 13px; }

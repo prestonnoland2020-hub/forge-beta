@@ -6,6 +6,8 @@ import { coreFirst, coreOnly, isCoreLift, isWeightedBodyweight, CORE_LIFT_LABELS
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { formatClock, normalizeGoalValue, isTimeUnit, isPaceMetric } from '../lib/goalInput';
 import { Icon } from './Icon';
+import { GoalCoachPicks, GoalCoachSuggest } from './GoalCoachSuggest';
+import type { GoalDraft, GoalSuggestion } from '../lib/goalSuggestions';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
 
@@ -27,7 +29,7 @@ const goalTypes = [
    The "training connection" step is skipped: the split that owns a goal lift
    is decided where the lifts are mapped, and a race connects to cardio. */
 export const noop=()=>{};
-export function GoalBuilder({ onClose, onSave, initialGoal, splitDays, coreLiftsOnly = false, inline = false }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal; splitDays?:{name:string;type:string}[]; coreLiftsOnly?:boolean; inline?:boolean }) {
+export function GoalBuilder({ onClose, onSave, initialGoal, splitDays, coreLiftsOnly = false, inline = false, coach, picks = [] }: { onClose:()=>void; onSave:(goal:CreatedGoal)=>void; initialGoal?:CreatedGoal; splitDays?:{name:string;type:string}[]; coreLiftsOnly?:boolean; inline?:boolean; coach?:(draft:GoalDraft)=>GoalSuggestion[]; picks?:GoalSuggestion[] }) {
   const {setup}=useProfileSetup();
   const connectionDays=(splitDays?.length?splitDays:setup?.splitDays||[]).filter(day=>day.type!=='Rest');
   const initialType=goalTypes.find(item=>item.label===initialGoal?.type)?.id ?? 'strength';
@@ -126,6 +128,17 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
   /* A time field opens the number pad, which has no colon: the colons go in as
      the digits arrive, the way onboarding has always done it. */
   const asTyped=(value:string)=>isTimeUnit(unit)||isPaceMetric(String(metric))?formatClock(value):value;
+  /* THE COACH'S SUGGESTIONS for whatever is picked so far — lift or race,
+     unit, and the current number if one was typed. */
+  const [direction,setDirection]=useState<'lose'|'gain'>(()=>{const now=Number.parseFloat(String(initialGoal?.current||''));const goal=Number.parseFloat(String(initialGoal?.target||''));return now&&goal&&goal>now?'gain':'lose'});
+  const [chosen,setChosen]=useState<GoalSuggestion|null>(null);
+  const draftType=type==='strength'?'Strength':type==='endurance'?'Endurance':type==='body'?'Body Composition':null;
+  const suggestions=useMemo(()=>coach&&draftType?coach({type:draftType,exercise,unit,metric:String(metric),current:current.trim(),direction}):[],[coach,draftType,exercise,unit,metric,current,direction]);
+  const chosenTier=chosen&&chosen.targetText===target&&chosen.date===targetDate&&suggestions.some(item=>item.tier===chosen.tier&&item.targetText===chosen.targetText)?chosen.tier:null;
+  const applySuggestion=(item:GoalSuggestion)=>{setTarget(item.targetText);setTargetDate(item.date);if(item.goal.unit&&item.goal.unit!==unit)setUnit(item.goal.unit);setFieldErrors({});setChosen(item)};
+  const emptyHint=type==='strength'?(unit==='lb'||unit==='kg'?'Enter your current best below and the coach will suggest targets.':'Pick lb or kg for target suggestions.'):type==='endurance'?(metric==='Finish time'&&!customEnduranceEvent?'Log a run, or enter your current time below, and the coach will suggest targets.':'Suggestions are for race finish times.'):'Enter your current weight below and the coach will suggest targets.';
+  const coachPanel=coach&&draftType?<GoalCoachSuggest suggestions={suggestions} chosen={chosenTier} onChoose={applySuggestion} empty={emptyHint} direction={type==='body'?direction:undefined} onDirection={type==='body'?setDirection:undefined}/>:null;
+  const usePick=(pick:GoalSuggestion)=>{const g=pick.goal;chooseType(g.type==='Endurance'?'endurance':g.type==='Body Composition'?'body':'strength');if(g.exercise)setExercise(g.exercise);if(g.metric)setMetric(g.metric);if(g.unit)setUnit(g.unit);setCustomEnduranceEvent('');setIsCustomRun(false);setTarget(pick.targetText);setTargetDate(pick.date);setChosen(pick);setStep(2)};
   const goalFields=(<div className="goal-fields">
 <div className="goal-selection-banner">
 <span>{selectedType.label.toUpperCase()} GOAL</span>
@@ -205,8 +218,8 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 </label>
 <label>Measurement<select value={metric} onChange={e=>setMetric(e.target.value)}><option>Resting heart rate</option><option>Repetition count</option><option>Daily steps</option><option>Sleep duration</option><option>Weekly completion</option><option>Session frequency</option><option>Distance</option><option>Duration</option><option>Body measurement</option><option>Yes/no milestone</option></select>
 </label>
-</div>}<div className="field-grid three">
-<label>Target<input value={target} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setTarget(asTyped(e.target.value));if(fieldErrors.target)setFieldErrors(errors=>({...errors,target:undefined}))}} placeholder={isPaceMetric(String(metric))?'8:30':isTimeUnit(unit)?(/hh/.test(unit)?'1:20:00':'22:30'):'315'} />
+</div>}{coachPanel}<div className="field-grid three">
+<label>Target<input value={target} inputMode={isTimeUnit(unit)||isPaceMetric(String(metric))?'numeric':'decimal'} onChange={e=>{setTarget(asTyped(e.target.value));if(fieldErrors.target)setFieldErrors(errors=>({...errors,target:undefined}))}} placeholder={isPaceMetric(String(metric))?'8:30':isTimeUnit(unit)?(/hh/.test(unit)?'1:20:00':'22:30'):type==='body'?'185':'315'} />
 {fieldErrors.target?<small className="field-error">{fieldErrors.target}</small>:isPaceMetric(String(metric))?<small>Minutes and seconds — 8:30 (8.5 also reads as 8:30).</small>:isTimeUnit(unit)?<small>A clock — 22:30. A bare number is minutes.</small>:null}
 </label>
 <label>Unit<select value={unit} onChange={e=>setUnit(e.target.value)}>{unitOptions.map(option=><option key={option}>{option}</option>)}</select>
@@ -242,6 +255,7 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 </header>
 <div className="goal-builder-progress">{[1,2,3].map(value=>
 <i className={value<=step?'active':''} key={value}/>)}</div>
+    {step===1&&!initialGoal&&<GoalCoachPicks picks={picks} onPick={usePick}/>}
     {step===1&&<div className="goal-type-grid">{goalTypes.map(item=>
 <button className={type===item.id?'active':''} onClick={()=>chooseType(item.id)} key={item.id}>
 <b>{item.label}</b>

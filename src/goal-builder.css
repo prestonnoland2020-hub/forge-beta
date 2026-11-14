@@ -26,3 +26,26 @@ body:has(.goal-builder-backdrop) .coach-bubble-shell{display:none}
 .goal-type-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .goal-type-chips button{min-height:48px;padding:12px 8px;border-radius:10px;border:1px solid var(--hairline-strong);background:var(--surface-sunken);color:var(--muted);font-weight:800;font-size:14px}
 .goal-type-chips button.active{border-color:var(--accent);background:color-mix(in oklch,var(--tint) 14%,var(--surface-sunken));color:var(--accent-text)}
+
+/* Coach suggests: three goals above the fields, one tap fills them in. */
+.goal-coach{display:grid;gap:10px}
+.goal-coach-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.goal-coach-head b{font:700 12px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.goal-coach-dir{display:inline-flex;gap:4px;padding:3px;border-radius:999px;background:var(--surface-2)}
+.goal-coach-dir button{min-height:30px!important;padding:4px 12px;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:700 13px var(--body)}
+.goal-coach-dir button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0/.2)}
+.goal-coach-list{display:grid;gap:8px}
+.goal-coach-option{display:grid;gap:4px;width:100%;min-height:0!important;padding:12px 14px;border:1px solid var(--hairline-strong);border-radius:12px;background:var(--surface-2);color:var(--ink);text-align:left;cursor:pointer}
+.goal-coach-option.active{border-color:var(--accent);background:color-mix(in oklch,var(--tint) 10%,var(--surface-2))}
+.goal-coach-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.goal-coach-top em{font:700 13px var(--body);font-style:normal;color:var(--ink-2)}
+.goal-coach-option.tier-quick .goal-coach-top em{color:var(--good,var(--accent-text))}
+.goal-coach-option.tier-stretch .goal-coach-top em{color:var(--warn,var(--accent-text))}
+.goal-coach-top small{font:600 12px var(--body);color:var(--ink-3)}
+.goal-coach-target{display:flex;align-items:baseline;gap:8px}
+.goal-coach-target b{font:700 22px var(--num,var(--body));letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.goal-coach-target small{font:500 14px var(--body);color:var(--ink-2)}
+.goal-coach-how{font:400 13px/1.35 var(--body);color:var(--ink-2);text-wrap:pretty}
+.goal-coach-empty{margin:0;font-size:14px;color:var(--ink-2)}
+.goal-coach-own{font-size:12px;color:var(--ink-3)}
+.goal-coach.picks{margin-bottom:14px}
