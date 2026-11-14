@@ -1086,6 +1086,18 @@ export const STALL_DAYS = 70;
 export const STALL_MIN_SETS = 4;
 export const STALL_MIN_SPAN_DAYS = 49;
 export const STALL_EASE = 0.95;
+/* THE STALL RULE, ONE PLACE: the plan's restart and the coach's "you have
+   hit a plateau" both read it, so the screen can never call a lift stuck
+   that the plan is still writing as climbing, or the other way round. */
+export function stallFrom(best: number, latest: LatestSet[] | undefined): { recentBest: number; restart: number } | null {
+  if (!(best > 0) || !latest?.length) return null;
+  const evidence = latest.filter(set => set.missed || (set.reps <= OFF_DAY_REPS && !(estimateWithEffort(set.weight, set.reps, effortOf(set.date, set.lift)) < best * OFF_DAY)));
+  const done = evidence.filter(set => !set.missed && (set.ageDays ?? 0) <= STALL_DAYS);
+  if (done.length < STALL_MIN_SETS) return null;
+  if (Math.max(...done.map(set => set.ageDays ?? 0)) - Math.min(...done.map(set => set.ageDays ?? 0)) < STALL_MIN_SPAN_DAYS) return null;
+  const recentBest = Math.max(...done.map(set => estimateWithEffort(set.weight, set.reps, effortOf(set.date, set.lift))));
+  return recentBest < best ? { recentBest, restart: recentBest * STALL_EASE } : null;
+}
 /* However many of the rules above apply at once — time off, a hard
    fortnight, a stall, recent sets below old bests — the ask never falls more
    than MAX_DROP below the plan. */
@@ -1327,14 +1339,7 @@ export function wavePrescription(best: number, weekIndex: number, options: WaveO
   };
   /* The recent sets that say something about strength: not off days. */
   const evidence = (latest || []).filter(set => set.missed || (set.reps <= OFF_DAY_REPS && !(best > 0 && estimateWithEffort(set.weight, set.reps, effortOf(set.date, set.lift)) < best * OFF_DAY)));
-  const stalledMax = (() => {
-    if (!evidence.length || projectSteps > 0 || !(best > 0)) return 0;
-    const done = evidence.filter(set => !set.missed && (set.ageDays ?? 0) <= STALL_DAYS);
-    if (done.length < STALL_MIN_SETS) return 0;
-    if (Math.max(...done.map(set => set.ageDays ?? 0)) - Math.min(...done.map(set => set.ageDays ?? 0)) < STALL_MIN_SPAN_DAYS) return 0;
-    const recentBest = Math.max(...done.map(set => estimateWithEffort(set.weight, set.reps, effortOf(set.date, set.lift))));
-    return recentBest < best ? recentBest * STALL_EASE : 0;
-  })();
+  const stalledMax = projectSteps > 0 ? 0 : (stallFrom(best, latest)?.restart ?? 0);
   const loadFor = (count: number) => {
     const held = backedOff(count) ? completedAt(count) : 0;
     if (held) return Math.max(plateStep, Math.floor(held / plateStep) * plateStep);

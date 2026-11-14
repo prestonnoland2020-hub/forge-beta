@@ -46,6 +46,9 @@ export type GoalDraft = {
   current?: string;
   /* Body weight only. */
   direction?: 'lose' | 'gain';
+  /* Strength only: the lift is stuck (lib/plateau). The quick win becomes
+     "break the plateau": a new best in six weeks, on the plateau plan. */
+  plateau?: { best: number; weeks: number };
 };
 
 const DAY = 86_400_000;
@@ -53,6 +56,8 @@ const addWeeks = (weeks: number, today = new Date()) => localDayIso(new Date(tod
 const dateLabel = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const trim = (value: number) => (Math.round(value * 10) / 10).toString();
 const NAMES: Record<SuggestionTier, string> = { quick: 'Quick win', attainable: 'Attainable', stretch: 'Stretch' };
+const PLATEAU_NAME = 'Break the plateau';
+const PLATEAU_WEEKS = 6;
 
 function base(draft: GoalDraft, targetText: string, date: string): CreatedGoal {
   const unit = draft.unit;
@@ -95,7 +100,14 @@ function strength(draft: GoalDraft, judge: GoalJudge, today: Date): GoalSuggesti
   const testFirst = estimate - now >= 2 * step;
   const from = testFirst ? estimate : now;
   const curve = (weeks: number) => { const r = judge(base(draft, '9999', addWeeks(weeks, today))); return testFirst ? r.model : r.p; };
-  if (testFirst) {
+  let plateauQuick = false;
+  if (draft.plateau && !testFirst) {
+    /* STUCK: the first goal is simply a new best, on the plateau plan. */
+    const target = down(now) + step;
+    plateauQuick = true;
+    out.push({ tier: 'quick', target, weeks: PLATEAU_WEEKS,
+      how: `Stuck under ${Math.round(draft.plateau.best)} for ${draft.plateau.weeks} weeks. Forge builds back from a little lighter, adds a back-off set and a variation — a new best by then.` });
+  } else if (testFirst) {
     out.push({ tier: 'quick', target: down(estimate), weeks: 3, test: true,
       how: `Your sets already estimate ${Math.round(estimate)}. Work up to a heavy single and it is yours.` });
   } else {
@@ -157,6 +169,7 @@ function strength(draft: GoalDraft, judge: GoalJudge, today: Date): GoalSuggesti
 
   return out.map(item => {
     const made = finish(draft, judge, item.tier, show(item.target), `${show(item.target)} ${unit}`, addWeeks(item.weeks, today), item.how, item.test, false, testFirst);
+    if (plateauQuick && item.tier === 'quick') return { ...made, name: PLATEAU_NAME, verdict: made.verdict === 'Realistic' ? made.verdict : 'Breaks a plateau' as const };
     return plateau && item.tier === 'attainable' && made.verdict === 'Ambitious' ? { ...made, verdict: 'Breaks a plateau' as const } : made;
   });
 }
@@ -284,11 +297,11 @@ export function suggestGoals(draft: GoalDraft, judge: GoalJudge, today = new Dat
 /* A GOAL THAT IS SLIPPING NEEDS A WIN SOON. The big goal stays; the coach
    offers a stepping stone a few weeks out so the athlete has something to hit
    now. Only for goals that are not on track. */
-export function quickWinFor(goal: CreatedGoal, judge: GoalJudge, today = new Date()): GoalSuggestion | null {
+export function quickWinFor(goal: CreatedGoal, judge: GoalJudge, today = new Date(), plateau?: GoalDraft['plateau']): GoalSuggestion | null {
   const type = goal.type === 'Strength' ? 'Strength' : goal.type === 'Endurance' ? 'Endurance' : null;
   if (!type) return null;
   const unit = goal.unit || String(goal.target || '').split(' ').slice(1).join(' ');
-  const quick = suggestGoals({ type, exercise: goal.exercise, unit, metric: goal.metric, current: goal.current }, judge, today).find(item => item.tier === 'quick');
+  const quick = suggestGoals({ type, exercise: goal.exercise, unit, metric: goal.metric, current: goal.current, ...(type === 'Strength' && plateau ? { plateau } : {}) }, judge, today).find(item => item.tier === 'quick');
   if (!quick || quick.date >= goal.date) return null;
   return quick;
 }

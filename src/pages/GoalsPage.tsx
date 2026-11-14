@@ -18,6 +18,8 @@ import { predictionFromNow } from '../lib/predictionFromNow';
 import { quickWinFor, suggestGoals, type GoalDraft, type GoalJudge, type GoalSuggestion } from '../lib/goalSuggestions';
 import { CORE_LIFTS } from '../lib/coreLifts';
 import { canonicalLiftKey } from '../lib/liftAliases';
+import { plateausFor } from '../lib/plateau';
+import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 
 /* THE GOALS PAGE IS THE CRUX, SO IT READS LIKE A SCOREBOARD.
 
@@ -131,7 +133,16 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
       return { now, model, p: model ? predictionFromNow(model, now) : undefined };
     };
   }, [records, setup, workouts, maxMode, vo2Version]);
-  const coach = useCallback((draft: GoalDraft) => suggestGoals(draft, judge), [judge]);
+  /* STUCK LIFTS: the plan's own stall rule (lib/plateau). A stuck lift's
+     first suggested goal is a new best on the plateau plan, and its goal card
+     says so. */
+  const { exercises: library } = useTrainingLibrary();
+  const stuck = useMemo(() => {
+    const lifts = [...new Set([...CORE_LIFTS, ...goals.filter(goal => goal.type === 'Strength' && goal.exercise).map(goal => String(goal.exercise))])];
+    return plateausFor(lifts, records, library);
+  }, [goals, records, library]);
+  const plateauOf = useCallback((lift?: string) => { const hit = lift ? stuck.get(canonicalLiftKey(lift)) : undefined; return hit ? { best: hit.plateau.best, weeks: hit.plateau.weeks } : undefined; }, [stuck]);
+  const coach = useCallback((draft: GoalDraft) => suggestGoals(draft.type === 'Strength' ? { ...draft, plateau: plateauOf(draft.exercise) } : draft, judge), [judge, plateauOf]);
   /* HAVE YOU THOUGHT ABOUT THIS ONE? Before a type is even chosen, the coach
      offers the goals it would set: the attainable target on each main lift the
      athlete trains and has no goal on yet, and a 5K when they run. */
@@ -143,7 +154,9 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
     const out: GoalSuggestion[] = [];
     for (const lift of CORE_LIFTS) {
       if (lift === 'Pull Ups' || has(lift) || !trained(lift)) continue;
-      const pick = suggestGoals({ type: 'Strength', exercise: lift, unit: weightUnit }, judge).find(item => item.tier === 'attainable');
+      const options = suggestGoals({ type: 'Strength', exercise: lift, unit: weightUnit, plateau: plateauOf(lift) }, judge);
+      /* A stuck lift is offered its plateau goal; the rest their attainable one. */
+      const pick = plateauOf(lift) ? options.find(item => item.tier === 'quick') : options.find(item => item.tier === 'attainable');
       if (pick) out.push(pick);
     }
     if (!goals.some(goal => goal.type === 'Endurance')) {
@@ -151,17 +164,20 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
       if (run) out.push(run);
     }
     return out.slice(0, 3);
-  }, [open, editing, goals, records, judge, weightUnit]);
+  }, [open, editing, goals, records, judge, weightUnit, plateauOf]);
   /* A SLIPPING GOAL GETS A STEPPING STONE: something the athlete can hit in
      the next few weeks, offered on the card. The big goal stays. */
   const quickWins = useMemo(() => goals.map((goal, index) => {
     const item = progress[index];
-    if (!item || (item.tone !== 'off-track' && item.tone !== 'needs-work') || !verdicts[index]?.prediction) return null;
-    const win = quickWinFor(goal, judge);
+    const plateau = goal.type === 'Strength' ? plateauOf(goal.exercise) : undefined;
+    /* A stuck lift is pushed whatever the pill says; otherwise only goals
+       that are slipping get a stepping stone. */
+    if (!item || item.tone === 'reached' || (!plateau && item.tone !== 'off-track' && item.tone !== 'needs-work') || !verdicts[index]?.prediction) return null;
+    const win = quickWinFor(goal, judge, undefined, plateau);
     if (!win) return null;
     const exists = goals.some(other => other.type === win.goal.type && other.exercise === win.goal.exercise && String(other.target).split(' ')[0] === win.targetText);
     return exists ? null : win;
-  }), [goals, progress, verdicts, judge]);
+  }), [goals, progress, verdicts, judge, plateauOf]);
   const hasStrength = goals.some(goal => goal.type === 'Strength' && goal.unit !== 'reps');
   const hasRunTime = goals.some(goal => goal.type === 'Endurance' && /mm:ss|hh:mm/i.test(String(goal.unit || goal.target || '')) && expectedRunMiles(goal) !== null);
   /* The bars start empty and fill one frame after the page mounts, so the

@@ -25,6 +25,8 @@ import { goalFeasibility } from '../lib/goalFeasibility';
 import { liftTrend } from '../lib/liftTrend';
 import { readSwaps, writeSwap, swappedName, lastSet, swapOptions } from '../lib/todaySwaps';
 import { buildFullWorkout, todaysObjective, warmupRamp } from '../lib/fullWorkout';
+import { plateauLine, plateausFor } from '../lib/plateau';
+import { canonicalLiftKey } from '../lib/liftAliases';
 import '../today-picks.css';
 
 const todayIso = () => {
@@ -39,6 +41,16 @@ const runDetail = (title: string, summary: string) => {
   const [first, ...rest] = summary.split(' · ');
   return rest.length && title.toLowerCase().includes(first.toLowerCase()) ? rest.join(' · ') : summary;
 };
+
+/* Remembered for the last inputs: Today re-renders on every swipe, and this
+   is computed below the early returns, where a hook cannot go. */
+let stuckCache: { key: string; records: unknown; library: unknown; value: ReturnType<typeof plateausFor> } | null = null;
+function stuckLifts(names: string, records: Parameters<typeof plateausFor>[1], library: Parameters<typeof plateausFor>[2]) {
+  if (stuckCache && stuckCache.key === names && stuckCache.records === records && stuckCache.library === library) return stuckCache.value;
+  const value = plateausFor(names ? names.split('|') : [], records, library);
+  stuckCache = { key: names, records, library, value };
+  return value;
+}
 
 export function HomePage() {
   const { recommendation: suggested, loading, syncError, toggleTopSet, setCardioSelected, recommendationFor, splitDays } = useDailyRecommendation();
@@ -159,7 +171,11 @@ export function HomePage() {
   const metric = setup?.units === 'Metric';
   const isGoalLift = (exercise: string) => goals.some(goal => goal.exercise && sameLift(goal.exercise, exercise));
   const lines = selectedSets.map(set => ({ exercise: set.exercise, muscle: set.muscle, weight: set.source === 'history' ? set.weight : 0, reps: set.reps || 5 }));
-  const full = buildFullWorkout({ topSets: lines, dayMuscles: recommendation.splitDay.muscles || [], library, records, metric, unit: weightUnit });
+  /* STUCK LIFTS get the plateau plan: named on Today, an extra back-off set
+     and a variation in the full workout (lib/plateau). */
+  const liftNames = lines.map(line => line.exercise).join('|');
+  const stuck = stuckLifts(liftNames, records, library);
+  const full = buildFullWorkout({ topSets: lines, dayMuscles: recommendation.splitDay.muscles || [], library, records, metric, unit: weightUnit, plateaus: new Map([...stuck].map(([key, value]) => [key, value.variation])) });
   const accessories = full.filter(block => block.kind === 'accessory');
   const extraParam = build === 'full' && recommendedSets.length && accessories.length ? `&extra=${encodeURIComponent(JSON.stringify(accessories.map(block => ({ lift: block.exercise, muscle: block.muscle, weight: block.weight, reps: block.reps }))))}` : '';
   /* TODAY'S GOAL, said once and big: the lift that moves a goal, its load,
@@ -177,6 +193,9 @@ export function HomePage() {
     const target = goal ? `${String(goal.target).replace(/[^0-9.]/g, '')} ${weightUnit}` : '';
     const by = goal?.date ? new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
     const lastText = last ? `Last time ${last.weight} × ${last.reps}${last.date === currentDate ? ' (today)' : ''}.` : 'First time on this lift.';
+    /* A STUCK LIFT IS SAID OUT LOUD, with the plan and a date to beat it. */
+    const plateau = stuck.get(canonicalLiftKey(objective.exercise));
+    if (plateau) return plateauLine(plateau.plateau, weightUnit, plateau.variation);
     const trend = goal ? liftTrend(objective.exercise, records, Number(String(goal.target).replace(/[^0-9.]/g, '')), goal.date, weightUnit) : null;
     if (trend) return `${lastText} ${trend.status === 'on-track' ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — on track for ${target}${by ? ` by ${by}` : ''}.` : trend.perWeek > 0 ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — ${by ? `by ${by} ` : ''}that’s ${trend.projected}, short of ${target}.` : `Your calc max has been flat — today is about getting it moving toward ${target}.`}`;
     const goalText = !goal ? 'The next step up your rep wave.'
