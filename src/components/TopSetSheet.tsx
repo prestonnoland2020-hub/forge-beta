@@ -31,7 +31,8 @@ export type TopSetDraft = { lift: string; muscles: string[]; isNew: boolean; wei
 
 const norm = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ');
 
-export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, onClose, onSave, blockedReason = '' }: {
+export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, onClose, onSave, blockedReason = '', askFor }: {
+  askFor?: (lift: string) => { weight: number; reps: number; last?: { weight: number; reps: number } };
   unit: string;
   exercises: LibraryExercise[];
   suggested: string[];
@@ -185,6 +186,11 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
             {STRENGTH_MUSCLES.map(muscle => <button type="button" key={muscle} className={muscles.includes(muscle) ? 'muscle-chip active' : 'muscle-chip'} aria-pressed={muscles.includes(muscle)} onClick={() => toggleMuscle(muscle)}>{muscle}</button>)}
           </div>
         </div>
+        {(() => { const ask = isNew ? null : askFor?.(lift); if (!ask?.reps) return null; const text = ask.weight ? `${ask.weight} ${unit} × ${ask.reps}` : `${ask.reps} reps`;
+          /* EVERY ADDED LIFT GETS A TARGET, even a small one; one tap puts it in the dials. */
+          return <button type="button" className="top-set-sheet-ask" onClick={() => { if (ask.weight) setWeight(String(ask.weight)); setReps(String(ask.reps)); }}>
+            <span>Today</span><strong>{text}</strong><small>{ask.last ? `Last time ${ask.last.weight} × ${ask.last.reps}` : `First time — find a weight you can do ${ask.reps} times with 2 left`}{ask.weight ? ' · tap to use' : ''}</small>
+          </button>; })()}
         <div className="field-grid dial-grid">
           <DialField label="Weight" kind="weight" unit={unit} value={weight} onChange={setWeight} />
           <DialField label="Reps" kind="reps" value={reps} onChange={setReps} />

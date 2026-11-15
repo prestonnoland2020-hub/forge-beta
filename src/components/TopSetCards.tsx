@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { DialField } from './NumberDial';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import type { LoggedTopSet, WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
-import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { calculateEstimatedOneRepMax, weightForReps } from '../lib/strength';
 import { lastCompletedSet } from './LastPerformance';
 import { STRENGTH_MUSCLES } from './TopSetSheet';
 import { tap } from '../lib/haptics';
@@ -74,6 +74,18 @@ const PrBadge = ({ record, unit, fresh }: { record: RecordResult; unit: string; 
    A set that is saved collapses to what it is — the lift, the load, the max —
    and opens on a tap when it needs correcting. A set still being entered is
    open, because it is the question on the screen. */
+/* Same reps as last time (kept between 5 and 12), the weight that last set
+   was worth at those reps plus one small step: 5 lb / 2.5 kg, or 2.5 lb under 20 lb (dumbbells jump in 5s above that).
+   light lift. Never done: 10 reps, weight found on the day. */
+export function suggestAdded(previous: { weight: number; reps: number } | undefined, unit: string): { weight: number; reps: number } {
+  if (!previous?.weight || !previous.reps) return { weight: 0, reps: 10 };
+  const reps = Math.max(5, Math.min(12, previous.reps));
+  const step = unit === 'kg' ? 2.5 : previous.weight < 20 ? 2.5 : 5;
+  /* Same reps: last weight is the base. Different reps: what it was worth. */
+  const base = reps === previous.reps ? previous.weight : Math.round(weightForReps(calculateEstimatedOneRepMax(previous.weight, previous.reps) || 0, reps) / step) * step;
+  return { weight: Math.max(step, base + step), reps };
+}
+
 export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKeys, exercises, muscles, records, date, unit, onAdd, onRemove, onDeleteLogged, onCreateExercise, planLabel, askFor, blockedReason = '' }: Props) {
   /* Keyed, not indexed: rows are added and removed under this state. */
   const [openKeys, setOpenKeys] = useState<string[]>([]);
@@ -202,8 +214,12 @@ export function TopSetCards({ sets, onChange, onQuickLog, onEditLogged, loggedKe
       /* WHAT THE PLAN ASKED FOR IS PRINTED, NOT PRE-TYPED. The weight dial
          opens empty on an unlogged set; the ask reads as an ask. */
       const elsewhere = !logged && !displayedSet.prescribedReps && displayedSet.lift ? askFor?.(displayedSet.lift) : undefined;
-      const askReps = logged ? 0 : displayedSet.prescribedReps || elsewhere?.prescribedReps || 0;
-      const askWeight = logged ? 0 : displayedSet.prescribedWeight || elsewhere?.prescribedWeight || 0;
+      /* A LIFT ADDED BY HAND STILL GETS A NUMBER. Not on the plan, so the
+         plan has no ask: build one from the last time it was done — same
+         reps, one small step heavier — or, never done, a first set of 10. */
+      const added = !logged && displayedSet.lift && !displayedSet.recommendationTopSetId && !displayedSet.prescribedReps && !elsewhere?.prescribedReps ? suggestAdded(previous, unit) : null;
+      const askReps = logged ? 0 : displayedSet.prescribedReps || elsewhere?.prescribedReps || added?.reps || 0;
+      const askWeight = logged ? 0 : displayedSet.prescribedWeight || elsewhere?.prescribedWeight || added?.weight || 0;
       const askText = askReps ? (askWeight ? `${askWeight} ${unit} × ${askReps} reps` : `${askReps} reps`) : '';
 
       /* Closed: the whole set is one line of text — saved sets read as their
