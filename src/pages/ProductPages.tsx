@@ -13,7 +13,8 @@ import { useWorkoutHistory, type LoggedTopSet, type WorkoutRecord } from '../fea
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioMiles, formatCardioSummary, isLoggedCardio, summarizeCardioDraft, type CardioLogDraft } from '../lib/cardioSession';
 import { isProgrammableStrength, useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
-import { TopSetCards } from '../components/TopSetCards';
+import { TopSetCards, suggestAdded } from '../components/TopSetCards';
+import { lastCompletedSet } from '../components/LastPerformance';
 import { PrCelebration } from '../components/PrCelebration';
 import { topSetRecord } from '../lib/personalRecords';
 import { success as successHaptic } from '../lib/haptics';
@@ -405,6 +406,9 @@ function WorkoutEditor() {
      the result still counts as an answer to the plan. */
   const planAsks=useMemo(()=>savedDays.flatMap((day,index)=>(recommendationFor(index+1,day?.name)?.topSets||[]).filter(item=>item.reps>0).map(item=>({lift:item.exercise,prescribedReps:item.reps,prescribedWeight:item.source==='history'&&item.weight?item.weight:undefined}))),[savedDays.map(day=>day?.name||'').join('|'),recommendationFor]); // eslint-disable-line react-hooks/exhaustive-deps
   const planAskFor=(lift:string):{prescribedReps?:number;prescribedWeight?:number}=>{const found=lift?planAsks.find(item=>sameLift(item.lift,lift)):undefined;return found?{prescribedReps:found.prescribedReps,prescribedWeight:found.prescribedWeight}:{}};
+  /* ADD A LIFT: the plan's ask when the plan names it, else one built from
+     the last time it was done (TopSetCards.suggestAdded). */
+  const sheetAsk=(lift:string)=>{const planned=planAskFor(lift);if(planned.prescribedReps)return{weight:planned.prescribedWeight||0,reps:planned.prescribedReps,last:lastCompletedSet(records.filter(record=>record.date<sessionIso),lift)};const last=lastCompletedSet(records.filter(record=>record.date<sessionIso),lift);return{...suggestAdded(last,weightUnit),last}};
   const prescriptionFor=(set:LoggedTopSet)=>{
     if(set.prescribedReps)return{prescribedReps:set.prescribedReps,prescribedWeight:set.prescribedWeight};
     const planned=topSets.find(row=>row.prescribedReps&&sameLift(row.lift,set.lift));
@@ -631,7 +635,7 @@ function WorkoutEditor() {
         the popup holds the question. */}
     {!editingRecord&&workoutSource==='blank'&&<ForgeWritesIt dateIso={sessionIso} session={written} onSession={setWritten}/>}
     {!topSets.length&&!cardioOnlyDay&&<section className="card form-card top-set-launch"><div className="section-title compact-title"><div><h3>Lifts</h3></div></div><button type="button" className="button add-top-set-button" onClick={openTopSetSheet}>＋ Add a lift</button></section>}
-    {addingTopSet&&<TopSetSheet unit={weightUnit} exercises={strengthCatalogue} suggested={allowedStrengthExercises.map(exercise=>exercise.name)} dayMuscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} existing={topSets.map(set=>set.lift).filter(Boolean)} onClose={()=>setAddingTopSet(false)} onSave={saveTopSetFromSheet} blockedReason={noDayReason}/>}
+    {addingTopSet&&<TopSetSheet unit={weightUnit} exercises={strengthCatalogue} suggested={allowedStrengthExercises.map(exercise=>exercise.name)} dayMuscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} existing={topSets.map(set=>set.lift).filter(Boolean)} onClose={()=>setAddingTopSet(false)} onSave={saveTopSetFromSheet} blockedReason={noDayReason} askFor={sheetAsk}/>}
     {prCelebration&&<PrCelebration lift={prCelebration.lift} weight={prCelebration.weight} previous={prCelebration.previous} unit={weightUnit} onDone={dismissPrCelebration}/>}
     {topSets.length>0&&<TopSetCards askFor={planAskFor} planLabel={plannedDay?.name?`FROM ${plannedDay.name.toUpperCase()}`:undefined} sets={topSets} onChange={updateTopSet} onQuickLog={quickLogTopSet} onEditLogged={editLoggedTopSet} loggedKeys={loggedTopSetKeys} exercises={allowedStrengthExercises} muscles={sourceMuscles.filter(muscle=>muscle!=='Cardio')} records={records} date={sessionIso} unit={weightUnit} onAdd={openTopSetSheet} onRemove={removeTopSet} onDeleteLogged={deleteLoggedTopSet} onCreateExercise={createExerciseForTopSet} blockedReason={noDayReason}/>}
     {quickLogMessage&&<div className="quick-log-flash" role="status"><small>{quickLogMessage}</small>
