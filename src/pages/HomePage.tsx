@@ -203,7 +203,8 @@ export function HomePage() {
     if (plateau) return plateauLine(plateau.plateau, weightUnit, plateau.variation);
     const trend = goal ? liftTrend(objective.exercise, records, Number(String(goal.target).replace(/[^0-9.]/g, '')), goal.date, weightUnit) : null;
     if (trend) return `${lastText} ${trend.status === 'on-track' ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — on track for ${target}${by ? ` by ${by}` : ''}.` : trend.perWeek > 0 ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — ${by ? `by ${by} ` : ''}that’s ${trend.projected}, short of ${target}.` : `Your calc max has been flat — today is about getting it moving toward ${target}.`}`;
-    const goalText = !goal ? 'The next step up your rep wave.'
+    /* A first time has no wave to step up yet; today only finds the number. */
+    const goalText = !goal ? (last ? 'The next step up your rep wave.' : 'Today sets the starting weight Forge builds from.')
       : verdict?.verdict === 'reachable' ? `Keeps you on pace for ${target}${by ? ` by ${by}` : ''}.`
       : verdict?.verdict === 'needs-more' && /heavy single/.test(verdict.change || '') ? `You’re close to ${target} — a heavy single soon will show where you stand.`
       : verdict?.verdict === 'needs-more' ? `Each week like this moves you toward ${target}${by ? ` by ${by}` : ''}.`
