@@ -1,6 +1,6 @@
 import '../today-picks.css';
 import { setEffort as saveEffort, type Effort } from '../lib/setEffort';
-import { markWorkoutOpen, markWorkoutDone } from '../lib/workoutOpen';
+import { markWorkoutOpen, markWorkoutDone, openWorkout } from '../lib/workoutOpen';
 import { readSwaps, swappedName, lastSet } from '../lib/todaySwaps';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -609,13 +609,20 @@ function WorkoutEditor() {
   };
   const removeWorkout=async()=>{if(!editingRecord||!window.confirm(`Delete the workout record for ${todayShort}? This permanently removes it from History and Insights.`))return;setSaveMessage('');const removed=await deleteRecord(editingRecord.id);if(removed)navigate('/history');else setSaveMessage('The workout could not be deleted. Check the sync message and try again.')};
   if(editId&&!editingRecord)return <div className="narrow stack-xl"><PageIntro eyebrow="WORKOUT HISTORY" title="Workout not found" copy="This workout may have been removed from this device."/><section className="card"><Link className="button" to="/history">Return to History</Link></section></div>;
+  /* RESUME MUST LEAD TO FINISH. Today said "In progress · Resume workout",
+     and Resume landed here — "Today · complete", with no way to finish — so
+     the day stayed in progress for good. While the day is still open, this
+     screen says so and its first button finishes it. */
+  const stillOpen=Boolean(completedOnEntry&&openWorkout(sessionIso));
+  const finishOpenDay=()=>{markWorkoutDone(sessionIso);navigate('/')};
   if(completedOnEntry)return <div className="narrow stack-xl workout-editor completed-workout-entry">
-    <PageIntro eyebrow={todayLong.toUpperCase()} title="Today is logged"/>
+    <PageIntro eyebrow={todayLong.toUpperCase()} title={stillOpen?'Workout in progress':'Today is logged'}/>
     <section className="card completed-day-card">
       <span className="completed-day-check"><Icon name="check" size={18} stroke={2.6}/></span>
-      <div><span className="eyebrow">Today · complete</span><h2>{completedOnEntry.title}</h2><p>{completedOnEntry.muscles.filter(muscle=>muscle!=='Cardio').join(' · ')||(completedOnEntry.hasCardio?'Cardio':'Completed training')}</p></div>
+      <div><span className="eyebrow">{stillOpen?'Today · in progress':'Today · complete'}</span><h2>{completedOnEntry.title}</h2><p>{completedOnEntry.muscles.filter(muscle=>muscle!=='Cardio').join(' · ')||(completedOnEntry.hasCardio?'Cardio':'Completed training')}</p></div>
       <CompletedDayReview record={completedOnEntry} unit={weightUnit} records={records} metric={weightUnit==='kg'}/>
-      <footer><Link className="button" to={`/workout?edit=${completedOnEntry.id}&cardio=1`}>＋ Add a session</Link><Link className="button ghost" to={`/workout?edit=${completedOnEntry.id}`}>Edit workout</Link><Link className="button ghost" to="/history">Open history</Link></footer>
+      {stillOpen&&<button type="button" className="button wide finish-open-day" onClick={finishOpenDay}>Finish workout</button>}
+      <footer><Link className={stillOpen?'button ghost':'button'} to={`/workout?edit=${completedOnEntry.id}&cardio=1`}>＋ Add a session</Link><Link className="button ghost" to={`/workout?edit=${completedOnEntry.id}`}>Edit workout</Link><Link className="button ghost" to="/history">Open history</Link></footer>
       <small className="second-session-hint">Two-a-day? “Add a session” opens today’s log so an evening run or extra lift lands on the same training day.</small>
     </section>
   </div>;

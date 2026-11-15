@@ -19,10 +19,10 @@ import { useSyncStatus } from '../features/sync/SyncStatusProvider';
 import { localDayIso } from '../lib/time';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { needsFollowUp } from '../features/training/athleteNotesService';
-import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyPartnerTrained } from '../lib/notifications';
+import { loadNotificationPrefs, maybeNotifyFollowUp, maybeNotifyPartnerTrained, saveNotificationPrefs } from '../lib/notifications';
 import { loadPartners } from '../features/friends/partnerService';
 import { registerServiceWorker, syncPushSubscription } from '../lib/push';
-import { openNotificationTaps } from '../lib/nativePush';
+import { openNotificationTaps, promptAndRegisterOnLaunch } from '../lib/nativePush';
 import { onWrappedReminderTap } from '../lib/wrappedReminder';
 import { getActivityConnection, syncStravaActivities } from '../features/training/activityConnectionService';
 import { importStravaActivities } from '../features/training/stravaImportService';
@@ -345,6 +345,17 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   }, [user]);
   /* In the iPhone app a tapped notification opens the screen it is about. */
   useEffect(() => { openNotificationTaps(path => navigate(path)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Signed in, in the iPhone app: ask with Apple's pop-up once, and keep
+     this phone registered (nativePush.promptAndRegisterOnLaunch). */
+  useEffect(() => {
+    if (!user) return;
+    const timer = window.setTimeout(() => void promptAndRegisterOnLaunch(() => {
+      const prefs = { ...loadNotificationPrefs(), morningWorkout: true, partnerTrained: true };
+      saveNotificationPrefs(prefs);
+      return prefs;
+    }), 1500);
+    return () => window.clearTimeout(timer);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* THE PARTNER NUDGE. Checked when the app opens and when it comes back to
      the foreground, which is when it can still change the day. It asks the

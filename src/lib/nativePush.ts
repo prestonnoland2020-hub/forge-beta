@@ -110,3 +110,29 @@ export function openNotificationTaps(navigate: (path: string) => void) {
     navigate(hash.startsWith('/') ? hash : '/');
   });
 }
+
+/* THE APPLE POP-UP, ONCE, WITHOUT HUNTING FOR A CARD.
+   The TestFlight build only ever asked from the Today card's button, and a
+   phone that already allowed notifications (or never saw the card) was never
+   registered at all, so nothing reached it. Now, on every launch of the
+   native app with someone signed in:
+   - never asked → iOS's own permission sheet, once; a yes turns on the
+     morning workout and partner notifications, the same as the card;
+   - allowed → register (or re-register a rotated token), keeping their
+     stored preferences;
+   - denied → nothing; Profile says how to allow it in Settings. */
+const ASKED_KEY = 'forge-native-push-asked';
+export async function promptAndRegisterOnLaunch(turnOn: () => { morningWorkout: boolean; partnerTrained: boolean }): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    let permission = await refreshNativePermission();
+    let prefs: { morningWorkout: boolean; partnerTrained: boolean } | undefined;
+    if (permission === 'default' && !localStorage.getItem(ASKED_KEY)) {
+      localStorage.setItem(ASKED_KEY, '1');
+      permission = await requestNativePermission();
+      if (permission === 'granted') prefs = turnOn();
+    }
+    if (permission === 'granted') await syncNativePush(prefs);
+  } catch { /* best effort: the Today card and Profile still work */ }
+}
+
