@@ -12,6 +12,9 @@ import { parseActions, overrideFromActions, circuitWorkoutFromAction, whereItGoe
 export type AppliedChange = { label: string; place: string; to: string };
 import { readTodayOverride, writeTodayOverride, appendAppliedActions } from './coachOverrides';
 import { localDayIso } from '../../lib/time';
+import { writeSwap } from '../../lib/todaySwaps';
+import { useDailyRecommendation } from './DailyRecommendationProvider';
+import type { CreatedGoal } from '../../components/GoalBuilder';
 
 /* ONE WAY TO APPLY WHAT THE COACH PROPOSES. The chat coach's confirm card
    and the weekly review's one-tap change both land here, so an action means
@@ -23,7 +26,8 @@ const kindLabel: Record<AthleteNote['kind'], string> = { injury: 'injury', fatig
 
 export function useCoachActions() {
   const { profile, updateProfile } = useAdaptiveTraining();
-  const { goals, saveGoal } = useGoals();
+  const { goals, saveGoal, deleteGoal } = useGoals();
+  const { recommendation } = useDailyRecommendation();
   const { strategy, updateStrategy } = useCoachingStrategy();
   const { setup, saveSetup } = useProfileSetup();
   const { exercises, addExercise, addWorkout } = useTrainingLibrary();
@@ -31,14 +35,15 @@ export function useCoachActions() {
 
   const context = useMemo<ActionContext>(() => ({
     splitDays: (setup?.splitDays || []).map((day, index) => ({ position: index + 1, name: day.name, type: day.type })),
-    goals: goals.map(goal => ({ title: goal.title })),
+    goals: goals.map(goal => ({ title: goal.title, type: goal.type, exercise: goal.exercise })),
+    todayLifts: (recommendation?.topSets || []).map(set => set.exercise).filter(Boolean),
     activeNoteAreas: notes.filter(note => note.status === 'active').map(note => note.area || kindLabel[note.kind]),
     exercises: exercises.map(exercise => exercise.name),
     weeklyMileage: Number(setup?.weeklyMileage) || profile.weeklyMileage || 0,
     runningDays: Number(setup?.runningDays) || profile.runningDays || 0,
     loadBiasPercent: strategy.loadBiasPercent,
     metric: setup?.units === 'Metric',
-  }), [setup, goals, notes, exercises, profile.weeklyMileage, profile.runningDays, strategy.loadBiasPercent]);
+  }), [setup, goals, notes, exercises, profile.weeklyMileage, profile.runningDays, strategy.loadBiasPercent, recommendation]);
 
   /* Applies every action and returns what was done and where it landed. */
   const apply = useCallback((actions: CoachAction[], reason: string): AppliedChange[] => {
@@ -53,6 +58,14 @@ export function useCoachActions() {
          back after being sick (lib/bodyLog reads the end date). */
       if (action.type === 'clear_note') { const note = notes.find(item => item.status === 'active' && (item.area || kindLabel[item.kind]) === action.area); if (note) upsert({ ...note, status: 'cleared', bufferUntil: todayIso }); }
       if (action.type === 'update_goal') { const index = goals.findIndex(goal => goal.title === action.goalTitle); if (index >= 0) saveGoal({ ...goals[index], ...(action.target ? { target: action.target } : {}), ...(action.date ? { date: action.date } : {}) }, index); }
+      if (action.type === 'create_goal') {
+        const goal: CreatedGoal = { type: action.goal.type, title: action.goal.title, target: `${action.goal.target} ${action.goal.unit}`, date: action.goal.date,
+          connection: action.goal.type === 'Endurance' ? 'Cardio only' : 'No fixed day', exercise: action.goal.exercise, metric: action.goal.metric,
+          current: '', unit: action.goal.unit, trackingSource: 'Workout history', checkInFrequency: 'Automatic', reminderEnabled: false };
+        saveGoal(goal, null);
+      }
+      if (action.type === 'delete_goal') { const index = goals.findIndex(goal => goal.title === action.goalTitle); if (index >= 0) deleteGoal(index); }
+      if (action.type === 'swap_exercise') writeSwap(todayIso, action.from, action.to);
       if (action.type === 'create_exercise') addExercise({ name: action.name, kind: action.muscles.includes('Cardio') ? 'Cardio' : 'Strength', muscles: action.muscles, detail: 'Coach-created · User confirmed', enabled: true, custom: true });
       /* A WORKOUT WITH ITS PRESCRIPTION IS SAVED AS A CIRCUIT — the stations,
          their numbers, rounds and rest — so it opens in the circuit builder,
@@ -71,7 +84,7 @@ export function useCoachActions() {
     if (override !== readTodayOverride(todayIso)) writeTodayOverride(override);
     appendAppliedActions(actions.map(action => ({ date: todayIso, type: action.type, label: action.label })));
     return applied;
-  }, [updateProfile, setup, saveSetup, updateStrategy, upsert, notes, goals, saveGoal, addExercise, addWorkout, exercises]);
+  }, [updateProfile, setup, saveSetup, updateStrategy, upsert, notes, goals, saveGoal, deleteGoal, addExercise, addWorkout, exercises]);
 
   const parse = useCallback((raw: unknown) => parseActions(raw, context), [context]);
 

@@ -110,6 +110,14 @@ export type StandoutAsk = {
 
 /* THE ONE EFFORT WORTH ASKING ABOUT. Two independent reasons to doubt a
    record; whichever is more sure of itself is the one that gets asked. */
+const AS_OF_DAYS = 60;
+function asOfEffort(date: string, todayIso: string): string {
+  const then = new Date(`${date}T12:00:00`);
+  then.setDate(then.getDate() + AS_OF_DAYS);
+  const iso = `${then.getFullYear()}-${String(then.getMonth() + 1).padStart(2, '0')}-${String(then.getDate()).padStart(2, '0')}`;
+  return iso < todayIso ? iso : todayIso;
+}
+
 export function standoutEffort(efforts: Effort[], answered: string[] = [], todayIso = localDayIso()): StandoutAsk | null {
   /* BOTH ANSWERS COUNT AS ANSWERED. A confirmed effort is stored with an "ok:"
      prefix so it is remembered without being excluded — recording only the
@@ -135,7 +143,13 @@ export function standoutEffort(efforts: Effort[], answered: string[] = [], today
      fitted curve rather than a fixed idea of what a suspicious shape is. */
   if (real.length >= 3) {
     for (const effort of unanswered) {
-      const gap = leaveOneOutGap(real, effort, todayIso);
+      /* JUDGED AGAINST ITS OWN TIME. The curve weights recent runs, so a
+         genuine personal best was fine the month it was run and then, a few
+         months on, "8% faster than everything else in your log" — because the
+         runs that matched it had aged out of the window, not because it got
+         any less real. An effort is compared with the log as it stood around
+         when it was run. */
+      const gap = leaveOneOutGap(real, effort, asOfEffort(effort.date, todayIso));
       if (gap === null || gap < ASK_GAP) continue;
       const others = real.filter(other => other !== effort);
       const runnerUp = others.reduce((winner, other) => mileEquivalent(other) < mileEquivalent(winner) ? other : winner, others[0]);

@@ -30,7 +30,10 @@ const table = name => {
     delete() { this.isDelete = true; return this; },
     maybeSingle() { return this.then(r => ({ data: r.data[0] ?? null })); },
     then(resolve) { return Promise.resolve(run(this)).then(resolve); },
-    or(expr) { this.orExpr = expr; return this; } };
+    or(expr) { this.orExpr = expr; return this; },
+    /* Range and null filters the morning brief uses to find the split day;
+       the fixtures hold no split rows, so they narrow nothing here. */
+    not() { return this; }, gte() { return this; }, lte() { return this; } };
   return q;
 };
 const matches = (row, filters) => filters.every(([c, v, op]) => op === 'in' ? v.includes(row[c]) : row[c] === v);
@@ -72,6 +75,7 @@ const admin = {
 const source = readFileSync('supabase/functions/forge-push/index.ts', 'utf8')
   .replace("import { createClient } from 'npm:@supabase/supabase-js@2';", '')
   .replace("import { sendPush, type PushTarget } from './webpush.ts';", '')
+  .replace("import { sendApns, type ApnsConfig } from './apns.ts';", 'const sendApns = globalThis.sendApns;')
   .replace(/const SERVICE_ROLE[\s\S]*?const admin = createClient\([^;]*;/, '')
   .replace('Deno.serve(', 'globalThis.__handler = (');
 const { transform } = await import('esbuild');
@@ -80,6 +84,7 @@ const { code } = await transform(source, { loader: 'ts', format: 'esm' });
 globalThis.Deno = { env: { get: name => (name === 'FORGE_PUSH_SECRET' ? 'shhh' : undefined) } };
 globalThis.admin = admin;
 globalThis.sendPush = async (target, payload) => { state.pushed.push({ endpoint: target.endpoint, payload }); return { endpoint: target.endpoint, status: 201, gone: false }; };
+globalThis.sendApns = async (endpoint, payload) => { state.pushed.push({ endpoint, payload, apns: true }); return { endpoint, status: 200, gone: false }; };
 await import(`data:text/javascript,${encodeURIComponent(
   code.replace(/\bconst admin\b/, 'const _unusedAdmin').replace(/^/, 'const admin = globalThis.admin; const sendPush = globalThis.sendPush;\n'))}`);
 const call = async body => {
@@ -262,7 +267,13 @@ state.sentLog = []; state.workouts = [];
 state.subs = Array.from({ length: 25 }, (_, index) => sub(`athlete-${index}`, MORNING));
 out = await call({ kind: 'morning' });
 check('twenty-five athletes all get their brief', state.pushed.length === 25, `${state.pushed.length}`);
-check('and the gates cost one query, not one each', state.workoutQueries === 1, `${state.workoutQueries} workout queries`);
+/* The brief now also reads the split position when there is no stored
+   recommendation, which is a second query — still a fixed number for any
+   crowd, which is the point: never one per athlete. */
+const forTwentyFive = state.workoutQueries;
+state.sentLog = []; state.subs = [sub('athlete-solo', MORNING)];
+await call({ kind: 'morning' });
+check('and the gates cost a fixed number of queries, not one each', forTwentyFive === state.workoutQueries && forTwentyFive <= 2, `${forTwentyFive} for 25, ${state.workoutQueries} for 1`);
 
 console.log('\nAuthorisation');
 const forbidden = await globalThis.__handler(new Request('https://x/', {

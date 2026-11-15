@@ -15,6 +15,7 @@ import { MileageCheckOnGoal } from '../components/MileageGate';
 import { land, rise, tap } from '../lib/haptics';
 import { Icon } from '../components/Icon';
 import { predictionFromNow } from '../lib/predictionFromNow';
+import { goalCards, makeGoalJudge } from '../lib/goalCards';
 import { quickWinFor, suggestGoals, type GoalDraft, type GoalJudge, type GoalSuggestion } from '../lib/goalSuggestions';
 import { CORE_LIFTS } from '../lib/coreLifts';
 import { canonicalLiftKey } from '../lib/liftAliases';
@@ -82,57 +83,19 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      ones it cannot judge and an index into a shortened list points at the
      wrong goal. */
   const vo2Version = useVo2Version();
-  const verdicts = useMemo(
-    () => goals.map(goal => goalFeasibility([goal], records, { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts })[0]),
-    [goals, records, setup?.maxWeeklyMileage, workouts, vo2Version],
-  );
   /* CALCULATED OR TESTED, for every strength number on the page at once —
      the cards, their bars and the overall ring. Remembered on this device. */
   const [maxMode, setMaxMode] = useState<MaxMode>(() => { try { return localStorage.getItem('forge-goals-max-mode') === 'tested' ? 'tested' : 'calculated'; } catch { return 'calculated'; } });
   const chooseMode = (mode: MaxMode) => { if (mode === maxMode) return; tap(); setMaxMode(mode); try { localStorage.setItem('forge-goals-max-mode', mode); } catch { /* per-device convenience */ } };
-  /* What logged running is worth at each endurance goal's distance today —
-     the same predictor the goal detail calls CURRENT. */
-  const enduranceNow = useMemo(() => goals.map(goal => {
-    if (goal.type !== 'Endurance') return null;
-    const miles = expectedRunMiles(goal);
-    if (!miles) return null;
-    /* Estimated is the race predictor; tested is a time actually run at the
-       distance — the same switch the strength goals use. */
-    const estimate = predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
-    return maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || [], estimate) : estimate;
-  }), [goals, records, setup?.excludedEfforts, workouts, vo2Version, maxMode]);
-  const progress = useMemo<GoalProgress[]>(() => goals.map((goal, index) => goalProgress(goal, records, verdicts[index], setup, maxMode, enduranceNow[index])), [goals, records, verdicts, setup, maxMode, enduranceNow]);
+  /* Every card's numbers come from lib/goalCards — the coach is given the
+     same ones, in words, so the two never disagree. */
+  const cards = useMemo(() => goalCards(goals, records, setup, workouts, maxMode), [goals, records, setup, workouts, maxMode, vo2Version]); // eslint-disable-line react-hooks/exhaustive-deps
+  const verdicts = useMemo(() => cards.map(card => card.verdict), [cards]);
+  const progress = useMemo<GoalProgress[]>(() => cards.map(card => card.progress), [cards]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
-  /* THE COACH'S EYE ON A GOAL THAT DOES NOT EXIST YET: the number its card
-     would show today and the prediction it would draw, from exactly the same
-     code the cards use — so a suggested goal reads on its card the way the
-     suggestion said it would. Race predictions are the slow part and are
-     remembered per distance. */
-  const judge = useMemo<GoalJudge>(() => {
-    const cap = { maxWeeklyMileage: Number(setup?.maxWeeklyMileage) || 0, excludedEfforts: setup?.excludedEfforts || [], workoutEfforts: workouts };
-    const raceNow = new Map<number, number | null>();
-    const verdictCache = new Map<string, ReturnType<typeof goalFeasibility>[number] | undefined>();
-    return (goal: CreatedGoal) => {
-      const key = `${goal.type}|${goal.exercise}|${goal.target}|${goal.date}|${goal.current}|${goal.unit}`;
-      if (!verdictCache.has(key)) verdictCache.set(key, goalFeasibility([goal], records, cap)[0]);
-      const verdict = verdictCache.get(key);
-      let endurance: number | null = null;
-      if (goal.type === 'Endurance') {
-        const miles = expectedRunMiles(goal);
-        if (miles) {
-          if (!raceNow.has(miles)) {
-            const estimate = predictRaceFromLegacyMethod(records, miles, setup?.excludedEfforts || [], workouts)?.seconds ?? null;
-            raceNow.set(miles, maxMode === 'tested' ? testedRaceSeconds(records, miles, setup?.excludedEfforts || [], estimate) : estimate);
-          }
-          endurance = raceNow.get(miles) ?? null;
-        }
-      }
-      const model = verdict?.prediction;
-      const now = goalProgress(goal, records, verdict, setup, maxMode, endurance).current ?? model?.start ?? null;
-      return { now, model, p: model ? predictionFromNow(model, now) : undefined };
-    };
-  }, [records, setup, workouts, maxMode, vo2Version]);
+  /* Suggestions are judged by the same code the cards use (lib/goalCards). */
+  const judge = useMemo<GoalJudge>(() => makeGoalJudge(records, setup, workouts, maxMode), [records, setup, workouts, maxMode, vo2Version]); // eslint-disable-line react-hooks/exhaustive-deps
   /* STUCK LIFTS: the plan's own stall rule (lib/plateau). A stuck lift's
      first suggested goal is a new best on the plateau plan, and its goal card
      says so. */
