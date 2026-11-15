@@ -113,3 +113,41 @@
 .tp-goal .tp-why { margin: -4px 0 10px; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
 
 
+
+/* TODAY'S PICK IS THE BIG CARD. The suggested day fills most of the strip;
+   the neighbours still peek at the edges so swiping stays obvious. */
+.tp-days { gap: 8px; }
+.tp-days::before, .tp-days::after { flex: 0 0 calc(7% - 8px); }
+.tp-day { flex: 0 0 86%; min-height: 112px; padding: 18px 20px; align-content: center; gap: 4px; }
+.tp-day b { font-size: 26px; }
+.tp-day span { font-size: 14px; }
+.tp-day.on { background: color-mix(in oklch, var(--accent) 4%, var(--surface-2)); box-shadow: 0 0 0 1px var(--accent), 0 8px 24px -12px color-mix(in oklch, var(--accent) 60%, transparent); }
+
+/* TOP SETS AS CARDS. Each lift is one card read top to bottom:
+   1 · the lift (and Swap), 2 · the number to hit, big, 3 · the rep wave as
+   a bar with this week lit and a plain line saying what it means. */
+.tp-sets { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 10px; }
+.tp-set { padding: 14px 16px 14px; border-radius: 18px; background: var(--surface-2); border: 1px solid var(--line); transition: opacity .15s, border-color .15s; }
+.tp-set:not(.on) { opacity: .55; }
+.tp-set-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tp-set-head label { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; cursor: pointer; }
+.tp-set-head input { position: absolute; opacity: 0; pointer-events: none; }
+.today .tp-set-head .td-tick { box-shadow: none; flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--line-strong, var(--ink-3)); color: var(--accent-ink, #0b100e); }
+.today .tp-set.on .td-tick { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #0b100e); }
+.today .tp-set:not(.on) .td-tick svg { opacity: 0; }
+.tp-set-head span { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 17px; font-weight: 750; color: var(--ink); line-height: 1.2; }
+.tp-set-head span small { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+.tp-set-step { display: none; }
+.tp-set-load { display: flex; align-items: baseline; gap: 4px; margin: 10px 0 0 34px; font-size: 34px; line-height: 1; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.tp-set-load small { font-size: 15px; font-weight: 650; letter-spacing: 0; color: var(--ink-3); }
+.tp-set-load i { font-style: normal; font-size: 22px; font-weight: 700; color: var(--ink-3); margin: 0 4px; }
+.tp-set-load.open, .tp-set-load.run { font-size: 22px; font-weight: 750; letter-spacing: -.01em; }
+.tp-set-wave { margin: 12px 0 0 34px; }
+.tp-set-wave div { display: flex; gap: 4px; }
+.tp-set-wave span { flex: 1; height: 26px; display: grid; place-items: center; border-radius: 8px; font-size: 12.5px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--ink-3); background: var(--surface-1); }
+.tp-set-wave span.past { color: var(--ink-2); background: color-mix(in oklch, var(--accent) 18%, var(--surface-1)); }
+.tp-set-wave span.now { color: var(--accent-ink, #0b100e); background: var(--accent); }
+.tp-set-wave em { display: block; margin-top: 7px; font-style: normal; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.tp-set-note { margin: 8px 0 0 34px; font-size: 14px; line-height: 1.35; color: var(--ink-2); }
+.tp-set .tp-swap-list { margin: 12px 0 0; }
+.td-card .tp-set .tp-swap { height: 32px !important; }
