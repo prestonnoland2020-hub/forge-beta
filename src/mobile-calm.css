@@ -71,7 +71,7 @@ body { background: transparent !important; }
 .completed-day-review-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 16px 16px; }
 .completed-day-review-list article + article { border-top: 1px solid var(--line); }
 .completed-day-review-list article > div { display: grid; gap: 3px; min-width: 0; }
-.completed-day-review-list article > div:last-child { text-align: right; }
+.completed-day-review-list article>div:last-of-type { text-align: right; }
 .completed-day-review-list strong, .completed-day-review-list b { color: var(--text); line-height: 1.25; }
 .completed-day-review-list small { color: var(--muted); font-size: 12px; line-height: 1.35; }
 .completed-cardio-summary { max-width: 440px; }
