@@ -377,10 +377,10 @@ select,input:not([type=checkbox]):not([type=radio]){min-height:36px}
    right-aligned wrapped text strands a fragment ("/mi") on its own line. Below
    the tablet breakpoint the row stacks and reads left-aligned instead. */
 .completed-day-review-list b{font-size:16px;font-variant-numeric:tabular-nums}
-.completed-day-review-list article>div:last-child{overflow-wrap:anywhere}
+.completed-day-review-list article>div:last-of-type{overflow-wrap:anywhere}
 @media(max-width:620px){
   .completed-day-review-list article{grid-template-columns:1fr;gap:4px}
-  .completed-day-review-list article>div:last-child{text-align:left}
+  .completed-day-review-list article>div:last-of-type{text-align:left}
   .completed-day-review-list article>div:first-child strong{font-size:14px;color:var(--ink-2)}
   .completed-day-review-list b{font-size:16px;color:var(--ink)}
 }
@@ -1395,16 +1395,16 @@ html[data-motion="false"] .bottom-nav a.active .nav-icon svg{animation:none}
 .day-recap .completed-day-review-list article>div:first-child{display:grid;gap:2px;min-width:0}
 .day-recap .completed-day-review-list article>div:first-child strong{font:800 14px/1.2 var(--display);color:var(--ink);overflow-wrap:anywhere}
 .day-recap .completed-day-review-list article>div:first-child small{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
-.day-recap .completed-day-review-list article>div:last-child{display:grid;gap:2px;justify-items:end;text-align:right;min-width:0}
-.day-recap .completed-day-review-list article>div:last-child b{font:800 16px/1.15 var(--display);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.day-recap .completed-day-review-list article>div:last-of-type{display:grid;gap:2px;justify-items:end;text-align:right;min-width:0}
+.day-recap .completed-day-review-list article>div:last-of-type b{font:800 16px/1.15 var(--display);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
 /* The multiplier is punctuation between two numbers, not a number itself. */
-.day-recap .completed-day-review-list article>div:last-child b em{font-style:normal;font-weight:700;color:var(--ink-3);padding:0 1px}
-.day-recap .completed-day-review-list article>div:last-child small{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.day-recap .completed-day-review-list article>div:last-of-type b em{font-style:normal;font-weight:700;color:var(--ink-3);padding:0 1px}
+.day-recap .completed-day-review-list article>div:last-of-type small{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 /* A pace like "9:40 /mi" must never break across the slash. */
-.day-recap .completed-cardio-summary b{white-space:normal;text-wrap:balance;font-size:14px}
+.day-recap .completed-day-review-list article>div.completed-cardio-summary b{white-space:normal;text-wrap:balance;font-size:14px}
 
 .day-recap article.is-pr{background:var(--accent-wash);box-shadow:inset 2px 0 var(--accent)}
-.day-recap article.is-pr>div:last-child b{color:var(--accent-text)}
+.day-recap article.is-pr>div:last-of-type b{color:var(--accent-text)}
 .day-recap .pr-flag{grid-column:1;justify-self:start;margin-top:1px;font-style:normal;font-size:12px;font-weight:900;letter-spacing:.14em;color:var(--accent-ink);background:var(--accent-strong);border-radius:3px;padding:2px 8px}
 
 /* One primary action; the other two share a row instead of stacking into
