@@ -30,7 +30,7 @@ export const ACTION_TYPES = [
   /* The coach's newer hands: make or drop a goal, swap one lift today, and
      start a guided session — things an athlete asked for in chat and had to
      be told to go and do themselves. */
-  'create_goal', 'delete_goal', 'swap_exercise', 'start_guided',
+  'create_goal', 'delete_goal', 'swap_exercise', 'start_guided', 'log_top_set', 'log_run',
 ] as const;
 export type ActionType = typeof ACTION_TYPES[number];
 
@@ -88,7 +88,9 @@ export type CoachAction =
   | { type: 'create_goal'; goal: NewGoal; label: string }
   | { type: 'delete_goal'; goalTitle: string; label: string }
   | { type: 'swap_exercise'; from: string; to: string; label: string }
-  | { type: 'start_guided'; focus: GuidedFocus; minutes: number; label: string };
+  | { type: 'start_guided'; focus: GuidedFocus; minutes: number; label: string }
+  | { type: 'log_top_set'; exercise: string; weight: number; reps: number; date: string; label: string }
+  | { type: 'log_run'; miles: number; minutes: number; date: string; label: string };
 
 /* A goal the coach proposes, in the shape the goal builder saves. */
 export type NewGoal = { type: 'Strength' | 'Endurance' | 'Body Composition'; exercise: string; target: string; unit: string; date: string; metric: string; title: string };
@@ -114,6 +116,15 @@ const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
 const num = (value: unknown) => { const n = Number(value); return Number.isFinite(n) ? n : NaN; };
 const str = (value: unknown) => String(value ?? '').trim();
+/* A log date: null means today; never the future, never more than 14 days back. */
+const logDate = (value: unknown) => {
+  const today = localDayIso();
+  const text = str(value);
+  if (!text) return today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || text > today) return '';
+  const back = new Date(`${today}T12:00:00`); back.setDate(back.getDate() - 14);
+  return text >= localDayIso(back) ? text : '';
+};
 
 /* Validate what the model sent against what the athlete has. An entry that
    names a day, goal or exercise the athlete does not have is dropped, never
@@ -125,7 +136,7 @@ export function parseActions(raw: unknown, ctx: ActionContext): CoachAction[] {
   for (const entry of raw.slice(0, 6)) {
     const action = parseOne((entry || {}) as RawAction, ctx);
     if (!action) continue;
-    const key = `${action.type}:${'area' in action ? action.area : ''}${'dayName' in action ? action.dayName : ''}`;
+    const key = `${action.type}:${'area' in action ? action.area : ''}${'dayName' in action ? action.dayName : ''}${'exercise' in action ? action.exercise : ''}${'date' in action ? action.date : ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(action);
@@ -278,6 +289,27 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
       if (!from || !to || norm(from) === norm(to)) return null;
       return { type, from, to, label: `Today: ${from} → ${to}` };
     }
+    /* LOGGING FROM THE CHAT. "Did 225 for 5 on bench" is a top set; the
+       athlete still taps Apply, so nothing lands in the log unseen. name is a
+       library lift, target "225x5", date null for today (never the future,
+       never more than two weeks back). */
+    case 'log_top_set': {
+      const exercise = ctx.exercises.find(item => norm(item) === norm(str(entry.name))) || ctx.exercises.find(item => norm(item).includes(norm(str(entry.name))) || norm(str(entry.name)).includes(norm(item)));
+      const match = str(entry.target).match(/(\d+(?:\.\d+)?)\s*(?:lb|lbs|kg)?\s*(?:x|×|for)\s*(\d+)/i);
+      const date = logDate(entry.date);
+      if (!exercise || !match || !date) return null;
+      const weight = num(match[1]); const reps = Math.round(num(match[2]));
+      if (!(weight > 0 && weight < 2000) || !(reps >= 1 && reps <= 30)) return null;
+      return { type, exercise, weight, reps, date, label: `Log ${exercise} ${weight} × ${reps}${date === localDayIso() ? '' : ` on ${date}`}` };
+    }
+    case 'log_run': {
+      const miles = num(entry.miles); const minutes = num(entry.minutes);
+      const date = logDate(entry.date);
+      if (!(miles > 0 && miles <= 60) || !(minutes > 0 && minutes <= 600) || !date) return null;
+      const pace = minutes / miles;
+      if (pace < 4 || pace > 20) return null;
+      return { type, miles: Math.round(miles * 100) / 100, minutes: Math.round(minutes), date, label: `Log a ${Math.round(miles * 100) / 100} mi run in ${Math.round(minutes)} min${date === localDayIso() ? '' : ` on ${date}`}` };
+    }
     case 'start_guided': {
       const focus = GUIDED_FOCUSES.find(item => norm(item) === norm(str(entry.name))) || 'Full body';
       const minutes = [20, 30, 45, 60].reduce((best, option) => Math.abs(option - (num(entry.minutes) || 30)) < Math.abs(best - (num(entry.minutes) || 30)) ? option : best, 30);
@@ -328,6 +360,7 @@ export function whereItGoes(action: CoachAction): ChangePlace {
     case 'open_split_guide': return { place: 'the split guide', to: '/split?guide=1' };
     case 'create_goal': case 'delete_goal': return { place: 'Goals', to: '/goals' };
     case 'swap_exercise': return { place: 'Today', to: '/' };
+    case 'log_top_set': case 'log_run': return { place: 'Activities', to: '/history' };
     case 'start_guided': return { place: 'Coach me', to: `/guided?go=1&min=${action.minutes}&focus=${encodeURIComponent(action.focus)}` };
   }
 }

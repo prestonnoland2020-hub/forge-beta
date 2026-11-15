@@ -57,5 +57,21 @@ const testedFacts = goalCardFacts(goalCards([{ ...goal, target: '265 lb', title:
 check('a goal the sets already reach, tested short, is ready to test', Boolean(testedFacts.readyToTest), JSON.stringify(testedFacts));
 check('and its status says so, the same as the card', testedFacts.status === 'Ready to test', testedFacts.status);
 
+console.log('\nLogging from the chat');
+const today = new Date(); const dayIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const set = one({ type: 'log_top_set', name: 'bench', target: '225x5' });
+check('"bench 225x5" is a Bench Press top set today', set?.exercise === 'Bench Press' && set.weight === 225 && set.reps === 5 && set.date === dayIso(today), JSON.stringify(set));
+check('"225 for 5" reads the same', one({ type: 'log_top_set', name: 'Bench Press', target: '225 for 5' })?.reps === 5);
+check('a lift not in the library is dropped', !one({ type: 'log_top_set', name: 'Zercher Squat', target: '225x5' }));
+const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+check('a set in the future is dropped', !one({ type: 'log_top_set', name: 'Bench Press', target: '225x5', date: dayIso(tomorrow) }));
+const old = new Date(today); old.setDate(old.getDate() - 30);
+check('a set from a month ago is dropped', !one({ type: 'log_top_set', name: 'Bench Press', target: '225x5', date: dayIso(old) }));
+const two = parseActions([{ ...blank, type: 'log_top_set', name: 'Bench Press', target: '225x5' }, { ...blank, type: 'log_top_set', name: 'Lat Pulldown', target: '180x8' }], ctx);
+check('two sets in one message are two actions', two.length === 2, JSON.stringify(two.map(a => a.label)));
+const run = one({ type: 'log_run', miles: 3.1, minutes: 27 });
+check('a 3.1 mi run in 27 min logs today', run?.miles === 3.1 && run.minutes === 27 && run.date === dayIso(today), JSON.stringify(run));
+check('a run at 2 min a mile is a typo, dropped', !one({ type: 'log_run', miles: 10, minutes: 20 }));
+
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
 console.log('\nall passed');

@@ -14,6 +14,7 @@ import { readTodayOverride, writeTodayOverride, appendAppliedActions } from './c
 import { localDayIso } from '../../lib/time';
 import { writeSwap } from '../../lib/todaySwaps';
 import { useDailyRecommendation } from './DailyRecommendationProvider';
+import { useWorkoutHistory, type WorkoutRecord } from './WorkoutHistoryProvider';
 import type { CreatedGoal } from '../../components/GoalBuilder';
 
 /* ONE WAY TO APPLY WHAT THE COACH PROPOSES. The chat coach's confirm card
@@ -32,6 +33,7 @@ export function useCoachActions() {
   const { setup, saveSetup } = useProfileSetup();
   const { exercises, addExercise, addWorkout } = useTrainingLibrary();
   const { notes, upsert } = useAthleteNotes();
+  const { records, addRecord, updateRecord } = useWorkoutHistory();
 
   const context = useMemo<ActionContext>(() => ({
     splitDays: (setup?.splitDays || []).map((day, index) => ({ position: index + 1, name: day.name, type: day.type })),
@@ -66,6 +68,26 @@ export function useCoachActions() {
       }
       if (action.type === 'delete_goal') { const index = goals.findIndex(goal => goal.title === action.goalTitle); if (index >= 0) deleteGoal(index); }
       if (action.type === 'swap_exercise') writeSwap(todayIso, action.from, action.to);
+      /* Logged into the day's record when there is one, so the day stays one
+         session; a new record otherwise. */
+      if (action.type === 'log_top_set' || action.type === 'log_run') {
+        const existing = records.find(record => record.date === action.date);
+        const muscle = action.type === 'log_top_set' ? (exercises.find(item => item.name === action.exercise)?.muscles?.[0] || '') : 'Cardio';
+        const set = action.type === 'log_top_set' ? { lift: action.exercise, weight: action.weight, reps: action.reps, muscle, completed: true } : null;
+        const run = action.type === 'log_run' ? { id: `coach-run-${Date.now()}`, structure: 'steady', activity: 'Run', summary: `Run · ${action.miles} mi`, prescription: { distance: String(action.miles), distanceUnit: 'miles', duration: String(action.minutes) } } : null;
+        if (existing) {
+          const { id, ...rest } = existing;
+          updateRecord(id, {
+            ...rest,
+            muscles: [...new Set([...(existing.muscles || []), ...(muscle ? [muscle] : [])])],
+            topSets: set ? [...(existing.topSets || []), set] : existing.topSets,
+            hasCardio: existing.hasCardio || Boolean(run),
+            cardioSessions: run ? [...(existing.cardioSessions || []), run] : existing.cardioSessions,
+          } as Omit<WorkoutRecord, 'id'>);
+        } else {
+          addRecord({ date: action.date, title: set ? 'Logged with coach' : 'Run', muscles: muscle ? [muscle] : [], hasCardio: Boolean(run), ...(set ? { topSets: [set] } : {}), ...(run ? { cardioSessions: [run] } : {}) } as Omit<WorkoutRecord, 'id'>);
+        }
+      }
       if (action.type === 'create_exercise') addExercise({ name: action.name, kind: action.muscles.includes('Cardio') ? 'Cardio' : 'Strength', muscles: action.muscles, detail: 'Coach-created · User confirmed', enabled: true, custom: true });
       /* A WORKOUT WITH ITS PRESCRIPTION IS SAVED AS A CIRCUIT — the stations,
          their numbers, rounds and rest — so it opens in the circuit builder,
@@ -84,7 +106,7 @@ export function useCoachActions() {
     if (override !== readTodayOverride(todayIso)) writeTodayOverride(override);
     appendAppliedActions(actions.map(action => ({ date: todayIso, type: action.type, label: action.label })));
     return applied;
-  }, [updateProfile, setup, saveSetup, updateStrategy, upsert, notes, goals, saveGoal, deleteGoal, addExercise, addWorkout, exercises]);
+  }, [updateProfile, setup, saveSetup, updateStrategy, upsert, notes, goals, saveGoal, deleteGoal, addExercise, addWorkout, exercises, records, addRecord, updateRecord]);
 
   const parse = useCallback((raw: unknown) => parseActions(raw, context), [context]);
 
