@@ -4,6 +4,7 @@ import type { AdaptiveProfile, RunResult } from '../features/training/AdaptiveTr
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import type { RecoveryState } from './recoveryEngine';
 import { buildWeeklyCardio, type GeneratedSession } from './cardioEngine';
+import { maintenanceRunMinutes } from './maintenanceRun';
 import { normalizeMuscleGroups } from './muscleGroups';
 import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
@@ -32,7 +33,7 @@ import { exerciseBlocked,bodyLogReason,EMPTY_BODY_LOG,type BodyLogState } from '
    that no longer produces it. */
 /* v7 adds the HYROX split day: Forge writes the session itself. v8 writes it
    only for an athlete with a HYROX goal. */
-export const DAILY_RECOMMENDATION_VERSION='hyrox-v9';
+export const DAILY_RECOMMENDATION_VERSION='easy-run-v10';
 
 export type RecommendationSplitDay={
   id?:string;
@@ -277,7 +278,14 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
          long. Only a day named easy can give way to station work. */
       if(found)return(wanted==='Easy'?stationsDay(found):undefined)||{...found,status:'Scheduled' as const};
     }
-    return stationsDay(weekly.scheduled[0])||weekly.scheduled[0];
+    const scheduled=stationsDay(weekly.scheduled[0])||weekly.scheduled[0];
+    if(scheduled)return scheduled;
+    /* No race goal, but a Run day and running they said they do: the same
+       easy run the Plan tab shows (maintenanceRun). */
+    const hasRace=input.goals.some(goal=>goal.type==='Endurance');
+    const minutes=!hasRace&&input.splitDay.type==='cardio'?maintenanceRunMinutes(Number(input.profile?.weeklyMileage)||0,Number(input.profile?.runningDays)||0):0;
+    if(!minutes)return undefined;
+    return{id:`easy-maintenance-${input.date}`,goal:'Running',event:'Custom Run' as GeneratedSession['event'],role:'Easy' as const,title:'Easy run',phase:'Base' as GeneratedSession['phase'],week:0,plan:{id:Date.now(),targetSource:'Goal generated',structure:'Steady',activity:'Easy Run',duration:String(minutes)} as never,rationale:`${minutes} minutes easy keeps the running you already do. No race goal, so no hard runs.`,placement:input.splitDay.name,stress:'Low' as const,progression:'',scaleNotes:[],status:'Scheduled' as const};
   })();
   const runBlocked=bodyLog.blocksRunning&&cardioCandidate&&!hyrox&&/run/i.test(`${cardioCandidate.plan.activity} ${cardioCandidate.title}`);
   const cardio=cardioCandidate?runBlocked

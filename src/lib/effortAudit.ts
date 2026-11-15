@@ -52,6 +52,7 @@ import { localDayIso } from './time';
    records Preston confirmed were false land at 12% and 22%. Six percent is the
    line between them, with room on both sides. */
 export const ASK_GAP = 0.06;
+export const MIN_CURVE_EFFORTS = 5;
 
 /* AND THE OLD RULE STAYS, BECAUSE IT CATCHES SOMETHING THE NEW ONE CANNOT.
 
@@ -70,6 +71,9 @@ export const ASK_GAP = 0.06;
 export const STANDOUT_MARGIN = 0.02;
 export const CONTRADICTION_MARGIN = 0.01;
 export const DISTANCE_RATIO = 1.5;
+/* A short effort is a time trial when it is at least 8% quicker per mile than
+   the athlete's median pace. */
+export const TIME_TRIAL_PACE = 0.92;
 export const CONFIRMED_PREFIX = 'ok:';
 
 export type Effort = { date: string; miles: number; seconds: number };
@@ -110,6 +114,16 @@ export type StandoutAsk = {
 
 /* THE ONE EFFORT WORTH ASKING ABOUT. Two independent reasons to doubt a
    record; whichever is more sure of itself is the one that gets asked. */
+/* "Oct 30", not "2026-10-30". */
+const dayLabel = (iso: string) => { const date = new Date(`${iso}T12:00:00`); return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }); };
+const AS_OF_DAYS = 60;
+function asOfEffort(date: string, todayIso: string): string {
+  const then = new Date(`${date}T12:00:00`);
+  then.setDate(then.getDate() + AS_OF_DAYS);
+  const iso = `${then.getFullYear()}-${String(then.getMonth() + 1).padStart(2, '0')}-${String(then.getDate()).padStart(2, '0')}`;
+  return iso < todayIso ? iso : todayIso;
+}
+
 export function standoutEffort(efforts: Effort[], answered: string[] = [], todayIso = localDayIso()): StandoutAsk | null {
   /* BOTH ANSWERS COUNT AS ANSWERED. A confirmed effort is stored with an "ok:"
      prefix so it is remembered without being excluded — recording only the
@@ -120,9 +134,9 @@ export function standoutEffort(efforts: Effort[], answered: string[] = [], today
   const unanswered = real.filter(effort => !seen.has(effortKey(effort)));
   if (real.length < 2 || !unanswered.length) return null;
 
-  const ask = (effort: Effort, runnerUp: Effort, gap: number, why: string): StandoutAsk => ({
+  const ask = (effort: Effort, runnerUp: Effort, gap: number, why: string, compare: string): StandoutAsk => ({
     effort, key: effortKey(effort), runnerUp, aheadBy: Math.round(gap * 1000) / 10,
-    say: `Your ${effort.miles.toFixed(2)} mi on ${effort.date} at ${clock(effort.seconds / effort.miles)}/mi is about ${Math.max(1, Math.round(gap * 100))}% ${why} — your ${runnerUp.miles.toFixed(2)} mi at ${clock(runnerUp.seconds / runnerUp.miles)}/mi.`,
+    say: `Your ${effort.miles.toFixed(2)} mi on ${dayLabel(effort.date)} at ${clock(effort.seconds / effort.miles)}/mi is about ${Math.max(1, Math.round(gap * 100))}% ${why}. ${compare}: ${runnerUp.miles.toFixed(2)} mi at ${clock(runnerUp.seconds / runnerUp.miles)}/mi.`,
     question: 'Every goal and every training pace is built on it. Was that a real effort?',
   });
 
@@ -133,13 +147,22 @@ export function standoutEffort(efforts: Effort[], answered: string[] = [], today
   /* ONE: A RECORD THAT BEATS THE ATHLETE'S WHOLE LOG. Works at any distance,
      including a fake fast mile, because the comparison is the athlete's own
      fitted curve rather than a fixed idea of what a suspicious shape is. */
-  if (real.length >= 3) {
+  /* A CURVE NEEDS POINTS. Fitted to three runs, leaving one out leaves a
+     line through two: a 6-miler at 8:30 beside a 5-miler at 9:00 came out
+     "7% faster than everything else" and blocked every screen. */
+  if (real.length >= MIN_CURVE_EFFORTS) {
     for (const effort of unanswered) {
-      const gap = leaveOneOutGap(real, effort, todayIso);
+      /* JUDGED AGAINST ITS OWN TIME. The curve weights recent runs, so a
+         genuine personal best was fine the month it was run and then, a few
+         months on, "8% faster than everything else in your log" — because the
+         runs that matched it had aged out of the window, not because it got
+         any less real. An effort is compared with the log as it stood around
+         when it was run. */
+      const gap = leaveOneOutGap(real, effort, asOfEffort(effort.date, todayIso));
       if (gap === null || gap < ASK_GAP) continue;
       const others = real.filter(other => other !== effort);
       const runnerUp = others.reduce((winner, other) => mileEquivalent(other) < mileEquivalent(winner) ? other : winner, others[0]);
-      offer({ gap, ask: ask(effort, runnerUp, gap, 'faster than everything else in your log, including') });
+      offer({ gap, ask: ask(effort, runnerUp, gap, 'faster than anything else in your log', 'Your next best') });
     }
   }
 
@@ -148,11 +171,19 @@ export function standoutEffort(efforts: Effort[], answered: string[] = [], today
      did is either a breakthrough or a bad GPS lock. */
   const ranked = [...unanswered].sort((a, b) => mileEquivalent(a) - mileEquivalent(b));
   const standout = ranked[0];
-  const shorter = real.filter(effort => standout.miles / effort.miles >= DISTANCE_RATIO);
+  /* …BUT ONLY AGAINST A REAL TIME TRIAL. The rule's premise is that the
+     short effort was run hard. An athlete whose log is all steady running —
+     a 3-miler at 8:08, a 5-miler at 8:12 — was asked "was that a real
+     effort?" over a perfectly ordinary run, in a box over every screen. A
+     short run only counts as the measuring stick when it is clearly quicker
+     than the athlete's usual pace. */
+  const paces = real.map(effort => effort.seconds / effort.miles).sort((a, b) => a - b);
+  const usualPace = paces[Math.floor(paces.length / 2)];
+  const shorter = real.filter(effort => standout.miles / effort.miles >= DISTANCE_RATIO && effort.seconds / effort.miles <= usualPace * TIME_TRIAL_PACE);
   if (shorter.length) {
     const runnerUp = shorter.reduce((winner, effort) => mileEquivalent(effort) < mileEquivalent(winner) ? effort : winner, shorter[0]);
     const gap = 1 - mileEquivalent(standout) / mileEquivalent(runnerUp);
-    if (gap >= STANDOUT_MARGIN) offer({ gap, ask: ask(standout, runnerUp, gap, 'worth more per mile than your best short effort') });
+    if (gap >= STANDOUT_MARGIN) offer({ gap, ask: ask(standout, runnerUp, gap, 'better than your best shorter run, once distance is counted', 'That shorter run') });
   }
 
   if (!found.length) return null;

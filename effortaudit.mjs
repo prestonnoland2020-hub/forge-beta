@@ -8,9 +8,16 @@
 
    Three automatic rules were tried and are pinned here as the reason the
    fourth answer — asking — is the right one. */
-import { standoutEffort, contradicted, trustedEfforts, effortKey, CONFIRMED_PREFIX,
+import { standoutEffort as standoutEffortAt, contradicted, trustedEfforts, effortKey, CONFIRMED_PREFIX,
   STANDOUT_MARGIN, DISTANCE_RATIO } from './src/lib/effortAudit.ts';
 import { isRaceEvidence } from './src/lib/runQuality.ts';
+/* His log ends in late August; the curve is recency-weighted, so the
+   question is asked as of the week the log was written, not whatever day the
+   suite happens to run. */
+const AS_OF = '2026-09-05';
+const standoutEffort = (efforts, answered = [], today = AS_OF) => standoutEffortAt(efforts, answered, today);
+/* …and it holds months later: a real PR is not questioned for getting old. */
+const standoutLater = efforts => standoutEffortAt(efforts, [], '2027-02-01');
 
 let fails = 0;
 const check = (l, c, d = '') => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${d ? ` — ${d}` : ''}`); if (!c) fails++; };
@@ -60,6 +67,9 @@ check('a genuine short PR is never queried — there is nothing shorter to doubt
 check('even though his 5:19 mile IS well clear of his 5:28 one',
   standoutEffort([MILE_519, e('2026-03-22', 1.00, '5:28')]) === null);
 check('and so is one with nothing to compare', standoutEffort([MILE_519]) === null);
+check('and it is still not queried months later, once the runs that matched it have aged',
+  standoutLater(REAL) === null, standoutLater(REAL)?.say || 'no question');
+check('while the bad long run is still caught months later', standoutLater([...REAL, BAD_LONG])?.effort.date === BAD_LONG.date, standoutLater([...REAL, BAD_LONG])?.effort.date);
 check('a best effort only marginally ahead is not worth a question',
   standoutEffort([MILE_519, e('2026-06-01', 1.00, '5:11')]) === null,
   `inside ${STANDOUT_MARGIN * 100}%`);

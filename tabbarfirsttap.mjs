@@ -14,7 +14,7 @@ const chrome = readFileSync('./src/features/shell/nativeChrome.ts', 'utf8');
 const css = readFileSync('./src/app-chrome.css', 'utf8');
 
 console.log('\nA tab switches on the touch itself');
-check('a still touch on a tab navigates on touchend', /onTouchEnd=\{event => \{[\s\S]*?Math\.hypot[\s\S]*?> 10\) return;[\s\S]*?navigate\(tab\.to\)/.test(shell));
+check('a still touch on a tab navigates on touchend', /onTouchEnd=\{event => \{[\s\S]*?Math\.hypot[\s\S]*?> 10\) return;[\s\S]*?(?:navigate|goTab)\(tab\.to\)/.test(shell));
 check('and the click that follows is suppressed', /event\.preventDefault\(\);\s*if \(index !== activeTab\)/.test(shell));
 
 console.log('\nThe bar sits above the strip iOS keeps for its swipe');

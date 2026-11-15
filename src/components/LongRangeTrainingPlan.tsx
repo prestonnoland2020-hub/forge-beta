@@ -35,7 +35,10 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
   const weekDays=weekCycleDays(week.startDate,0,cycle as SplitDayRef[],rhythm,anchor).map((day,index)=>{const date=new Date(start);date.setDate(start.getDate()+index);return{date,day:day as unknown as SplitDay};});
   /* A HYROX day is Forge's own session, never a slot for the week's runs. */
   const compatible=weekDays.map((entry,index)=>({entry,index})).filter(({entry})=>entry.day.dayType.toLowerCase()!=='hyrox'&&(entry.day.dayType.toLowerCase()!=='rest'||entry.day.cardioPolicy!=='none'));
-  const requestedRuns=enduranceGoal?Math.max(1,Math.min(profile.runningDays,compatible.length)):0;
+  /* No race goal: only the easy runs the athlete already does, and only on the
+     days the split gives to running. */
+  const runDaysInSplit=compatible.filter(({entry})=>entry.day.dayType.toLowerCase()==='cardio').length;
+  const requestedRuns=enduranceGoal?Math.max(1,Math.min(profile.runningDays,compatible.length)):/ min easy/.test(week.easy)?Math.min(profile.runningDays,runDaysInSplit):0;
   const cardioByDay=new Map<number,'quality'|'easy'|'long'>();
   /* A split day NAMED for a run role owns that role — a day called "Long Run"
      can never be handed 4×200s. Only the remaining requested runs fall back
@@ -60,9 +63,9 @@ function weekCalendar(week:PlanWeek,splitDays:SplitDay[],goals:CreatedGoal[],pro
     const cardioOnly=new Set(compatible.filter(({entry})=>entry.day.dayType.toLowerCase()==='cardio'||entry.day.dayType.toLowerCase()==='rest').map(({index:slot})=>slot));
     const takeMostSpacedFrom=(pool:number[])=>{let best=pool[0],bestScore=-1;for(const slot of pool){const score=runDays.size?Math.min(...[...runDays].map(day=>Math.abs(day-slot))):slot+1;if(score>bestScore){bestScore=score;best=slot}}free.splice(free.indexOf(best),1);runDays.add(best);return best};
     const freeCardioOnly=()=>free.filter(slot=>cardioOnly.has(slot));
-    if(!named.has('quality')&&cardioByDay.size<requestedRuns&&freeCardioOnly().length)cardioByDay.set(takeMostSpacedFrom(freeCardioOnly()),'quality');
-    if(requestedRuns>1&&!named.has('long')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpacedFrom(freeCardioOnly().length?freeCardioOnly():free),'long');
-    while(cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpaced(),'easy');
+    if(enduranceGoal&&!named.has('quality')&&cardioByDay.size<requestedRuns&&freeCardioOnly().length)cardioByDay.set(takeMostSpacedFrom(freeCardioOnly()),'quality');
+    if(enduranceGoal&&requestedRuns>1&&!named.has('long')&&cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(takeMostSpacedFrom(freeCardioOnly().length?freeCardioOnly():free),'long');
+    while(cardioByDay.size<requestedRuns&&free.length)cardioByDay.set(enduranceGoal?takeMostSpaced():takeMostSpacedFrom(freeCardioOnly().filter(slot=>weekDays[slot].day.dayType.toLowerCase()==='cardio').length?freeCardioOnly().filter(slot=>weekDays[slot].day.dayType.toLowerCase()==='cardio'):free),'easy');
   }
   /* THE GOAL LIFT SITS ON THE DAY THAT TRAINS IT. "Primary" used to mean the
      first strength day of the week, which put "Back Squat 225 × 8" on Chest &

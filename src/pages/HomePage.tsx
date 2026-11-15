@@ -149,6 +149,9 @@ export function HomePage() {
   /* The suggested day leads, then the rest of the split in order. */
   /* The split in its order, each day once — a split with the same day name
      twice showed it twice — rest days only when today is one. */
+  /* Rest days are not chips, so a 4-day week with its days off read "Day 1,
+     Day 3, Day 5, Day 6". Training days are numbered among themselves. */
+  const trainingNumber = (position: number) => splitDays.filter(day => day.type !== 'rest' && day.position <= position).length;
   const chips = splitDays.filter((day, index, list) => (day.type !== 'rest' || day.name === suggested?.splitDay.name) && list.findIndex(other => other.name === day.name) === index);
   const onDay = recommendedSets.map(set => set.exercise);
   const swapPanel = (set: { exercise: string; muscle: string; swappedFrom?: string }) => {
@@ -200,7 +203,8 @@ export function HomePage() {
     if (plateau) return plateauLine(plateau.plateau, weightUnit, plateau.variation);
     const trend = goal ? liftTrend(objective.exercise, records, Number(String(goal.target).replace(/[^0-9.]/g, '')), goal.date, weightUnit) : null;
     if (trend) return `${lastText} ${trend.status === 'on-track' ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — on track for ${target}${by ? ` by ${by}` : ''}.` : trend.perWeek > 0 ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — ${by ? `by ${by} ` : ''}that’s ${trend.projected}, short of ${target}.` : `Your calc max has been flat — today is about getting it moving toward ${target}.`}`;
-    const goalText = !goal ? 'The next step up your rep wave.'
+    /* A first time has no wave to step up yet; today only finds the number. */
+    const goalText = !goal ? (last ? 'The next step up your rep wave.' : 'Today sets the starting weight Forge builds from.')
       : verdict?.verdict === 'reachable' ? `Keeps you on pace for ${target}${by ? ` by ${by}` : ''}.`
       : verdict?.verdict === 'needs-more' && /heavy single/.test(verdict.change || '') ? `You’re close to ${target} — a heavy single soon will show where you stand.`
       : verdict?.verdict === 'needs-more' ? `Each week like this moves you toward ${target}${by ? ` by ${by}` : ''}.`
@@ -234,7 +238,7 @@ export function HomePage() {
   const dayChips = <>
     <div className="tp-days" ref={daysRef} onScroll={onDaysScroll} role="radiogroup" aria-label="Training day">
       {chips.map(day => { const on = day.name === recommendation.splitDay.name; const isSuggested = day.name === suggested?.splitDay.name; return <button type="button" role="radio" aria-checked={on} key={`${day.position}-${day.name}`} data-day={day.name} className={`tp-day${on ? ' on' : ''}`} onClick={event => { event.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); pick(day.name); }}>
-        <small>{isSuggested ? 'Suggested' : day.type === 'rest' ? 'Rest' : `Day ${day.position}`}</small>
+        <small>{isSuggested ? 'Suggested' : day.type === 'rest' ? 'Rest' : `Day ${trainingNumber(day.position)}`}</small>
         <b>{day.name}</b>
         {day.muscles.length > 0 && <span>{day.muscles.slice(0, 4).join(' · ')}</span>}
       </button>; })}
@@ -242,12 +246,16 @@ export function HomePage() {
     {chips.length > 1 && <div className="tp-dots" aria-hidden="true">{chips.map(day => <i key={day.name} className={day.name === recommendation.splitDay.name ? 'on' : ''} />)}</div>}
   </>;
 
-  const cardioLine = recommendation.cardio && <li><label className={choosing || recommendation.cardio.selected ? 'on' : ''}>
-    <input type="checkbox" checked={choosing || recommendation.cardio.selected} disabled={choosing} onChange={event => setCardioSelected(event.target.checked)} />
-    <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
-    <span className="td-stack">{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <small className="td-hr">{hrHint(recommendation.cardio.title)}</small>}
-      <em className="td-detail">{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</em></span>
-  </label></li>;
+  /* The run, as a card like the lifts: what to do big, the why under it. */
+  const cardioLine = recommendation.cardio && <li className={`tp-set${choosing || recommendation.cardio.selected ? ' on' : ''}`}>
+    <div className="tp-set-head"><label>
+      <input type="checkbox" checked={choosing || recommendation.cardio.selected} disabled={choosing} onChange={event => setCardioSelected(event.target.checked)} />
+      <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
+      <span>Run</span>
+    </label></div>
+    <b className="tp-set-load run">{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</b>
+    <p className="tp-set-note">{recommendation.cardio.title}{hrHint(recommendation.cardio.title) && <> · {hrHint(recommendation.cardio.title)}</>}</p>
+  </li>;
 
   return <div className="forge-feed today">
     <SplitGuidePrompt />
@@ -313,22 +321,25 @@ export function HomePage() {
         <button type="button" role="tab" aria-selected={build === 'full'} className={build === 'full' ? 'on' : ''} onClick={() => chooseBuild('full')}>Build my workout</button>
       </div>}
 
-      {build === 'top' && recommendedSets.length > 0 && <ul className="td-lines">
-        {recommendedSets.map(set => { const wave = set.source === 'history' ? waveFor(set.exercise, set.reps) : null; const on = choosing || set.selected; return <li key={set.id}><label className={on ? 'on' : ''}>
-          <input type="checkbox" checked={on} disabled={choosing} onChange={() => toggleTopSet(set.id)} />
-          <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
-          <span>{set.exercise}{set.optional && <small>Optional</small>}</span>
-          {set.source === 'history'
-            ? <b className="td-load">{set.weight}<small> {weightUnit}</small> × {set.reps}<small> reps</small></b>
-            : <b className="td-load open">Work up to {set.reps || 5}</b>}
-        </label>
-        <div className="tp-row-foot">
-          {wave ? <div className="tp-wave" aria-label={`Rep plan for ${set.exercise}: ${wave.wave.join(', ')}. This week ${set.reps}.`}>
-            {wave.wave.map((reps, index) => <span key={index} className={index === wave.at ? 'now' : index < wave.at ? 'past' : ''}>{reps}</span>)}
-            <em>{wave.at < wave.wave.length - 1 ? `Next: ${wave.wave[wave.at + 1]}` : 'Max week'}</em>
-          </div> : <span />}
+      {build === 'top' && recommendedSets.length > 0 && <ul className="tp-sets">
+        {recommendedSets.map((set, index) => { const wave = set.source === 'history' ? waveFor(set.exercise, set.reps) : null; const on = choosing || set.selected; return <li key={set.id} className={`tp-set${on ? ' on' : ''}`}>
+        {/* ONE CARD PER LIFT, READ TOP TO BOTTOM: which lift, the number to
+            hit, where this week sits in the rep wave. */}
+        <div className="tp-set-head">
+          <label>
+            <input type="checkbox" checked={on} disabled={choosing} onChange={() => toggleTopSet(set.id)} />
+            <i className="td-tick" aria-hidden="true"><Icon name="check" size={12} stroke={3.2} /></i>
+            <span><em className="tp-set-step">{index + 1}</em>{set.exercise}{set.optional && <small>Optional</small>}</span>
+          </label>
           {swapButton(set)}
         </div>
+        {set.source === 'history'
+          ? <b className="tp-set-load">{set.weight}<small> {weightUnit}</small><i>×</i>{set.reps}<small> reps</small></b>
+          : <b className="tp-set-load open">Work up to {set.reps || 5} reps</b>}
+        {wave && <div className="tp-set-wave" aria-label={`Rep plan for ${set.exercise}: ${wave.wave.join(', ')}. This week ${set.reps}.`}>
+          <div>{wave.wave.map((reps, step) => <span key={step} className={step === wave.at ? 'now' : step < wave.at ? 'past' : ''}>{reps}</span>)}</div>
+          <em>{wave.at < wave.wave.length - 1 ? `This week ${wave.wave[wave.at]}s · next week ${wave.wave[wave.at + 1]}s` : 'Max week — heaviest of the wave'}</em>
+        </div>}
         {swapPanel(set)}
         </li>; })}
         {cardioLine}
@@ -349,7 +360,7 @@ export function HomePage() {
       {!recommendedSets.length && dayType !== 'rest' && dayType !== 'cardio' && dayType !== 'hyrox' && <Link className="td-fix" to="/exercises"><span><b>Choose exercises for this day</b>Forge needs a lift mapped to it.</span><Icon name="arrow" size={16} /></Link>}
       {dayType === 'hyrox' && !recommendation.cardio && <Link className="td-fix" to="/goals"><span><b>Add a HYROX goal</b>Forge writes HYROX sessions once you’re training for one. Today is open.</span><Icon name="arrow" size={16} /></Link>}
       {quiet && <p className="td-quiet"><b>{dayType === 'rest' ? 'Rest day' : 'No run needed today'}</b>{dayType === 'rest' ? 'Nothing required. Walk, stretch or log anything you do.' : 'Your running is covered this week.'}</p>}
-      {!recommendedSets.length && recommendation.cardio && <ul className="td-lines">{cardioLine}</ul>}
+      {!recommendedSets.length && recommendation.cardio && <ul className="tp-sets">{cardioLine}</ul>}
       {(recommendation.coachNote || recommendation.bodyLogNote) && <p className="td-note">{recommendation.coachNote || recommendation.bodyLogNote}</p>}
       <Link className="button wide" to={`${startUrl}${extraParam}`} data-vt="">{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
       <Link className="tp-week" to="/plan">See your week</Link>

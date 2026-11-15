@@ -33,11 +33,17 @@ import { Icon } from '../components/Icon';
 import { useBilling } from '../features/billing/BillingProvider';
 import { PRO_ACTION_TYPES } from '../features/billing/entitlements';
 import { nudgeUpgrade } from '../components/UpgradeSheet';
+import { useWorkoutEvidence } from '../features/training/useWorkoutEvidence';
+import { goalCardFacts, goalCards, makeGoalJudge } from '../lib/goalCards';
+import { plateausFor, plateauLine } from '../lib/plateau';
+import { suggestGoals } from '../lib/goalSuggestions';
+import { CORE_LIFTS } from '../lib/coreLifts';
+import { readSwaps } from '../lib/todaySwaps';
 
 const questions=['What should I train today?','Weekly recap','What is my training geared toward?','Am I on track for my goal?','Plan my week'];
 
 export function CoachPage(){
-  const [params]=useSearchParams();const {records}=useWorkoutHistory();const {recovery,profile}=useAdaptiveTraining();const {goals}=useGoals();const {strategy}=useCoachingStrategy();const {setup}=useProfileSetup();const weightUnit=setup?.units==='Metric'?'kg':'lb';const {exercises,workouts}=useTrainingLibrary();const {recommendation,anchorDate}=useDailyRecommendation();
+  const [params]=useSearchParams();const {records}=useWorkoutHistory();const {recovery,profile}=useAdaptiveTraining();const {goals}=useGoals();const {strategy}=useCoachingStrategy();const {setup}=useProfileSetup();const weightUnit=setup?.units==='Metric'?'kg':'lb';const {exercises,workouts}=useTrainingLibrary();const {recommendation,anchorDate}=useDailyRecommendation();const watchEfforts=useWorkoutEvidence();
 const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number(strengthGoal?.target.replace(/[^0-9.]/g,''))||undefined;
   const savedPlan=useMemo(()=>{try{return JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:Array<{name:string;dayType:string;muscles?:string[];exercises?:string[]}>}|null}catch{return null}},[setup]);const splitDays=savedPlan?.days||[];const fallbackDay=setup?.splitDays.find(day=>day.type!=='Rest');const dueDay=recommendation?{name:recommendation.splitDay.name,dayType:recommendation.splitDay.type,muscles:recommendation.splitDay.muscles,exercises:recommendation.splitDay.exercises}:splitDays[0]||null;const dueMuscles=normalizeMuscleGroups(recommendation?.splitDay.muscles||dueDay?.muscles||fallbackDay?.muscles||[]).filter(muscle=>muscle!=='Cardio');const strengthLibrary=exercises.filter(exercise=>exercise.enabled&&isProgrammableStrength(exercise));const completedStrength=records.flatMap(record=>(record.topSets||[]).filter(set=>set.completed!==false).map(set=>({date:record.date,lift:set.lift})));const templates=(recommendation?.topSets.length?recommendation.topSets.map(set=>({exercise:set.exercise,calculatedMax:set.calculatedMax,exposureIndex:new Set(completedStrength.filter(result=>result.lift===set.exercise).map(result=>result.date)).size})):strengthLibrary.slice(0,1).map(exercise=>({exercise:exercise.name,calculatedMax:0,exposureIndex:0})));if(!templates.length)templates.push({exercise:'Strength exercise',calculatedMax:0,exposureIndex:0});const intelligence=buildTrainingIntelligence({records,recovery,templates,/* CANONICAL KEY, because that is what buildTrainingIntelligence reads it
        with. A "Back Squat" goal keyed as "Back Squat" and was looked up as
@@ -116,12 +122,36 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
      everyone. Plan-wide changes are Pro. */
   const billing=useBilling();const {isPro,trialDays}=billing;const coachUsage=billing.entitlements.endpoints['forge-coach'];const remainingCoach=isPro||!coachUsage||coachUsage.dailyLimit===null?null:Math.max(0,coachUsage.dailyLimit-coachUsage.usedToday);
   const proOnly=(action:CoachAction)=>!isPro&&(PRO_ACTION_TYPES as readonly string[]).includes(action.type);
-  const applyActions=()=>{if(!pending)return;const allowed=pending.actions.filter(action=>!proOnly(action));if(allowed.length<pending.actions.length)nudgeUpgrade('pro-action');if(!allowed.length){setPending(null);return}const applied=coachActions.apply(allowed,pending.question);/* THE GUIDE IS A PLACE, NOT A CHANGE: tapping it closes the coach and opens the guide on screen. */if(allowed.some(action=>action.type==='open_split_guide')){setPending(null);window.dispatchEvent(new Event('forge:close-coach'));navigate('/split?guide=1');return}
+  const applyActions=()=>{if(!pending)return;const allowed=pending.actions.filter(action=>!proOnly(action));if(allowed.length<pending.actions.length)nudgeUpgrade('pro-action');if(!allowed.length){setPending(null);return}const applied=coachActions.apply(allowed,pending.question);/* THE GUIDE IS A PLACE, NOT A CHANGE: tapping it closes the coach and opens the guide on screen. */if(allowed.some(action=>action.type==='open_split_guide')){setPending(null);window.dispatchEvent(new Event('forge:close-coach'));navigate('/split?guide=1');return}/* A GUIDED SESSION STARTS ON TAP: the coach closes and the session opens. */const guided=allowed.find(action=>action.type==='start_guided');if(guided&&guided.type==='start_guided'){setPending(null);window.dispatchEvent(new Event('forge:close-coach'));navigate(`/guided?go=1&min=${guided.minutes}&focus=${encodeURIComponent(guided.focus)}`);return}
     /* DONE, AND WHERE. Each change says the screen it landed on and links
        there — a saved circuit opens the library on that circuit. */
     const message=applied.length===1?`Done — ${applied[0].label.charAt(0).toLowerCase()+applied[0].label.slice(1)}. It’s in ${applied[0].place}.`:`Done:\n${applied.map(item=>`• ${item.label} → ${item.place}`).join('\n')}`;
     const links=applied.filter((item,index,all)=>all.findIndex(other=>other.to===item.to)===index).map(item=>({place:item.place,to:item.to}));
     setAdjustmentMessage(message);setConversation(turns=>[...turns,{role:'forge',text:message,links}]);setPending(null)};
+  /* THE GOAL FACTS THE SCREENS SHOW, for the coach: each card as drawn, the
+     lifts the plan has found stuck and its plan for them, the goals the
+     builder would suggest (so a goal the coach proposes reads on its card the
+     way the coach said), and today's swapped lifts. */
+  const coachGoalFacts=(todayIso:string)=>{
+    const maxMode=(()=>{try{return localStorage.getItem('forge-goals-max-mode')==='tested'?'tested' as const:'calculated' as const}catch{return 'calculated' as const}})();
+    const open=openGoals(goals,todayIso);
+    const cards=goalCardFacts(goalCards(open,records,setup,watchEfforts,maxMode),maxMode);
+    const goalLifts=open.filter(goal=>goal.type==='Strength'&&goal.exercise).map(goal=>String(goal.exercise));
+    const trained=(lift:string)=>records.some(record=>(record.topSets||[]).some(set=>set.lift&&canonicalLiftKey(set.lift)===canonicalLiftKey(lift)&&set.completed!==false));
+    const lifts=[...new Set([...goalLifts,...CORE_LIFTS.filter(lift=>lift!=='Pull Ups'&&trained(lift))])];
+    const stuck=plateausFor(lifts,records,exercises);
+    const judge=makeGoalJudge(records,setup,watchEfforts,maxMode);
+    const unit=setup?.units==='Metric'?'kg':'lb';
+    const suggested=lifts.slice(0,5).map(lift=>{const hit=stuck.get(canonicalLiftKey(lift));const options=suggestGoals({type:'Strength',exercise:lift,unit,...(hit?{plateau:{best:hit.plateau.best,weeks:hit.plateau.weeks}}:{})},judge);return options.length?{lift,options:options.map(item=>({kind:item.name,target:item.label,by:item.date,verdictOnCard:item.verdict,how:item.how}))}:null}).filter(Boolean);
+    const run=records.some(record=>(record.cardioSessions||[]).length>0)?suggestGoals({type:'Endurance',exercise:'5K Run',unit:'mm:ss',metric:'Finish time'},judge):[];
+    return {
+      goalMaxMode:maxMode==='tested'?'tested: strength goals are measured by the heaviest single actually lifted':'calculated: strength goals are measured by the max estimated from recent sets',
+      goalCards:cards,
+      plateaus:[...stuck.values()].map(({plateau,variation})=>({lift:plateau.lift,stuckUnder:plateau.best,weeks:plateau.weeks,restartTopSetsFrom:plateau.restart,variation,whatForgeIsDoing:plateauLine(plateau,unit,variation)})),
+      goalSuggestions:[...suggested,...(run.length?[{lift:'5K Run',options:run.map(item=>({kind:item.name,target:item.label,by:item.date,verdictOnCard:item.verdict,how:item.how}))}]:[])],
+      todaySwaps:readSwaps(todayIso),
+    };
+  };
   const ask=async(value:string)=>{setQuestion(value);setPending(null);setAdjustmentMessage('');setConversation(turns=>[...turns,{role:'user',text:value}]);const fallback=dynamicAnswers[value]??`I would evaluate that against your saved history, active goals, split position, and ${readinessText}.`;setCoachLoading(true);const wearableRecovery=recovery.confidence==='Low'?null:recovery;/* SIXTY DAYS, NOT 180. The server keeps the first 30,000 characters of the
      context and 180 records ran past that, so everything after this key —
      the career summary, the deterministic recommendation, the evidence
@@ -158,6 +188,11 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
          saying it was not going to happen. */
       goalFeasibility:goalFeasibility(openGoals(goals,todayIso),records,{maxWeeklyMileage:Number(setup?.maxWeeklyMileage)||0,excludedEfforts:setup?.excludedEfforts||[]}),
       competingRaces:competingRaces(goals),
+      /* WHAT THE GOALS SCREEN SAYS, word for word. The same function draws the
+         cards (lib/goalCards), in the same calculated/tested mode the athlete
+         has the screen in — so "you're at 385" can never sit beside a card that
+         reads "365 tested", or "on track" beside "Needs more work". */
+      ...coachGoalFacts(todayIso),
       weeklyRunning:weeklyRunning(records),
       /* THE NUMBERS THE COACH MAY QUOTE ABOUT RUNNING, computed once in
          lib/stats and handed over as facts. The model never adds up the log

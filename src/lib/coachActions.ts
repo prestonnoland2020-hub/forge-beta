@@ -1,6 +1,7 @@
 import type { DailyRecommendation } from './dailyRecommendationEngine';
 import { SICK_AREA, EASE_BACK_DAYS, PREGNANCY_AREA, POSTPARTUM_AREA, PREGNANCY_DAYS, POSTPARTUM_DAYS, limitationIn, plainText, fatigueScope } from './bodyLog';
 import { weightForReps } from './strength';
+import { localDayIso } from './time';
 import type { CircuitStation, PlannedCardio } from '../components/CardioPlanBuilder';
 
 /* THE COACH CAN ACT.
@@ -26,6 +27,10 @@ export const ACTION_TYPES = [
   'set_weekly_mileage', 'set_running_days', 'set_load_bias',
   'update_goal', 'create_exercise', 'create_workout',
   'open_split_guide',
+  /* The coach's newer hands: make or drop a goal, swap one lift today, and
+     start a guided session — things an athlete asked for in chat and had to
+     be told to go and do themselves. */
+  'create_goal', 'delete_goal', 'swap_exercise', 'start_guided', 'log_top_set', 'log_run',
 ] as const;
 export type ActionType = typeof ACTION_TYPES[number];
 
@@ -79,11 +84,25 @@ export type CoachAction =
   | { type: 'update_goal'; goalTitle: string; target?: string; date?: string; label: string }
   | { type: 'create_exercise'; name: string; muscles: string[]; label: string }
   | { type: 'create_workout'; name: string; items: string[]; stations?: WorkoutStation[]; rounds?: number; format?: WorkoutFormat; roundRest?: number; label: string }
-  | { type: 'open_split_guide'; label: string };
+  | { type: 'open_split_guide'; label: string }
+  | { type: 'create_goal'; goal: NewGoal; label: string }
+  | { type: 'delete_goal'; goalTitle: string; label: string }
+  | { type: 'swap_exercise'; from: string; to: string; label: string }
+  | { type: 'start_guided'; focus: GuidedFocus; minutes: number; label: string }
+  | { type: 'log_top_set'; exercise: string; weight: number; reps: number; date: string; label: string }
+  | { type: 'log_run'; miles: number; minutes: number; date: string; label: string };
+
+/* A goal the coach proposes, in the shape the goal builder saves. */
+export type NewGoal = { type: 'Strength' | 'Endurance' | 'Body Composition'; exercise: string; target: string; unit: string; date: string; metric: string; title: string };
+export const GUIDED_FOCUSES = ['Full body', 'Upper body', 'Lower body', 'Glutes & core', 'Stretch it out'] as const;
+export type GuidedFocus = typeof GUIDED_FOCUSES[number];
+const RACES: Record<string, string> = { mile: 'Mile Run', '1 mile': 'Mile Run', '5k': '5K Run', '10k': '10K Run', 'half marathon': 'Half Marathon', half: 'Half Marathon', marathon: 'Marathon' };
 
 export type ActionContext = {
   splitDays: Array<{ position: number; name: string; type?: string }>;
-  goals: Array<{ title: string }>;
+  goals: Array<{ title: string; type?: string; exercise?: string }>;
+  /* Today's top-set lifts, which a swap must start from. */
+  todayLifts?: string[];
   activeNoteAreas: string[];
   exercises: string[];
   weeklyMileage: number;
@@ -97,6 +116,15 @@ const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
 const num = (value: unknown) => { const n = Number(value); return Number.isFinite(n) ? n : NaN; };
 const str = (value: unknown) => String(value ?? '').trim();
+/* A log date: null means today; never the future, never more than 14 days back. */
+const logDate = (value: unknown) => {
+  const today = localDayIso();
+  const text = str(value);
+  if (!text) return today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || text > today) return '';
+  const back = new Date(`${today}T12:00:00`); back.setDate(back.getDate() - 14);
+  return text >= localDayIso(back) ? text : '';
+};
 
 /* Validate what the model sent against what the athlete has. An entry that
    names a day, goal or exercise the athlete does not have is dropped, never
@@ -108,7 +136,7 @@ export function parseActions(raw: unknown, ctx: ActionContext): CoachAction[] {
   for (const entry of raw.slice(0, 6)) {
     const action = parseOne((entry || {}) as RawAction, ctx);
     if (!action) continue;
-    const key = `${action.type}:${'area' in action ? action.area : ''}${'dayName' in action ? action.dayName : ''}`;
+    const key = `${action.type}:${'area' in action ? action.area : ''}${'dayName' in action ? action.dayName : ''}${'exercise' in action ? action.exercise : ''}${'date' in action ? action.date : ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(action);
@@ -217,6 +245,76 @@ function parseOne(entry: RawAction, ctx: ActionContext): CoachAction | null {
        opens the step-by-step guide on the screen itself. */
     case 'open_split_guide':
       return { type, label: 'Open the split guide — build your split step by step' };
+    /* NEW GOAL. name says what (a lift from the library, a race — "5K",
+       "Half Marathon" — or "Body weight"), target the number, date when. A
+       goal on something the athlete cannot log, or without a date ahead, is
+       dropped rather than guessed. */
+    case 'create_goal': {
+      const what = str(entry.name);
+      const targetText = str(entry.target);
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(str(entry.date)) ? str(entry.date) : '';
+      if (!what || !targetText || !date || date <= localDayIso()) return null;
+      const race = RACES[norm(what).replace(/ run$/, '')] || (/marathon|5k|10k|mile/i.test(what) ? RACES[norm(what).match(/half marathon|marathon|10k|5k|1 mile|mile/)?.[0] || ''] : '');
+      const weightUnit = ctx.metric ? 'kg' : 'lb';
+      let goal: NewGoal | null = null;
+      if (race) {
+        const clock = targetText.match(/^\d{1,2}(:\d{2}){1,2}$/) ? targetText : '';
+        if (!clock) return null;
+        const hours = clock.split(':').length === 3;
+        goal = { type: 'Endurance', exercise: race, target: clock, unit: hours ? 'hh:mm:ss' : 'mm:ss', date, metric: 'Finish time', title: `${race} · ${clock} ${hours ? 'hh:mm:ss' : 'mm:ss'}` };
+      } else if (/body ?weight|^weight$/i.test(what)) {
+        const value = num(targetText.replace(/[^\d.]/g, ''));
+        if (!(value > 50)) return null;
+        goal = { type: 'Body Composition', exercise: '', target: String(value), unit: weightUnit, date, metric: 'Body weight', title: `${value} ${weightUnit} body-weight goal` };
+      } else {
+        const exercise = ctx.exercises.find(item => norm(item) === norm(what)) || ctx.exercises.find(item => norm(item).includes(norm(what)) || norm(what).includes(norm(item)));
+        const value = num(targetText.replace(/[^\d.]/g, ''));
+        if (!exercise || !(value > 0)) return null;
+        goal = { type: 'Strength', exercise, target: String(value), unit: weightUnit, date, metric: 'Real 1RM', title: `${value} ${weightUnit} ${exercise}` };
+      }
+      if (ctx.goals.some(item => norm(item.title) === norm(goal!.title))) return null;
+      return { type, goal, label: `New goal: ${goal.type === 'Endurance' ? `${goal.exercise} in ${goal.target}` : goal.type === 'Body Composition' ? `${goal.target} ${goal.unit} body weight` : `${goal.target} ${goal.unit} ${goal.exercise}`} by ${date}` };
+    }
+    case 'delete_goal': {
+      const wanted = norm(str(entry.goalTitle));
+      const goal = ctx.goals.find(item => norm(item.title) === wanted) || ctx.goals.find(item => norm(item.title).includes(wanted) || wanted.includes(norm(item.title)));
+      if (!goal || !wanted) return null;
+      return { type, goalTitle: goal.title, label: `Remove the goal "${goal.title}"` };
+    }
+    /* ONE LIFT, TODAY ONLY: name is today's lift, target is what replaces it
+       (from the library). The day and the rest of the plan stay. */
+    case 'swap_exercise': {
+      const from = (ctx.todayLifts || []).find(item => norm(item) === norm(str(entry.name))) || (ctx.todayLifts || []).find(item => norm(item).includes(norm(str(entry.name))));
+      const to = ctx.exercises.find(item => norm(item) === norm(str(entry.target))) || ctx.exercises.find(item => norm(item).includes(norm(str(entry.target))));
+      if (!from || !to || norm(from) === norm(to)) return null;
+      return { type, from, to, label: `Today: ${from} → ${to}` };
+    }
+    /* LOGGING FROM THE CHAT. "Did 225 for 5 on bench" is a top set; the
+       athlete still taps Apply, so nothing lands in the log unseen. name is a
+       library lift, target "225x5", date null for today (never the future,
+       never more than two weeks back). */
+    case 'log_top_set': {
+      const exercise = ctx.exercises.find(item => norm(item) === norm(str(entry.name))) || ctx.exercises.find(item => norm(item).includes(norm(str(entry.name))) || norm(str(entry.name)).includes(norm(item)));
+      const match = str(entry.target).match(/(\d+(?:\.\d+)?)\s*(?:lb|lbs|kg)?\s*(?:x|×|for)\s*(\d+)/i);
+      const date = logDate(entry.date);
+      if (!exercise || !match || !date) return null;
+      const weight = num(match[1]); const reps = Math.round(num(match[2]));
+      if (!(weight > 0 && weight < 2000) || !(reps >= 1 && reps <= 30)) return null;
+      return { type, exercise, weight, reps, date, label: `Log ${exercise} ${weight} × ${reps}${date === localDayIso() ? '' : ` on ${date}`}` };
+    }
+    case 'log_run': {
+      const miles = num(entry.miles); const minutes = num(entry.minutes);
+      const date = logDate(entry.date);
+      if (!(miles > 0 && miles <= 60) || !(minutes > 0 && minutes <= 600) || !date) return null;
+      const pace = minutes / miles;
+      if (pace < 4 || pace > 20) return null;
+      return { type, miles: Math.round(miles * 100) / 100, minutes: Math.round(minutes), date, label: `Log a ${Math.round(miles * 100) / 100} mi run in ${Math.round(minutes)} min${date === localDayIso() ? '' : ` on ${date}`}` };
+    }
+    case 'start_guided': {
+      const focus = GUIDED_FOCUSES.find(item => norm(item) === norm(str(entry.name))) || 'Full body';
+      const minutes = [20, 30, 45, 60].reduce((best, option) => Math.abs(option - (num(entry.minutes) || 30)) < Math.abs(best - (num(entry.minutes) || 30)) ? option : best, 30);
+      return { type, focus, minutes, label: `Start a ${minutes}-min ${focus.toLowerCase()} session with your coach` };
+    }
     case 'create_workout': {
       const name = str(entry.name).slice(0, 60);
       /* THE PRESCRIPTION, NOT A LIST OF NAMES. A station needs a name and a
@@ -260,6 +358,10 @@ export function whereItGoes(action: CoachAction): ChangePlace {
     case 'create_exercise': return { place: 'Library · Exercises', to: '/exercises' };
     case 'create_workout': return { place: 'Library · Saved circuits', to: '/exercises?show=circuits' };
     case 'open_split_guide': return { place: 'the split guide', to: '/split?guide=1' };
+    case 'create_goal': case 'delete_goal': return { place: 'Goals', to: '/goals' };
+    case 'swap_exercise': return { place: 'Today', to: '/' };
+    case 'log_top_set': case 'log_run': return { place: 'Activities', to: '/history' };
+    case 'start_guided': return { place: 'Coach me', to: `/guided?go=1&min=${action.minutes}&focus=${encodeURIComponent(action.focus)}` };
   }
 }
 

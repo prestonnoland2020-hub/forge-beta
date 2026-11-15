@@ -110,11 +110,20 @@ export function starterSplit(focus: AthleteSetup['primaryFocus'], count: number)
   /* EVERY DAY GETS ITS OWN NAME. The plan matches days by name, so a 4-day
      strength split with "Chest & Back" twice was one day to the plan and two
      to the cursor. A repeat is numbered: Chest & Back, …, Chest & Back 2. */
-  return Array.from({ length: Math.max(1, Math.min(7, count)) }, (_, index) => {
+  const training = Array.from({ length: Math.max(1, Math.min(7, count)) }, (_, index) => {
     const day = source[index % source.length];
     const repeat = Math.floor(index / source.length);
     return repeat ? { ...day, name: `${day.name} ${repeat + 1}` } : day;
   });
+  /* "4 DAYS A WEEK" MEANS THREE DAYS OFF. The starter cycle was the training
+     days alone, and Plan draws a cycle onto consecutive dates — so an athlete
+     who chose 4 days saw six lifting days and a run in their first week. The
+     rest days are part of the cycle, spread between the training days. */
+  if (training.length >= 7) return training;
+  const slots = new Set(training.map((_, index) => Math.round(index * 7 / training.length)));
+  const rest = { name: 'Rest', type: 'Rest' as const, muscles: [] as string[] };
+  let next = 0;
+  return Array.from({ length: 7 }, (_, index) => slots.has(index) ? training[next++] : rest);
 }
 
 /* A REAL DAY, NOT ONE LIFT. A starter day used to get a single lift, so a
@@ -261,6 +270,8 @@ function OnboardingForm() {
   }, [strengthLibrary]);
   const plannedDays = useMemo(() => data.splitDays?.length ? data.splitDays : starterSplit(data.primaryFocus, data.trainingDays), [data.splitDays, data.primaryFocus, data.trainingDays]);
   const runningPlanned = plannedDays.some(day => /Cardio|Mixed/i.test(day.type));
+  /* A runner with no lifting day is not asked what they can bench. */
+  const liftingPlanned = plannedDays.some(day => /Strength|Mixed/i.test(day.type));
   const plannedCardioDays = plannedDays.filter(day => /Cardio|Mixed/i.test(day.type)).length;
 
   const weightGoal = data.primaryFocus === 'Body composition';
@@ -653,9 +664,14 @@ function OnboardingForm() {
       </> };
       case 'numbers': return {
         body: <>
+          {liftingPlanned ? <>
           <h1>What can you lift right now?</h1>
           <p className="ob-lead">One top set per lift: a heavy set you could repeat today. Just the weight is fine — reps count as 5 unless you change them. Tap ✕ on any you don’t know.</p>
-          <div className="ob-numbers">{shownLifts.map(lift => {
+          </> : <>
+          <h1>Do you run with a watch?</h1>
+          <p className="ob-lead">Your runs come in on their own, and paces start from real training instead of a guess.</p>
+          </>}
+          <div className="ob-numbers">{(liftingPlanned ? shownLifts : []).map(lift => {
             const value = numberFor(lift);
             const name = CORE_LIFT_LABELS[lift] || lift;
             const max = maxFor(lift);
@@ -671,10 +687,10 @@ function OnboardingForm() {
             {max > 0 && <p className="ob-number-max"><strong>Max ≈ {Math.round(max / plate) * plate} {massUnit}</strong> · {atReps(max, 3)} × 3 or {atReps(max, 8)} × 8{toGoal ? ` · ${toGoal} ${massUnit} to your goal` : ''}</p>}
             </div>;
           })}</div>
-          {removedLifts.length > 0 && <div className="ob-chips ob-number-restore">{removedLifts.map(lift => chip(lift, `+ ${CORE_LIFT_LABELS[lift] || lift}`, false, toggle(() => setRemovedLifts(current => current.filter(item => item !== lift)))))}</div>}
+          {liftingPlanned && removedLifts.length > 0 && <div className="ob-chips ob-number-restore">{removedLifts.map(lift => chip(lift, `+ ${CORE_LIFT_LABELS[lift] || lift}`, false, toggle(() => setRemovedLifts(current => current.filter(item => item !== lift)))))}</div>}
           {(runningPlanned || goalKind === 'race') && <label className="setup-check"><input type="checkbox" checked={importStrava} onChange={event => { tap(); setImportStrava(event.target.checked); }} /><span><strong>I have a smartwatch I’ll connect</strong><small>After setup, Forge takes you straight to Connections so your runs come in and paces start from real training.</small></span></label>}
         </>,
-        action: <button className="button ob-next" onClick={submitNumbers}>{startingList.length || halfFilled.length ? 'Continue' : 'Skip for now'}</button>,
+        action: <button className="button ob-next" onClick={submitNumbers}>{!liftingPlanned || startingList.length || halfFilled.length ? 'Continue' : 'Skip for now'}</button>,
       };
       case 'week': {
         /* The goal again, now from the best they gave or the top set they typed. */

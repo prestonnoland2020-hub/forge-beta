@@ -96,7 +96,7 @@ const bestPerDay = (points: Array<{ date: string; value: number }>, lowerIsBette
    number that describes nothing and reads as a verdict. The series says what
    happened, and marks the week that has not finished yet. */
 export type RunningWeek = { weekOf: string; miles: number; partial: boolean };
-export function weeklyRunning(records: WorkoutRecord[], weeks = 8): RunningWeek[] {
+export function weeklyRunning(records: WorkoutRecord[], weeks = 8, todayIso = localDayIso()): RunningWeek[] {
   /* A LOCAL DATE, KEPT LOCAL. This built the date at local noon and then
      serialised it with toISOString(), which is UTC — at +13 or +14 local noon
      is the previous UTC day, so the shift was applied twice and every bucket
@@ -107,7 +107,7 @@ export function weeklyRunning(records: WorkoutRecord[], weeks = 8): RunningWeek[
     date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
-  const thisWeek = monday(localDayIso());
+  const thisWeek = monday(todayIso);
   const totals = new Map<string, number>();
   runLines(records).forEach(run => {
     const week = monday(run.date);
@@ -348,8 +348,8 @@ const isBodyGoal = (goal: CreatedGoal) =>
    predictor and the cardio engine each had their own. Its one real insight,
    that leading empty weeks are not weeks somebody ran nothing, lives in
    runVolume now and applies everywhere rather than here alone. */
-export function medianWeeklyMiles(records: WorkoutRecord[]): number {
-  return weeklyMilesFrom(runLines(records).map(run => ({ date: run.date, miles: run.miles })));
+export function medianWeeklyMiles(records: WorkoutRecord[], todayIso = localDayIso()): number {
+  return weeklyMilesFrom(runLines(records).map(run => ({ date: run.date, miles: run.miles })), todayIso);
 }
 
 

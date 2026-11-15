@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { isDemoMode } from '../../lib/env';
 
 export type ActivityConnectionStatus = {
   connected: boolean;
@@ -9,6 +10,8 @@ export type ActivityConnectionStatus = {
 };
 
 async function callStrava(action: string, extra: Record<string, unknown> = {}) {
+  /* The preview build has no server; it would only log a failed request. */
+  if (isDemoMode) throw new Error('Connections are off in the preview.');
   const { data, error } = await supabase.functions.invoke('strava-connect', { body: { action, ...extra } });
   if (error) throw new Error(error.message || 'The activity connection is unavailable.');
   if (data?.error) throw new Error(data.error);

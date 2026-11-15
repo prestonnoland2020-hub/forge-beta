@@ -59,11 +59,11 @@ check('the 8-miler on Aug 28 was the longest in a month', isLongestRunInWindow(r
 check('longestContinuousRun agrees', longestContinuousRun(records) === 8);
 
 console.log('\nEvery surface reads the same log');
-const fromTrajectory = weeklyRunning(records, 8).reduce((s, w) => s + w.miles, 0);
+const fromTrajectory = weeklyRunning(records, 8, TODAY).reduce((s, w) => s + w.miles, 0);
 const fromPrediction = runVolumeEntries(records).reduce((s, e) => s + e.miles, 0);
 const fromStats = lines.reduce((s, l) => s + l.miles, 0);
 check('weeklyRunning total = predictor total = stats total', near(fromTrajectory, fromStats, 0.11) && near(fromPrediction, fromStats), `${fromTrajectory} ${fromPrediction} ${fromStats}`);
-check('medianWeeklyMiles is a number off the same lines', medianWeeklyMiles(records) > 0);
+check('medianWeeklyMiles is a number off the same lines', medianWeeklyMiles(records, TODAY) > 0);
 
 console.log('\nThe check-in tells the truth');
 const askedAbout = records.find(r => r.id === 'r11');

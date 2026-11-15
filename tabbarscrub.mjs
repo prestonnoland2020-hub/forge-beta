@@ -17,7 +17,7 @@ console.log('\nThe bar follows a sliding finger');
 check('the bar listens for a moving touch', /className=\{`tab-bar[\s\S]{0,400}onTouchMove=/.test(shell));
 check('only a sideways drag counts, not a tap or a scroll', /dx < 12 \|\| dx < dy/.test(shell));
 check('the tab under the finger is found by its box', /getBoundingClientRect\(\); return point\.clientX >= box\.left && point\.clientX < box\.right/.test(shell));
-check('crossing into a tab changes page', /navigate\(tabs\[index\]\.to, \{ replace: state\.moved \}\)/.test(shell));
+check('crossing into a tab changes page', /(?:navigate|goTab)\(tabs\[index\]\.to, \{ replace: state\.moved \}\)/.test(shell));
 check('so Back returns to where the slide began', /replace: state\.moved/.test(shell));
 
 console.log('\nAnd you can feel each tab');

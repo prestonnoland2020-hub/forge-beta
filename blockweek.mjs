@@ -14,7 +14,9 @@ import { currentWeekIndex, weeksRemaining, provenMax } from './src/features/trai
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
 
-const back = days => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); };
+/* Local dates, like the app's: toISOString() is UTC, and after 6 pm in
+   Chicago that is already tomorrow, so the suite failed every evening. */
+const back = days => { const d = new Date(); d.setDate(d.getDate() - days); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const block = (startedDaysAgo, weeks = 10) => ({
   startDate: back(startedDaysAgo),
   plan: { weeks: Array.from({ length: weeks }, (_, i) => ({ week: i + 1, topSets: [] })) },
