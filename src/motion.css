@@ -1,0 +1,26 @@
+/* ONE MOTION PER SCREEN CHANGE.
+   A tab switch was three animations stacked: the browser's crossfade, then
+   every card on the new screen rising in one after another (dt-rise / gx-rise,
+   up to 280ms late, gx-rise sliding diagonally), while the scroll snapped back
+   to the top a frame later. The crossfade blended to a half-empty screen and
+   the cards popped in after it: the "glitchy" look.
+
+   Now a screen change is the crossfade alone (tabs) or one short slide
+   (opening something deeper, going back). Content is simply there. */
+.app-frame :is(.gx-group > *, .simple-preview-results > *, .td-stack > *,
+  .history-page > *, .simple-profile > *, .simple-settings-list > *,
+  .gx-hero, .gx-card, .gx-empty-art span) {
+  animation: none !important;
+}
+/* Opening and going back: a small, quick slide that starts mostly visible,
+   so nothing blinks. */
+.screen-push { animation: screen-push-calm .22s cubic-bezier(.2, .8, .2, 1); }
+.screen-pop { animation: screen-pop-calm .22s cubic-bezier(.2, .8, .2, 1); }
+.screen-fade { animation: screen-fade-calm .16s ease-out; }
+@keyframes screen-push-calm { from { opacity: .7; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes screen-pop-calm { from { opacity: .7; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+@keyframes screen-fade-calm { from { opacity: .6; } to { opacity: 1; } }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
+@media (prefers-reduced-motion: reduce) {
+  .screen-push, .screen-pop, .screen-fade { animation: none; }
+}
