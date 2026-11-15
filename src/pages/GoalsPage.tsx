@@ -252,7 +252,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
           const pct = item.share === null ? 0 : item.share;
           return <li className={`gx-card tone-${item.tone}${isOpen ? ' open' : ''}`} key={`${goal.title}-${index}`} style={{ '--gx-delay': `${delay}ms`, animationDelay: `${order * 70}ms` } as CSSProperties}>
             <button className="gx-face" onClick={() => { tap(); toggleGoal(index); }} aria-expanded={isOpen}>
-              <span className="gx-top"><strong className="gx-title">{goal.title}</strong><span className={`gx-pill tone-${item.tone}`}>{item.label}</span></span>
+              <span className="gx-top"><strong className="gx-title">{goal.title.replace(/ (hh:)?mm:ss$/, '')}</strong><span className={`gx-pill tone-${item.tone}`}>{item.label}</span></span>
               <span className="gx-numbers">
                 <span className="gx-now">{item.current !== null ? (item.currentText.includes(':') ? item.currentText : <CountUp to={item.current} delay={delay} format={value => `${Math.round(value * 10) / 10}`} />) : '—'}<small>{[item.current !== null && !item.currentText.includes(':') ? item.currentText.replace(/^[\d.]+\s*/, '') : '', goal.type === 'Strength' && goal.unit !== 'reps' ? (maxMode === 'tested' ? 'tested' : 'estimated') : goal.type === 'Endurance' && item.current !== null && item.currentText.includes(':') ? (maxMode === 'tested' ? 'tested' : 'est.') : item.current === null ? 'now' : ''].filter(Boolean).join(' · ')}</small></span>
                 <span className="gx-arrow" aria-hidden="true"><Icon name="arrow" size={14}/></span>

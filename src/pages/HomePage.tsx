@@ -149,6 +149,9 @@ export function HomePage() {
   /* The suggested day leads, then the rest of the split in order. */
   /* The split in its order, each day once — a split with the same day name
      twice showed it twice — rest days only when today is one. */
+  /* Rest days are not chips, so a 4-day week with its days off read "Day 1,
+     Day 3, Day 5, Day 6". Training days are numbered among themselves. */
+  const trainingNumber = (position: number) => splitDays.filter(day => day.type !== 'rest' && day.position <= position).length;
   const chips = splitDays.filter((day, index, list) => (day.type !== 'rest' || day.name === suggested?.splitDay.name) && list.findIndex(other => other.name === day.name) === index);
   const onDay = recommendedSets.map(set => set.exercise);
   const swapPanel = (set: { exercise: string; muscle: string; swappedFrom?: string }) => {
@@ -234,7 +237,7 @@ export function HomePage() {
   const dayChips = <>
     <div className="tp-days" ref={daysRef} onScroll={onDaysScroll} role="radiogroup" aria-label="Training day">
       {chips.map(day => { const on = day.name === recommendation.splitDay.name; const isSuggested = day.name === suggested?.splitDay.name; return <button type="button" role="radio" aria-checked={on} key={`${day.position}-${day.name}`} data-day={day.name} className={`tp-day${on ? ' on' : ''}`} onClick={event => { event.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); pick(day.name); }}>
-        <small>{isSuggested ? 'Suggested' : day.type === 'rest' ? 'Rest' : `Day ${day.position}`}</small>
+        <small>{isSuggested ? 'Suggested' : day.type === 'rest' ? 'Rest' : `Day ${trainingNumber(day.position)}`}</small>
         <b>{day.name}</b>
         {day.muscles.length > 0 && <span>{day.muscles.slice(0, 4).join(' · ')}</span>}
       </button>; })}

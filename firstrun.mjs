@@ -75,16 +75,18 @@ for (const theme of ['dark', 'light']) {
      arrives with a movement already chosen. */
   for (let index = 0; index < MUSCLE_DAYS.length; index += 1) {
     const prefilled = await page.locator('.setup-day-head small').nth(index).innerText();
-    check(`${MUSCLE_DAYS[index].name} arrives with a movement chosen`, !/pick a movement/i.test(prefilled), prefilled);
+    check(`${MUSCLE_DAYS[index].name} arrives with a movement chosen`, !/pick lifts/i.test(prefilled), prefilled);
     const head = page.locator('.setup-day-head').nth(index);
     if (!(await page.locator('.setup-day').nth(index).getAttribute('class') || '').includes('open')) await head.click();
     await page.waitForTimeout(200);
-    const options = await page.locator('.setup-day').nth(index).locator('.setup-day-options .muscle-chip').allInnerTexts();
-    /* The Bench goal is offered on every day by design; it must not be the
-       ONLY thing offered, or the athlete is forced to program bench on legs. */
-    const real = options.filter(name => !name.includes('★'));
+    /* What the day holds plus what it offers to add. The goal lift is offered
+       everywhere by design; it must not be the ONLY thing on offer, or the
+       athlete is forced to program bench on legs. */
+    const day = page.locator('.setup-day').nth(index);
+    const options = [...await day.locator('.ob-day-lift').allInnerTexts(), ...await day.locator('.ob-day-add button').allInnerTexts()];
+    const real = options.map(name => name.replace(/[＋×✓]|Goal lift/g, '').trim()).filter(name => name && !/bench press/i.test(name));
     check(`${MUSCLE_DAYS[index].name} offers a movement that belongs to it`, real.length > 0,
-      real.map(name => name.trim()).join(', ') || 'nothing but the goal lift');
+      real.join(', ') || 'nothing but the goal lift');
     await head.click();
     await page.waitForTimeout(150);
   }
@@ -92,16 +94,20 @@ for (const theme of ['dark', 'light']) {
   /* Now the refusal — after clearing a day on purpose — and whether it can be read. */
   await page.locator('.setup-day-head').first().click();
   await page.waitForTimeout(200);
-  await page.locator('.setup-day').first().locator('.setup-day-options .muscle-chip[aria-pressed="true"]').first().click();
-  await page.waitForTimeout(200);
-  await page.locator('.setup-actions .button:not(.ghost)').click();
+  while (await page.locator('.setup-day').first().locator('.ob-day-lift').count()) {
+    await page.locator('.setup-day').first().locator('.ob-day-lift').first().click();
+    await page.waitForTimeout(120);
+  }
+  await page.locator('.ob-next').last().click();
   await page.waitForTimeout(500);
   const error = page.locator('.setup-error');
   const text = await error.innerText().catch(() => '');
-  check('finishing is refused while a day is unmapped', /pick a movement/i.test(text), text.replace(/\n/g, ' '));
+  check('finishing is refused while a day is unmapped', /pick at least one lift/i.test(text), text.replace(/\n/g, ' '));
   const colours = await error.evaluate(node => {
     const style = getComputedStyle(node);
-    return { fg: style.color, bg: style.backgroundColor };
+    /* oklch() cannot be parsed by hand; let the browser paint it and read the pixel. */
+    const toRgb = colour => { const c = document.createElement('canvas'); c.width = c.height = 1; const g = c.getContext('2d'); g.fillStyle = colour; g.fillRect(0, 0, 1, 1); const [r, gr, b] = g.getImageData(0, 0, 1, 1).data; return `rgb(${r}, ${gr}, ${b})`; };
+    return { fg: toRgb(style.color), bg: toRgb(style.backgroundColor) };
   }).catch(() => null);
   const contrast = colours ? ratio(rgb(colours.fg), rgb(colours.bg)) : 0;
   check('and the athlete can actually read it', contrast >= 4.5, `${contrast.toFixed(2)}:1 (${colours?.fg} on ${colours?.bg})`);

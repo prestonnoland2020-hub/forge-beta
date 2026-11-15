@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { isDemoMode } from '../../lib/env';
 import type { DailyHealthSnapshot } from '../../lib/recoveryEngine';
 import { normalizeWearableDay } from './wearableService';
 
@@ -17,6 +18,8 @@ export type GarminConnectionStatus = {
 };
 
 async function callGarmin(action: string, extra: Record<string, unknown> = {}) {
+  /* The preview build has no server; it would only log a failed request. */
+  if (isDemoMode) throw new Error('Connections are off in the preview.');
   const { data, error } = await supabase.functions.invoke('garmin-connect', { body: { action, ...extra } });
   if (error) throw new Error(error.message || 'The Garmin connection is unavailable.');
   if (data?.error) throw new Error(data.error);

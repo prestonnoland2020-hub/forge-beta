@@ -163,6 +163,11 @@ export function formatCardioPace(draft:CardioLogDraft){
     }
   }
   if(!miles||!minutes)return'';
+  /* A HYROX or circuit day mixes runs with stations: its whole time over its
+     run miles read "23:30 /mi" beside runs prescribed at 7:57. No pace. */
+  if(/hyrox|circuit|crossfit|metcon|wod/i.test(`${draft.activity} ${draft.summary}`))return'';
+  const lines=legacyCardioIntervals(draft);
+  if(lines.length&&lines.some(line=>{const activity=String(line.cardioType||line.activity||draft.activity);const unit=String(line.unit||line.distanceUnit||'');return isNonRunningCardio(activity)||!isMileageInterval(activity,unit)}))return'';
   const looksLikeRunning=/run|jog|walk/i.test(draft.activity)||/\bmi(?:les?)?\b/i.test(draft.summary);
   return looksLikeRunning?`${formatCardioMinutes(minutes/miles)}\u00a0/mi`:'';
 }

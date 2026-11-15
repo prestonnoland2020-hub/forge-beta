@@ -42,10 +42,12 @@ check('a real recent time within reach of the estimate counts', testedRaceSecond
 
 console.log('\nThe page');
 const page = readFileSync('./src/pages/GoalsPage.tsx', 'utf8');
-check('every goal is measured in the chosen mode', /goalProgress\(goal, records, verdicts\[index\], setup, maxMode[,)]/.test(page));
+/* The cards are built in one place (goalCards) so the page and the coach read the same numbers. */
+const cards = readFileSync('./src/lib/goalCards.ts', 'utf8');
+check('every goal is measured in the chosen mode', /goalProgress\(goal, records, verdict, setup, maxMode[,)]/.test(cards) && /goalCards\(goals, records, setup, [^)]*maxMode\)/.test(page));
 check('the choice is remembered on the device', /localStorage\.setItem\('forge-goals-max-mode', mode\)/.test(page));
 check('the switch shows when a strength or running goal can use it, once something is logged', /\{\(hasStrength \|\| hasRunTime\) && records\.length > 0 && <div className="gx-mode"/.test(page));
-check('running goals read the same switch', /maxMode === 'tested' \? testedRaceSeconds/.test(page));
+check('running goals read the same switch', /maxMode === 'tested' \? testedRaceSeconds/.test(cards));
 
 console.log(fails ? `\n${fails} failing\n` : '\nAll checks passed\n');
 process.exit(fails ? 1 : 0);

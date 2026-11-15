@@ -9,6 +9,7 @@
    the same day, the same lifts, the same numbers — before and after a coach
    override changes today. */
 import { chromium } from 'playwright';
+import { onboard } from './onboardflow.mjs';
 
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${ok ? '' : detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
@@ -16,25 +17,30 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-119
 const c = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const p = await c.newPage();
 const text = () => p.evaluate(() => document.body.innerText);
-const tapText = async (t, i = 0) => { const loc = p.locator(`text=${t}`); await loc.nth(i).scrollIntoViewIfNeeded(); await loc.nth(i).click(); await p.waitForTimeout(450); };
+const tapText = async (t, i = 0) => { const button = p.getByRole('button', { name: t, exact: true }); const loc = await button.count() ? button : p.locator(`text=${t}`); await loc.nth(i).scrollIntoViewIfNeeded(); await loc.nth(i).click(); await p.waitForTimeout(450); };
 const between = (t, a, len) => { const i = t.indexOf(a); return i < 0 ? '' : t.slice(i, i + len); };
 const visibleInputs = async () => { const out = []; for (const i of await p.$$('input')) if (await i.isVisible()) out.push(i); return out; };
-const dismissModals = async () => { for (const label of ['Yes, that was real', 'Not now']) { const loc = p.locator(`text=${label}`); if (await loc.count()) { try { await loc.first().click({ timeout: 1500 }); await p.waitForTimeout(400); } catch { /* not blocking */ } } } await p.evaluate(() => document.querySelector('.update-ready-pill')?.remove()); };
+const dismissModals = async () => { for (const label of ['Yes, that was real', 'Got it', 'Not now']) { const loc = p.locator(`text=${label}`); if (await loc.count()) { try { await loc.first().click({ timeout: 1500 }); await p.waitForTimeout(400); } catch { /* not blocking */ } } } await p.evaluate(() => document.querySelector('.update-ready-pill')?.remove()); };
 const go = async (hash) => { await p.evaluate(h => { location.hash = h; }, hash); await p.waitForTimeout(2000); await dismissModals(); return text(); };
 
 /* Every surface's reading of "today", from its own text. */
-const readHome = t => ({ day: between(t, 'UP NEXT\n', 80).split('\n')[1], lift: between(t, 'UP NEXT\n', 200).split('\n')[5] });
-const readPlan = t => { const block = between(t, 'TODAY ·', 200).split('\n'); const liftLine = block.find(line => /^Top set · |×/.test(line)) || ''; return { day: block[1], lift: liftLine.replace(/^Top set · /, '').split(/:| \d/)[0].trim() }; };
-const readLogger = t => ({ day: between(t, 'LOGGING ·', 60).split('\n')[1], position: between(t, 'SPLIT POSITION ', 3).trim() });
+const readHome = t => {
+  if (/\nRest day\nNothing required/.test(t)) return { day: 'Rest day', lift: '' };
+  return { day: between(t, 'Suggested\n', 80).split('\n')[1], lift: between(t, 'Build my workout\n', 80).split('\n')[1] };
+};
+const readPlan = t => {
+  const block = between(t, 'This week\n', 400).split('\n');
+  const day = block[3] || '';
+  const liftLine = block.slice(4).find(line => line && line !== 'Start' && line !== '›') || '';
+  const rowText = block.slice(3, 8).join('\n');
+  return { day: /^Rest\b/.test(day) && /rest day|asked the coach|Nothing scheduled/i.test(rowText) ? 'Rest day' : day, lift: liftLine.replace(/ \d+×\d+.*$/, '').replace(/ ·.*$/, '').trim() };
+};
+const readLogger = t => ({ day: (t.match(/\w{3}, \w{3} \d+, \d{4}\n([^\n]+)/) || [])[1] });
 const askCoach = async (question) => { await go('#/coach'); await p.fill('textarea', question); await tapText('Send'); await p.waitForTimeout(1200); return p.evaluate(() => window.__forgeCoachContext); };
 const titleCase = s => String(s || '').toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase()).replace(/&/g, '&');
 
 /* ---------- A hybrid athlete with two weeks of history ---------- */
-await p.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2200);
-await p.fill('input', 'Casey'); await tapText('Hybrid', 0); await tapText('Forge is training guidance'); await tapText('Continue →'); await p.waitForTimeout(700);
-const ins = await visibleInputs(); await ins[0].fill('275'); await ins[1].fill('315');
-await tapText('Save goal'); await p.waitForTimeout(600); await tapText('Continue →'); await p.waitForTimeout(800);
-await tapText('Enter Forge'); await p.waitForTimeout(2800);
+await onboard(p, { name: 'Casey', focus: 'Both', lift: 'Squat', target: '315', current: '275' });
 const iso = d => { const x = new Date(); x.setDate(x.getDate() - d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 const steady = (id, d, miles, minutes) => ({ id, date: iso(d), title: 'Training day', muscles: ['Cardio'], hasCardio: true, cardioSessions: [{ id: `${id}c`, structure: 'steady', activity: 'Run', summary: `Run · ${miles} mi`, prescription: { distance: String(miles), distanceUnit: 'miles', duration: String(minutes) } }] });
 const records = [steady('r1', 2, 5, 45), steady('r2', 4, 3, 27), steady('r3', 9, 6, 51),
@@ -43,12 +49,9 @@ const records = [steady('r1', 2, 5, 45), steady('r2', 4, 3, 27), steady('r3', 9,
 await p.evaluate(r => localStorage.setItem('forge-workout-history-v1', JSON.stringify(r)), records);
 await p.reload(); await p.waitForTimeout(2800); await dismissModals();
 
-console.log('\nThe week reviewed, first');
-const homeText = await text();
-check('Home opens on the review of last week', /YOUR WEEK\n(1 more\n)?Last week: 3 sessions, 9 mi, a PR \(Back Squat 275 × 5\)\./.test(homeText), between(homeText, 'YOUR WEEK', 120));
-check('with what matters, what changes and what is next', /Nothing changes/.test(homeText) && /Next: /.test(homeText), between(homeText, 'YOUR WEEK', 300));
-await dismissModals(); await tapText('Got it'); await p.waitForTimeout(500);
-check('Got it puts it away for good', !/YOUR WEEK/.test(await text()));
+/* The weekly review moved into the coach's "Forge noticed" notes (weekReview
+   via useCoachNotes); it is covered there, not as a Home card. */
+await dismissModals();
 
 console.log('\nThe same day everywhere');
 const home = readHome(await text());
@@ -87,17 +90,18 @@ const partial = (ctx?.weeklyRunning || []).find(w => w.partial);
 check('weeklyRunning\'s partial week never exceeds the 7-day count', !partial || partial.miles <= 8.01, JSON.stringify(partial));
 const history = await go('#/history');
 const monthMiles = [[2, 5], [4, 3], [9, 6]].filter(([d]) => iso(d).slice(0, 7) === iso(0).slice(0, 7)).reduce((sum, [, m]) => sum + m, 0);
-check(`History's month total is ${monthMiles} — the same runs`, new RegExp(`${monthMiles}(\\.0)?\\nMILES`).test(history), between(history, 'MILES', -40) || history.slice(0, 200));
+check(`History's month total is ${monthMiles} — the same runs`, new RegExp(`Miles\\n${monthMiles}(\\.0)?\\n`, 'i').test(history), between(history, 'MILES', -40) || history.slice(0, 200));
 
 console.log('\nA coach override moves every surface together');
 await go('#/coach'); await p.fill('textarea', 'I need a rest day'); await tapText('Send'); await p.waitForTimeout(1200);
 await tapText('Apply'); await p.waitForTimeout(800);
 const homeRest = readHome(await go('#/'));
-const planRest = readPlan(await go('#/plan'));
+const planRestText = await go('#/plan');
+const planRest = readPlan(planRestText);
 const loggerRest = readLogger(await go('#/workout?source=recommendation'));
 const ctxRest = await askCoach('what should I train today?');
 check('Home says Rest day', homeRest.day === 'Rest day', homeRest.day);
-check('Plan says Rest day', planRest.day === 'Rest day', planRest.day);
+check('Plan says Rest day', planRest.day === 'Rest day', JSON.stringify(planRest) + ' :: ' + planRestText.slice(planRestText.indexOf('This week'), planRestText.indexOf('This week') + 160).replace(/\n/g, ' | '));
 check('the logger says Rest day', /rest day/i.test(loggerRest.day || ''), loggerRest.day);
 check('the coach is told Rest day', ctxRest?.savedDailyRecommendation?.splitDay?.name === 'Rest day', ctxRest?.savedDailyRecommendation?.splitDay?.name);
 check('and that no top sets are prescribed', (ctxRest?.savedDailyRecommendation?.topSets || []).length === 0);

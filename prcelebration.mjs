@@ -67,11 +67,11 @@ const rowText = async (name, figure) => (await rows()).find(t => t.startsWith(na
 await p.goto('http://localhost:4191/#/workout', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2600); await dismissModals();
 
 console.log('\nA new calculated max is a nod');
-/* 300×5 → 338 and 315×1 → 315 on the curve; 305×5 → 343 beats both. */
+/* The curve softens above 3 reps (#159): 305×5 → 337 beats the old bests. */
 await addViaSheet('Back Squat', 305, 5);
 check('no pop-up for a calculated max', !(await has('.pr-celebration')));
 const squat = await rowText('Back Squat');
-check('the line says it is a new calculated max', /New est. max · 343/.test(squat), squat);
+check('the line says it is a new calculated max', /New est. max · 337/.test(squat), squat);
 check('and it animates in, because it just happened', await has('.top-set-pr.calc.fresh'));
 
 console.log('\nA real 1RM PR is the big one');

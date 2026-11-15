@@ -4,6 +4,7 @@
    stand-in supplies the actions — the card, Apply, the override and the
    Today card are the same code either way. */
 import { chromium } from 'playwright';
+import { onboard } from './onboardflow.mjs';
 
 let fails = 0;
 const check = (label, ok, detail = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${ok ? '' : detail ? ` — ${detail}` : ''}`); if (!ok) fails += 1; };
@@ -11,18 +12,14 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-119
 const c = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 const p = await c.newPage();
 const text = () => p.evaluate(() => document.body.innerText);
-const tapText = async (t, i = 0) => { const loc = p.locator(`text=${t}`); await loc.nth(i).scrollIntoViewIfNeeded(); await loc.nth(i).click(); await p.waitForTimeout(450); };
+const tapText = async (t, i = 0) => { const button = p.getByRole('button', { name: t, exact: true }); const loc = await button.count() ? button : p.locator(`text=${t}`); await loc.nth(i).scrollIntoViewIfNeeded(); await loc.nth(i).click(); await p.waitForTimeout(450); };
 const between = (t, a, len) => { const i = t.indexOf(a); return i < 0 ? '' : t.slice(i, i + len); };
 const killPill = () => p.evaluate(() => document.querySelector('.update-ready-pill')?.remove());
 const visibleInputs = async () => { const out = []; for (const i of await p.$$('input')) if (await i.isVisible()) out.push(i); return out; };
 
-await p.goto('http://localhost:4191/#/', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2200);
-await p.fill('input', 'Dana'); await tapText('Strength', 0); await tapText('Forge is training guidance'); await tapText('Continue →'); await p.waitForTimeout(700);
-const ins = await visibleInputs(); await ins[0].fill('275'); await ins[1].fill('315');
-await tapText('Save goal'); await p.waitForTimeout(600); await tapText('Continue →'); await p.waitForTimeout(800);
-await tapText('Enter Forge'); await p.waitForTimeout(2800); await killPill();
+await onboard(p, { name: 'Dana', focus: 'Get stronger', lift: 'Squat', target: '315', current: '275' });
 let t = await text();
-const todayBefore = between(t, 'UP NEXT\n', 60).split('\n')[1];
+const todayBefore = between(t, 'Suggested\n', 60).split('\n')[1];
 check(`Today starts as ${todayBefore}`, todayBefore === 'Chest & Back', todayBefore);
 
 console.log('\n"My knee hurts and I only have 30 minutes"');
@@ -53,8 +50,8 @@ check('rest is proposed', /Today → Rest day/.test(t), between(t, 'Forge would 
 await tapText('Apply'); await p.waitForTimeout(900);
 await p.evaluate(() => { location.hash = '#/'; }); await p.waitForTimeout(1800);
 t = await text();
-const todayAfter = between(t, 'UP NEXT\n', 60).split('\n')[1];
-check('Today is now a rest day', todayAfter === 'Rest day' || /Recovery is next/.test(t), todayAfter);
+const todayAfter = between(t, 'Suggested\n', 60).split('\n')[1];
+check('Today is now a rest day', todayAfter === 'Rest day' || /\nRest day\nNothing required/.test(t) || /Recovery is next/.test(t), todayAfter);
 check('with the coach note on it', /Rest day — you asked the coach for it/.test(t), between(t, 'UP NEXT', 200));
 
 console.log('\nA question changes nothing');

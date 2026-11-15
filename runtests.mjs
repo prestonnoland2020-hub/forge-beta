@@ -23,7 +23,7 @@ const args = process.argv.slice(2);
 const logicOnly = args.includes('--logic');
 const filters = args.filter(arg => !arg.startsWith('--'));
 
-const SELF = ['runtests.mjs', 'seed.mjs', 'el.mjs', 'dialdriver.mjs', 'inspect.mjs'];
+const SELF = ['runtests.mjs', 'seed.mjs', 'el.mjs', 'dialdriver.mjs', 'inspect.mjs', 'onboardflow.mjs'];
 const suites = readdirSync('.').filter(name => name.endsWith('.mjs') && !SELF.includes(name))
   .filter(name => !filters.length || filters.some(filter => name.includes(filter)))
   .sort();
