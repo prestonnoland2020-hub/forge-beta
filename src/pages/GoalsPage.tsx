@@ -47,10 +47,16 @@ const reducedMotion = () => { try { return window.matchMedia('(prefers-reduced-m
 
 /* A number that counts up to its value when it first appears — the feeling
    of an app arriving with the score already moving. */
+/* Counted up once per figure per session. Counting from 0 on every visit to
+   Goals was the second jump after each tab switch. */
+const counted = new Set<string>();
+let goalsFilledOnce = false;
 function CountUp({ to, delay = 0, duration = 1100, format = (value: number) => String(Math.round(value)) }: { to: number; delay?: number; duration?: number; format?: (value: number) => string }) {
-  const [value, setValue] = useState(() => (reducedMotion() ? to : 0));
+  const seen = counted.has(String(to));
+  const [value, setValue] = useState(() => (reducedMotion() || seen ? to : 0));
   useEffect(() => {
-    if (reducedMotion()) { setValue(to); return; }
+    if (reducedMotion() || counted.has(String(to))) { setValue(to); return; }
+    counted.add(String(to));
     let frame = 0;
     let shown = format(0);
     const start = performance.now() + delay;
@@ -151,10 +157,12 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const hasRunTime = goals.some(goal => goal.type === 'Endurance' && /mm:ss|hh:mm/i.test(String(goal.unit || goal.target || '')) && expectedRunMiles(goal) !== null);
   /* The bars start empty and fill one frame after the page mounts, so the
      width transition runs; each card is a beat behind the one above it. */
-  const [filled, setFilled] = useState(false);
+  /* Bars and the ring fill on the first visit of a session only; after that
+     they are simply full, so returning to Goals has no late second motion. */
+  const [filled, setFilled] = useState(() => goalsFilledOnce);
   /* Both frames are cancelled on cleanup and nothing guards a second run, so
      StrictMode's mount-unmount-mount still ends with the bars filled. */
-  useEffect(() => { let inner = 0; const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setFilled(true)); }); return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); }; }, []);
+  useEffect(() => { let inner = 0; const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => { goalsFilledOnce = true; setFilled(true); }); }); return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); }; }, []);
   /* Every goal's full read-out used to be open on the first goal the moment
      the page loaded, with no way to shut it again. Nothing is expanded on
      arrival now, and tapping an open goal closes it. */

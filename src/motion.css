@@ -1,26 +1,28 @@
-/* ONE MOTION PER SCREEN CHANGE.
-   A tab switch was three animations stacked: the browser's crossfade, then
-   every card on the new screen rising in one after another (dt-rise / gx-rise,
-   up to 280ms late, gx-rise sliding diagonally), while the scroll snapped back
-   to the top a frame later. The crossfade blended to a half-empty screen and
-   the cards popped in after it: the "glitchy" look.
+/* ONE CALM MOTION PER SCREEN CHANGE.
+   Recorded in WebKit at iPhone size: a tab switch snapped with no motion
+   (the view transition did not play in the WebView), then numbers counted up
+   from 0 and cards jumped in a third of a second later. Two visible changes
+   per tap read as a glitch.
 
-   Now a screen change is the crossfade alone (tabs) or one short slide
-   (opening something deeper, going back). Content is simply there. */
-.app-frame :is(.gx-group > *, .simple-preview-results > *, .td-stack > *,
-  .history-page > *, .simple-profile > *, .simple-settings-list > *,
-  .gx-hero, .gx-card, .gx-empty-art span) {
-  animation: none !important;
+   Now every screen change is the same short move: the new screen is already
+   almost fully there (opacity .85) and settles 8px into place in 240ms, with the
+   first few cards following 25ms apart. Nothing starts invisible, nothing
+   lands late. */
+@media (prefers-reduced-motion: no-preference) {
+  .app-frame main.page { animation: page-in .24s cubic-bezier(.2, .8, .2, 1) both; }
+  .app-frame main.page.screen-push { animation-name: page-push; }
+  .app-frame main.page.screen-pop { animation-name: page-pop; }
+  .app-frame :is(.gx-group > *, .simple-preview-results > *, .td-stack > *,
+    .history-page > *, .simple-profile > *, .simple-settings-list > *, .gx-hero, .gx-card, .gx-empty-art span) {
+    animation: card-in .22s cubic-bezier(.2, .8, .2, 1) both !important;
+  }
+  .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(2) { animation-delay: 25ms !important; }
+  .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(3) { animation-delay: 50ms !important; }
+  .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(n + 4) { animation-delay: 75ms !important; }
 }
-/* Opening and going back: a small, quick slide that starts mostly visible,
-   so nothing blinks. */
-.screen-push { animation: screen-push-calm .22s cubic-bezier(.2, .8, .2, 1); }
-.screen-pop { animation: screen-pop-calm .22s cubic-bezier(.2, .8, .2, 1); }
-.screen-fade { animation: screen-fade-calm .16s ease-out; }
-@keyframes screen-push-calm { from { opacity: .7; transform: translateX(14px); } to { opacity: 1; transform: none; } }
-@keyframes screen-pop-calm { from { opacity: .7; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
-@keyframes screen-fade-calm { from { opacity: .6; } to { opacity: 1; } }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
-@media (prefers-reduced-motion: reduce) {
-  .screen-push, .screen-pop, .screen-fade { animation: none; }
-}
+@keyframes page-in { from { opacity: .85; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes page-push { from { opacity: .85; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+@keyframes page-pop { from { opacity: .85; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
+@keyframes card-in { from { opacity: .7; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* The old per-screen classes defer to the rules above. */
+.screen-push, .screen-pop, .screen-fade { animation: none; }

@@ -124,8 +124,9 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
      with reduced motion, it is a plain navigation and the CSS fade runs. */
   const goTab = useCallback((to: string, options?: { replace?: boolean }) => {
     const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
-    if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { navigate(to, options); return; }
-    doc.startViewTransition(() => { crossfading.current = true; flushSync(() => navigate(to, options)); });
+    /* No view transition: in the iPhone WebView it snapped instead of
+       crossfading. Every screen change uses the one CSS motion (motion.css). */
+    void doc; navigate(to, options);
   }, [navigate]);
   /* SHARED ELEMENT TRANSITIONS. A link marked data-vt goes through the same
      view transition as a tab, so an element named on both screens (the day's
