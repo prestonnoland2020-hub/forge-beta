@@ -163,6 +163,11 @@
   .coach-bubble-panel > header strong { font-size: 20px; text-transform: none; letter-spacing: -.01em; }
   .coach-bubble-panel > header button { border: 0; border-radius: 999px; width: 38px; height: 38px; font-size: 18px; background: color-mix(in oklch, var(--ink, var(--text)) 8%, transparent); }
   .coach-bubble-backdrop { display: block; z-index: 40; animation: scrim-in .3s ease; }
+  /* On a short phone the intro and chips pushed the message box below the
+     fold. The scroll area is sized to the sheet, and the composer sticks to
+     its bottom edge so it is on screen the moment the sheet opens. */
+  .coach-bubble-shell:not(.expanded) .coach-bubble-content { max-height: calc(88dvh - 66px - var(--safe-b, env(safe-area-inset-bottom))); overscroll-behavior: contain; }
+  .coach-bubble-content .coach-composer { position: sticky; bottom: -16px; z-index: 2; margin: 0 -16px -16px; padding: 10px 16px 16px; background: color-mix(in oklch, var(--panel) 96%, var(--lift)); box-shadow: 0 -1px 0 var(--line); }
 }
 
 @media (min-width: 901px) {
