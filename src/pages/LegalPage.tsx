@@ -57,6 +57,7 @@ function Privacy() {
       <li>To send the notifications you switched on.</li>
       <li>To show your training partners the summary described below, if you add any.</li>
       <li>To enforce the fair-use limits on Forge AI, which is why request counts are stored.</li>
+      <li>To check that coaching answers are accurate. Your coach questions and answers are saved to your account, visible only to you and to Forge's own quality checks, and deleted with your account.</li>
       <li>To operate a subscription if you buy one, and to keep the service secure.</li>
     </ul>
     <p>Your training data is not used to train anybody's machine-learning model.</p>
