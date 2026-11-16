@@ -19,6 +19,7 @@ import { SplitGuidePrompt, SplitReadyNote } from '../components/SplitGuidePrompt
 import { useGoals } from '../features/goals/GoalsProvider';
 import { WAVE_REPS, ACCESSORY_REPS } from '../features/training/aiPlanService';
 import { sameLift } from '../lib/liftAliases';
+import { startingNumbers } from '../lib/startingNumbers';
 import { useTrainingLibrary } from '../features/training/TrainingLibraryProvider';
 import { openWorkout } from '../lib/workoutOpen';
 import { goalFeasibility } from '../lib/goalFeasibility';
@@ -197,14 +198,17 @@ export function HomePage() {
     const verdict = goalIndex >= 0 ? feasibility[goalIndex] : undefined;
     const target = goal ? `${String(goal.target).replace(/[^0-9.]/g, '')} ${weightUnit}` : '';
     const by = goal?.date ? new Date(`${goal.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    const lastText = last ? `Last time ${last.weight} × ${last.reps}${last.date === currentDate ? ' (today)' : ''}.` : 'First time on this lift.';
+    /* A NEW ATHLETE'S STARTING SET is where today's load came from; saying
+       "first time" right after they typed it reads as if it was ignored. */
+    const start = !last && objective.weight > 0 ? startingNumbers().find(item => sameLift(item.lift, objective.exercise)) : undefined;
+    const lastText = last ? `Last time ${last.weight} × ${last.reps}${last.date === currentDate ? ' (today)' : ''}.` : start ? `From your starting set ${start.weight} × ${start.reps}.` : 'First time on this lift.';
     /* A STUCK LIFT IS SAID OUT LOUD, with the plan and a date to beat it. */
     const plateau = stuck.get(canonicalLiftKey(objective.exercise));
     if (plateau) return plateauLine(plateau.plateau, weightUnit, plateau.variation);
     const trend = goal ? liftTrend(objective.exercise, records, Number(String(goal.target).replace(/[^0-9.]/g, '')), goal.date, weightUnit) : null;
     if (trend) return `${lastText} ${trend.status === 'on-track' ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — on track for ${target}${by ? ` by ${by}` : ''}.` : trend.perWeek > 0 ? `You’re gaining ${trend.perWeek} ${weightUnit}/week — ${by ? `by ${by} ` : ''}that’s ${trend.projected}, short of ${target}.` : `Your calc max has been flat — today is about getting it moving toward ${target}.`}`;
     /* A first time has no wave to step up yet; today only finds the number. */
-    const goalText = !goal ? (last ? 'The next step up your rep wave.' : 'Today sets the starting weight Forge builds from.')
+    const goalText = !goal ? (last ? 'The next step up your rep wave.' : start ? 'Your first logged set takes over from here.' : 'Today sets the starting weight Forge builds from.')
       : verdict?.verdict === 'reachable' ? `Keeps you on pace for ${target}${by ? ` by ${by}` : ''}.`
       : verdict?.verdict === 'needs-more' && /heavy single/.test(verdict.change || '') ? `You’re close to ${target} — a heavy single soon will show where you stand.`
       : verdict?.verdict === 'needs-more' ? `Each week like this moves you toward ${target}${by ? ` by ${by}` : ''}.`
