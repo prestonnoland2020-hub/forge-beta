@@ -9,12 +9,12 @@
    first few cards following 25ms apart. Nothing starts invisible, nothing
    lands late. */
 @media (prefers-reduced-motion: no-preference) {
-  .app-frame main.page { animation: page-in .24s cubic-bezier(.2, .8, .2, 1) both; }
+  .app-frame main.page { animation: page-in .24s cubic-bezier(.2, .8, .2, 1) backwards; }
   .app-frame main.page.screen-push { animation-name: page-push; }
   .app-frame main.page.screen-pop { animation-name: page-pop; }
   .app-frame :is(.gx-group > *, .simple-preview-results > *, .td-stack > *,
     .history-page > *, .simple-profile > *, .simple-settings-list > *, .gx-hero, .gx-card, .gx-empty-art span) {
-    animation: card-in .22s cubic-bezier(.2, .8, .2, 1) both !important;
+    animation: card-in .22s cubic-bezier(.2, .8, .2, 1) backwards !important;
   }
   .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(2) { animation-delay: 25ms !important; }
   .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(3) { animation-delay: 50ms !important; }
@@ -24,5 +24,9 @@
 @keyframes page-push { from { opacity: .85; transform: translateX(16px); } to { opacity: 1; transform: none; } }
 @keyframes page-pop { from { opacity: .85; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
 @keyframes card-in { from { opacity: .7; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* "backwards", never "both": an animation that keeps filling after it ends
+   leaves the page counted as transformed, and a transformed page becomes the
+   frame for every fixed-position sheet inside it. The add-a-set sheet then
+   opened somewhere below the page and only its blurred backdrop showed. */
 /* The old per-screen classes defer to the rules above. */
 .screen-push, .screen-pop, .screen-fade { animation: none; }
