@@ -39,6 +39,26 @@ export const CURVE_WINDOW_DAYS = 180;
 export const RECENCY_HALF_LIFE_DAYS = 70;
 export const RECENCY_FLOOR = 0.2;
 
+/* AN OLD BEST IS NOT TODAY'S FITNESS.
+
+   The recency weights above only decide which efforts the level is blended
+   from. When the athlete's best run is five months old and nothing since is
+   anywhere near it, every effort in the blend is that old run and its age
+   washes out of a weighted average entirely: the prediction read as if the
+   race were run yesterday. Fitness fades without the work that made it.
+
+   So the level is slowed by the age of the efforts it rests on — nothing for
+   the first four weeks, then about 1.5% slower per month, capped at 10% — but
+   never slower than what the athlete has shown recently. A recent run close to
+   the old best proves the fitness is still there and cancels the fade; a
+   recent jog proves nothing and leaves it in place. */
+export const DETRAIN_GRACE_DAYS = 28;
+export const DETRAIN_PER_DAY = 0.0005;
+export const DETRAIN_MAX = 0.10;
+export const CORROBORATE_DAYS = 42;
+export const detrainFraction = (ageInDays: number) =>
+  Math.min(DETRAIN_MAX, Math.max(0, ageInDays - DETRAIN_GRACE_DAYS) * DETRAIN_PER_DAY);
+
 /* DISTANCE BINS, SO TWENTY EASY FOUR-MILERS CANNOT OUTVOTE ONE TIME TRIAL.
 
    A least-squares fit over every logged run fits the athlete's TRAINING, not
@@ -160,6 +180,9 @@ export type FitnessCurve = {
   fitted: boolean;
   /* The frontier: best effort per distance bin, newest-weighted. */
   points: CurvePoint[];
+  /* How much the level was slowed (log-time) because the efforts behind it
+     are old and nothing recent backs them up. 0 when the evidence is fresh. */
+  detrained: number;
   /* The efforts the level was actually blended from, best first. */
   sources: Effort[];
   /* Longest distance with real evidence — where extrapolation starts. */
@@ -322,7 +345,12 @@ export function fitnessCurve(efforts: Effort[], todayIso: string, confirmed: Set
   const top = pool.slice(0, LEVEL_BLEND.length);
   const weights = top.map((item, index) => LEVEL_BLEND[index] * item.weight);
   const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
-  const level = top.reduce((sum, item, index) => sum + weights[index] * item.level, 0) / weightTotal;
+  const blendedLevel = top.reduce((sum, item, index) => sum + weights[index] * item.level, 0) / weightTotal;
+  const restingAge = top.reduce((sum, item, index) => sum + weights[index] * ageDays(item.effort.date, todayIso), 0) / weightTotal;
+  const recentLevels = pool.filter(item => ageDays(item.effort.date, todayIso) <= CORROBORATE_DAYS).map(item => item.level);
+  const fade = detrainFraction(restingAge);
+  const detrained = recentLevels.length ? Math.min(fade, Math.max(0, Math.min(...recentLevels) - blendedLevel)) : fade;
+  const level = blendedLevel + detrained;
 
   /* THE SPREAD, read only from the athlete's hard days. */
   const hard = pool.filter(item => item.level - level <= SPREAD_WINDOW);
@@ -340,7 +368,7 @@ export function fitnessCurve(efforts: Effort[], todayIso: string, confirmed: Set
     level, exponent, fitted, points,
     sources: top.map(item => item.effort),
     longest: Math.max(...points.map(point => point.miles)),
-    spread, confidence,
+    spread, confidence, detrained,
   };
 }
 

@@ -32,7 +32,7 @@ import { isRaceEvidence } from './runQuality';
 import { RIEGEL as RIEGEL_EXPONENT } from './riegel';
 import { cardioMiles, summarizeCardioDraft, continuousRunEfforts } from './cardioSession';
 import { effortKey, CONFIRMED_PREFIX } from './effortAudit';
-import { fitnessCurve, predictFromCurve, type Effort, type Effort as CurveEffort } from './fitnessCurve';
+import { fitnessCurve, predictFromCurve, detrainFraction, type Effort, type Effort as CurveEffort } from './fitnessCurve';
 import { heartRateEffort } from './heartRate';
 
 /* Canonical race durations the training paces are anchored to. These are the
@@ -199,6 +199,12 @@ export function paceModel(
       ? { miles: goal.miles, seconds: goal.paceSecondsPerMile * goal.miles, date: today }
       : null);
   if (!evidence) return emptyPaceModel;
+  /* An older run carried with no curve behind it (older than the curve's
+     window) fades with its age the same way the curve does. */
+  const ageOf = (iso: string) => Math.max(0, (Date.parse(`${today}T12:00:00`) - Date.parse(`${iso}T12:00:00`)) / 86400000);
+  const carried = older && evidence === older
+    ? { ...older, seconds: older.seconds * Math.exp(detrainFraction(ageOf(older.date))) }
+    : evidence;
 
   const source: PaceSource = recent ? 'recent-run' : fromHeart ? 'heart-rate' : older ? 'older-run' : 'goal';
 
@@ -220,13 +226,13 @@ export function paceModel(
   const shortfall = volumeShortfall(weeklyMiles, evidence.seconds / evidence.miles);
   const at = (miles: number) => {
     const fromCurve = curve ? predictFromCurve(curve, miles, shortfall) : null;
-    return fromCurve ? fromCurve.seconds / miles : paceAt(evidence, miles, shortfall);
+    return fromCurve ? fromCurve.seconds / miles : paceAt(carried, miles, shortfall);
   };
   const threshold = at(THRESHOLD_MILES);
   /* The ladder's fast end is judged against the threshold their SPEED
      implies, before the volume correction — the shortfall is about endurance,
      and it must not drag a genuine fast mile's repetition pace with it. */
-  const atFit = (miles: number) => { const fromCurve = curve ? predictFromCurve(curve, miles, 0) : null; return fromCurve ? fromCurve.seconds / miles : paceAt(evidence, miles, 0); };
+  const atFit = (miles: number) => { const fromCurve = curve ? predictFromCurve(curve, miles, 0) : null; return fromCurve ? fromCurve.seconds / miles : paceAt(carried, miles, 0); };
   const thresholdFit = Math.min(threshold, atFit(THRESHOLD_MILES));
   return {
     source, supported: source !== 'goal', from: recent || fromHeart || older,
