@@ -3,7 +3,7 @@ import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider'
 import { weeklyRunVolume } from './cardioPrediction';
 import { cardioMiles, summarizeCardioDraft } from './cardioSession';
 import { clockToSeconds, goalClockSeconds, localDayIso } from './time';
-import { calculateEstimatedOneRepMax } from './strength';
+import { calculateEstimatedOneRepMax, topSetMax } from './strength';
 import { effortOf, estimateWithEffort } from './setEffort';
 import { startingNumbers } from './startingNumbers';
 import { isRaceEvidence } from './runQuality';
@@ -409,7 +409,7 @@ function liftFeasibility(goal: CreatedGoal, records: WorkoutRecord[]): Feasibili
   records.forEach(record => (record.topSets || []).forEach(set => {
     if (set.completed === false || !set.lift || !sameLift(set.lift, String(goal.exercise))) return;
     const effort = effortOf(record.date, set.lift);
-    const max = effort ? estimateWithEffort(set.weight, set.reps, effort) : set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
+    const max = effort ? estimateWithEffort(set.weight, set.reps, effort) : topSetMax(set);
     if (max > 0) sets.push({ date: record.date, max, weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 });
   }));
   /* NOTHING LOGGED YET IS NOT NOTHING KNOWN. The best entered with the goal
