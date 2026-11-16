@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useSt
 import { mergeSession } from '../../lib/sameEffort';
 import type { CardioLogDraft } from '../../lib/cardioSession';
 import { isDemoMode } from '../../lib/env';
+import { topSetMax } from '../../lib/strength';
 import { useAuth } from '../auth/AuthProvider';
 import { useSyncStatus } from '../sync/SyncStatusProvider';
 import { deleteWorkoutDay,findWorkoutDayId,loadWorkoutHistory,saveWorkoutDay } from './workoutHistoryService';
@@ -31,7 +32,7 @@ const readPending=():string[]=>{try{const saved=JSON.parse(localStorage.getItem(
 const writePending=(ids:string[])=>{try{localStorage.setItem(pendingKey,JSON.stringify(ids))}catch{/* full */}};
 const isUuid=(value:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const cardioSignature=(sessions:CardioLogDraft[]|undefined)=>JSON.stringify(sessions||[],(key,value)=>key==='id'?undefined:value);
-const normalizedTopSets=(record:Partial<WorkoutRecord>):LoggedTopSet[]=>Array.isArray(record.topSets)&&record.topSets.length?record.topSets.filter(set=>set&&set.lift).map(set=>({...set,muscle:set.muscle||record.muscles?.[0]||'Primary',weight:Number(set.weight),reps:Number(set.reps),completed:set.completed!==false})):(record.lift&&record.weight&&record.reps?[{muscle:record.muscles?.[0]||'Primary',lift:record.lift,weight:Number(record.weight),reps:Number(record.reps),calculatedMax:record.calculatedMax,completed:true}]:[]);
+const normalizedTopSets=(record:Partial<WorkoutRecord>):LoggedTopSet[]=>Array.isArray(record.topSets)&&record.topSets.length?record.topSets.filter(set=>set&&set.lift).map(set=>({...set,muscle:set.muscle||record.muscles?.[0]||'Primary',weight:Number(set.weight),reps:Number(set.reps),calculatedMax:topSetMax(set)||undefined,completed:set.completed!==false})):(record.lift&&record.weight&&record.reps?[{muscle:record.muscles?.[0]||'Primary',lift:record.lift,weight:Number(record.weight),reps:Number(record.reps),calculatedMax:topSetMax(record)||undefined,completed:true}]:[]);
 const normalizeRecord=<T extends Partial<WorkoutRecord>>(record:T)=>{const topSets=normalizedTopSets(record);const first=topSets[0];return{...record,topSets:topSets.length?topSets:undefined,lift:first?.lift??record.lift,weight:first?.weight??record.weight,reps:first?.reps??record.reps,calculatedMax:first?.calculatedMax??record.calculatedMax}};
 import { SYNCED_SESSION, keepSyncedSessions } from './syncedCardio';
 const setSignature=(set:LoggedTopSet)=>`${set.muscle}|${set.lift}|${set.weight}|${set.reps}`;

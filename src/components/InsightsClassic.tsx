@@ -2,7 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { cardioMiles, bestRunPaceMinutesPerMile } from '../lib/cardioSession';
-import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { calculateEstimatedOneRepMax, topSetMax } from '../lib/strength';
 import '../today-picks.css';
 import { Icon } from './Icon';
 
@@ -94,7 +94,7 @@ export function InsightsClassic() {
     records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.topSets || []).forEach(set => {
       if (set.completed === false || set.lift !== selectedLift || !set.weight) return;
       if (prMode === '1rm' && set.reps !== 1) return;
-      const value = prMode === 'calc' ? (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0) : set.weight;
+      const value = prMode === 'calc' ? topSetMax(set) : set.weight;
       if (!value) return;
       const held = byDay.get(record.date);
       /* The day's heaviest set; at the same weight, the one with more reps. */
@@ -112,7 +112,7 @@ export function InsightsClassic() {
     records.filter(record => record.date >= rangeCutoffIso).forEach(record => (record.topSets || []).forEach(set => {
       if (set.completed === false || set.lift !== selectedLift || !set.weight) return;
       if (prMode === '1rm' && set.reps !== 1) return;
-      const value = prMode === 'calc' ? (set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0) : set.weight;
+      const value = prMode === 'calc' ? topSetMax(set) : set.weight;
       if (!value) return;
       entries.push({ date: record.date, value });
       if (!best || value > best.value) best = { weight: set.weight, reps: set.reps, date: record.date, value };

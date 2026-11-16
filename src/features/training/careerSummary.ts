@@ -1,6 +1,6 @@
 import { cardioMiles, formatCardioMinutes, summarizeCardioDraft, type CardioLogDraft } from '../../lib/cardioSession';
 import { canonicalLiftKey } from '../../lib/liftAliases';
-import { calculateEstimatedOneRepMax } from '../../lib/strength';
+import { calculateEstimatedOneRepMax, topSetMax } from '../../lib/strength';
 import { runShapedActivity } from './stravaImportService';
 import type { WorkoutRecord } from './WorkoutHistoryProvider';
 
@@ -86,7 +86,7 @@ export function buildCareerSummary(records: WorkoutRecord[]): CareerSummary | nu
 
     for (const set of record.topSets || []) {
       if (set.completed === false || !set.lift || !set.weight || !set.reps) continue;
-      const max = set.calculatedMax || calculateEstimatedOneRepMax(set.weight, set.reps) || 0;
+      const max = topSetMax(set);
       if (!max) continue;
       const key = canonicalLiftKey(set.lift);
       const entry: LiftBest = { lift: set.lift, calculatedMax: max, weight: set.weight, reps: set.reps, date: record.date };
