@@ -49,6 +49,7 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
   const [muscles, setMuscles] = useState<string[]>([]);
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
+  const [editMuscles, setEditMuscles] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   /* OPENS AND CLOSES ON A TRANSITION, NOT A KEYFRAME. A transition can be
      reversed from wherever it is, so a sheet dismissed while it is still
@@ -111,7 +112,7 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
     setMuscles(dayMuscles.filter(muscle => STRENGTH_MUSCLES.includes(muscle)));
     setQuery('');
   };
-  const clearLift = () => { setChosen(null); setNewName(''); setMuscles([]); setQuery(''); window.setTimeout(() => search.current?.focus(), 0); };
+  const clearLift = () => { setChosen(null); setNewName(''); setEditMuscles(false); setMuscles([]); setQuery(''); window.setTimeout(() => search.current?.focus(), 0); };
   const toggleMuscle = (muscle: string) => setMuscles(current => current.includes(muscle) ? current.filter(item => item !== muscle) : [...current, muscle]);
 
   const max = Number(weight) && Number(reps) ? calculateEstimatedOneRepMax(Number(weight), Number(reps)) : null;
@@ -151,13 +152,13 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
   return <div className="top-set-sheet-backdrop" data-state={shown ? 'open' : 'closed'} role="dialog" aria-modal="true" aria-label="Add a top set" onClick={closeOnBackdrop}>
     <div className={lift ? 'top-set-sheet' : 'top-set-sheet picking'}>
       <header>
-        <div><strong>Add a top set</strong><small>The one heaviest meaningful set. Forge measures progress from it.</small></div>
+        <div><strong>Add a top set</strong>{!lift && <small>The one heaviest meaningful set. Forge measures progress from it.</small>}</div>
         <button type="button" className="top-set-sheet-close" aria-label="Close" onClick={close}>×</button>
       </header>
 
       {lift
         ? <div className="top-set-sheet-chosen">
-            <div><span className="eyebrow">{isNew ? 'NEW EXERCISE' : 'EXERCISE'}</span><strong>{lift}</strong></div>
+            <div>{isNew && <span className="eyebrow">NEW EXERCISE</span>}<strong>{lift}</strong>{!isNew && !editMuscles && <small className="top-set-sheet-muscle-line">{muscles.join(' · ') || 'No muscles set'} · <button type="button" className="text-button" onClick={() => setEditMuscles(true)}>Edit</button></small>}</div>
             <button type="button" className="text-button" onClick={clearLift}>Change</button>
           </div>
         : <label className="top-set-sheet-search">
@@ -179,30 +180,30 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
       </div>}
 
       {lift && <>
-        <div className="top-set-sheet-muscles">
+        {/* Known exercises already have their muscles: show them on one line so the sheet fits without scrolling. */}
+        {(isNew || editMuscles) && <div className="top-set-sheet-muscles">
           <span className="field-caption">Muscle groups</span>
           {isNew && <small>A new exercise needs its mapping — it decides what this set counts toward.</small>}
           <div className="muscle-picker compact-muscle-picker">
             {STRENGTH_MUSCLES.map(muscle => <button type="button" key={muscle} className={muscles.includes(muscle) ? 'muscle-chip active' : 'muscle-chip'} aria-pressed={muscles.includes(muscle)} onClick={() => toggleMuscle(muscle)}>{muscle}</button>)}
           </div>
-        </div>
+        </div>}
         {(() => { const ask = isNew ? null : askFor?.(lift); if (!ask?.reps) return null; const text = ask.weight ? `${ask.weight} ${unit} × ${ask.reps}` : `${ask.reps} reps`;
           /* EVERY ADDED LIFT GETS A TARGET, even a small one; one tap puts it in the dials. */
           return <button type="button" className="top-set-sheet-ask" onClick={() => { if (ask.weight) setWeight(String(ask.weight)); setReps(String(ask.reps)); }}>
-            <span>Today</span><strong>{text}</strong><small>{ask.last ? `Last time ${ask.last.weight} × ${ask.last.reps}` : `First time — find a weight you can do ${ask.reps} times with 2 left`}{ask.weight ? ' · tap to use' : ''}</small>
+            <span>Today</span><strong>{text}</strong><small>{ask.last ? `Last time ${ask.last.weight} × ${ask.last.reps}` : `First time — a weight you can do ${ask.reps} times with 2 left`}{ask.weight ? ' · tap to use' : ''}</small>
           </button>; })()}
         <div className="field-grid dial-grid">
           <DialField label="Weight" kind="weight" unit={unit} value={weight} onChange={setWeight} />
           <DialField label="Reps" kind="reps" value={reps} onChange={setReps} />
         </div>
-        {max ? <div className="top-set-card-result"><span>{Number(reps) === 1 ? 'REAL 1RM' : 'CALCULATED MAX'}</span><strong>{max} {unit}</strong></div> : null}
+        {max ? <small className="top-set-sheet-max">{Number(reps) === 1 ? 'Real 1RM' : 'Calculated max'} <strong>{max} {unit}</strong></small> : null}
         {alreadyLogged ? <small className="top-set-sheet-warning">{lift} is already on today’s log — saving this adds a second set of it.</small> : null}
       </>}
 
       {blockedReason ? <p className="top-set-sheet-warning">{blockedReason}</p> : null}
       <footer>
         <button type="button" className="button" disabled={!ready} onClick={() => { onSave({ lift, muscles, isNew, weight: Number(weight), reps: Number(reps) }); close(); }}>Save top set</button>
-        <button type="button" className="button ghost" onClick={close}>Cancel</button>
       </footer>
     </div>
   </div>;
