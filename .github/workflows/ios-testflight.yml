@@ -3,8 +3,12 @@ name: iOS build to TestFlight
 # Builds the Capacitor iOS app on a GitHub Mac and uploads it to TestFlight.
 # Run it from the Actions tab ("Run workflow") or with:
 #   gh workflow run ios-testflight.yml -R prestonnoland2020-hub/forge-beta
-# Signing is automatic: Xcode uses the App Store Connect API key to make or
-# reuse the distribution certificate and profile, so no certificates live here.
+# Signing is automatic: Xcode uses the App Store Connect API key for profiles.
+# If the IOS_DIST_CERT_P12 / IOS_DIST_CERT_PASSWORD secrets are set, the stored
+# signing certificate(s) are imported into a temporary keychain first, so Xcode
+# reuses them instead of creating a new Apple certificate on every fresh runner
+# (which hit Apple's certificate limit on Nov 16). Without the secrets the
+# build behaves exactly as before.
 
 # Every merge to main ships a new TestFlight build, so the app on testers'
 # phones matches the website. A newer merge replaces a build still in progress.
@@ -60,6 +64,29 @@ jobs:
           printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
           echo "ASC_KEY_PATH=$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" >> "$GITHUB_ENV"
 
+      - name: Import the stored signing certificate
+        env:
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: |
+          if [ -z "$IOS_DIST_CERT_P12" ]; then
+            echo "No stored certificate secret; Xcode will manage certificates itself."
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/forge-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          printf '%s' "$IOS_DIST_CERT_P12" | base64 --decode > "$RUNNER_TEMP/forge-signing.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/forge-signing.p12" -P "$IOS_DIST_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/forge-signing.p12"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
       # Signed at archive time so the push-notification entitlement
       # (App/App.entitlements) is embedded; an unsigned archive carries no
       # entitlements and the export could not add them. Development signing
@@ -107,4 +134,6 @@ jobs:
 
       - name: Remove the key
         if: always()
-        run: rm -rf "$RUNNER_TEMP/keys"
+        run: |
+          rm -rf "$RUNNER_TEMP/keys"
+          security delete-keychain "$RUNNER_TEMP/forge-signing.keychain-db" 2>/dev/null || true
