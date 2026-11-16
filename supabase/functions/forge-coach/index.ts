@@ -187,6 +187,21 @@ function fitContext(raw: Record<string, unknown>): string {
   return json.length <= CONTEXT_LIMIT ? json : json.slice(0, CONTEXT_LIMIT);
 }
 
+/* EVERY ANSWER IS KEPT FOR CHECKING. The coach checker compares what the
+   coach said against the athlete's real data; it can only do that if the
+   question, the reply and the context it was given are saved. Best-effort:
+   a failed save is logged and never costs the athlete their answer. */
+async function saveReply(caller: { id: string; admin: { from: (table: string) => any } }, scope: string, question: string, reply: string, context: string) {
+  try {
+    let contextJson: unknown = null;
+    try { contextJson = JSON.parse(context); } catch { contextJson = null; }
+    const { error } = await caller.admin.from('coach_messages').insert({ owner_id: caller.id, scope, question, reply, context: contextJson });
+    if (error) console.warn('forge-coach-save-failed', error.message);
+  } catch (error) {
+    console.warn('forge-coach-save-failed', String(error));
+  }
+}
+
 Deno.serve(async request => {
   const corsHeaders = corsFor(request);
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -380,6 +395,7 @@ Return one editable cardio/circuit using only exact movement names and units in 
     const responseBody = await aiResponse.json();
     const answer = outputText(responseBody);
     if (!answer) throw new Error('Coach returned no answer.');
+    await saveReply(caller, String(body.scope || 'training'), question, answer, context);
     if (cardioScope) {
       const parsed = JSON.parse(answer);
       /* UNIT AND DISTANCE MUST AGREE — enforced, not requested. A distance
