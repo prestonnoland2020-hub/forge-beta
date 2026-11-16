@@ -726,9 +726,37 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   /* What a non-long run is worth, relative to the long one. */
   const OTHER_RUN_SHARE = 0.6;
   const WEEK_ON_WEEK_MAX = 1.2;
-  const clampMiles = (value: number) => {
-    const high = ceilingMiles ? Math.min(value, ceilingMiles) : value;
-    return floorMiles ? Math.max(high, floorMiles) : high;
+  /* THE FIRST WEEK FOLLOWS THE LOGS, NOT THE SETTING. A floor or a stated
+     mileage typed once in setup overrode what the athlete actually runs, so
+     someone logging seven miles a week with a twenty-mile minimum was handed
+     twenty on Monday — a near-3x jump — and someone who had not run for eight
+     weeks was still handed the 24 miles they ran before they stopped.
+
+     When real runs are on file, the current week is held to
+     max(actual × 1.1, actual + 3) and climbs from there at ten percent a week
+     until it meets the floor; the floor becomes the target, not the start.
+     When there is older running but nothing recent, the athlete is returning:
+     they restart at 55% of what they said they run (inside the 50–60% band)
+     and climb the same way. Nothing logged ever stays as it was — there is no
+     evidence to cap against. Weeks already behind the athlete are left alone. */
+  const actualForCap = Number(athlete.recentWeeklyMileage) || 0;
+  const statedForCap = Number(athlete.weeklyMileage) || floorMiles || 0;
+  const lapsed = actualForCap <= 0 && (Number(athlete.recentLongestRun) || 0) > 0 && statedForCap > 0;
+  const evidenceStart = actualForCap > 0
+    ? Math.max(actualForCap * 1.1, actualForCap + 3)
+    : lapsed ? statedForCap * 0.55 : 0;
+  const currentIndexForCap = Math.max(0, Number(block?.currentWeekIndex) || 0);
+  const evidenceCapAt = (index: number) => {
+    const ahead = index - currentIndexForCap;
+    return evidenceStart > 0 && ahead >= 0 ? evidenceStart * Math.pow(1.1, ahead) : Infinity;
+  };
+  /* floorShare: a deload week climbing toward the floor is still a deload, so
+     the floor it is raised to is the evidence cap's lighter share. With no
+     evidence cap the floor binds exactly as before. */
+  const clampMiles = (value: number, index = Math.max(0, Number(block?.weekIndex) || 0), floorShare = 1) => {
+    const evidenceCap = evidenceCapAt(index);
+    const high = Math.min(ceilingMiles ? Math.min(value, ceilingMiles) : value, evidenceCap);
+    return floorMiles ? Math.max(high, Math.min(floorMiles, evidenceCap * floorShare)) : high;
   };
   /* THE FLOOR IS WHAT THEY ARE ALREADY DOING. Stated mileage is a starting
      guess that goes stale the week after setup; the last few weeks of real
@@ -736,7 +764,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
      themselves at 25 is not handed 30 — but nothing below their own training
      gets prescribed as progress. */
   const actualMiles = Number(athlete.recentWeeklyMileage) || 0;
-  const startMiles = clampMiles(Math.max(Number(athlete.weeklyMileage) || floorMiles || Number(week.mileage) || 0, actualMiles));
+  const startMiles = clampMiles(Math.max(Number(athlete.weeklyMileage) || floorMiles || Number(week.mileage) || 0, actualMiles), 0);
   const progress = blockWeeks > 1 ? Math.min(1, weekIndex / (blockWeeks - 1)) : 0;
   /* A SHORT HORIZON DOES NOT LICENSE A BIG JUMP. Dividing the whole climb by
      however many weeks are left asked an athlete on twelve miles for sixty in
@@ -790,7 +818,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
   const climbAt = (index: number) => {
     const share = blockWeeks > 1 ? Math.min(1, Math.max(0, index) / (blockWeeks - 1)) : 0;
     const line = ceilingMiles ? startMiles + (ceilingMiles - startMiles) * share : startMiles;
-    return clampMiles(Math.max(Math.min(line, Math.max(startMiles, startMiles * Math.pow(1.1, Math.max(0, index)))), actualMiles));
+    return clampMiles(Math.max(Math.min(line, Math.max(startMiles, startMiles * Math.pow(1.1, Math.max(0, index)))), actualMiles), Math.max(0, index));
   };
   const deloading = deloadIndex % 5 === 3;
   /* WHAT LAST WEEK ACTUALLY WAS, not where the climb had got to. The rate
@@ -888,7 +916,7 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
          the cuts — and where last week was rate-limited and this one was not,
          the taper stepped back up. */
       ? round1(Math.min(chosen, climb, taperBase) * taperShare)
-      : clampMiles(round1(deloading ? Math.min(chosen, climb, previousWeek) * DELOAD_SHARE : chosen));
+      : clampMiles(round1(deloading ? Math.min(chosen, climb, previousWeek) * DELOAD_SHARE : chosen), weekIndex, deloading ? DELOAD_SHARE : 1);
 
   /* THE WEEK'S REAL BUDGET, decided before anything is sized against it. The
      hard session and the long run were both measured against `target` and then

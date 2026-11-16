@@ -45,6 +45,10 @@ const ATHLETES = [
   { key: 'recreational',weekly: 22, history: [run(9, 6.2, 2760), run(30, 13.1, 6300)] },
   { key: 'trained',     weekly: 45, history: [run(7, 6.2, 2100), run(40, 13.1, 4680)] },
   { key: 'stale',       weekly: 12, history: [run(300, 3.1, 1020)] },
+  /* Stated far above what they log (e6418c64: floor 20, ~7 logged), and a
+     runner who stopped (309566d6: 25 stated, nothing for eight weeks). */
+  { key: 'overstated',  weekly: 20, recent: 7, history: [run(5, 3, 1680), run(12, 4, 2280)] },
+  { key: 'lapsed',      weekly: 25, recent: 0, longest: 6, history: [run(60, 6, 3300), run(70, 5, 2700)] },
 ];
 
 /* ── Goals: distance × ambition ─────────────────────────────────────────── */
@@ -93,6 +97,7 @@ const INVARIANTS = [
   'a long block reaches its race-specific phase',
   'no block repeats one session type for its whole length',
   'no block with a goal is left without hard running',
+  'week 1 follows the logs: max(actual × 1.1, actual + 3), lapsed restarts at 50–60%',
 ];
 const violations = new Map();
 const flag = (kind, detail) => {
@@ -135,8 +140,8 @@ for (const athlete of ATHLETES) {
                     };
                     const w = resolveWeekRunning(raw, days, {
                       runningDays, minWeeklyMileage: floor, maxWeeklyMileage: ceiling,
-                      weeklyMileage: athlete.weekly, recentWeeklyMileage: athlete.weekly,
-                      recentLongestRun: athlete.weekly * 0.35, readiness,
+                      weeklyMileage: athlete.weekly, recentWeeklyMileage: athlete.recent ?? athlete.weekly,
+                      recentLongestRun: athlete.longest ?? athlete.weekly * 0.35, readiness,
                       goalPaceSecondsPerMile: goal.paceSecondsPerMile, goalMiles: goal.miles, paces,
                     }, { weekIndex: index, blockWeeks, waveIndex: index, weeksToRace: raceAway });
 
@@ -149,6 +154,12 @@ for (const athlete of ATHLETES) {
                     if (ceiling && !isRace && w.mileage > ceiling + 0.05) flag('week exceeds the ceiling the athlete set', `${id} → ${w.mileage} > ${ceiling}`);
                     if (isRace && w.longRunMiles > 0) flag('a long run in race week', `${id} → ${w.longRunMiles} mi`);
                     if (isRace && event.miles > 3 && w.mileage < event.miles) flag('race week does not fit the race', `${id} → ${w.mileage} < ${event.miles}`);
+
+                    if (index === 0 && !isRace) {
+                      const recent = athlete.recent ?? athlete.weekly;
+                      const cap = recent > 0 ? Math.max(recent * 1.1, recent + 3) : athlete.recent === 0 ? athlete.weekly * 0.6 : Infinity;
+                      if (w.mileage > cap + 0.05) flag('week 1 runs ahead of the logs', `${id} → ${w.mileage} on ${recent} logged`);
+                    }
 
                     const parts = (w.longRunMiles || 0) + (w.easyRuns || []).reduce((t, m) => t + m, 0);
                     const qualityMiles = Math.max(0, w.mileage - parts);
