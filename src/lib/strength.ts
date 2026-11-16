@@ -42,6 +42,15 @@ export function calculateEstimatedOneRepMax(weight: number, reps: number) {
   return Math.round(weight * repMaxCoefficient(reps));
 }
 
+/* ONE SET, ONE MAX, FROM TODAY'S CURVE. Sets saved before the curve was
+   softened still carry the old, higher calculatedMax (405 x 8 kept 503 where
+   the curve now says 481), and merging kept the device copy, so the stale
+   number outlived every reload and read a 500 squat goal as reached. Weight
+   and reps are the evidence; the stored number is only a fallback. */
+export function topSetMax(set: { weight?: number | string | null; reps?: number | string | null; calculatedMax?: number | null }): number {
+  return calculateEstimatedOneRepMax(Number(set.weight), Number(set.reps)) || Number(set.calculatedMax) || 0;
+}
+
 /* The same curve backwards: what a given max is worth at a rep count. */
 export function weightForReps(max: number, reps: number): number {
   return max / repMaxCoefficient(reps, PRESCRIPTION_REP_CAP);
