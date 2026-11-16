@@ -245,7 +245,10 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   const fresh = curve ? predictFromCurve(curve, goalMiles, shortfall) : null;
   const freshest = curve ? Math.min(...curve.sources.map(item => daysAgo(item.date))) : 0;
   const freshestDate = curve ? curve.sources.map(item => item.date).sort().at(-1)! : '';
-  const detrain = curve ? detrainingFactor(records, freshestDate) : 1;
+  /* The curve has already slowed an old best that nothing recent backs up
+     (fitnessCurve, detrained). Time off on top of that is the larger of the
+     two, not both. */
+  const detrain = curve ? Math.max(1, detrainingFactor(records, freshestDate) / Math.exp(curve.detrained)) : 1;
   const prediction = fresh ? { ...fresh, seconds: Math.round(fresh.seconds * detrain), low: Math.round(fresh.low * detrain), high: Math.round(fresh.high * detrain) } : null;
 
   const parts: Array<{ seconds: number; weight: number }> = [];
