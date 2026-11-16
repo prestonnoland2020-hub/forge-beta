@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useToday } from '../lib/dayClock';
 import { MileageStartupCheck } from './MileageGate';
 import { EffortCheck } from './EffortCheck';
@@ -210,7 +210,8 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
   /* A new screen starts at its top. Without this, switching tabs kept the
      last page's scroll and opened Goals halfway down an empty page. */
   const firstScreen = useRef(true);
-  useEffect(() => { if (firstScreen.current) { firstScreen.current = false; return; } document.querySelector('.app-main')?.scrollTo(0, 0); window.scrollTo(0, 0); }, [screenKey]);
+  /* Before paint, so the new screen is drawn at the top rather than drawn mid-page and then jumped. */
+  useLayoutEffect(() => { if (firstScreen.current) { firstScreen.current = false; return; } document.querySelector('.app-main')?.scrollTo(0, 0); window.scrollTo(0, 0); }, [screenKey]);
   /* A partner opened from Today is still inside Today, so Today stays lit. */
   const activeTab = tabs.findIndex(tab => tab.owns(location.pathname));
   /* A workout in progress and the full coach are tasks, not places: the tab

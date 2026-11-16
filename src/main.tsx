@@ -100,6 +100,7 @@ import './guided.css';
 import './design-terms.css';
 import './atmosphere.css';
 import './apple-ui.css';
+import './motion.css';
 import { startNativeChrome } from './features/shell/nativeChrome';
 import { listenForSignInReturn } from './features/auth/nativeSignIn';
 
