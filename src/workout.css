@@ -202,7 +202,7 @@
    that was not already in the library had no path at all. One sheet: type it,
    pick it or create it, load, reps, save. */
 .top-set-sheet-backdrop{position:fixed;inset:0;z-index:65;background:var(--scrim);backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px;overflow-y:auto}
-.top-set-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);overflow-y:auto;display:grid;gap:14px;background:linear-gradient(145deg,color-mix(in oklch,var(--card) 96%,var(--lift) 4%),var(--card));border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 30px 80px var(--scrim)}
+.top-set-sheet{width:min(560px,100%);max-height:calc(100vh - 36px);max-height:calc(100dvh - 36px);overflow-y:auto;display:grid;gap:14px;background:linear-gradient(145deg,color-mix(in oklch,var(--card) 96%,var(--lift) 4%),var(--card));border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 30px 80px var(--scrim)}
 .top-set-sheet header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .top-set-sheet header>div{display:grid;gap:4px;min-width:0}
 .top-set-sheet header strong{font:800 20px var(--display-font,inherit);text-transform:uppercase;line-height:1.06;text-wrap:balance}
