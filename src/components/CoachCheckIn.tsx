@@ -14,6 +14,7 @@ import { useGoals } from '../features/goals/GoalsProvider';
 import { medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
 import { readinessFromCheckIn, type CheckInScale } from '../lib/readiness';
 import { localDayIso } from '../lib/time';
+import { Overlay } from './Overlay';
 
 const SNOOZE_KEY = 'forge-checkin-snooze';
 const readSnooze = () => { try { return localStorage.getItem(SNOOZE_KEY) || undefined; } catch { return undefined; } };
@@ -134,7 +135,7 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
   };
   const said = result === null ? null : outcome(result);
 
-  return <div className="coach-checkin-backdrop" role="dialog" aria-modal="true" aria-label="Check in with your coach">
+  return <Overlay><div className="coach-checkin-backdrop" role="dialog" aria-modal="true" aria-label="Check in with your coach">
     <section className="card coach-checkin">
       <span className="eyebrow">Forge</span>
       {said ? <>
@@ -154,5 +155,5 @@ export function CoachCheckIn({ onClose }: { onClose?: () => void } = {}) {
         </div>
       </>}
     </section>
-  </div>;
+  </div></Overlay>;
 }

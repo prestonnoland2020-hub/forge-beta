@@ -8,6 +8,7 @@ import type { CreatedGoal } from './GoalBuilder';
 import { useCheckIns } from '../features/training/CheckInProvider';
 import { dueCheckIn } from '../lib/checkInSchedule';
 import { localDayIso } from '../lib/time';
+import { Overlay } from './Overlay';
 
 /* AN ENDURANCE GOAL THE PLAN IS NOT BUILDING FOR SHOULD SAY SO, AND OFFER THE FIX.
 
@@ -130,7 +131,7 @@ export function MileageCheckOnGoal({ goal, onClose }: { goal: CreatedGoal; onClo
   if (!gap) return null;
   const commit = (next: typeof setup) => { if (next) saveSetup(next); onClose(); };
 
-  return <div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Running volume for this goal">
+  return <Overlay><div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Running volume for this goal">
     <div className="mileage-check">
       <GateCard
         gap={gap} unit={unit} show={show}
@@ -139,7 +140,7 @@ export function MileageCheckOnGoal({ goal, onClose }: { goal: CreatedGoal; onClo
         onMinimum={() => commit(setup && applyMileageGap(setup, gap))}
         onDismiss={onClose} />
     </div>
-  </div>;
+  </div></Overlay>;
 }
 
 /* THE CHECK THAT RUNS WHEN THE APP OPENS, FOR EVERY ATHLETE.
@@ -235,7 +236,7 @@ export function MileageStartupCheck() {
 
   if (!ready || !gap || closed || seenBefore) return null;
 
-  return <div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Running volume for your goal">
+  return <Overlay><div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Running volume for your goal">
     <div className="mileage-check">
       <GateCard
         gap={gap} unit={unit} show={show}
@@ -244,5 +245,5 @@ export function MileageStartupCheck() {
         onMinimum={() => finish(setup && applyMileageGap(setup, gap))}
         onDismiss={() => finish()} />
     </div>
-  </div>;
+  </div></Overlay>;
 }

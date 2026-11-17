@@ -5,6 +5,7 @@ import { standoutEffort, CONFIRMED_PREFIX, type Effort } from '../lib/effortAudi
 import { continuousRunEfforts } from '../lib/cardioSession';
 import { isRaceEvidence } from '../lib/runQuality';
 import { localDayIso } from '../lib/time';
+import { Overlay } from './Overlay';
 
 /* "WAS THAT REAL?" — ASKED ONCE, ABOUT THE ONE THING THAT MATTERS.
 
@@ -78,7 +79,7 @@ export function EffortCheck() {
     setClosed(true);
   };
 
-  return <div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Confirm this effort">
+  return <Overlay><div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Confirm this effort">
     <div className="mileage-check">
       <section className="card gate-card">
         <span className="eyebrow">Before Forge builds on this</span>
@@ -91,5 +92,5 @@ export function EffortCheck() {
         <p className="gate-foot">Either way the miles still count. This only decides what your goals and paces are predicted from.</p>
       </section>
     </div>
-  </div>;
+  </div></Overlay>;
 }

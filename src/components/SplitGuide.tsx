@@ -8,6 +8,7 @@ import { canonicalLiftKey } from '../lib/liftAliases';
 import { tap } from '../lib/haptics';
 import { Icon } from './Icon';
 import { SearchField } from './SearchField';
+import { Overlay } from './Overlay';
 
 /* BUILD YOUR SPLIT, ONE QUESTION AT A TIME.
 
@@ -295,7 +296,7 @@ export function SplitGuide({ initialName, metric, onCancel, onFinish }: {
     return { label: saving ? 'Saving…' : 'Save and see Today', run: () => void finish(), ready: !saving && days.length > 0 };
   })();
 
-  return <div className="sg-backdrop" role="dialog" aria-modal="true" aria-label="Build your split">
+  return <Overlay><div className="sg-backdrop" role="dialog" aria-modal="true" aria-label="Build your split">
     <section className="sg-sheet">
       <header className="sg-top">
         {history.length ? <button type="button" className="sg-icon" onClick={back} aria-label="Back"><Icon name="back" /></button> : <span className="sg-icon-space" />}
@@ -309,5 +310,5 @@ export function SplitGuide({ initialName, metric, onCancel, onFinish }: {
         {primary && <button type="button" className="button" disabled={!primary.ready} onClick={primary.run}>{primary.label}</button>}
       </footer>}
     </section>
-  </div>;
+  </div></Overlay>;
 }

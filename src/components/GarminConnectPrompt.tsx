@@ -5,6 +5,7 @@ import { isDemoMode } from '../lib/env';
 import { isNative } from '../features/billing/platform';
 import { BrandMark } from '../features/training/brandLogos';
 import { getGarminConnection } from '../features/training/garminConnectionService';
+import { Overlay } from './Overlay';
 
 /* GARMIN, ASKED ON OPEN. A Garmin watch is the single biggest thing an
    athlete can give Forge — every workout, and with the Health API their
@@ -69,7 +70,7 @@ export function GarminConnectPrompt() {
   const never = () => { write(localStorage, neverKey, '1'); setOpen(false); };
   const connect = () => { setOpen(false); navigate('/profile?view=connections'); };
 
-  return <div className="strava-review-backdrop" role="dialog" aria-modal="true" aria-labelledby="garmin-prompt-title" onClick={event => { if (event.target === event.currentTarget) later(); }}>
+  return <Overlay><div className="strava-review-backdrop" role="dialog" aria-modal="true" aria-labelledby="garmin-prompt-title" onClick={event => { if (event.target === event.currentTarget) later(); }}>
     <div className="strava-review-sheet garmin-prompt">
       <header>
         <div>
@@ -86,5 +87,5 @@ export function GarminConnectPrompt() {
         <button type="button" className="garmin-prompt-never" onClick={never}>I don’t wear a Garmin</button>
       </footer>
     </div>
-  </div>;
+  </div></Overlay>;
 }

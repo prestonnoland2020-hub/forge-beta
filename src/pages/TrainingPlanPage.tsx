@@ -25,6 +25,7 @@ import { tap } from '../lib/haptics';
 import { Icon } from '../components/Icon';
 import { SearchField } from '../components/SearchField';
 import { TEMPLATES, DAY_TYPES, cardioPresets, SPLIT_MUSCLES as muscles, durationForDay, type DayType, type TrainingDay } from '../features/splits/splitModel';
+import { Overlay } from '../components/Overlay';
 
 /* SAVED SPLITS ride inside the plan record, so they reach the account through
    the same athlete_settings write as the split itself and need no table of
@@ -287,7 +288,7 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
       {days.length>1&&<p className="ss-swipe-hint">Swipe a day left to delete it.</p>}
       <div className="ss-actions"><button type="button" className="ss-add" onClick={()=>{tap();addDay();setSheetDay(days.length)}}>＋ Add a day</button></div>
     </div>}
-    {tab==='split'&&sheetDay!==null&&active&&<div className="ss-backdrop" onClick={event=>{if(event.target===event.currentTarget)closeSheet()}}>
+    {tab==='split'&&sheetDay!==null&&active&&<Overlay><div className="ss-backdrop" onClick={event=>{if(event.target===event.currentTarget)closeSheet()}}>
       <section className="ss-sheet" role="dialog" aria-modal="true" aria-label={`Edit ${active.name}`}>
         <span className="ss-grabber" aria-hidden="true"/>
         <header className="ss-sheet-head"><span>Day {selectedDay+1}</span><strong>{active.name||'New day'}</strong><button type="button" className="ss-done" onClick={()=>{tap();closeSheet()}}>Done</button></header>
@@ -356,6 +357,6 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
           </div></details>
         </div>
       </section>
-    </div>}
+    </div></Overlay>}
   </div>;
 }

@@ -7,6 +7,7 @@ import { openCoachBubble } from '../features/training/coachService';
 import { Icon } from './Icon';
 import { useBilling } from '../features/billing/BillingProvider';
 import { localDayIso } from '../lib/time';
+import { Overlay } from './Overlay';
 
 /* NOW AND AGAIN, NOT EVERY VISIT. A card that sat on Today every time the app
    opened turned into furniture. The note now arrives as a pop-up at most once
@@ -66,7 +67,7 @@ export function ForgeNoticed() {
   const close = () => setNote(null);
   const done = () => { acknowledge(note); close(); };
   const applyAndClose = () => { coach.apply(actions, note.ask); done(); };
-  return <div className="coach-checkin-backdrop forge-noticed-backdrop" role="dialog" aria-modal="true" aria-label="Forge noticed" onClick={event => { if (event.target === event.currentTarget) close(); }}>
+  return <Overlay><div className="coach-checkin-backdrop forge-noticed-backdrop" role="dialog" aria-modal="true" aria-label="Forge noticed" onClick={event => { if (event.target === event.currentTarget) close(); }}>
   <section className={`card coach-checkin forge-noticed${review ? ' forge-week-review' : ''}`}>
     <div className="forge-noticed-head">
       <span className="eyebrow">{review ? 'Last week' : 'Forge noticed'}</span>
@@ -108,5 +109,5 @@ export function ForgeNoticed() {
         : <button type="button" className="button secondary small-button" onClick={done}>Got it</button>}
     </div>
   </section>
-  </div>;
+  </div></Overlay>;
 }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBilling } from '../features/billing/BillingProvider';
 import { PRO_PITCH } from '../features/billing/entitlements';
 import { Icon } from './Icon';
+import { Overlay } from './Overlay';
 
 /* THE UPGRADE MOMENT. Free shows the problem; this sheet offers the fix, at
    the moments the athlete has just felt the gap:
@@ -74,7 +75,7 @@ export function UpgradeSheet() {
   const copy = nudge ? COPY[nudge.kind] : { title: paywall?.upgrade ? 'You’ve used today’s free questions' : 'Forge AI limit reached', body: paywall?.message || '' };
   const showOffer = nudge ? true : Boolean(paywall?.upgrade);
 
-  return <>
+  return <Overlay><>
     <button type="button" className="upgrade-backdrop" aria-label="Close" onClick={close} />
     <section className="upgrade-sheet" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
       <span className="upgrade-grip" aria-hidden="true" />
@@ -87,5 +88,5 @@ export function UpgradeSheet() {
         <button type="button" className="button ghost" onClick={close}>{showOffer ? 'Not now' : 'OK'}</button>
       </footer>
     </section>
-  </>;
+  </></Overlay>;
 }
