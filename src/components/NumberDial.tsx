@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { tap, tick } from '../lib/haptics';
 
 /* NUMBERS ARE PICKED, NOT TYPED. A keyboard for a barbell load is the wrong
@@ -185,7 +186,10 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
      the sheet is never a click on the backdrop, whatever unmounts along the
      way. See the note in TopSetSheet for what the stopPropagation version
      costs. */
-  return <div className="dial-backdrop" role="dialog" aria-modal="true" aria-label={title}
+  /* Rendered into <body>: a transform, filter or backdrop-filter on any card
+     above it turns position:fixed into "fixed to that card", and on iPhone the
+     sheet then lands below the page with only its blurred backdrop on screen. */
+  return createPortal(<div className="dial-backdrop" role="dialog" aria-modal="true" aria-label={title}
     onClick={event => { if (event.target === event.currentTarget) onCancel(); }}>
     <div className="dial-sheet dial-pro dial-simple">
       <span className="dial-grabber" aria-hidden="true" />
@@ -224,7 +228,7 @@ function DialSheet({ kind, unit, title, value, onCancel, onConfirm }: {
           : <button type="button" className="text-button" onClick={() => { tap(); setTyping(true); }}>Type it instead</button>}
       </div>}
     </div>
-  </div>;
+  </div>, document.body);
 }
 
 /* The field a caller places in a form: it shows the value, opens the dial on
