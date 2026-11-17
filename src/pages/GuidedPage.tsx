@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { rememberGuidedFeel } from '../features/training/coachMemoryService';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Model from 'react-body-highlighter';
@@ -525,6 +526,10 @@ export function GuidedPage() {
          coach already lightened the next set for it. */
       for (const item of best.values()) if (item.feel === 'easy' || item.feel === 'right') setEffort(todayIso(), item.name, item.feel === 'right' ? 'good' : 'easy');
       setSavedNote(result.ok ? 'Saved to your log.' : 'Already in your log.');
+      /* The coach remembers how each lift's LAST set felt (row coach-memory-2026-11). */
+      const lastFeel = new Map<string, LoggedSet>();
+      for (const item of main) if (!item.timed) lastFeel.set(item.name, item);
+      void rememberGuidedFeel([...lastFeel.values()].map(item => ({ lift: item.name, weight: item.weight, reps: item.reps, feel: item.feel })), unit);
       write(COUNT_KEY, read<number>(COUNT_KEY, 0) + 1);
       if (!fromPlan && !custom) write(LAST_KEY, { focus: workout.focus, moves: workout.steps.map(item => item.move.id) });
       if (fromPlan) { try { sessionStorage.removeItem(FROM_PLAN_KEY); } catch { /* fine */ } }

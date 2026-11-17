@@ -312,7 +312,7 @@ export function AppShell({ coach }: { coach?: ReactNode }) {
       case '/partners': return { title: 'Partners' };
       case '/profile': {
         const view = params.get('view');
-        const names: Record<string, string> = { settings: 'Settings', billing: 'Plan & billing', coach: 'Coach & notifications', connections: 'Connections', devices: 'Connections', faq: 'FAQ' };
+        const names: Record<string, string> = { settings: 'Settings', billing: 'Plan & billing', coach: 'Coach & notifications', memory: 'What the coach knows', connections: 'Connections', devices: 'Connections', faq: 'FAQ' };
         /* An old link to the appearance page lands on Settings, where the
            light/dark switch lives now; the header says so. */
         if (view === 'appearance') return { title: 'Settings', back: '/profile' };
