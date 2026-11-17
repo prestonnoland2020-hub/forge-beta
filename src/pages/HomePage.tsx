@@ -350,16 +350,37 @@ export function HomePage() {
       </ul>}
 
       {/* BUILD MY WORKOUT: every line is something to do, with its numbers. */}
-      {build === 'full' && recommendedSets.length > 0 && <ul className="tp-full">
-        {full.map((block, index) => <li key={`${block.exercise}-${index}`} className={block.kind}>
-          {block.kind === 'accessory' && index === lines.length && <p className="tp-full-head">Accessories</p>}
-          <div><span>{block.exercise}</span>
-            <b>{block.kind === 'top' ? (block.weight > 0 ? <>{block.weight}<small> {weightUnit}</small> × {block.reps}</> : <>Work up to {block.reps}</>) : null}</b></div>
-          <em>{block.kind === 'top' ? `Top set. ${block.plan}` : block.plan}</em>
-          {block.kind === 'top' && (() => { const set = recommendedSets.find(item => item.exercise === block.exercise); return set ? <><div className="tp-row-foot"><span />{swapButton(set)}</div>{swapPanel(set)}</> : null; })()}
-        </li>)}
-        {recommendation.cardio && <li className="cardio"><div><span>{recommendation.cardio.title}</span></div><em>{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</em></li>}
-      </ul>}
+      {build === 'full' && recommendedSets.length > 0 && (() => {
+        const tops = full.filter(block => block.kind === 'top');
+        const acc = full.filter(block => block.kind === 'accessory');
+        /* "3 × 10–12 · pick a weight…": the sets go on the right, and the
+           weight advice is said once for the group when every row shares it. */
+        const split = (plan: string) => { const [sets, ...rest] = plan.split(' · '); return { sets, note: rest.join(' · ') }; };
+        const notes = acc.map(block => split(block.plan).note);
+        const shared = notes.length > 1 && notes.every(note => note && note === notes[0]) ? notes[0] : '';
+        return <div className="tp-groups">
+          <section className="tp-group top">
+            <p className="tp-group-head">{tops.length > 1 ? 'Top sets' : 'Top set'}</p>
+            {tops.map((block, index) => { const set = recommendedSets.find(item => item.exercise === block.exercise); return <div className="tp-g-row" key={`${block.exercise}-${index}`}>
+              <div className="tp-g-line"><span>{block.exercise}</span>
+                <b className={block.weight > 0 ? '' : 'soft'}>{block.weight > 0 ? <>{block.weight}<small> {weightUnit}</small> × {block.reps}</> : <>Work up to {block.reps}</>}</b></div>
+              <div className="tp-g-foot"><em>{block.plan}</em>{set && swapButton(set)}</div>
+              {set && swapPanel(set)}
+            </div>; })}
+          </section>
+          {acc.length > 0 && <section className="tp-group">
+            <p className="tp-group-head">Accessories{shared && <small>{shared[0].toUpperCase() + shared.slice(1)}</small>}</p>
+            {acc.map((block, index) => { const { sets, note } = split(block.plan); return <div className="tp-g-row" key={`${block.exercise}-${index}`}>
+              <div className="tp-g-line"><span>{block.exercise}</span><b className="soft">{sets}</b></div>
+              {!shared && note && <em>{note}</em>}
+            </div>; })}
+          </section>}
+          {recommendation.cardio && <section className="tp-group">
+            <p className="tp-group-head">Cardio</p>
+            <div className="tp-g-row"><div className="tp-g-line"><span>{recommendation.cardio.title}</span><b className="soft">{runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan))}</b></div></div>
+          </section>}
+        </div>;
+      })()}
 
       {!recommendedSets.length && dayType !== 'rest' && dayType !== 'cardio' && dayType !== 'hyrox' && <Link className="td-fix" to="/exercises"><span><b>Choose exercises for this day</b>Forge needs a lift mapped to it.</span><Icon name="arrow" size={16} /></Link>}
       {dayType === 'hyrox' && !recommendation.cardio && <Link className="td-fix" to="/goals"><span><b>Add a HYROX goal</b>Forge writes HYROX sessions once you’re training for one. Today is open.</span><Icon name="arrow" size={16} /></Link>}
