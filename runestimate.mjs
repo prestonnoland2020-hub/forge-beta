@@ -41,7 +41,7 @@ rememberVo2({ value: 52, date: day(1) });
 const before = at(base).seconds;
 rememberVo2({ value: 54, date: day(0) });
 check('a higher VO2 max raises it', at(base).seconds < before);
-const moreMiles = [...base, ...[2, 4, 6, 7, 9, 11, 13, 14].map(n => easy(n, 8.8, 148))];
+const moreMiles = [...base, ...[2, 4, 6, 7, 9, 11, 13, 14].map(n => easy(n, 8.6, 148))];
 check('more weekly miles help the half marathon', at(moreMiles, HALF).seconds < at(base, HALF).seconds, `${at(moreMiles, HALF).seconds} vs ${at(base, HALF).seconds}`);
 rememberVo2(null);
 
