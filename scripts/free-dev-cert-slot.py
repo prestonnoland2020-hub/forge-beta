@@ -24,17 +24,34 @@ now = int(time.time())
 token = jwt.encode({"iss": os.environ["ASC_ISSUER_ID"], "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"},
                    key, algorithm="ES256", headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"})
 
-def call(method, url):
-    req = urllib.request.Request(url, method=method, headers={"Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(req, timeout=30) as res:
-        body = res.read()
-        return json.loads(body) if body else None
+def call(method, url, tries=3):
+    """Apple's API sometimes answers 500 for a moment; retry, then say what it said."""
+    for attempt in range(tries):
+        req = urllib.request.Request(url, method=method, headers={"Authorization": f"Bearer {token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as res:
+                body = res.read()
+                return json.loads(body) if body else None
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", "replace")[:500]
+            print(f"{method} {url.split('?')[0]} -> HTTP {error.code} (try {attempt + 1}/{tries}): {detail}", file=sys.stderr)
+            if error.code < 500 or attempt == tries - 1:
+                raise
+            time.sleep(5 * (attempt + 1))
 
-certs, url = [], f"{API}/certificates?limit=200&fields[certificates]=name,displayName,certificateType,expirationDate"
-while url:
-    page = call("GET", url)
-    certs += page.get("data", [])
-    url = page.get("links", {}).get("next")
+# No sparse-fieldset filter: the bracketed query (fields[certificates]=...) got
+# HTTP 500 from Apple on Nov 17. A plain list is small enough.
+certs, url = [], f"{API}/certificates?limit=200"
+try:
+    while url:
+        page = call("GET", url)
+        certs += page.get("data", [])
+        url = page.get("links", {}).get("next")
+except urllib.error.HTTPError as error:
+    # Listing failed: carry on to the archive rather than stop here; if the
+    # account is still full, Xcode's own error says so.
+    print(f"Could not list certificates (HTTP {error.code}); skipping cleanup.", file=sys.stderr)
+    sys.exit(0)
 
 dev = [c for c in certs if c["attributes"].get("certificateType") in ("DEVELOPMENT", "IOS_DEVELOPMENT")]
 print(f"{len(certs)} certificates on the team, {len(dev)} development:")
