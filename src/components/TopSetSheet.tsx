@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { DialField } from './NumberDial';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
@@ -149,7 +150,8 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
     }
   };
 
-  return <div className="top-set-sheet-backdrop" data-state={shown ? 'open' : 'closed'} role="dialog" aria-modal="true" aria-label="Add a top set" onClick={closeOnBackdrop}>
+  /* Into <body>, so no card's transform or filter can pin it off-screen. */
+  return createPortal(<div className="top-set-sheet-backdrop" data-state={shown ? 'open' : 'closed'} role="dialog" aria-modal="true" aria-label="Add a top set" onClick={closeOnBackdrop}>
     <div className={lift ? 'top-set-sheet' : 'top-set-sheet picking'}>
       <header>
         <div><strong>Add a top set</strong>{!lift && <small>The one heaviest meaningful set. Forge measures progress from it.</small>}</div>
@@ -206,5 +208,5 @@ export function TopSetSheet({ unit, exercises, suggested, dayMuscles, existing, 
         <button type="button" className="button" disabled={!ready} onClick={() => { onSave({ lift, muscles, isNew, weight: Number(weight), reps: Number(reps) }); close(); }}>Save top set</button>
       </footer>
     </div>
-  </div>;
+  </div>, document.body);
 }
