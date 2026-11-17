@@ -16,6 +16,7 @@ import { SearchField } from '../components/SearchField';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { sameLift } from '../lib/liftAliases';
 import { calculateEstimatedOneRepMax } from '../lib/strength';
+import { Overlay } from '../components/Overlay';
 
 const MESSAGES: Record<AddResult, string> = {
   requested: 'Request sent. They will see it next time they open Forge.',
@@ -266,7 +267,7 @@ export function PartnersPage() {
       }} />
     </div>
 
-    {removing && <div className="ps-confirm-backdrop" role="dialog" aria-modal="true" aria-label="Remove partner" onClick={() => setRemoving(null)}>
+    {removing && <Overlay><div className="ps-confirm-backdrop" role="dialog" aria-modal="true" aria-label="Remove partner" onClick={() => setRemoving(null)}>
       <div className="ps-confirm" onClick={event => event.stopPropagation()}>
         <h3>Remove {removing.displayName}?</h3>
         <p>You’ll stop seeing each other’s training. You can add them again any time.</p>
@@ -275,6 +276,6 @@ export function PartnersPage() {
           <button type="button" className="button ps-danger" onClick={() => { const who = removing; setRemoving(null); void removePartner(who.friendId).then(refresh); }}>Remove</button>
         </div>
       </div>
-    </div>}
+    </div></Overlay>}
   </div>;
 }

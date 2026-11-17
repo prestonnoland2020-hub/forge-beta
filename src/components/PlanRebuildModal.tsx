@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Overlay } from './Overlay';
 
 /* A REBUILD IS A CONVERSATION, NOT A CONFIRMATION.
 
@@ -44,7 +45,7 @@ export function PlanRebuildModal({ saved, standing, busy, stage, error, onCancel
 
   useEffect(() => { if (!busy) box.current?.focus(); }, [busy]);
 
-  return <div className="plan-rebuild-backdrop" role="dialog" aria-modal="true" aria-label="Regenerate your plan"
+  return <Overlay><div className="plan-rebuild-backdrop" role="dialog" aria-modal="true" aria-label="Regenerate your plan"
     onClick={() => { if (!busy) onCancel(); }}>
     <div className="plan-rebuild-sheet" onClick={event => event.stopPropagation()}>
       <header>
@@ -91,5 +92,5 @@ export function PlanRebuildModal({ saved, standing, busy, stage, error, onCancel
           : 'A plain rebuild: a fresh block from your goals, split and logged bests, with no extra instructions.'}
       </small>
     </div>
-  </div>;
+  </div></Overlay>;
 }

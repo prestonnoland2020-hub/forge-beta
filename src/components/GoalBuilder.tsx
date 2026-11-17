@@ -8,6 +8,7 @@ import { formatClock, normalizeGoalValue, isTimeUnit, isPaceMetric } from '../li
 import { Icon } from './Icon';
 import { GoalCoachPicks, GoalCoachSuggest } from './GoalCoachSuggest';
 import type { GoalDraft, GoalSuggestion } from '../lib/goalSuggestions';
+import { Overlay } from './Overlay';
 
 export type CreatedGoal = { type: string; title: string; target: string; date: string; connection: string; exercise?: string; metric?: string; current?: string; unit?: string; trackingSource?: string; checkInFrequency?: string; reminderEnabled?: boolean; eventTemplate?: string; eventDivision?: string; eventDistance?: string; eventDistanceUnit?: string; eventSurface?: string };
 
@@ -244,7 +245,7 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
     {goalFields}
     <footer>{onClose!==noop&&<button type="button" className="button ghost" onClick={onClose}>Cancel</button>}<button type="button" className="button" disabled={!canSave} onClick={()=>{const checked=checkValues();if(!checked.ok)return;saveGoal(checked)}}>{initialGoal?'Update goal':'Save goal'} <Icon name="check"/></button></footer>
   </section>;
-  return <div className="goal-builder-backdrop" role="dialog" aria-modal="true" aria-label="Create a new goal">
+  return <Overlay><div className="goal-builder-backdrop" role="dialog" aria-modal="true" aria-label="Create a new goal">
 <section className="goal-builder">
 <header>
 <div>
@@ -283,5 +284,5 @@ const titleFor=(target:string)=>type==='strength'?(target?`${target} ${unit} ${C
 </div>}
     <footer>{step>1?<button className="button ghost" onClick={()=>setStep(step-1)}>Back</button>:<button className="button ghost" onClick={onClose}>Cancel</button>}<button className="button" disabled={step===2&&!canSave} onClick={()=>{if(step===2&&!checkValues().ok)return;if(step<3){setStep(step+1);return}saveGoal()}}>{step<3?<>Continue <Icon name="arrow"/></>:<>{initialGoal?'Update Goal':'Create Goal'} <Icon name="check"/></>}</button></footer>
   </section>
-</div>;
+</div></Overlay>;
 }

@@ -7,6 +7,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { type CircuitStation, type PlannedCardio } from './CardioPlanBuilder';
 import { Icon } from './Icon';
 import { SearchField } from './SearchField';
+import { Overlay } from './Overlay';
 
 type BuilderMode = 'manual' | 'forge';
 
@@ -202,7 +203,7 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
   };
   const missing = stations.filter(station => !String(station.target || '').trim()).length;
 
-  return <div className="cardio-plan-backdrop" role="dialog" aria-modal="true" aria-label="Circuit builder">
+  return <Overlay><div className="cardio-plan-backdrop" role="dialog" aria-modal="true" aria-label="Circuit builder">
     <section className="cardio-plan-modal cb-modal">
       <header className="cb-head">
         <input className="cb-name" value={name} onChange={event => setName(event.target.value)} aria-label="Workout name" placeholder="Name this circuit" />
@@ -284,5 +285,5 @@ export function CircuitWorkoutBuilder({ mode, initial, exercises, onClose, onSav
         <button type="button" className="button" disabled={!name.trim() || !stations.length} onClick={() => onSave(plan)}>Save circuit</button>
       </footer>
     </section>
-  </div>;
+  </div></Overlay>;
 }

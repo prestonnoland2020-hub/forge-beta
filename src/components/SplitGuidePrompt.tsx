@@ -4,6 +4,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { readGuideState, SPLIT_GUIDE_KEY, SPLIT_GUIDE_FRESH_KEY } from '../features/splits/splitGuideState';
 import { tap } from '../lib/haptics';
 import { Icon } from './Icon';
+import { Overlay } from './Overlay';
 
 /* "DO YOU WANT TO MAKE YOUR SPLIT?" — asked once, on Home, of someone who has
    only the starter split Forge made at sign-up. Yes opens the step-by-step
@@ -20,7 +21,7 @@ export function SplitGuidePrompt() {
   if (!starter || asked || coaching) return null;
   const dayNames = (setup?.splitDays || []).map(day => day.name).filter(Boolean);
   const later = () => { tap(); try { localStorage.setItem(SPLIT_GUIDE_KEY, 'later'); } catch { /* per-device */ } setAsked('later'); };
-  return <div className="sgp-backdrop" role="dialog" aria-modal="true" aria-labelledby="sgp-title">
+  return <Overlay><div className="sgp-backdrop" role="dialog" aria-modal="true" aria-labelledby="sgp-title">
     <section className="sgp-sheet">
       <span className="sgp-mark" aria-hidden="true"><Icon name="star" /></span>
       <h2 id="sgp-title">Do you want to make your split?</h2>
@@ -30,7 +31,7 @@ export function SplitGuidePrompt() {
       <button type="button" className="button ghost" onClick={later}>Not now — keep the starter split</button>
       <small>You can always find it under Profile → Split guide, or ask the coach.</small>
     </section>
-  </div>;
+  </div></Overlay>;
 }
 
 /* "YOUR SPLIT IS READY" — once, on the Home the guide lands on, so the

@@ -12,6 +12,7 @@ import { calculateEstimatedOneRepMax } from '../lib/strength';
 import { primaryMusclesFor } from '../lib/liftAliases';
 import { DialField } from './NumberDial';
 import { Icon } from './Icon';
+import { Overlay } from './Overlay';
 
 /* A SYNCED ACTIVITY IS HALF A RECORD, AND IT DESERVES THE WHOLE SCREEN.
    Strava knows the athlete moved for 54 minutes. It does not know which split
@@ -274,7 +275,7 @@ export function StravaReviewModal() {
     close();
   };
 
-  return <div className="strava-review-backdrop" role="dialog" aria-modal="true" aria-label="Review synced activity">
+  return <Overlay><div className="strava-review-backdrop" role="dialog" aria-modal="true" aria-label="Review synced activity">
     <div className="strava-review-sheet">
       <header>
         <div>
@@ -339,5 +340,5 @@ export function StravaReviewModal() {
         <button type="button" className="button strava-review-save" disabled={busy} onClick={() => void save()}>{busy ? 'Reading it…' : <>Save to {saveDayLabel} <Icon name="check"/></>}</button>
       </footer>
     </div>
-  </div>;
+  </div></Overlay>;
 }

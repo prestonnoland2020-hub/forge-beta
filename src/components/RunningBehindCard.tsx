@@ -7,6 +7,7 @@ import { tap } from '../lib/haptics';
 import { useNavigate } from 'react-router-dom';
 import { saveAthleteSettings } from '../features/profile/settingsSync';
 import { readLocalAiPlan, rememberedPlannedMiles } from '../features/training/aiPlanService';
+import { Overlay } from './Overlay';
 
 /* THE COACH SAYING THE MILEAGE IS TOO HIGH, WITH THE NUMBERS IN YOUR HANDS.
 
@@ -137,7 +138,7 @@ export function RunningBehindNudge() {
       <p>You’ve run about <strong>{show(behind.ranAvg)} {unit}</strong> a week against <strong>{show(behind.plannedAvg)}</strong> planned. Let’s lower your weekly mileage so the plan fits your week.</p>
       <button type="button" className="button" onClick={() => { tap(); setOpen(true); }}>Adjust my mileage</button>
     </section>
-    {open && <div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Adjust your weekly mileage" onClick={event => { if (event.target === event.currentTarget) setOpen(false); }}>
+    {open && <Overlay><div className="mileage-check-backdrop" role="dialog" aria-modal="true" aria-label="Adjust your weekly mileage" onClick={event => { if (event.target === event.currentTarget) setOpen(false); }}>
       <div className="mileage-check">
         <BehindForm behind={behind} onNotNow={() => { setOpen(false); setDone(true); }}
           onCommit={(min, max, rebuild, instruction) => {
@@ -146,6 +147,6 @@ export function RunningBehindNudge() {
             if (rebuild) navigate('/plan', { state: { rebuildInstruction: instruction } });
           }} />
       </div>
-    </div>}
+    </div></Overlay>}
   </>;
 }

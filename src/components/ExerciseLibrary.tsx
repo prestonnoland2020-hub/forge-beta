@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { exerciseCategory, useTrainingLibrary, type ExerciseCategory, type LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import { SearchField } from './SearchField';
+import { Overlay } from './Overlay';
 
 /* STRENGTH FIRST. Most athletes come here for a lift, so lifts head the page;
    the event and conditioning movements follow. */
@@ -57,7 +58,7 @@ export function ExerciseLibrary({ tab = 'lifts' }: { tab?: 'lifts' | 'cardio' } 
 
   return <div className="exercise-library stack-lg">
     <div className="exercise-library-head"><SearchField value={query} onChange={setQuery} placeholder={tab === 'cardio' ? 'Search cardio' : 'Search lifts'} aria-label="Search exercises" /><button className="button" onClick={() => open()}>＋ Add</button></div>
-    {editing !== null && <div className="mobile-editor-backdrop" role="presentation">
+    {editing !== null && <Overlay><div className="mobile-editor-backdrop" role="presentation">
       <section className="card custom-exercise" role="dialog" aria-modal="true" aria-label={editing ? 'Edit exercise' : 'Add exercise'}>
         <div className="card-head"><div><span className="eyebrow">{editing ? 'EDIT EXERCISE' : 'NEW EXERCISE'}</span><h3>{editing ? editingExercise?.name : 'Add an exercise'}</h3></div><button className="text-button" onClick={close}>Close</button></div>
         <div className="field-grid"><label>Name<input value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Belt Squat" /></label><label>Category<select value={category} onChange={event => setCategory(event.target.value as ExerciseCategory)}>{groups.map(group => <option key={group}>{group}</option>)}</select></label></div>
@@ -67,7 +68,7 @@ export function ExerciseLibrary({ tab = 'lifts' }: { tab?: 'lifts' | 'cardio' } 
         <div className="exercise-use-row"><div><strong>Use in my plans</strong><small>Off keeps it out of anything Forge programs for you.</small></div><button type="button" role="switch" aria-checked={enabled} aria-label="Use in my plans" className={enabled ? 'table-status on' : 'table-status'} onClick={() => setEnabled(value => !value)} /></div>
         <div className="button-row"><button className="button" disabled={!canSave} onClick={save}>Save exercise</button>{editingExercise && <button className="button ghost danger" onClick={() => remove(editingExercise)}>Delete</button>}</div>
       </section>
-    </div>}
+    </div></Overlay>}
     {shown.map(({ group, items }) => <section className="exercise-group" key={group}>
       <span className="eyebrow">{group}</span>
       <div className="simple-settings-list">{items.map(item => <button type="button" className={item.enabled ? '' : 'off'} onClick={() => open(item)} key={item.id}><div><strong>{item.name}</strong><span>{item.enabled ? '' : 'Off · '}{item.muscles.filter(muscle => muscle !== 'Cardio').join(' · ') || 'Needs a muscle group'}</span></div><b>›</b></button>)}</div>
