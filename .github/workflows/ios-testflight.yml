@@ -87,6 +87,18 @@ jobs:
           rm -f "$RUNNER_TEMP/forge-signing.p12"
           security find-identity -v -p codesigning "$KEYCHAIN"
 
+      # Without a stored certificate, Xcode makes a new Apple Development
+      # certificate on every fresh runner and Apple's limit stops the build.
+      # Revoke the unusable ones CI made earlier (named "Created via API") so
+      # there is always room. Certificates made on a Mac are never touched.
+      - name: Free a development certificate slot
+        env:
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+        run: |
+          if [ -n "$IOS_DIST_CERT_P12" ]; then echo "Stored certificate in use; nothing to free."; exit 0; fi
+          python3 -m pip install --quiet --break-system-packages 'pyjwt[crypto]' 2>/dev/null || python3 -m pip install --quiet 'pyjwt[crypto]'
+          python3 scripts/free-dev-cert-slot.py
+
       # Signed at archive time so the push-notification entitlement
       # (App/App.entitlements) is embedded; an unsigned archive carries no
       # entitlements and the export could not add them. Development signing
