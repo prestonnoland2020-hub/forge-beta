@@ -165,3 +165,24 @@
 .top-set-sheet .top-set-sheet-chosen { padding: 10px 14px; }
 .top-set-sheet-max { color: var(--muted); font-size: 13px; }
 .top-set-sheet-max strong { color: var(--ink); font-size: 15px; font-weight: 800; }
+
+/* BUILD MY WORKOUT, GROUPED: top set, accessories, cardio, each its own panel. */
+.tp-groups { display: grid; gap: 10px; margin: 0 0 14px; }
+.tp-group { padding: 12px 14px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); }
+.tp-group.top { border-color: color-mix(in oklch, var(--accent) 45%, var(--line)); }
+.tp-group-head { display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px; font-size: 12px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3, var(--muted)); }
+.tp-group.top .tp-group-head { color: var(--accent-text, var(--accent)); }
+.tp-group-head small { font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink-2); }
+.tp-g-row { padding: 8px 0; border-top: 1px solid var(--line); }
+.tp-g-row:first-of-type { border-top: 0; }
+.tp-g-line { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.tp-g-line span { min-width: 0; font-size: 16px; font-weight: 650; color: var(--ink); line-height: 1.25; }
+.tp-g-line b { flex: none; white-space: nowrap; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+.tp-g-line b small { font-size: 12px; font-weight: 600; color: var(--ink-3, var(--muted)); }
+.tp-g-line b.soft { font-size: 14.5px; font-weight: 700; color: var(--ink-2); }
+.tp-group.top .tp-g-line span { font-weight: 750; }
+.tp-group.top .tp-g-line b { font-size: 20px; }
+.tp-g-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 4px; }
+.tp-groups em { display: block; font-style: normal; font-size: 13.5px; color: var(--ink-2); }
+.tp-groups .tp-swap-list { margin: 8px 0 0; }
+.tp-group.top .tp-g-line b.soft { font-size: 15px; color: var(--ink); }
