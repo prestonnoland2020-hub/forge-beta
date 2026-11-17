@@ -7,6 +7,7 @@ import { HelpFaq } from '../components/HelpFaq';
 import { useBilling } from '../features/billing/BillingProvider';
 import { useWrappedYear } from '../components/WrappedEntry';
 import { CoachBodyLog } from '../components/CoachBodyLog';
+import { CoachMemorySettings } from '../components/CoachMemorySettings';
 import { useAthleteNotes } from '../features/training/useAthleteNotes';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
 import { ConnectionsView } from '../components/ConnectionsView';
@@ -19,8 +20,8 @@ import { beginStravaConnection, disconnectStrava, finishStravaConnection, getAct
 import { importStravaActivities } from '../features/training/stravaImportService';
 import { beginGarminConnection, disconnectGarmin, finishGarminConnection, getGarminConnection, loadGarminHealth, syncGarmin, type GarminConnectionStatus } from '../features/training/garminConnectionService';
 
-type View='profile'|'settings'|'coach'|'connections'|'billing'|'faq';
-const VIEWS=['profile','settings','coach','connections','billing','faq'] as const;
+type View='profile'|'settings'|'coach'|'memory'|'connections'|'billing'|'faq';
+const VIEWS=['profile','settings','coach','memory','connections','billing','faq'] as const;
 const isView=(value:string|null):value is View=>(VIEWS as readonly string[]).includes(String(value));
 export function ProfilePage(){
   const {user,signOut}=useAuth();const {setup}=useProfileSetup();const {profile,recovery,health,syncWearableHealth}=useAdaptiveTraining();const {goals}=useGoals();const {records,addRecord,updateRecord}=useWorkoutHistory();const {setTheme,resolved:resolvedTheme}=useAppearance();/* THE VIEW LIVES IN THE URL. The app header names the sub-screen and draws
@@ -67,6 +68,7 @@ export function ProfilePage(){
       <section aria-labelledby="settings-training"><h3 id="settings-training">Training</h3>
         <div className="simple-settings-list">
           <button type="button" onClick={()=>setView('coach')}><div><strong>Coach &amp; notifications</strong><span>Check-ins, reminders, limitations</span></div><b>›</b></button>
+          <button type="button" onClick={()=>setView('memory')}><div><strong>What the coach knows about me</strong><span>See, edit or wipe what it remembers</span></div><b>›</b></button>
           <button type="button" onClick={()=>setView('connections')}><div><strong>Connections</strong><span>{activity?.connected||garmin?.connected?`${[garmin?.connected&&'Garmin',activity?.connected&&'Strava'].filter(Boolean).join(' & ')} connected · recovery and devices`:'Strava, smartwatches and health apps'}</span></div><b>›</b></button>
         </div>
       </section>
@@ -89,6 +91,7 @@ export function ProfilePage(){
       </section>
     </div>}
     {view==='billing'&&<BillingSettings/>}
+    {view==='memory'&&<CoachMemorySettings/>}
     {view==='coach'&&<div className="stack-l coach-settings"><NotificationSettings/><CoachBodyLog notes={notes} upsert={upsert}/></div>}
     {view==='profile'&&<>{/* Running numbers only for someone who runs: a lifter's profile was half zeros. */}<section className={runsShown?'simple-profile-stats':'simple-profile-stats two'}><div><span>Workouts</span><strong>{records.length}</strong></div>{runsShown&&<div><span>Run · last 7 days</span><strong>{weeklyDistance} {distanceUnit}</strong></div>}{runsShown&&<div><span>Longest run</span><strong>{longestDistance} {distanceUnit}</strong></div>}<div><span>Active goals</span><strong>{goals.length}</strong></div></section><section className="simple-settings-list">{wrappedYear&&<Link to="/wrapped"><div><strong>Forge Wrapped {wrappedYear}</strong><span>{isPro?'Your year of training':'Forge Pro · your year of training'}</span></div><b>›</b></Link>}<Link to="/split"><div><strong>Split</strong><span>Training and rest-day structure</span></div><b>›</b></Link><Link to="/split?guide=1"><div><strong>Split guide</strong><span>Build your split step by step</span></div><b>›</b></Link><Link to="/exercises"><div><strong>Exercise library</strong><span>Browse every movement Forge knows</span></div><b>›</b></Link><Link to="/partners"><div><strong>Training partners</strong><span>Up to five people and what they trained</span></div><b>›</b></Link><button type="button" onClick={()=>setView('settings')}><div><strong>Settings</strong><span>Appearance, coach, connections, billing</span></div><b>›</b></button></section></>}
     {view==='connections'&&<div className="connection-stack"><section className="simple-recovery"><div><span className="eyebrow">Smartwatch recovery</span><h3>{recovery.confidence==='Low'?'No watch data yet':recovery.hardTrainingAllowed?'Recovery supports the plan':'Recovery safeguard active'}</h3><p>{recovery.confidence==='Low'?'Connect a watch below and Forge adjusts each day’s training from your sleep, HRV and resting heart rate. Until then it leaves recovery out rather than guess.':recovery.reasons.join(' · ')}</p></div><strong>{recovery.confidence==='Low'?'—':recovery.readiness}</strong></section>{/* Watch numbers only when a watch sent them: readiness can come from the morning check-in alone, and "0 hr · — ms · Unavailable" is not a reading. */}{latest.provider!=='Unavailable'&&<section className="simple-profile-stats"><div><span>Sleep</span><strong>{latest.sleepMinutes?`${Math.round(latest.sleepMinutes/6)/10} hr`:'—'}</strong></div><div><span>HRV</span><strong>{latest.hrvRmssd?`${latest.hrvRmssd} ms`:'—'}</strong></div><div><span>Resting HR</span><strong>{latest.restingHr?`${latest.restingHr} bpm`:'—'}</strong></div><div><span>Source</span><strong>{latest.provider}</strong></div></section>}<ConnectionsView garmin={garmin} garminBusy={garminBusy} garminMessage={garminMessage} onGarmin={action=>void garminAction(action)} strava={activity} stravaBusy={connectionBusy} stravaMessage={connectionMessage} onStrava={action=>void connectionAction(action)} /></div>}

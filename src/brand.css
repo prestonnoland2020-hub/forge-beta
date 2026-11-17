@@ -440,3 +440,12 @@ h3 { font-family: var(--display); font-size: var(--fs-title); font-weight: 600; 
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .simple-profile-stats { box-shadow: none; } }
 :root[data-theme="dark"] .simple-profile-stats { box-shadow: none; }
+
+/* Settings > What the coach knows about me */
+.coach-memory-lead, .coach-memory-empty { color: var(--ink-2); margin: 0; }
+.coach-memory h3 { margin: 0 0 var(--s2); }
+.coach-memory-row > div:first-child strong { font-weight: 600; overflow-wrap: anywhere; }
+.coach-memory-row input { flex: 1; min-width: 0; font: inherit; padding: var(--s2); border: 1px solid var(--line, currentColor); border-radius: 8px; background: transparent; color: inherit; }
+.simple-settings-list > .settings-row.coach-memory-row > .coach-memory-actions { display: flex; flex-direction: row; gap: var(--s1, 4px); flex-shrink: 0; }
+.coach-memory-row .coach-memory-actions button { min-height: 44px; padding: 0 var(--s3); background: none; border: 0; color: var(--accent, inherit); font: inherit; font-weight: 600; }
+.coach-memory > section + section, .coach-memory > p + section { margin-top: var(--s2); }

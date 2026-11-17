@@ -1,4 +1,7 @@
 import { consumeQuota, corsFor, errorResponse, HttpError, refundQuota, requireCaller } from '../_shared/guard.ts';
+import { DAILY_EXTRACTIONS, extractionInstructions, extractionSchema, memorySummary, mergeExtraction, normalizeFacts, worthRemembering, type CoachMemoryFacts } from '../_shared/coachMemory.ts';
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
 
 const outputText = (response: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }) =>
   response.output?.flatMap(item => item.content || []).find(item => item.type === 'output_text')?.text || '';
@@ -202,6 +205,57 @@ async function saveReply(caller: { id: string; admin: { from: (table: string) =>
   }
 }
 
+/* COACH MEMORY (row coach-memory-2026-11). Read before every answer; updated
+   after a training answer by one small, capped extraction call that runs after
+   the reply is sent. Every failure here is logged and swallowed: memory makes
+   answers better, it must never cost the athlete an answer. */
+type Admin = { from: (table: string) => any };
+async function loadMemory(caller: { id: string; admin: Admin }): Promise<CoachMemoryFacts | null> {
+  try {
+    const { data, error } = await caller.admin.from('coach_memory').select('facts').eq('owner_id', caller.id).maybeSingle();
+    if (error) { console.warn('forge-coach-memory-read-failed', error.message); return null; }
+    return data ? normalizeFacts(data.facts) : null;
+  } catch (error) { console.warn('forge-coach-memory-read-failed', String(error)); return null; }
+}
+
+async function updateMemory(caller: { id: string; admin: Admin }, memory: CoachMemoryFacts | null, question: string, safetyIdentifier: string) {
+  try {
+    if (!worthRemembering(question)) return;
+    const since = new Date(Date.now() - 86400000).toISOString();
+    const { count } = await caller.admin.from('coach_memory_events').select('id', { count: 'exact', head: true }).eq('owner_id', caller.id).eq('source', 'coach-extract').gte('created_at', since);
+    if ((count ?? 0) >= DAILY_EXTRACTIONS) return;
+    const facts = memory || normalizeFacts(null);
+    const remembered = facts.items.map(item => ({ id: item.id, category: item.category, text: item.text }));
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')!}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: Deno.env.get('OPENAI_MEMORY_MODEL') || Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
+        store: false,
+        safety_identifier: safetyIdentifier,
+        prompt_cache_key: 'forge-coach-memory-v1',
+        reasoning: { effort: 'low' },
+        max_output_tokens: 600,
+        text: { verbosity: 'low', format: { type: 'json_schema', name: 'forge_coach_memory', strict: true, schema: extractionSchema } },
+        instructions: extractionInstructions,
+        input: `Remembered facts JSON: ${JSON.stringify(remembered)}\nAthlete's latest message: ${question.slice(0, 1200)}`,
+      }),
+    });
+    await caller.admin.from('coach_memory_events').insert({ owner_id: caller.id, source: 'coach-extract', note: response.ok ? 'checked' : `failed ${response.status}` });
+    if (!response.ok) { console.warn('forge-coach-memory-extract-failed', response.status); return; }
+    const text = outputText(await response.json());
+    if (!text) return;
+    const { facts: next, added, removed } = mergeExtraction(facts, JSON.parse(text));
+    if (!added.length && !removed.length) return;
+    const { error } = await caller.admin.from('coach_memory').upsert({ owner_id: caller.id, facts: next, summary: memorySummary(next), updated_at: new Date().toISOString() });
+    if (error) { console.warn('forge-coach-memory-write-failed', error.message); return; }
+    const notes = [...added.map(item => `+ ${item}`), ...removed.map(item => `- ${item}`)].join(' | ').slice(0, 500);
+    await caller.admin.from('coach_memory_events').insert({ owner_id: caller.id, source: 'coach', note: notes });
+  } catch (error) {
+    console.warn('forge-coach-memory-failed', String(error));
+  }
+}
+
 Deno.serve(async request => {
   const corsHeaders = corsFor(request);
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -232,6 +286,8 @@ Deno.serve(async request => {
        evidence rules for any active athlete. The history is shortened until
        the whole thing fits; the slice is only a last resort. */
     const context = fitContext(body.context || {});
+    const memory = await loadMemory(caller);
+    const memoryBlock = memory ? memorySummary(memory) : '';
     const identifierBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(caller.id));
     const safetyIdentifier = Array.from(new Uint8Array(identifierBytes)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32);
     const workoutScope = String(body.scope || '') === 'workout';
@@ -246,7 +302,7 @@ Deno.serve(async request => {
         model: Deno.env.get('OPENAI_MODEL') || 'gpt-5.6-terra',
         store: false,
         safety_identifier: safetyIdentifier,
-        prompt_cache_key: cardioScope ? 'forge-cardio-log-v2' : 'forge-coach-v8',
+        prompt_cache_key: cardioScope ? 'forge-cardio-log-v2' : 'forge-coach-v9',
         reasoning: { effort: cardioScope ? 'low' : 'medium' },
         text: cardioScope ? {
           verbosity: 'low',
@@ -357,6 +413,9 @@ COACHING RULES
 HYROX SESSIONS
 A HYROX session trains a few stations, not the course. A normal session picks two to four of the eight stations, each with a run before it, and the next session takes the others, so the week covers the course between sessions. Compromised running (shorter stations, no rest, race-pace runs) and a half simulation are their own days. The full eight-station simulation is a rehearsal done a few times a block, later in the build and only when the athlete's running base can carry eight 1 km runs; never offer it as a routine workout, and never to an athlete whose base is the limiter. When hyroxUpcoming is supplied it is the rotation Forge will actually write: answer from it, by session and its stations, and do not invent a different session.
 
+WHAT I KNOW ABOUT YOU
+When the input carries a "What I know about you" block, it is what this athlete told you in earlier conversations and how their guided sets felt: their usual days, exercises they like and refuse, equipment, limits, how they respond to load, and how they want to be coached. Use it the way a coach who knows them would: pick from exercises they do, avoid the ones they dislike, respect a stated limit, fit their schedule, use their preferred tone, and let a lift that felt too easy or too hard last time inform the advice. It never overrides logged data, the deterministic recommendation, or the saved plan; when it conflicts with them, they win. Do not recite it or announce that you remember things; just coach with it.
+
 RESPONSE STYLE
 Answer the question first. Normal answers are 2–4 short sentences and under 120 words. Plain words a lifter uses. Say "estimated 1-rep max", not "calculated max" or "calc max", and to a newer lifter explain it once in a few words ("what you could likely lift once, worked out from your set"). No hedging stack: one honest uncertainty is worth stating, three in a row is an evasion. Weekly plans use one concise line per day and stay under 220 words. Use plain language, minimal formatting, and no generic executive-summary filler, AI disclaimer, motivational padding, or medical diagnosis.
 
@@ -366,7 +425,7 @@ WORKOUT SCOPE
 Return one editable cardio/circuit using only exact movement names and units in availableLibrary. Honor selected movements when supplied; otherwise choose a balanced assortment supported by the request, goals, recent work, and limitations. HYROX workouts alternate Run with two to four functional stations when Run is available; include all eight only when the athlete explicitly asks for a full simulation. Do not turn every conditioning request into running. Keep targets realistic, use each movement's saved unit, and explain the assortment briefly.`,
         input: cardioScope
           ? `Athlete's description of the completed cardio workout: ${question}\nContext JSON (may include a synced device summary and the athlete's saved cardio types): ${context}`
-          : `Scope: ${String(body.scope || 'training')}\nAthlete question: ${question}\nVerified context JSON: ${context}`,
+          : `Scope: ${String(body.scope || 'training')}\nAthlete question: ${question}\n${memoryBlock ? `What I know about you (things the athlete told the coach before; logged data wins any conflict):\n${memoryBlock}\n` : ''}Verified context JSON: ${context}`,
     };
     let aiResponse = await askProvider(providerPayload);
     /* THE COACH NEVER GOES DARK OVER ITS OWN SCHEMA. If the provider ever
@@ -396,6 +455,10 @@ Return one editable cardio/circuit using only exact movement names and units in 
     const answer = outputText(responseBody);
     if (!answer) throw new Error('Coach returned no answer.');
     await saveReply(caller, String(body.scope || 'training'), question, answer, context);
+    if (trainingScope) {
+      const job = updateMemory(caller, memory, question, safetyIdentifier);
+      if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(job); else await job;
+    }
     if (cardioScope) {
       const parsed = JSON.parse(answer);
       /* UNIT AND DISTANCE MUST AGREE — enforced, not requested. A distance
