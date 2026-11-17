@@ -15,6 +15,7 @@ import '../partners-slim.css';
 import { SearchField } from '../components/SearchField';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { sameLift } from '../lib/liftAliases';
+import { calculateEstimatedOneRepMax } from '../lib/strength';
 
 const MESSAGES: Record<AddResult, string> = {
   requested: 'Request sent. They will see it next time they open Forge.',
@@ -157,20 +158,27 @@ export function PartnersPage() {
   const headline = !leader ? ''
     : myLast && myLast >= lastDayOf(leader) ? `You trained last, ${ago(myLast)}. ${first(leader)} ${myLast === lastDayOf(leader) ? 'did too' : `last trained ${ago(lastDayOf(leader))}`}.`
     : `${first(leader)} trained last, ${ago(lastDayOf(leader))}. ${myLast ? `You last trained ${ago(myLast)}.` : 'Your turn.'}`;
-  const insights = (partner: Partner, recent: PartnerDay[]) => {
-    const lines: string[] = [];
+  /* HEAD TO HEAD, NOT SENTENCES. Each insight is a label and two rows (them,
+     you) so the eye reads numbers side by side; the higher one is marked. */
+  type Versus = { label: string; theirs: string; mine: string; lead: 'theirs' | 'mine' | 'level' };
+  const insights = (partner: Partner, recent: PartnerDay[]): Versus[] => {
+    const out: Versus[] = [];
     const theirWeek = recent.filter(day => day.date >= weekAgo).length;
-    if (theirWeek || myWeek) lines.push(`Last 7 days: ${first(partner)} ${theirWeek} ${theirWeek === 1 ? 'session' : 'sessions'}, you ${myWeek}`);
+    if (theirWeek || myWeek) out.push({ label: 'Last 7 days', theirs: `${theirWeek}`, mine: `${myWeek}`,
+      lead: theirWeek === myWeek ? 'level' : theirWeek > myWeek ? 'theirs' : 'mine' });
     /* A lift you both do: their latest set beside yours. */
+    const myLatest = records.filter(record => record.date <= today).sort((a, b) => b.date.localeCompare(a.date)).flatMap(record => record.topSets || []);
     for (const day of recent) {
       const match = day.lifts.map(lift => {
-        const mine = records.filter(record => record.date <= today).sort((a, b) => b.date.localeCompare(a.date))
-          .flatMap(record => record.topSets || []).find(set => sameLift(set.lift, lift.name) && set.weight && set.reps);
-        return mine ? `${lift.name}: ${first(partner)} ${lift.weight}×${lift.reps}, you ${mine.weight}×${mine.reps}` : '';
+        const mine = myLatest.find(set => sameLift(set.lift, lift.name) && set.weight && set.reps);
+        if (!mine) return null;
+        const a = calculateEstimatedOneRepMax(lift.weight, lift.reps) ?? 0; const b = calculateEstimatedOneRepMax(Number(mine.weight), Number(mine.reps)) ?? 0;
+        return { label: lift.name, theirs: `${lift.weight}×${lift.reps}`, mine: `${mine.weight}×${mine.reps}`,
+          lead: Math.round(a) === Math.round(b) ? 'level' : a > b ? 'theirs' : 'mine' } as Versus;
       }).find(Boolean);
-      if (match) { lines.push(match); break; }
+      if (match) { out.push(match); break; }
     }
-    return lines;
+    return out;
   };
   const [removing, setRemoving] = useState<Partner | null>(null);
   const searchingNow = username.trim().length >= 2;
@@ -239,7 +247,11 @@ export function PartnersPage() {
             {last.lifts.length > 5 && <li><span>+{last.lifts.length - 5} more</span></li>}
             {last.cardio.map((session, index) => { const parts = session.summary.split(' · ').filter(Boolean); return <li key={`c-${index}`}><span>{session.name}</span><b>{parts.slice(1).join(' · ')}</b></li>; })}
           </ul>}
-          {notes.length > 0 && <div className="ps-insights">{notes.map(note => <span key={note}>{note}</span>)}</div>}
+          {notes.length > 0 && <div className="ps-vs">{notes.map(note => <div className={`ps-vs-item lead-${note.lead}`} key={note.label}>
+            <span className="ps-vs-label">{note.label}</span>
+            <span className="ps-vs-row theirs"><small>{first(partner)}</small><b>{note.theirs}</b></span>
+            <span className="ps-vs-row mine"><small>You</small><b>{note.mine}</b></span>
+          </div>)}</div>}
           <button type="button" className="ps-x" aria-label={`Remove ${partner.displayName}`} onClick={() => setRemoving(partner)}>×</button>
         </article>;
       })}

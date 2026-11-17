@@ -48,3 +48,13 @@
 /* Lime on white is a smudge: light mode reads the darker brand text colour. */
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .ps-card.done :is(.partner-mark, .ps-status) { color: var(--accent-text); } }
 :root[data-theme="light"] .ps-card.done :is(.partner-mark, .ps-status) { color: var(--accent-text); }
+
+/* Head to head: label on top, them and you as two number rows, leader lit. */
+.ps-vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; margin: 10px -30px 0 0; }
+.ps-vs-item { display: grid; gap: 4px; padding: 9px 11px; border-radius: 12px; background: var(--surface-2); min-width: 0; }
+.ps-vs-label { font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3, var(--muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-vs-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ps-vs-row small { font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-vs-row b { flex: none; font-size: 17px; font-weight: 800; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ps-vs-item.lead-theirs .ps-vs-row.theirs b, .ps-vs-item.lead-mine .ps-vs-row.mine b { color: var(--accent-text, var(--accent)); }
+.ps-vs-item.lead-theirs .ps-vs-row.theirs small, .ps-vs-item.lead-mine .ps-vs-row.mine small { color: var(--ink); font-weight: 700; }
