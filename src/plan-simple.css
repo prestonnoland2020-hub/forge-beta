@@ -222,3 +222,18 @@
    an explanation, not an alert, and it sits above the week it explains. */
 .pv-collision{margin:0 0 12px;padding:12px 12px;border-left:2px solid var(--accent,#2f6fd0);background:var(--surface-2,rgba(127,127,127,.06));border-radius:0 10px 10px 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
 .pv-line-support .pv-line-value{font:600 14px var(--body, inherit);color:var(--ink-3)}
+
+/* ONE COLOUR FOR THE WEEKS. The bar was teal for done, lime for now and an
+   outline for max weeks — three colours to decode. Now every week is the
+   accent: full for weeks done and the week shown, faint for weeks ahead.
+   Max and lighter weeks are named in the header when you're on them. */
+.pv-dots .pv-dot::before { background: var(--accent) !important; border: 0 !important; opacity: .28 !important; box-shadow: none !important; }
+.pv-dots .pv-dot.done::before, .pv-dots .pv-dot.here::before, .pv-dots .pv-dot.now::before { opacity: 1 !important; }
+.pv-dots .pv-dot.done::before, .pv-dots .pv-dot.here::before { background: var(--accent) !important; }
+.pv-dots .pv-dot.now::before { background: var(--accent) !important; box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 25%, transparent) !important; }
+.running-behind.compact { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.running-behind-line { flex: 1; margin: 0; font-size: 14px; line-height: 1.35; color: var(--ink-2); }
+.running-behind-line strong { color: var(--ink); }
+.running-behind-line-actions { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
+.running-behind-line-actions .button.small { min-height: 36px; padding: 0 14px; font-size: 14px; }
+.running-behind-line-actions .text-button { font-size: 13px; min-height: 28px; }
