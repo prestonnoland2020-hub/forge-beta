@@ -128,8 +128,8 @@ export function HomePage() {
   };
 
   /* THE PLAN IS ALWAYS ON TODAY. Whatever the screen shows — plan, coach,
-     a finished or in-progress session — a one-line strip of the next days
-     sits under it and opens the full week. One split day per calendar day
+     a finished or in-progress session — one plain link under the card names
+     the next days and opens the full week. One split day per calendar day
      from today's (the picked day if one was chosen). */
   const planStrip = (() => {
     const ordered = [...splitDays].sort((a, b) => a.position - b.position);
@@ -140,12 +140,8 @@ export function HomePage() {
     /* Today, then the next two training days (rest days skipped so names fit). */
     const all = Array.from({ length: ordered.length * 2 }, (_, offset) => ({ ...ordered[(start + offset) % ordered.length], offset }));
     const days = [all[0], ...all.slice(1).filter(day => day.type !== 'rest')].slice(0, 3);
-    return <Link className="plan-strip" to="/plan" aria-label="Open your plan">
-      <span className="plan-strip-head"><b>Your plan</b><small>See week ›</small></span>
-      <span className="plan-strip-days">{days.map(day => <span key={day.offset} className={`plan-strip-day${day.offset === 0 ? ' today' : ''}${day.type === 'rest' ? ' rest' : ''}`}>
-        <small>{weekday(day.offset)}</small><b>{day.offset === 0 && completedToday && !resumeUrl ? '✓ ' : ''}{day.type === 'rest' ? 'Rest' : day.name}</b>
-      </span>)}</span>
-    </Link>;
+    const next = days.slice(1, 2).map(day => `${weekday(day.offset)} ${day.name}`).join('');
+    return <Link className="plan-link" to="/plan">See your plan{next ? <span> · Next: {next}</span> : null} ›</Link>;
   })();
   if (loading && !recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">Today</span><h2>Preparing your workout</h2><p>Checking your latest training.</p></section></div>;
   if (!recommendation) return <div className="forge-feed"><section className="feed-state card"><span className="eyebrow">One quick setup</span><h2>Build your first training day</h2><p>Add a split day so Forge knows what comes next.</p><Link className="button" to="/split?guide=1&from=home">Build my split step by step <Icon name="arrow"/></Link></section><SplitGuidePrompt /></div>;
@@ -300,7 +296,6 @@ export function HomePage() {
     {/* TODAY IS TODAY'S WORKOUT AND NOTHING ELSE. Partners have their own tab;
         the nudges and the first-week checklist made this a feed to scroll
         past before the one thing it is for. */}
-    {planStrip}
     {!completedToday && <TodayModeSwitch mode={mode} onChange={chooseMode} />}
     {!completedToday && mode === 'coach' && <CoachToday plan={coachPlan} context={coachContext} />}
 
@@ -410,5 +405,6 @@ export function HomePage() {
       {(recommendation.coachNote || recommendation.bodyLogNote) && <p className="td-note">{recommendation.coachNote || recommendation.bodyLogNote}</p>}
       <Link className="button wide" to={`${startUrl}${extraParam}`} data-vt="">{selectedCount ? 'Start session' : 'Open workout'} <Icon name="arrow" /></Link>
     </section>}
+    {planStrip}
   </div>;
 }
