@@ -25,6 +25,20 @@ const MAP: Record<string, string[]> = {
 
 const plate = (weight: number, metric: boolean) => { const step = metric ? 2.5 : 5; return Math.max(step, Math.round(weight / step) * step); };
 
+/* WHAT A LIFT GUIDED DOES NOT KNOW IS LOADED WITH, read from its name. It
+   used to be "barbell if the plan had a number, else nothing", so a first
+   bench press or barbell row (no number yet) became a no-weight card: no
+   empty bar to start from, nothing to adjust, and the top set was never
+   logged. */
+function loadOf(lift: PlanLift): Move['load'] {
+  const name = lift.exercise.toLowerCase();
+  if (/push[- ]?up|pull[- ]?up|chin[- ]?up|\bdips?\b|plank|bodyweight|sit[- ]?up|crunch|burpee/.test(name)) return 'none';
+  if (/dumbbell|\bdb\b/.test(name)) return 'dumbbell';
+  if (/kettlebell/.test(name)) return 'kettlebell';
+  if (/machine|cable|pulldown|press machine|leg press|extension|curl machine|pec deck|smith/.test(name)) return 'machine';
+  return 'barbell';
+}
+
 function moveFor(lift: PlanLift, metric: boolean): Move {
   const key = canonicalLiftKey(lift.exercise);
   const known = MOVES.find(move => canonicalLiftKey(move.name) === key);
@@ -36,7 +50,7 @@ function moveFor(lift: PlanLift, metric: boolean): Move {
     : `Work up to a weight you could do for ${lift.reps} with two reps left in the tank. That one set is your top set.`;
   if (known) return { ...known, name: lift.exercise, cue: ramp };
   return {
-    id: `plan-${key}`, name: lift.exercise, photo: '', pattern: 'push', equip: ['none'], load: lift.weight > 0 ? 'barbell' : 'none', styles: [],
+    id: `plan-${key}`, name: lift.exercise, photo: '', pattern: 'push', equip: ['none'], load: loadOf(lift), styles: [],
     map: { primary: MAP[lift.muscle] || ['abs'], secondary: [] }, muscles: [lift.muscle || 'Full body'],
     cue: ramp,
     steps: ['Warm up with a couple of lighter sets, fewer reps each time.', 'Load your top-set weight and take a breath.', `Do ${lift.reps} clean reps, then rack it.`],
@@ -55,7 +69,7 @@ export function planWorkout(title: string, lifts: PlanLift[], metric: boolean): 
     const move = moveFor(lift, metric);
     /* No number yet: start from the empty bar and let her set what she lifted
        with − and +, so the set is logged with a real weight. */
-    const bare = metric ? 20 : 45;
+    const bare = move.load === 'dumbbell' || move.load === 'kettlebell' ? (metric ? 5 : 10) : (metric ? 20 : 45);
     /* An accessory from Build my workout: its working sets, shorter rest. */
     steps.push({ move, sets: raw.sets || 1, reps: lift.reps, weight: lift.weight > 0 ? lift.weight : (move.load === 'none' ? null : bare), weightNote: lift.weight > 0 ? undefined : 'Set the weight you actually lift with − and +.', rest: raw.accessory ? 75 : 120, part: 'main' });
   }

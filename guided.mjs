@@ -62,6 +62,16 @@ check('a taught phrase works next time', matchCommand('dumbbell', ['done'], { du
 check('taught phrases respect the moment', matchCommand('dumbbell', ['easy', 'right', 'hard'], { dumbbell: 'done' }) === null);
 check('a sentence is not a near miss', matchCommand('my neighbor is really noisy today honestly', ['ready', 'more']) === null);
 check('chatter is not a command', matchCommand('what time is it', ['done', 'how', 'skip']) === null);
+const CARD = ['ask', 'done', 'ready', 'start', 'how', 'easier', 'harder', 'heavier', 'lighter', 'repeat', 'skip', 'pause', 'resume', 'end'];
+check('counting reps out loud never ends the set', ['one', 'gone', 'none', 'one two three'].every(t => matchCommand(t, CARD) === null), ['one', 'gone', 'none'].map(t => `${t}:${matchCommand(t, CARD)?.command}`).join());
+check('"not done yet" and "don\'t skip" move nothing', ["not done yet", "I'm not done", "don't skip", "not ready"].every(t => matchCommand(t, CARD) === null));
+check('"not ready" in the rest still asks for more time', matchCommand('not ready', ['ready', 'more'])?.command === 'more');
+{ const first = planWorkout('Chest & Back', [{ exercise: 'Barbell Row', muscle: 'Back', weight: 0, reps: 5 }, { exercise: 'Bench Press', muscle: 'Chest', weight: 0, reps: 0 }, { exercise: 'Incline Dumbbell Press', muscle: 'Chest', weight: 0, reps: 10, sets: 3, accessory: true }, { exercise: 'Pull Ups', muscle: 'Back', weight: 0, reps: 5 }], false);
+  const by = name => first.steps.find(s => s.move.name === name);
+  check('a first barbell lift from the plan starts at the empty bar, so it gets logged', by('Barbell Row').weight === 45 && by('Bench Press').weight === 45, `${by('Barbell Row').weight}/${by('Bench Press').weight}`);
+  check('a first dumbbell lift from the plan starts light, not at 45', by('Incline Dumbbell Press').weight === 10, String(by('Incline Dumbbell Press').weight));
+  check('a bodyweight lift from the plan stays weightless', by('Pull Ups').weight === null); }
+check('real mishearings still land', matchCommand('redy')?.command === 'ready' && matchCommand('finised')?.command === 'done' && matchCommand('jest right')?.command === 'right');
 check('phrases are stored plainly', normalizePhrase("I'm  DONE!") === 'im done');
 check('feel step only hears feel words', parseCommand("I'm done", ['easy', 'right', 'hard']) === null);
 check('rest: "ready" while only ready/more allowed', parseCommand('okay ready', ['ready', 'more']) === 'ready');
