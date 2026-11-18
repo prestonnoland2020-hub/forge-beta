@@ -51,6 +51,16 @@ function BehindForm({ behind, onCommit, onNotNow }: {
       `I have been running about ${toShow(behind.ranAvg)} ${unit} a week against ${toShow(behind.plannedAvg)} planned. Rebuild the running around ${shownMin}–${shownMax} ${unit} a week, keep the long run and one quality session, and build up gently from there. Keep the lifting as it is.`);
   };
   const notNow = () => { tap(); remember(behind.fingerprint); onNotNow(); };
+  /* ONE LINE UNTIL ASKED. The whole form at the top of Plan made the page
+     busy; it opens when she taps Lower it. */
+  const [open, setOpen] = useState(false);
+  if (!open) return <section className="card mileage-gate running-behind compact" aria-label="Running behind the plan">
+    <p className="running-behind-line">You ran <strong>{behind.weeks.map(week => toShow(week.ran)).join(' and ')} {unit}</strong> the last two weeks vs <strong>{behind.weeks.map(week => toShow(week.planned)).join(' and ')}</strong> planned.</p>
+    <div className="running-behind-line-actions">
+      <button type="button" className="button small" onClick={() => { tap(); setOpen(true); }}>Lower it</button>
+      <button type="button" className="text-button" onClick={notNow}>Not now</button>
+    </div>
+  </section>;
 
   return <section className="card mileage-gate running-behind" aria-label="Running behind the plan">
     <span className="eyebrow">Coach · your running</span>
