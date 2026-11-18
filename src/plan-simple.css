@@ -237,3 +237,13 @@
 .running-behind-line-actions { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
 .running-behind-line-actions .button.small { min-height: 36px; padding: 0 14px; font-size: 14px; }
 .running-behind-line-actions .text-button { font-size: 13px; min-height: 28px; }
+
+/* Hold-to-delete sheet for split pills. */
+.ss-library-row button { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.ss-hold-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; justify-content: center; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); background: rgb(0 0 0 / .45); }
+.ss-hold-sheet { width: min(100%, 420px); display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); animation: hold-in .16s ease-out backwards; }
+.ss-hold-sheet strong { text-align: center; font-size: 15px; color: var(--ink-2); padding-bottom: 4px; }
+.ss-hold-sheet button { min-height: 50px; border-radius: 14px; border: 0; font-size: 17px; font-weight: 700; }
+.ss-hold-delete { background: color-mix(in oklch, #ff4d4f 18%, var(--surface-2)); color: #ff6b6b; }
+.ss-hold-cancel { background: var(--surface-2); color: var(--ink); }
+@keyframes hold-in { from { opacity: 0; transform: translateY(12px); } }
