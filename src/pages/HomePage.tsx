@@ -313,7 +313,7 @@ export function HomePage() {
         : <span className="td-chip done"><Icon name="check" size={12} stroke={3} />Complete</span>}
         {!resumeUrl && <Link to={`/workout?edit=${completedToday.id}`}>Edit</Link>}</div>
       <h3 className="td-title">{completedToday.title}</h3>
-      {completedToday.durationMinutes ? <p className="td-session-length"><Icon name="watch" size={13} />{completedSets.length ? 'Lifting' : 'Session'} · {sessionLength(completedToday.durationMinutes)} · from your watch</p> : null}
+      {completedToday.durationMinutes ? <p className="td-session-length"><Icon name="watch" size={13} />{completedSets.length ? 'Lifting' : 'Session'} · {sessionLength(completedToday.durationMinutes)}{/^(Forge Guided|Coached) · /.test(completedToday.notes || '') ? ' · with your coach' : ' · from your watch'}</p> : null}
       {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <ul className="td-lines">
         {completedSets.map((set, index) => <li key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><b>{set.weight} {weightUnit} × {set.reps}</b></li>)}
         {(completedToday.cardioSessions || []).map(session => <li key={session.id}><span>{session.activity}</span><b>{formatCardioSummary(session)}</b></li>)}

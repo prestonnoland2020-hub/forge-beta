@@ -39,11 +39,19 @@ const RULES: Array<[Command, RegExp]> = [
   ['start', /\bstart\b|\bbegin\b/],
 ];
 
+/* "I'M NOT DONE" IS NOT DONE. A word right after not / don't / never is
+   taken out before the moving-on commands are matched, so "not done yet"
+   leaves the set running and "don't skip" skips nothing. "Not ready" still
+   reaches More rest, which reads the sentence whole. */
+const NEGATABLE: Command[] = ['done', 'ready', 'skip', 'end', 'start'];
+const unNegated = (text: string) => text.replace(/\b(not|never|don'?t|do not|didn'?t|can'?t|isn'?t|aren'?t|wasn'?t)\s+(yet\s+|quite\s+|really\s+|even\s+)?[a-z']+/g, ' ');
+
 export function parseCommand(transcript: string, allowed?: Command[]): Command | null {
   const text = ` ${transcript.toLowerCase().replace(/[.,!?]/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  const plain = unNegated(text);
   for (const [command, pattern] of RULES) {
     if (allowed && !allowed.includes(command)) continue;
-    if (pattern.test(text)) return command;
+    if (pattern.test(NEGATABLE.includes(command) ? plain : text)) return command;
   }
   return null;
 }
@@ -99,6 +107,14 @@ function distance(a: string, b: string) {
   return row[b.length];
 }
 const similarity = (a: string, b: string) => 1 - distance(a, b) / Math.max(a.length, b.length, 1);
+/* A CLOSE CALL KEEPS EVERY WORD'S FIRST SOUND. Without this, counting reps
+   out loud ended the set: "one" is one letter from "done", and so are "gone"
+   and "none". Mishearings keep the opening sound ("redy", "finised", "jest
+   right"); real words that only rhyme do not. */
+const sameStarts = (a: string, b: string) => {
+  const x = a.split(' '), y = b.split(' ');
+  return x.length === y.length && x.every((word, i) => word[0] === y[i][0]);
+};
 
 export type Match = { command: Command; how: 'rule' | 'learned' | 'sounds-like' | 'close' ; score: number };
 export function matchCommand(transcript: string, allowed?: Command[], memory: Record<string, Command> = {}): Match | null {
@@ -116,6 +132,7 @@ export function matchCommand(transcript: string, allowed?: Command[], memory: Re
   const candidates: Array<[Command, string]> = [...CANON, ...Object.entries(memory).map(([text, command]) => [command, text] as [Command, string])];
   for (const [command, text] of candidates) {
     if (!ok(command)) continue;
+    if (!sameStarts(phrase, text)) continue;
     const score = similarity(phrase, text);
     if (score >= 0.72 && (!best || score > best.score)) best = { command, how: 'close', score };
   }

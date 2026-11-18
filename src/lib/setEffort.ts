@@ -9,6 +9,9 @@ import { calculateEstimatedOneRepMax } from './strength';
 
 export type Effort = 'easy' | 'good' | 'hard';
 const STORE = 'forge-set-effort-v1';
+/* Read straight from the build, not env.ts: that one throws on import when
+   the Supabase keys are missing, which every logic suite would inherit. */
+const isDemoMode = import.meta.env?.VITE_DEMO_MODE === 'true';
 export const REPS_LEFT: Record<Effort, number> = { easy: 2, good: 1, hard: 0 };
 
 const id = (date: string, lift: string) => `${date}|${canonicalLiftKey(lift)}`;
@@ -25,11 +28,15 @@ function remember(date: string, lift: string, effort: Effort) {
    device copy standing. */
 export function setEffort(date: string, lift: string, effort: Effort) {
   remember(date, lift, effort);
+  /* The preview build has no account: finishing a guided workout there used
+     to fire this at a placeholder server and print a CORS error. */
+  if (isDemoMode) return;
   void import('./supabase').then(({ supabase }) => supabase?.from('set_efforts').upsert({ performed_on: date, lift_key: canonicalLiftKey(lift), effort, updated_at: new Date().toISOString() }, { onConflict: 'owner_id,performed_on,lift_key' })).catch(() => undefined);
 }
 
 /* The account's copy, merged into the device's when history loads. */
 export async function pullEfforts(): Promise<void> {
+  if (isDemoMode) return;
   try {
     const { supabase } = await import('./supabase');
     if (!supabase) return;
