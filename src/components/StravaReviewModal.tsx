@@ -122,7 +122,10 @@ export function StravaReviewModal() {
       if (scored.length) return String(scored[0].index);
     }
     if (pending.date === todayIso && recommendation) {
-      const index = planDays.findIndex(day => splitDayKey(day.name) === splitDayKey(recommendation.splitDay.name));
+      /* Exact name first: "Chest & Back 2" must not land on "Chest & Back". */
+      const wanted = recommendation.splitDay.name.trim().toLowerCase();
+      const exactIndex = planDays.findIndex(day => day.name.trim().toLowerCase() === wanted);
+      const index = exactIndex >= 0 ? exactIndex : planDays.findIndex(day => splitDayKey(day.name) === splitDayKey(recommendation.splitDay.name));
       if (index >= 0) return String(index);
     }
     return '';
