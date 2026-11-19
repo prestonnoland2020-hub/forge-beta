@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { type GuidedPrefs, type Focus } from '../lib/guided/builder';
 import { pickFocus, type PickInput } from '../lib/guided/pickFocus';
 import { GUIDED_KEYS } from '../lib/guided/session';
+import { NUDGE_KEY, NUDGE_LINE, showNudge, dismissNudge, type NudgeState } from '../lib/guided/nudge';
 
 /* TODAY, COACH ME. The same Today screen with the coach in charge: what the
    coach picked for today, how long she has, and one button. Setting it up the
@@ -27,6 +28,12 @@ export function CoachToday({ plan, context }: { plan?: CoachPlan; context?: Coac
   const last = read<{ focus?: Focus }>(GUIDED_KEYS.last, {});
   const [minutes, setMinutes] = useState(30);
   const [trainAnyway, setTrainAnyway] = useState(false);
+  /* One coach line for someone who has never run a guided workout. */
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [nudgeState, setNudgeState] = useState(() => read<NudgeState | null>(NUDGE_KEY, null));
+  const nudge = showNudge(nudgeState, read<number>(GUIDED_KEYS.count, 0), todayIso);
+  const hideNudge = () => { const next = dismissNudge(nudgeState, todayIso); setNudgeState(next); try { localStorage.setItem(NUDGE_KEY, JSON.stringify(next)); } catch { /* per device */ } };
+  const nudgeLine = nudge ? <p className="ct-nudge"><span>{NUDGE_LINE}</span><button type="button" aria-label="Dismiss" onClick={hideNudge}>×</button></p> : null;
   /* A Guided workout left part-way (GuidedPage keeps it for 24 hours). */
   const paused = read<{ savedAt?: number; workout?: { focus?: string }; logged?: unknown[] } | null>('forge-guided-resume-v1', null);
   if (paused?.savedAt && Date.now() - paused.savedAt < 24 * 3600 * 1000) return <section className="td-card ct-card">
@@ -38,6 +45,7 @@ export function CoachToday({ plan, context }: { plan?: CoachPlan; context?: Coac
   if (plan && !ownPick) return <section className="td-card ct-card">
     <span className="ct-eyebrow">TODAY, GUIDED</span>
     <h3 className="td-title">{plan.title}</h3>
+    {nudgeLine}
     <p className="ct-lead">Your full workout for today, {plan.count} {plan.count === 1 ? 'exercise' : 'exercises'}. Videos for every move, and your coach talks you through each set and logs it for you.</p>
     <button type="button" className="button wide" onClick={plan.start}>Start guided workout</button>
     <button type="button" className="ct-more" onClick={() => setOwnPick(true)}>Let the coach pick a different workout</button>
@@ -66,6 +74,7 @@ export function CoachToday({ plan, context }: { plan?: CoachPlan; context?: Coac
   return <section className="td-card ct-card">
     <span className="ct-eyebrow">YOUR COACH PICKED</span>
     <h3 className="td-title">{focus}</h3>
+    {nudgeLine}
     <p className="ct-why">{picked.why}</p>
     <p className="ct-lead">{style}{prefs.place === 'Gym' ? ' at the gym' : prefs.place === 'Home' ? ' at home' : ', no equipment'}. Your coach talks you through every set.</p>
     <div className="ct-times" role="radiogroup" aria-label="How long">{[20, 30, 45, 60].map(m => <button type="button" role="radio" aria-checked={minutes === m} key={m} className={minutes === m ? 'on' : ''} onClick={() => setMinutes(m)}>{m} min</button>)}</div>

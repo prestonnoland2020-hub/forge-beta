@@ -101,5 +101,26 @@ for (const [name, prefs] of Object.entries(setups)) for (const focus of ['Full b
   if (estimateMinutes(wk) > min * 1.25 || estimateMinutes(wk) < min * 0.45) misses.push(`${name} ${focus} ${min}m: ${estimateMinutes(wk)} min`);
 }
 check('every focus hits every muscle group it promises, and fits the time', !misses.length, [...new Set(misses)].slice(0, 8).join('; '));
+
+/* THE FOUR BARBELL LIFTS every default plan is built on resolve to a catalog move with photos (they used to fall back to the bare muscle map). */
+{ const { canonicalLiftKey } = await import('./src/lib/liftAliases.ts');
+  for (const name of ['Bench Press', 'Barbell Bench Press', 'Barbell Row', 'Back Squat', 'Squat', 'Deadlift', 'Conventional Deadlift']) {
+    const hit = MOVES.find(m => canonicalLiftKey(m.name) === canonicalLiftKey(name));
+    check(`catalog: "${name}" resolves to a move with photos`, !!hit && !!hit.photo && existsSync(`public/exercises/${hit.photo}/0.jpg`) && existsSync(`public/exercises/${hit.photo}/1.jpg`) && !!hit.cue && hit.steps.every(Boolean), hit?.id || 'no match'); }
+  const lifts = ['Bench Press', 'Barbell Row', 'Back Squat', 'Deadlift'].map(exercise => ({ exercise, muscle: 'Chest', weight: 100, reps: 5 }));
+  const day = planWorkout('Full Body', lifts, false).steps.filter(s => s.part === 'main');
+  check('plan-day cards for these lifts have photos, not the bare muscle map', day.length === 4 && day.every(s => s.move.photo), day.map(s => `${s.move.name}:${s.move.photo || 'none'}`).join()); }
+
+/* THE COACH ME NUDGE: when its line shows and when it hides. */
+{ const { showNudge, dismissNudge } = await import('./src/lib/guided/nudge.ts');
+  const d1 = '2026-11-19', d2 = '2026-11-20', d3 = '2026-11-21';
+  check('nudge: shows for someone who never did a guided workout', showNudge(null, 0, d1));
+  check('nudge: gone for good after the first guided workout', !showNudge(null, 1, d1) && !showNudge({ dismissals: 1, lastDismissed: d1 }, 3, d3));
+  let st = dismissNudge(null, d1);
+  check('nudge: a dismissal hides it for the rest of that day', !showNudge(st, 0, d1));
+  check('nudge: it comes back the next day after one dismissal', showNudge(st, 0, d2));
+  st = dismissNudge(st, d2);
+  check('nudge: two dismissals hide it for good', !showNudge(st, 0, d3) && !showNudge(st, 0, '2027-01-01'));
+  check('nudge: counts dismissals', st.dismissals === 2); }
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);
