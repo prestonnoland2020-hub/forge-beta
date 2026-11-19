@@ -66,6 +66,10 @@ const CARD = ['ask', 'done', 'ready', 'start', 'how', 'easier', 'harder', 'heavi
 check('counting reps out loud never ends the set', ['one', 'gone', 'none', 'one two three'].every(t => matchCommand(t, CARD) === null), ['one', 'gone', 'none'].map(t => `${t}:${matchCommand(t, CARD)?.command}`).join());
 check('"not done yet" and "don\'t skip" move nothing', ["not done yet", "I'm not done", "don't skip", "not ready"].every(t => matchCommand(t, CARD) === null));
 check('"not ready" in the rest still asks for more time', matchCommand('not ready', ['ready', 'more'])?.command === 'more');
+check('background talk never moves the workout', ['I was going to go to the store', 'play the next song now', 'we should go get food after this'].every(t => matchCommand(t, ['ready', 'more', 'skip', 'done']) === null), ['I was going to go to the store'].map(t => matchCommand(t, ['ready'])?.command).join());
+check('short "next" / "go" still mean ready', ['next', 'go go go', 'next one please'].every(t => matchCommand(t, ['ready', 'more'])?.command === 'ready'));
+check('"not too hard" is just right; "it wasn\'t easy" sets nothing', matchCommand('not too hard', ['easy', 'right', 'hard'])?.command === 'right' && matchCommand("it wasn't easy", ['easy', 'right', 'hard']) === null);
+check('"that felt good" in a sentence is just right', matchCommand('yeah that felt good', ['easy', 'right', 'hard'])?.command === 'right');
 { const first = planWorkout('Chest & Back', [{ exercise: 'Barbell Row', muscle: 'Back', weight: 0, reps: 5 }, { exercise: 'Bench Press', muscle: 'Chest', weight: 0, reps: 0 }, { exercise: 'Incline Dumbbell Press', muscle: 'Chest', weight: 0, reps: 10, sets: 3, accessory: true }, { exercise: 'Pull Ups', muscle: 'Back', weight: 0, reps: 5 }], false);
   const by = name => first.steps.find(s => s.move.name === name);
   check('a first barbell lift from the plan starts at the empty bar, so it gets logged', by('Barbell Row').weight === 45 && by('Bench Press').weight === 45, `${by('Barbell Row').weight}/${by('Bench Press').weight}`);
