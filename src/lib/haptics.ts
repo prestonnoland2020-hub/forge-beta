@@ -72,3 +72,11 @@ export function land() {
   lastLand = now;
   tap();
 }
+
+/* A press-and-hold landing: firmer than tap(), so you feel the menu open
+   under your thumb before you lift it. */
+export function hold() {
+  const haptics = native();
+  if (haptics?.impact) { haptics.impact({ style: 'MEDIUM' }).catch(() => {}); return; }
+  buzz(18);
+}

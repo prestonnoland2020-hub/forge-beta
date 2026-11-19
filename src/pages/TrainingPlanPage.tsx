@@ -21,7 +21,7 @@ import { useEditingSplit } from '../features/profile/splitEditing';
 import { NumberInput } from '../components/NumberInput';
 import { coreFirst } from '../lib/coreLifts';
 import { canonicalLiftKey } from '../lib/liftAliases';
-import { tap } from '../lib/haptics';
+import { hold, tap, warning } from '../lib/haptics';
 import { Icon } from '../components/Icon';
 import { SearchField } from '../components/SearchField';
 import { TEMPLATES, DAY_TYPES, cardioPresets, SPLIT_MUSCLES as muscles, durationForDay, type DayType, type TrainingDay } from '../features/splits/splitModel';
@@ -176,6 +176,19 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
   /* Deleting another saved split asks twice, in place, like deleting a goal. */
   const [confirmDelete,setConfirmDelete]=useState<string|null>(null);
   const deleteSaved=(id:string)=>{if(confirmDelete!==id){setConfirmDelete(id);return}tap();setLibrary(items=>items.filter(item=>item.id!==id));setConfirmDelete(null)};
+  /* HOLD A SPLIT TO DELETE IT. Press and hold a split pill: a firm haptic,
+     then a small sheet asks once. Deleting the split you're on moves you to
+     the next saved one. */
+  const [holdMenu,setHoldMenu]=useState<{id:string;name:string}|null>(null);
+  const holdTimer=useRef<number|null>(null);
+  const held=useRef(false);
+  const holdStart=(id:string,name:string)=>{held.current=false;if(holdTimer.current)window.clearTimeout(holdTimer.current);holdTimer.current=window.setTimeout(()=>{held.current=true;hold();setHoldMenu({id,name})},450)};
+  const holdEnd=()=>{if(holdTimer.current){window.clearTimeout(holdTimer.current);holdTimer.current=null}};
+  const deleteHeld=()=>{if(!holdMenu)return;warning();const id=holdMenu.id;setHoldMenu(null);
+    if(id!==activeId){setLibrary(items=>items.filter(item=>item.id!==id));return}
+    const other=library.find(item=>item.id!==id);
+    setLibrary(items=>items.filter(item=>item.id!==id));
+    if(other){setActiveId(other.id);setSplitName(other.name);setRhythm(other.rhythm);setDays(other.days);setSelectedDay(0);setSheetDay(null)}else setActiveId(null)};
   const forgetSplit=()=>{if(!savedEntry)return;tap();setLibrary(items=>items.filter(item=>item.id!==savedEntry.id));setActiveId(null)};
   const removeDay=()=>{if(days.length===1)return;setDays(items=>items.filter((_,index)=>index!==selectedDay));setSelectedDay(Math.max(0,selectedDay-1))};
   const moveDay=(direction:-1|1)=>{const destination=selectedDay+direction;if(destination<0||destination>=days.length)return;setDays(items=>{const next=[...items];[next[selectedDay],next[destination]]=[next[destination],next[selectedDay]];return next});setSelectedDay(destination)};
@@ -254,12 +267,22 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
           hides, and ＋ New split lives under Name & schedule. */}
       {(library.length>1||(library.length>0&&!savedEntry))&&      <section className="ss-library" aria-label="Your splits">
           <div className="ss-library-row">
-            {library.map(item=><button type="button" key={item.id} className={item.id===activeId?'active':''} aria-pressed={item.id===activeId} onClick={()=>switchSplit(item.id)}>{item.id===activeId?(splitName.trim()||item.name):item.name}</button>)}
+            {library.map(item=><button type="button" key={item.id} className={item.id===activeId?'active':''} aria-pressed={item.id===activeId}
+              onPointerDown={()=>holdStart(item.id,item.id===activeId?(splitName.trim()||item.name):item.name)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd}
+              onContextMenu={event=>event.preventDefault()}
+              onClick={()=>{if(held.current){held.current=false;return}switchSplit(item.id)}}>{item.id===activeId?(splitName.trim()||item.name):item.name}</button>)}
             {!savedEntry&&<button type="button" className="active" aria-pressed="true">{splitName.trim()||'My training split'}</button>}
             <button type="button" className="ss-library-new" onClick={newSplit}>＋ New</button>
           </div>
           {!savedEntry&&<button type="button" className="ss-library-save" onClick={saveSplit}>Add to my splits</button>}
         </section>}
+      {holdMenu&&<Overlay><div className="ss-hold-backdrop" role="dialog" aria-label={`Delete ${holdMenu.name}?`} onClick={()=>setHoldMenu(null)}>
+        <div className="ss-hold-sheet" onClick={event=>event.stopPropagation()}>
+          <strong>{holdMenu.name}</strong>
+          <button type="button" className="ss-hold-delete" onClick={deleteHeld}>Delete split</button>
+          <button type="button" className="ss-hold-cancel" onClick={()=>{tap();setHoldMenu(null)}}>Cancel</button>
+        </div>
+      </div></Overlay>}
       <header className="ss-head"><div><h2>{splitName}</h2><small>{days.length} {days.length===1?'day':'days'} · {rhythm==='weekly'?'by weekday':'repeats in order'}</small></div><div className="ss-head-right"><small className={`split-autosave ${syncState}`}>{syncState==='saving'?'Saving…':syncState==='error'?'Saved here · will retry':'Saved'}</small><button type="button" className={`adjust-pill${adjustOpen?' open':''}`} aria-expanded={adjustOpen} onClick={()=>setAdjustOpen(open=>!open)}>Adjust</button></div></header>
       {/* CONTROLS ON TOP. Name, schedule, weekly running and templates sat under the
           whole list of days. They live behind one Adjust button in the header now. */}
