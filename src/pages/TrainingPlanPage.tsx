@@ -88,8 +88,21 @@ export function TrainingPlanPage({mode='program'}:{mode?:'program'|'split'}={}){
      it leaves for Home straight after and an unmounted page cancels a timer. */
   const writeSplitLocally=(next:{name:string;rhythm:'rolling'|'weekly';days:TrainingDay[];activeId:string|null;library:SavedSplit[]})=>{const min=Math.max(0,minWeeklyMileage);const max=Math.max(min,maxWeeklyMileage);const savedPlanState={name:next.name,rhythm:next.rhythm,days:next.days,minWeeklyMileage:min,maxWeeklyMileage:max,activeId:next.activeId,library:next.library} satisfies SavedPlan;localStorage.setItem(planStorageKey,JSON.stringify(savedPlanState));if(setup)saveSetup({...setup,minWeeklyMileage:min,maxWeeklyMileage:max,scheduleStyle:next.rhythm==='weekly'?'Weekly schedule':'Rolling cycle',splitSource:'Custom',trainingDays:next.days.filter(day=>day.dayType!=='rest').length,splitDays:next.days.map(day=>({name:day.name,type:(day.dayType[0].toUpperCase()+day.dayType.slice(1)) as 'Strength'|'Cardio'|'Mixed'|'Rest',muscles:day.muscles,exercises:day.exercises}))});return savedPlanState};
   const writeSplitToServer=(name:string,splitDays:TrainingDay[])=>saveTrainingSplit(name,splitDays.map((day,index)=>({position:index+1,name:day.name,muscleGroups:day.dayType==='strength'||day.dayType==='mixed'?day.muscles:[],goalLifts:day.dayType==='strength'||day.dayType==='mixed'?day.exercises:[],cardioTypes:day.dayType==='hyrox'?['HYROX']:day.dayType==='cardio'||day.dayType==='mixed'?(day.cardioPolicy==='planned'?(day.cardio.length?day.cardio.map(cardioPlanSummary):['Planned']):['Forge']):[]}))).then(()=>{window.dispatchEvent(new Event('forge-training-cycle-changed'))});
-  useEffect(()=>{if(!edited)return;const savedPlanState=writeSplitLocally({name:splitName,rhythm,days,activeId,library});const settingsTimer=window.setTimeout(()=>saveAthleteSettings({plan:savedPlanState}),1500);return()=>window.clearTimeout(settingsTimer)},[edited,splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage,activeId,library]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(()=>{if(isDemoMode||!user){setSyncState('local');return}if(!edited){setSyncState('saved');return}setSyncState('saving');const timer=window.setTimeout(()=>{void writeSplitToServer(splitName,days).then(()=>setSyncState('saved')).catch(()=>setSyncState('error'))},1200);return()=>window.clearTimeout(timer)},[edited,user,splitName,days]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* LEAVING THE PAGE SAVES. The writes above wait a beat while you edit; if
+     you switched splits and went straight back to Today, leaving the page
+     cancelled them and Today (which reads the server split) kept the old one —
+     then reopening the page showed a third. Whatever is still waiting is sent
+     the moment the page closes. */
+  const pendingServer=useRef<{name:string;days:TrainingDay[]}|null>(null);
+  const pendingSettings=useRef<SavedPlan|null>(null);
+  useEffect(()=>()=>{
+    const server=pendingServer.current;pendingServer.current=null;
+    if(server&&!isDemoMode)void writeSplitToServer(server.name,server.days).catch(()=>{});
+    const settings=pendingSettings.current;pendingSettings.current=null;
+    if(settings)void saveAthleteSettings({plan:settings});
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(!edited)return;const savedPlanState=writeSplitLocally({name:splitName,rhythm,days,activeId,library});pendingSettings.current=savedPlanState;const settingsTimer=window.setTimeout(()=>{pendingSettings.current=null;void saveAthleteSettings({plan:savedPlanState})},1500);return()=>window.clearTimeout(settingsTimer)},[edited,splitName,rhythm,days,minWeeklyMileage,maxWeeklyMileage,activeId,library]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(isDemoMode||!user){setSyncState('local');return}if(!edited){setSyncState('saved');return}setSyncState('saving');pendingServer.current={name:splitName,days};const timer=window.setTimeout(()=>{pendingServer.current=null;void writeSplitToServer(splitName,days).then(()=>setSyncState('saved')).catch(()=>setSyncState('error'))},1200);return()=>window.clearTimeout(timer)},[edited,user,splitName,days]); // eslint-disable-line react-hooks/exhaustive-deps
   const updateDay=(change:Partial<TrainingDay>)=>setDays(items=>items.map((day,index)=>{if(index!==selectedDay)return day;const next={...day,...change};next.maxDuration=durationForDay(next);return next}));
   /* Functional update — two fast taps must both land, never overwrite each
      other through a stale closure. */
