@@ -36,6 +36,14 @@ testers = find('/betaTesters', 'email', email)
 inv = invites[0] if invites else None
 print(f'STATUS user={bool(users)} pending_invite={bool(inv)} beta_tester={bool(testers)}'
       + (f" invite_expires={inv['attributes'].get('expirationDate')}" if inv else ''))
+in_team = False
+if testers:
+    t = testers[0]
+    gr = call('GET', f"/betaTesters/{t['id']}/betaGroups?limit=20")
+    groups = [g['id'] for g in gr.json().get('data', [])] if gr.status_code < 400 else []
+    print(f"TESTER state={t['attributes'].get('state')} invite_type={t['attributes'].get('inviteType')}"
+          f" in_team_group={env['ASC_GROUP_ID'] in groups} groups={len(groups)}")
+    in_team = env['ASC_GROUP_ID'] in groups
 
 if action == 'resend':
     if users: print('RESULT already accepted - nothing to resend'); sys.exit(0)
@@ -55,6 +63,7 @@ if action == 'resend':
     print(f"RESULT invite resent, expires {r.json()['data']['attributes'].get('expirationDate')}")
 elif action == 'add':
     if not users: print('RESULT not accepted yet - cannot add to internal group'); sys.exit(0)
+    if in_team: print('RESULT already in internal group'); sys.exit(0)
     if testers:
         r = call('POST', f"/betaGroups/{env['ASC_GROUP_ID']}/relationships/betaTesters",
                  json={'data': [{'type': 'betaTesters', 'id': testers[0]['id']}]})
