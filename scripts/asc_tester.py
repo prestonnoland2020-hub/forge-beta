@@ -46,8 +46,12 @@ if action == 'resend':
         if call('DELETE', f"/userInvitations/{inv['id']}").status_code >= 400: sys.exit(1)
     body = {'data': {'type': 'userInvitations', 'attributes': attrs,
             'relationships': {'visibleApps': {'data': [{'type': 'apps', 'id': env['ASC_APP_ID']}]}}}}
-    r = call('POST', '/userInvitations', json=body)
-    if r.status_code >= 400: print('RESULT resend FAILED'); sys.exit(1)
+    # Apple takes a few seconds to free the email after a delete (409 DUPLICATE).
+    for attempt in range(12):
+        r = call('POST', '/userInvitations', json=body)
+        if r.status_code != 409: break
+        time.sleep(10)
+    if r.status_code >= 400: print('RESULT resend FAILED - invite may be gone, run resend again'); sys.exit(1)
     print(f"RESULT invite resent, expires {r.json()['data']['attributes'].get('expirationDate')}")
 elif action == 'add':
     if not users: print('RESULT not accepted yet - cannot add to internal group'); sys.exit(0)
