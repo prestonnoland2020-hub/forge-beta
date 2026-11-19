@@ -4,6 +4,7 @@ status: prints whether the email is a user, has a pending invite, or is a tester
 resend: if the invite is still pending, deletes and recreates it (same role,
         Forge app only), which is what "Resend Invitation" does.
 add:    if the email is an accepted user, adds them to the internal group.
+invite: (re)sends the TestFlight email for Forge ("View in TestFlight" + redeem code).
 """
 import os, sys, time, jwt, requests
 
@@ -44,6 +45,17 @@ if testers:
     print(f"TESTER state={t['attributes'].get('state')} invite_type={t['attributes'].get('inviteType')}"
           f" in_team_group={env['ASC_GROUP_ID'] in groups} groups={len(groups)}")
     in_team = env['ASC_GROUP_ID'] in groups
+    st = call('GET', f"/betaTesters/{t['id']}?fields[betaTesters]=state,inviteType,email")
+    if st.status_code < 400:
+        print(f"TESTER detail state={st.json()['data']['attributes'].get('state')}")
+    gb = call('GET', f"/betaGroups/{env['ASC_GROUP_ID']}/builds?limit=5&fields[builds]=version,processingState,expired,uploadedDate")
+    if gb.status_code < 400:
+        for b in gb.json().get('data', [])[:3]:
+            a = b['attributes']
+            print(f"GROUP build {a.get('version')} {a.get('processingState')} expired={a.get('expired')} uploaded={a.get('uploadedDate')}")
+        if not gb.json().get('data'): print('GROUP has NO builds')
+    ga = call('GET', f"/betaGroups/{env['ASC_GROUP_ID']}?fields[betaGroups]=name,isInternalGroup,hasAccessToAllBuilds")
+    if ga.status_code < 400: print(f"GROUP {ga.json()['data']['attributes']}")
 
 if action == 'resend':
     if users: print('RESULT already accepted - nothing to resend'); sys.exit(0)
@@ -72,4 +84,11 @@ elif action == 'add':
                  'attributes': {'email': email, 'firstName': env['TESTER_FIRST'], 'lastName': env['TESTER_LAST']},
                  'relationships': {'betaGroups': {'data': [{'type': 'betaGroups', 'id': env['ASC_GROUP_ID']}]}}}})
     print('RESULT added to internal group' if r.status_code < 400 else 'RESULT add FAILED')
+    sys.exit(0 if r.status_code < 400 else 1)
+elif action == 'invite':
+    if not testers: print('RESULT not a tester yet - run add first'); sys.exit(0)
+    r = call('POST', '/betaTesterInvitations', json={'data': {'type': 'betaTesterInvitations', 'relationships': {
+        'app': {'data': {'type': 'apps', 'id': env['ASC_APP_ID']}},
+        'betaTester': {'data': {'type': 'betaTesters', 'id': testers[0]['id']}}}}})
+    print('RESULT TestFlight invite email sent' if r.status_code < 400 else 'RESULT invite FAILED')
     sys.exit(0 if r.status_code < 400 else 1)

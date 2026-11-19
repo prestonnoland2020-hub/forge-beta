@@ -15,7 +15,7 @@ on:
       last_name:
         required: true
       action:
-        description: "status | resend | add"
+        description: "status | resend | add | invite"
         required: true
         default: status
 
