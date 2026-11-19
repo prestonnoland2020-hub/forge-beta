@@ -453,7 +453,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      it — which would silently prescribe the wrong day's lifts. The name is the
      part both copies actually share. */
   const recommendationFor=useCallback((position:number,name?:string)=>{
-    const byName=name?days.find(item=>splitDayKey(item.name)===splitDayKey(name)):undefined;
+    const exact=(a:string,b:string)=>a.trim().toLowerCase()===b.trim().toLowerCase();const byName=name?(days.find(item=>exact(item.name,name))||days.find(item=>splitDayKey(item.name)===splitDayKey(name))):undefined;
     const day=byName||days.find(item=>item.position===position);
     return day?buildFor(day):null;
   },[days,buildFor]);

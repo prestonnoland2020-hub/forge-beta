@@ -276,10 +276,18 @@ export function WeekList({ sessions, unit, records, title = 'This week', note, t
      as Bench and Row. The rest of the day's lifts are listed too — collapsed
      as "+1 more", and in the open row with their weight set on the day. */
   const { setup } = useProfileSetup();
-  const dayLifts = new Map((splitDays || setup?.splitDays || []).map(day => [splitDayKey(day.name), day.exercises || []]));
+  /* A DAY'S OWN LIFTS, by its exact name first. Keyed only by splitDayKey,
+     "Chest & Back" and "Chest & Back 2" shared one slot and the later day won,
+     so Thursday's Chest & Back listed Chest & Back 2's lifts (Incline, Pull
+     Ups) while Today listed its own (Barbell Row). */
+  const sourceDays = splitDays || setup?.splitDays || [];
+  const exactLifts = new Map(sourceDays.map(day => [String(day.name || '').trim().toLowerCase(), day.exercises || []]));
+  const dayLifts = new Map<string, string[]>();
+  sourceDays.forEach(day => { const key = splitDayKey(day.name); if (!dayLifts.has(key)) dayLifts.set(key, day.exercises || []); });
   const supportingFor = (session: PlanSession) => {
     const planned = new Set(session.lifts.map(lift => canonicalLiftKey(lift.exercise)));
-    return (dayLifts.get(splitDayKey(session.title)) || []).filter(name => !planned.has(canonicalLiftKey(name)));
+    const own = exactLifts.get(String(session.title || '').trim().toLowerCase()) ?? dayLifts.get(splitDayKey(session.title)) ?? [];
+    return own.filter(name => !planned.has(canonicalLiftKey(name)));
   };
   /* Being sick reaches the week, not just Today: the days inside it read as
      rest, and the days after it as the same session, lighter. */
