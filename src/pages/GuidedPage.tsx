@@ -272,7 +272,7 @@ export function GuidedPage() {
     const amount = s.move.timed ? `${s.reps} seconds${s.move.perSide && s.part === 'main' ? ' on each side' : ''}` : `${s.reps} ${s.move.perSide ? 'on each side' : 'reps'}`;
     const load = w !== null ? ` at ${w} ${unitWord}` : s.weightNote && setNo === 0 ? `. ${s.weightNote}` : '';
     const ask = s.move.timed ? (first ? " Say go when you're ready, and I'll time it." : " Say go when you're set.") : first ? " When you're finished, just say done." : '';
-    if (s.part === 'warmup') return `Let's warm up first. ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
+    if (s.part === 'warmup') return w !== null ? `Warm-up. ${s.move.name}, ${amount}${load}. ${s.move.cue}${ask}` : `Let's warm up first. ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
     if (s.part === 'cooldown') return `Last one. Let's cool down with ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
     if (setNo === 0) return `Alright, ${s.move.name}. ${s.sets > 1 ? `${s.sets} sets, ` : ''}${amount}${load}. ${s.move.cue}${ask}`;
     return `${setNo + 1 === s.sets ? 'Last set' : `Set ${setNo + 1}`} of ${s.move.name}. ${amount}${load}. ${setNo + 1 === s.sets ? 'Make it count.' : 'Same as before.'}${ask}`;
@@ -506,9 +506,9 @@ export function GuidedPage() {
     if (phase !== 'done' || saved.current || !workout) return;
     saved.current = true;
     const minutesTaken = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
-    const main = logged.filter(item => item.feel !== null);
+    const main = logged.filter(item => item.feel !== null && !item.moveId.endsWith(':warmup'));
     const best = new Map<string, LoggedSet>();
-    for (const item of main) if (item.weight !== null && (!best.has(item.moveId) || (item.weight ?? 0) > (best.get(item.moveId)!.weight ?? 0))) best.set(item.moveId, item);
+    for (const item of main) if (!item.moveId.endsWith(':warmup') && item.weight !== null && (!best.has(item.moveId) || (item.weight ?? 0) > (best.get(item.moveId)!.weight ?? 0))) best.set(item.moveId, item);
     const muscles = [...new Set(logged.flatMap(item => item.muscles))];
     const notes = `${fromPlan ? 'Coached' : 'Forge Guided'} · ${fromPlan ? workout.title : workout.focus}. ` + [...new Set(main.map(item => item.name))].map(name => { const sets = main.filter(item => item.name === name); return `${name} ${sets.length}×${sets[0].timed ? `${sets[0].reps}s` : sets[0].reps}${sets[0].weight !== null ? ` @ ${sets[sets.length - 1].weight} ${unit}` : ''}`; }).join(' · ');
     if (logged.length) {
@@ -901,7 +901,7 @@ export function GuidedPage() {
       <h1>{main.length ? 'You did it.' : 'Workout ended.'}</h1>
       <div className="gd-stats">
         <div><strong>{Math.max(1, Math.round((Date.now() - startedAt) / 60000))}</strong><span>minutes</span></div>
-        <div><strong>{new Set(logged.map(item => item.moveId)).size}</strong><span>moves</span></div>
+        <div><strong>{new Set(logged.map(item => item.moveId.replace(/:warmup$/, ''))).size}</strong><span>moves</span></div>
         <div><strong>{main.length}</strong><span>sets</span></div>
       </div>
       {notes.length > 0 && <div className="gd-card"><span className="gd-eyebrow">YOUR COACH NOTICED</span>{notes.map(name => <p key={name} className="gd-note"><Svg d="M12 19V5M5 12l7-7 7 7" size={16} />{name} felt easy. It starts heavier next time.</p>)}</div>}

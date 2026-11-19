@@ -1,6 +1,7 @@
 import { MOVES, MOVE, type Move } from './catalog';
 import type { Step, Workout } from './builder';
 import { canonicalLiftKey } from '../liftAliases';
+import { warmupRamp } from '../fullWorkout';
 
 /* COACH ME THROUGH TODAY'S PLAN.
 
@@ -46,7 +47,7 @@ function moveFor(lift: PlanLift, metric: boolean): Move {
   const ramp = lift.accessory
     ? `${lift.sets || 3} sets of ${lift.reps}${lift.weight > 0 ? ` at ${lift.weight} ${unit}` : ''}. About a minute between sets.`
     : lift.weight > 0
-    ? `Warm up first: ${plate(lift.weight * 0.5, metric)} for 8, then ${plate(lift.weight * 0.75, metric)} for 3. Then your top set: ${lift.weight} ${unit} for ${lift.reps}.`
+    ? `Your top set: ${lift.weight} ${unit} for ${lift.reps}. Stop with one or two reps left.`
     : `Work up to a weight you could do for ${lift.reps} with two reps left in the tank. That one set is your top set.`;
   if (known) return { ...known, name: lift.exercise, cue: ramp };
   return {
@@ -70,6 +71,14 @@ export function planWorkout(title: string, lifts: PlanLift[], metric: boolean): 
     /* No number yet: start from the empty bar and let her set what she lifted
        with − and +, so the set is logged with a real weight. */
     const bare = move.load === 'dumbbell' || move.load === 'kettlebell' ? (metric ? 5 : 10) : (metric ? 20 : 45);
+    /* THE WARM-UP SETS TODAY PRESCRIBES, as real cards before the top set:
+       the same ramp the Today card lists (e.g. 180 × 5, 250 × 3, 305 × 1), each
+       said with its weight. They are not logged as top sets. */
+    if (!raw.accessory && lift.weight > 0) {
+      warmupRamp(lift.weight, metric).forEach((weight, index) => {
+        steps.push({ move: { ...move, id: `${move.id}:warmup`, cue: index === 0 ? 'Warm-up set. Easy, smooth reps.' : 'Warm-up set. Stay crisp, save the effort.' }, sets: 1, reps: [5, 3, 1][index] ?? 1, weight, rest: 60, part: 'warmup' });
+      });
+    }
     /* An accessory from Build my workout: its working sets, shorter rest. */
     steps.push({ move, sets: raw.sets || 1, reps: lift.reps, weight: lift.weight > 0 ? lift.weight : (move.load === 'none' ? null : bare), weightNote: lift.weight > 0 ? undefined : 'Set the weight you actually lift with − and +.', rest: raw.accessory ? 75 : 120, part: 'main' });
   }
