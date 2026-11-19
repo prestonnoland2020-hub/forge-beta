@@ -17,3 +17,7 @@
 .td-coach-btn svg { color: var(--accent-strong, var(--accent)); }
 /* Why the coach picked it, in one line, above the details. */
 .ct-why { margin: 2px 0 0; font-size: 15px; line-height: 1.4; color: var(--ink); font-weight: 600; text-wrap: pretty; }
+/* The one-line "try Coach me" nudge on the existing card. */
+.ct-nudge { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 15px; line-height: 1.4; color: var(--ink); }
+.ct-nudge span { flex: 1; }
+.ct-nudge button { flex: none; width: 32px; height: 32px; margin: -4px -6px 0 0; border: 0; border-radius: 10px; background: none; color: var(--ink-2); font: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
