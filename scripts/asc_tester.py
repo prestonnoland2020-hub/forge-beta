@@ -48,7 +48,7 @@ if testers:
     st = call('GET', f"/betaTesters/{t['id']}?fields[betaTesters]=state,inviteType,email")
     if st.status_code < 400:
         print(f"TESTER detail state={st.json()['data']['attributes'].get('state')}")
-    gb = call('GET', f"/betaGroups/{env['ASC_GROUP_ID']}/builds?limit=5&sort=-uploadedDate&fields[builds]=version,processingState,expired,uploadedDate")
+    gb = call('GET', f"/betaGroups/{env['ASC_GROUP_ID']}/builds?limit=5&fields[builds]=version,processingState,expired,uploadedDate")
     if gb.status_code < 400:
         for b in gb.json().get('data', [])[:3]:
             a = b['attributes']
