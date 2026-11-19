@@ -23,13 +23,15 @@ const RULES: Array<[Command, RegExp]> = [
   ['end', /\b(end|finish|stop|quit)( the)? workout\b|\bi'?m finished for today\b/],
   ['easier', /\b(make it )?easier\b|\beasier (one|version)\b/],
   ['harder', /\b(make it )?harder\b|\bharder (one|version)\b/],
-  ['easy', /\btoo easy\b|\bthat was easy\b|\b(it was |felt )?easy\b|\blight\b/],
+  /* "Not too hard" is just right, not too hard. Checked before easy/hard. */
+  ['right', /\bnot (too |that |so )(hard|heavy|tough|easy)\b|\bnot bad\b/],
+  ['easy', /\btoo easy\b|\bthat was easy\b|\b(it was |felt )?easy\b/],
   ['hard', /\btoo hard\b|\btoo heavy\b|\bthat was hard\b|\b(it was |felt )?(hard|heavy|tough)\b/],
-  ['right', /\bjust right\b|\bperfect\b|\bgood\b|\bfine\b|\bright\b|\bok(ay)?\b/],
+  ['right', /\bjust right\b|\bperfect\b|\b(felt|feels|that was|it was) (good|fine|ok(ay)?|right)\b/],
   ['heavier', /\bheavier\b|\bmore weight\b|\bgo up\b/],
   ['lighter', /\blighter\b|\bless weight\b|\bgo down\b/],
   ['more', /\bmore (rest|time)\b|\b(30|thirty) more\b|\bneed (a )?minute\b|\bnot ready\b/],
-  ['ready', /\bready\b|\blet'?s go\b|\bgo\b|\bnext\b|\bcontinue\b/],
+  ['ready', /\bready\b|\blet'?s go\b/],
   ['done', /\bdone\b|\bfinished\b|\bcomplete\b|\bthat'?s it\b/],
   ['how', /\bhow (do|does|to)\b|\bshow me\b|\bexplain\b|\bwhat do i do\b/],
   ['repeat', /\brepeat\b|\bsay (that|it) again\b|\bwhat\??$|\bpardon\b|\bcome again\b/],
@@ -43,13 +45,28 @@ const RULES: Array<[Command, RegExp]> = [
    taken out before the moving-on commands are matched, so "not done yet"
    leaves the set running and "don't skip" skips nothing. "Not ready" still
    reaches More rest, which reads the sentence whole. */
-const NEGATABLE: Command[] = ['done', 'ready', 'skip', 'end', 'start'];
-const unNegated = (text: string) => text.replace(/\b(not|never|don'?t|do not|didn'?t|can'?t|isn'?t|aren'?t|wasn'?t)\s+(yet\s+|quite\s+|really\s+|even\s+)?[a-z']+/g, ' ');
+const NEGATABLE: Command[] = ['done', 'ready', 'skip', 'end', 'start', 'easy', 'hard'];
+const unNegated = (text: string) => text.replace(/\b(not|never|don'?t|do not|didn'?t|can'?t|isn'?t|aren'?t|wasn'?t)\s+(yet\s+|quite\s+|really\s+|even\s+|too\s+|that\s+|so\s+)?[a-z']+/g, ' ');
+
+/* BACKGROUND TALK IS NOT A COMMAND. Someone nearby saying "I was going to go
+   to the store", or a lyric with "next" in it, used to start the next set,
+   and "good morning" answered Just right. These everyday words count only
+   when they are most of what was said (a few words, said to the coach). */
+const LOOSE: Array<[Command, RegExp]> = [
+  ['easy', /\blight\b/],
+  ['right', /\bgood\b|\bfine\b|\bright\b|\bok(ay)?\b/],
+  ['ready', /\bgo\b|\bnext\b|\bcontinue\b/],
+];
+const SHORT = 3;
 
 export function parseCommand(transcript: string, allowed?: Command[]): Command | null {
   const text = ` ${transcript.toLowerCase().replace(/[.,!?]/g, ' ').replace(/\s+/g, ' ').trim()} `;
   const plain = unNegated(text);
-  for (const [command, pattern] of RULES) {
+  const rules = text.trim().split(' ').length <= SHORT ? [...RULES, ...LOOSE] : RULES;
+  /* Loose words keep their old place in line: a short "okay ready" is still ready. */
+  const order = (command: Command) => RULES.reduce((at, [name], i) => name === command ? i : at, -1);
+  const ranked = rules.map((rule, i) => [rule, i < RULES.length ? i : order(rule[0]) + 0.5] as const).sort((a, b) => a[1] - b[1]).map(([rule]) => rule);
+  for (const [command, pattern] of ranked) {
     if (allowed && !allowed.includes(command)) continue;
     if (pattern.test(NEGATABLE.includes(command) ? plain : text)) return command;
   }
