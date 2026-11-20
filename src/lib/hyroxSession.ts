@@ -19,7 +19,7 @@ import type { PaceModel } from './paceModel';
    evidence for the HYROX goal because it IS the event. Race week gets a short
    sharpener instead of any of those. */
 
-export type HyroxShape='stations'|'compromised'|'simulation'|'race-week';
+export type HyroxShape='stations'|'compromised'|'simulation'|'race-week'|'rounds';
 export type HyroxInput={
   /* How many HYROX sessions the athlete has already completed. Drives the rotation. */
   sessionIndex:number;
@@ -51,7 +51,7 @@ export const HYROX_READINESS_FLOOR=58;
 /* Seconds per mile ADDED to threshold for each shape's 1 km runs. Eight runs
    with stations between them are held slower than a continuous 10 km, and a
    stations day slower again — the athlete is there for the sled, not the run. */
-export const RUN_OFFSET:Record<HyroxShape,number>={stations:35,compromised:15,simulation:25,'race-week':25};
+export const RUN_OFFSET:Record<HyroxShape,number>={stations:35,compromised:15,simulation:25,'race-week':25,rounds:20};
 export const EASED_OFFSET=20;
 
 /* WHAT A FINISH TIME ASKS FOR. A HYROX is close to half running and half
@@ -169,7 +169,7 @@ const finishClock=(seconds:number)=>{const total=Math.round(seconds);return `${M
    pace and no faster — bank nothing on the first four runs — so compromised
    running, simulations and race week all sit on it. A stations day is there
    for the sled, and its runs ease off a little. */
-export const GOAL_OFFSET:Record<HyroxShape,number>={stations:15,compromised:0,simulation:0,'race-week':0};
+export const GOAL_OFFSET:Record<HyroxShape,number>={stations:15,compromised:0,simulation:0,'race-week':0,rounds:10};
 
 type Station={name:string;kind:CircuitStation['kind'];target:number;unit:'meters'|'reps';minutes:number;load?:Record<Division,string>;targetFor?:Partial<Record<Division,number>>};
 type Division='mo'|'wo'|'mp'|'wp';
@@ -243,6 +243,30 @@ export function hyroxSession(input:HyroxInput):HyroxSession{
   const division=divisionKey(input.division);
   const half=stationsHalf(input.sessionIndex);
   const full=simulationFull(input.sessionIndex);
+
+  /* ROUNDS: fewer movements, more laps — "3 rounds of 1000 m row, 50 wall
+     balls, 1000 m run". Two stations a round (a different pair each time, in a
+     different order) with a 1 km run closing the round. Rounds drop as the
+     station loads rise, so the whole thing stays about 40–55 minutes. */
+  if(shape==='rounds'){
+    const pairs:Array<[number,number]>=[[4,7],[0,6],[1,5],[2,7],[3,4],[5,0]];
+    const at=((input.sessionIndex%pairs.length)+pairs.length)%pairs.length;
+    const [a,b]=pairs[at].map(index=>HYROX_STATIONS[index]);
+    const reps=at%2===0?3:4;
+    const amount=(station:Station)=>scaleTarget(station,/Wall|Lunges|Farmers|Burpee/.test(station.name)?.5:1,division);
+    const paceText=paceSeconds?`${runPace}${split?` (${split} per km)`:''}`:'controlled effort';
+    const roundSeconds=(paceSeconds?paceSeconds/1.609344:300)+(a.minutes+b.minutes)*60;
+    const entries:CircuitStation[]=[
+      {id:1,kind:a.kind,name:a.name,target:String(amount(a)),unit:a.unit,load:a.load?.[division],rest:'0'},
+      {id:2,kind:b.kind,name:b.name,target:String(amount(b)),unit:b.unit,load:b.load?.[division],rest:'0'},
+      {id:3,kind:'Cardio',name:'Run',target:'1000',unit:'meters',pace:runPace,rest:'0'}];
+    const minutes=Math.round(roundSeconds*reps/60);
+    const summary=`${reps} rounds · ${a.name}, ${b.name}, 1 km run at ${runPace}`;
+    return{shape,title:`HYROX rounds · ${a.name} + ${b.name}`,summary,
+      rationale:`${reps} rounds of ${amount(a)} ${a.unit==='reps'?'reps':'m'} ${a.name}, ${amount(b)} ${b.unit==='reps'?'reps':'m'} ${b.name} and a 1 km run at ${paceText}. Fewer movements, more laps: hold the same pace every round. Rest only to swap stations.${eased?` Readiness is under ${HYROX_READINESS_FLOOR}, so the pace is eased by ${EASED_OFFSET} s/mi.`:''}`,
+      runPace,runs:reps,
+      plan:{id:7100+input.sessionIndex,activity:'HYROX',structure:'Circuit',targetSource:'Goal generated',circuitFormat:'For time',rounds:String(reps),roundRest:'0',duration:String(minutes),stationEntries:entries,customTarget:summary}};
+  }
 
   const picked:Array<{station:Station;share:number;rest:string}>=(()=>{
     if(shape==='stations'){
@@ -361,4 +385,14 @@ export function upcomingHyroxSessions(input:Omit<HyroxInput,'sessionIndex'|'shap
     const written=hyroxSession({...input,sessionIndex:input.sessionsDone+offset});
     return{session:offset+1,shape:written.shape,title:written.title,summary:written.summary};
   });
+}
+
+/* A HYROX DAY THE ATHLETE WROTE: their circuit, shown as written. Forge does
+   not rewrite it and needs no HYROX goal to show it. */
+export function ownHyroxSession(plan:PlannedCardio){
+  const entries=plan.stationEntries||[];
+  const rounds=Number(plan.rounds)>1?Number(plan.rounds):1;
+  const names=entries.map(entry=>entry.name).join(', ');
+  const summary=`${rounds>1?`${rounds} rounds: `:''}${names}`;
+  return{shape:'stations' as const,title:'Your HYROX session',summary,rationale:'You wrote this session, so Forge shows it exactly as you built it.',runPace:'',runs:entries.filter(entry=>entry.name==='Run').length,plan:{...plan,activity:'HYROX',customTarget:summary}};
 }
