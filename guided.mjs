@@ -1,7 +1,7 @@
 /* FORGE GUIDED: the builder makes safe, fitting workouts; the coach hears
    short commands; the weights follow how each set felt. */
 import { MUST_HIT, customWorkout, buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
-import { parseCommand, matchCommand, normalizePhrase } from './src/lib/guided/voice.ts';
+import { parseCommand, matchCommand, normalizePhrase, parseSetReport } from './src/lib/guided/voice.ts';
 import { MOVES } from './src/lib/guided/catalog.ts';
 import { planWorkout } from './src/lib/guided/fromPlan.ts';
 import { existsSync } from 'node:fs';
@@ -136,5 +136,14 @@ check('every focus hits every muscle group it promises, and fits the time', !mis
   check('coached plan: warm-ups are kept apart from the top set when logging', ramp.every(s => s.move.id.endsWith(':warmup')) && !top.move.id.endsWith(':warmup'));
   const acc = planWorkout('X', [{ exercise: 'Incline Dumbbell Press', muscle: 'Chest', weight: 60, reps: 10, sets: 3, accessory: true }], false);
   check('coached plan: accessories get no warm-up ramp', !acc.steps.some(s => s.part === 'warmup' && s.weight !== null)); }
+{ /* Nov 19 (real workout): "I just did 400 pounds for six reps" on the Bench card went unheard. */
+  const r = (t) => JSON.stringify(parseSetReport(t));
+  check('set report: "I just did 400 pounds for six reps" = 400 lb × 6', r('I just did 400 pounds for six reps') === JSON.stringify({ weight: 400, reps: 6, unit: 'lb' }), r('I just did 400 pounds for six reps'));
+  check('set report: "got 225 for 5" = 225 × 5', r('got 225 for 5') === JSON.stringify({ weight: 225, reps: 5, unit: null }), r('got 225 for 5'));
+  check('set report: "did 100 kilos for 3" is kilos', parseSetReport('did 100 kilos for 3')?.unit === 'kg');
+  check('set report: "I did 8 reps" is reps only', r('I did 8 reps') === JSON.stringify({ weight: null, reps: 8, unit: null }), r('I did 8 reps'));
+  check('set report: "I hit 1,000 pounds for 2" reads the comma', parseSetReport('I hit 1,000 pounds for 2')?.weight === 1000);
+  for (const t of ['Alright, Bench. 2 reps at 360 pounds.', 'should I do 400 for 6', "I didn't get 6 reps", 'coach I did 400 for 6?', 'Done', 'I did it', 'two three four five', 'play the next song'])
+    check(`set report: "${t}" is not a set`, parseSetReport(t) === null, r(t)); }
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

@@ -8,7 +8,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
 import { amountText, buildWorkout, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
-import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
+import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
@@ -442,9 +442,12 @@ export function GuidedPage() {
     setPhase('feel');
     say(FEEL_LINE, ['ask', 'easy', 'right', 'hard', 'repeat', 'end']);
   };
+  /* A set the athlete said out loud ("I did 225 for 5") is logged as said. */
+  const reported = useRef<{ reps?: number; weight?: number } | null>(null);
   const record = (feel: Feel | null) => {
     if (!step) return;
-    setLogged(list => [...list, { moveId: step.move.id, name: step.move.name, muscles: step.move.muscles, reps: step.reps, weight, feel, timed: Boolean(step.move.timed) }]);
+    const said = reported.current; reported.current = null;
+    setLogged(list => [...list, { moveId: step.move.id, name: step.move.name, muscles: step.move.muscles, reps: said?.reps ?? step.reps, weight: said?.weight ?? weight, feel, timed: Boolean(step.move.timed) }]);
   };
   const answer = (feel: Feel) => {
     if (!step || !workout) return;
@@ -508,7 +511,7 @@ export function GuidedPage() {
     const minutesTaken = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
     const main = logged.filter(item => item.feel !== null && !item.moveId.endsWith(':warmup'));
     const best = new Map<string, LoggedSet>();
-    for (const item of main) if (!item.moveId.endsWith(':warmup') && item.weight !== null && (!best.has(item.moveId) || (item.weight ?? 0) > (best.get(item.moveId)!.weight ?? 0))) best.set(item.moveId, item);
+    for (const item of main) if (!item.moveId.endsWith(':warmup') && item.weight !== null && (!best.has(item.moveId) || (item.weight ?? 0) > (best.get(item.moveId)!.weight ?? 0) || (item.weight === best.get(item.moveId)!.weight && item.reps > best.get(item.moveId)!.reps))) best.set(item.moveId, item);
     const muscles = [...new Set(logged.flatMap(item => item.muscles))];
     const notes = `${fromPlan ? 'Coached' : 'Forge Guided'} · ${fromPlan ? workout.title : workout.focus}. ` + [...new Set(main.map(item => item.name))].map(name => { const sets = main.filter(item => item.name === name); return `${name} ${sets.length}×${sets[0].timed ? `${sets[0].reps}s` : sets[0].reps}${sets[0].weight !== null ? ` @ ${sets[sets.length - 1].weight} ${unit}` : ''}`; }).join(' · ');
     if (logged.length) {
@@ -589,7 +592,37 @@ export function GuidedPage() {
       if (command === 'more') { setTimer(t => t + 30); say('Sure, thirty more seconds.', ['ready', 'more', 'skip', 'repeat', 'end']); return; }
     }
   };
-  useEffect(() => { coach.current?.on((command, heardText) => commandRef.current(command, heardText)); }, []);
+  /* "I just did 400 pounds for six reps" on a card: that is the set. Logged
+     as said, then the usual feel question. A warm-up card with a report at or
+     above the working weight was the top set, so it is logged as that. */
+  const reportRef = useRef<(text: string) => boolean>(() => false);
+  reportRef.current = (text: string) => {
+    if (phase !== 'card' || !step || !workout || step.move.timed) return false;
+    const said = parseSetReport(text);
+    if (!said) return false;
+    let w = said.weight;
+    if (w !== null && said.unit && (said.unit === 'kg') !== metric) w = metric ? Math.round(w * 0.4536 / 2.5) * 2.5 : Math.round(w * 2.2046 / 5) * 5;
+    if (step.move.load === 'none' || weight === null) w = null;
+    if (w === null && said.reps === null) return false;
+    misses.current = 0; setUnknown(null); setRunning(false);
+    let at = stepIndex;
+    if (step.part !== 'main' && step.move.id.endsWith(':warmup') && w !== null) {
+      const id = step.move.id.replace(/:warmup$/, '');
+      const top = workout.steps.findIndex((item, i) => i > stepIndex && item.part === 'main' && item.move.id === id);
+      const topWeight = top >= 0 ? (weights[top] !== undefined ? weights[top] : workout.steps[top].weight) : null;
+      if (top >= 0 && topWeight !== null && w >= topWeight) at = top;
+    }
+    const target = workout.steps[at];
+    reported.current = { ...(said.reps !== null ? { reps: said.reps } : {}), ...(w !== null ? { weight: w } : {}) };
+    if (w !== null) setWeights(map => ({ ...map, [at]: w! }));
+    const got = `Got it${w !== null ? `, ${w} ${unitWord}` : ''}${said.reps !== null ? ` for ${said.reps}` : ''}.`;
+    if (target.part !== 'main') { record(null); goTo(at + 1); return true; }
+    if (at !== stepIndex) { setStepIndex(at); setSetIndex(0); }
+    setPhase('feel');
+    say(`${got} ${FEEL_LINE}`, ['ask', 'easy', 'right', 'hard', 'repeat', 'end']);
+    return true;
+  };
+  useEffect(() => { coach.current?.on((command, heardText) => commandRef.current(command, heardText)); if (coach.current) coach.current.onSetReport = text => reportRef.current(text); }, []);
 
   const active = (phase === 'card' || phase === 'feel' || phase === 'rest') && Boolean(workout);
   const leave = () => { writeLive(null); coach.current?.stop(); navigate('/'); };

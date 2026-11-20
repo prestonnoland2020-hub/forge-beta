@@ -134,6 +134,33 @@ const sameStarts = (a: string, b: string) => {
 };
 
 export type Match = { command: Command; how: 'rule' | 'learned' | 'sounds-like' | 'close' ; score: number };
+/* A SET SAID OUT LOUD. "I just did 400 pounds for six reps", "got 225 for
+   5", "8 reps": a real coach writes that down instead of asking again. Only a
+   first-person report counts; the coach's own "2 reps at 360 pounds", a plan
+   ("should I do 400"), a question or a "didn't" is not a set. */
+const COUNT: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30 };
+export type SetReport = { weight: number | null; reps: number | null; unit: 'lb' | 'kg' | null };
+export function parseSetReport(transcript: string): SetReport | null {
+  const text = transcript.toLowerCase().replace(/(\d),(\d{3})/g, '$1$2').replace(/[,.!]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!text || text.includes('?') || /^(hey |ok |okay )?coach\b/.test(text)) return null;
+  if (/\b(didn'?t|did not|couldn'?t|could not|can'?t|cannot|won'?t|not|should|shall|will|gonna|going to|want to|wanna|try|next|plan)\b/.test(text)) return null;
+  if (!/\b(i|i've|ive|i'm|just|did|got|hit|made|managed|finished|completed|went|that was|that's)\b/.test(text)) return null;
+  const num = (word: string) => /^\d/.test(word) ? Number(word) : COUNT[word] ?? NaN;
+  const N = '(\\d{1,4}(?:\\.\\d)?|' + Object.keys(COUNT).join('|') + ')';
+  let weight: number | null = null, reps: number | null = null, unit: SetReport['unit'] = null;
+  const w = text.match(new RegExp(`\\b${N}\\s*(pounds?|lbs?|kilos?|kilograms?|kgs?)\\b`));
+  if (w) { weight = num(w[1]); unit = /^(k)/.test(w[2]) ? 'kg' : 'lb'; }
+  const r = text.match(new RegExp(`\\b${N}\\s*(reps?|times)\\b`)) || (w ? text.slice((w.index || 0) + w[0].length).match(new RegExp(`^\\s*(?:for|x|times)\\s+${N}\\b`)) : null);
+  if (r) reps = num(r[1]);
+  if (weight === null && reps === null) {
+    const pair = text.match(/\b(\d{2,4}(?:\.\d)?)\s+(?:for|x)\s+(\d{1,2}|[a-z]+)\b/);
+    if (pair && Number.isFinite(num(pair[2]))) { weight = Number(pair[1]); reps = num(pair[2]); }
+  }
+  if (weight !== null && !(weight > 0 && weight <= 1500)) weight = null;
+  if (reps !== null && !(Number.isInteger(reps) && reps >= 1 && reps <= 100)) reps = null;
+  return weight === null && reps === null ? null : { weight, reps, unit };
+}
+
 export function matchCommand(transcript: string, allowed?: Command[], memory: Record<string, Command> = {}): Match | null {
   const ok = (command: Command) => !allowed || allowed.includes(command);
   const rule = parseCommand(transcript, allowed);
@@ -378,6 +405,7 @@ export class Coach {
   private handleHeard(alternatives: string[]) {
     if (!alternatives.length) return;
     if (this.capture) { const take = this.capture; this.capture = null; this.ears?.learnLevel(true); this.onHeard(alternatives[0]); take(alternatives); return; }
+    if (!this.freeText && this.onSetReport(alternatives[0])) { this.ears?.learnLevel(); this.onHeard(alternatives[0]); return; }
     let best: { match: Match; heard: string } | null = null;
     for (const heard of alternatives) {
       const match = matchCommand(heard, this.allowed, this.memory);
@@ -407,6 +435,8 @@ export class Coach {
   /* The voice check: the next thing said goes here, every alternative. */
   capture: ((heard: string[]) => void) | null = null;
   onUnknown: (heard: string) => void = () => {};
+  /* "I did 225 for 5": true when the page took it as the set. */
+  onSetReport: (heard: string) => boolean = () => false;
   memory: Record<string, Command> = {};
   reloadMemory() { this.memory = typeof localStorage === 'undefined' ? {} : loadVoiceMemory(); }
 
