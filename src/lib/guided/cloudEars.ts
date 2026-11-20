@@ -12,6 +12,8 @@
    MediaRecorder cannot hand back the start of a sentence it was not already
    recording. */
 
+import { LoudnessGate, toDb } from './voiceGate';
+
 export type Transcribe = (wav: Blob) => Promise<string>;
 
 const RATE = 16000;
@@ -60,10 +62,16 @@ export class CloudEars {
   private floor = 0.008;
   private sent = 0;
   private busy = false;
+  private voicedSq = 0;
+  private voicedN = 0;
+  private lastSentDb: number | null = null;
+  readonly gate = new LoudnessGate();
   paused = true;
   onText: (text: string) => void = () => {};
   onLevel: (active: boolean) => void = () => {};
   onError: (error: unknown) => void = () => {};
+  /* A clip was held back for being far quieter than the athlete: the running count only. */
+  onGated: (count: number) => void = () => {};
 
   constructor(private transcribe: Transcribe) {}
 
@@ -108,20 +116,24 @@ export class CloudEars {
     if (this.paused || this.sent >= SESSION_CAP) { this.reset(); this.keepRing(chunk); return; }
     if (!this.speaking) {
       this.keepRing(chunk);
-      if (loud) { this.speaking = true; this.speechStart = now; this.lastLoud = now; this.speech = [...this.ring]; this.onLevel(true); }
+      if (loud) { this.speaking = true; this.speechStart = now; this.lastLoud = now; this.speech = [...this.ring]; this.voicedSq = rms * rms; this.voicedN = 1; this.onLevel(true); }
       return;
     }
     this.speech.push(chunk);
-    if (loud) this.lastLoud = now;
+    if (loud) { this.lastLoud = now; this.voicedSq += rms * rms; this.voicedN += 1; }
     const length = now - this.speechStart;
     if (now - this.lastLoud > END_SILENCE || length > MAX_SPEECH) {
       const voiced = this.lastLoud - this.speechStart;
       const clip = this.speech;
+      const db = toDb(Math.sqrt(this.voicedSq / Math.max(1, this.voicedN)));
       this.reset();
       this.onLevel(false);
-      if (voiced >= MIN_SPEECH) void this.send(clip);
+      if (voiced >= MIN_SPEECH) void this.send(clip, db);
     }
   }
+
+  /* The last clip sent was a real command (or the voice check): that is the athlete's level. */
+  learnLevel(fromVoiceCheck = false) { if (this.lastSentDb !== null) this.gate.setLevel(this.lastSentDb, fromVoiceCheck); }
 
   private keepRing(chunk: Float32Array) {
     this.ring.push(chunk); this.ringSamples += chunk.length;
@@ -131,8 +143,10 @@ export class CloudEars {
 
   private reset() { this.speaking = false; this.speech = []; }
 
-  private async send(parts: Float32Array[]) {
+  private async send(parts: Float32Array[], db: number) {
     if (this.busy || !this.ctx) return;
+    if (!this.gate.allow(db, performance.now())) { this.onGated(this.gate.dropped); return; }
+    this.lastSentDb = db;
     this.busy = true; this.sent += 1;
     try {
       const total = parts.reduce((sum, part) => sum + part.length, 0);

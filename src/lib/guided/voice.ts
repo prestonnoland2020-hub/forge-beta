@@ -354,6 +354,7 @@ export class Coach {
     if (!cloudEarsSupported()) return false;
     const ears = new CloudEars(blob => transcribe(blob));
     ears.onText = text => { this.cloudFailures = 0; if (this.tapToTalk) { this.oneShot += 1; this.stopListening(); } this.handleHeard([text]); };
+    ears.onGated = count => this.onReport('gated', String(count));
     ears.onError = () => {
       this.cloudFailures += 1;
       if (this.cloudFailures >= 2) { ears.close(); this.ears = null; this.mode = 'phone'; this.onMode('phone'); if (this.wantListen && !this.speaking) this.listen(); }
@@ -376,7 +377,7 @@ export class Coach {
   /* One place that turns what was heard into a command, for either ear. */
   private handleHeard(alternatives: string[]) {
     if (!alternatives.length) return;
-    if (this.capture) { const take = this.capture; this.capture = null; this.onHeard(alternatives[0]); take(alternatives); return; }
+    if (this.capture) { const take = this.capture; this.capture = null; this.ears?.learnLevel(true); this.onHeard(alternatives[0]); take(alternatives); return; }
     let best: { match: Match; heard: string } | null = null;
     for (const heard of alternatives) {
       const match = matchCommand(heard, this.allowed, this.memory);
@@ -385,7 +386,7 @@ export class Coach {
     }
     if (best) {
       if (best.match.how === 'close' && best.match.score >= 0.85) { teachPhrase(best.heard, best.match.command); this.reloadMemory(); }
-      this.onHeard(best.heard); this.handler(best.match.command, best.heard); return;
+      this.ears?.learnLevel(); this.onHeard(best.heard); this.handler(best.match.command, best.heard); return;
     }
     this.onHeard(alternatives[0]);
     if (this.freeText) { this.freeText = false; this.handler('ask', alternatives[0]); return; }
