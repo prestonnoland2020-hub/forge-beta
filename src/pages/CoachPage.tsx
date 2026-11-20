@@ -1,3 +1,4 @@
+import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
 import { guidedCoachContext } from '../lib/guided/session';
 import { isDemoMode } from '../lib/env';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -41,6 +42,22 @@ import { CORE_LIFTS } from '../lib/coreLifts';
 import { readSwaps } from '../lib/todaySwaps';
 
 const questions=['What should I train today?','Weekly recap','What is my training geared toward?','Am I on track for my goal?','Plan my week'];
+
+
+/* WHAT YOU LOGGED TODAY, FIRST IN WHAT THE COACH READS. "How was today?"
+   was answered with "I can't see the sets you completed" because today's sets
+   sat deep in recentTrainingHistory, past where a long context gets cut. This
+   small block goes first and is never cut. */
+function todayLoggedFor(records: WorkoutRecord[], todayIso: string) {
+  const today = records.filter(record => record.date === todayIso);
+  return {
+    date: todayIso,
+    workouts: today.map(record => ({ title: record.title || null, effort: record.effort ?? null, notes: record.notes || null,
+      topSets: (record.topSets || []).filter(set => set.completed !== false && set.lift).map(set => ({ lift: set.lift, weight: set.weight, reps: set.reps, calculatedMax: set.calculatedMax ?? null })),
+      cardio: (record.cardioSessions || []).map(session => ({ activity: session.activity, summary: session.summary })) })),
+    note: today.length ? 'These are the sets the athlete has logged today. Judge today from them.' : 'Nothing is logged today yet.',
+  };
+}
 
 export function CoachPage(){
   const [params]=useSearchParams();const {records}=useWorkoutHistory();const {recovery,profile}=useAdaptiveTraining();const {goals}=useGoals();const {strategy}=useCoachingStrategy();const {setup}=useProfileSetup();const weightUnit=setup?.units==='Metric'?'kg':'lb';const {exercises,workouts}=useTrainingLibrary();const {recommendation,anchorDate}=useDailyRecommendation();const watchEfforts=useWorkoutEvidence();
@@ -162,7 +179,7 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
     /* THE CONSISTENCY TEST READS WHAT THE COACH IS TOLD. In preview mode the
        request never leaves the device; the context is left on window so a
        test can check it says the same day, lifts and miles as the screens. */
-    const coachRequest={question:value,scope:'today' as const,context:{conversationHistory:conversationRef.current.slice(-10).map(turn=>({role:turn.role,text:turn.text})),aiProgram:storedProgram&&blockIsOver(storedProgram,todayIso)?{status:'complete',summary:storedProgram.plan.summary,blockWeeks:storedProgram.plan.weeks.length,endedOn:blockEndIso(storedProgram),note:'The block is finished and the next one has not been built. There is no current plan week: do not quote week numbers, mileage or top sets from it as this week. Today is the deterministic recommendation alone; say the next block is built from the Plan tab.'}:storedProgram&&programWeek?{generatedAt:storedProgram.generatedAt,summary:storedProgram.plan.summary,blockWeeks:storedProgram.plan.weeks.length,currentWeek:{week:programWeek.week,phase:programWeek.phase,mileage:programWeek.mileage,longRun:`${programWeek.longRunMiles} mi @ ${programWeek.longRunPace} on ${programWeek.longRunDay}`,quality:`${programWeek.quality}${programWeek.qualityPace?` @ ${programWeek.qualityPace}`:''} on ${programWeek.qualityDay}`,easy:(programWeek.easyDays||[]).map((day,index)=>`${day}: ${programWeek.easyRuns?.[index] ?? '?'} mi @ ${programWeek.easyPace}`).join('; ')||'No easy runs this week',topSets:/* An unlogged lift carries weight 0 as "no number yet"; the coach must not read it as zero pounds. */programWeek.topSets.map(set=>set.unlogged?{splitDay:set.splitDay,exercise:set.exercise,reps:set.reps,weight:'not logged yet — athlete finds their weight'}:set),note:programWeek.note}}:null,athleteHealthNotes:notesForCoachContext(notes),/* THE HYROX ROTATION FORGE WILL WRITE, so a HYROX question is answered with
+    const coachRequest={question:value,scope:'today' as const,context:{todayLogged:todayLoggedFor(records,todayIso),conversationHistory:conversationRef.current.slice(-10).map(turn=>({role:turn.role,text:turn.text})),aiProgram:storedProgram&&blockIsOver(storedProgram,todayIso)?{status:'complete',summary:storedProgram.plan.summary,blockWeeks:storedProgram.plan.weeks.length,endedOn:blockEndIso(storedProgram),note:'The block is finished and the next one has not been built. There is no current plan week: do not quote week numbers, mileage or top sets from it as this week. Today is the deterministic recommendation alone; say the next block is built from the Plan tab.'}:storedProgram&&programWeek?{generatedAt:storedProgram.generatedAt,summary:storedProgram.plan.summary,blockWeeks:storedProgram.plan.weeks.length,currentWeek:{week:programWeek.week,phase:programWeek.phase,mileage:programWeek.mileage,longRun:`${programWeek.longRunMiles} mi @ ${programWeek.longRunPace} on ${programWeek.longRunDay}`,quality:`${programWeek.quality}${programWeek.qualityPace?` @ ${programWeek.qualityPace}`:''} on ${programWeek.qualityDay}`,easy:(programWeek.easyDays||[]).map((day,index)=>`${day}: ${programWeek.easyRuns?.[index] ?? '?'} mi @ ${programWeek.easyPace}`).join('; ')||'No easy runs this week',topSets:/* An unlogged lift carries weight 0 as "no number yet"; the coach must not read it as zero pounds. */programWeek.topSets.map(set=>set.unlogged?{splitDay:set.splitDay,exercise:set.exercise,reps:set.reps,weight:'not logged yet — athlete finds their weight'}:set),note:programWeek.note}}:null,athleteHealthNotes:notesForCoachContext(notes),/* THE HYROX ROTATION FORGE WILL WRITE, so a HYROX question is answered with
        the real next sessions — a few stations at a time — not all eight at once. */
     hyroxUpcoming:(()=>{const hyroxGoal=hyroxGoalOf(goals);if(!hyroxGoal)return null;const threshold=paceModel(records,enduranceTarget(goals),todayIso,medianWeeklyMiles(records),setup?.excludedEfforts||[]).threshold;return upcomingHyroxSessions({sessionsDone:hyroxSessionsDone(records,todayIso),thresholdSecondsPerMile:threshold||0,division:hyroxGoal.eventDivision,goalTarget:hyroxGoal.target,weeksToRace:weeksUntil(hyroxGoal.date,todayIso),metric:setup?.units==='Metric'})})(),athleteSex:setup?.sex||null,coachActionsApplied:readAppliedActions().slice(-12),/* weeklyPlan removed: a SECOND planner with its own numbers and its own
        claim that 'the goal lift is trained once this week, other strength days

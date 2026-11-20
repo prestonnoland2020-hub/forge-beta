@@ -174,19 +174,31 @@ NUMBERS YOU MAY QUOTE. runningFacts carries the athlete's running as Forge count
 const SAFETY_PATTERN = /\b(pain|painful|hurt|hurts|hurting|injur\w*|sore|strain\w*|sprain\w*|tweak\w*|pulled|sick|ill|illness|unwell|fever|flu|covid|cold|vomit\w*|nause\w*|dizz\w*|faint\w*|bleed\w*|pregnan\w*|postpartum|period|cramps?|cleared to|doctor|physio)\b/i;
 
 const CONTEXT_LIMIT = 30000;
+/* TODAY IS NEVER CUT. A long context used to be sliced off at the end, and
+   with it the athlete's own sets — "How was today?" got "I can't see the sets
+   you completed" an hour after he logged them. Now: today's log and the
+   conversation go first and stay whole; the bulky reference parts shrink
+   before the training history does; and a blind cut is the very last resort. */
+const BULKY_KEYS = ['availableLibrary', 'aiProgram', 'careerSummary', 'weeklyRunning', 'bodyWeight', 'goalSuggestions', 'trainingSummary'];
 function fitContext(raw: Record<string, unknown>): string {
-  let json = JSON.stringify(raw);
+  const { todayLogged, conversationHistory, ...rest } = raw;
+  const ctx: Record<string, unknown> = { todayLogged, conversationHistory, ...rest };
+  let json = JSON.stringify(ctx);
   if (json.length <= CONTEXT_LIMIT) return json;
-  const ctx: Record<string, unknown> = { ...raw };
   const history = Array.isArray(ctx.recentTrainingHistory) ? (ctx.recentTrainingHistory as unknown[]) : null;
   if (history) {
     let keep = history.length;
-    while (keep > 10 && json.length > CONTEXT_LIMIT) {
+    while (keep > 20 && json.length > CONTEXT_LIMIT) {
       keep = Math.floor(keep * 0.7);
       ctx.recentTrainingHistory = history.slice(0, keep);
       json = JSON.stringify(ctx);
     }
   }
+  for (const key of BULKY_KEYS) {
+    if (json.length <= CONTEXT_LIMIT) break;
+    if (key in ctx) { ctx[key] = '(left out for length)'; json = JSON.stringify(ctx); }
+  }
+  if (history && json.length > CONTEXT_LIMIT) { ctx.recentTrainingHistory = history.slice(0, 10); json = JSON.stringify(ctx); }
   return json.length <= CONTEXT_LIMIT ? json : json.slice(0, CONTEXT_LIMIT);
 }
 
@@ -363,6 +375,8 @@ NEVER REPORT DATA AS MISSING WITHOUT CHECKING THE CONTEXT FOR IT. bodyWeight car
 WHEN SOMETHING GENUINELY IS MISSING, NAME THE SESSION THAT WOULD FIX IT. A trajectory with 'missing' set says exactly what is absent and what would supply it. Prescribe that - "a hard mile inside the next two weeks and this stops being a guess" - as an action, in your own words. Never report the absence of a test as though the athlete failed to bring one: programming the test is your job.
 
 WHEN DATA IS THIN, STILL COACH. A question about technique, programming principles, a plateau, recovery, or fitting running around lifting deserves a real answer from coaching knowledge even before much is logged. Testers with a fresh account asked "how do I break a 5/3/1 bench plateau?" three times and got "log your bench first" three times; every one of them stopped trusting the coach. So: give the general guidance first - two or three concrete, standard options an experienced coach would offer (for that stall: reset the training max about 10%, add a paused or close-grip bench as the supplemental, check bar speed on the 5s week) - say plainly that it is general, then add ONE clause on what logging would let you personalise. The evidence rules govern numbers you prescribe (loads, reps, paces) and the saved plan; they never forbid explaining principles or naming standard methods as options. A standard method you name is an option for the athlete, not a change to their plan - it follows the proposed-change rule below. "Log first" is never the whole answer, and never the answer twice in a row.
+
+WHAT THEY LOGGED TODAY. todayLogged lists every set and run the athlete has logged today. When they ask how today went, judge it from those numbers against today's plan (deterministicRecommendation): what they hit, what beat or missed the target, what it means for the goal. Never say you can't see today's sets when todayLogged has them. If todayLogged is empty, say nothing is logged yet. Never tell them to log something todayLogged already has.
 
 NEVER REPEAT YOURSELF. conversationHistory holds the recent exchange. If the athlete asks something you have already answered, do not restate the same sentences - acknowledge it in a few words ("Same as above: 135 x 10 next Chest & Back") and add the one thing that is new or more useful: the reason behind it, a cue, or what would change the answer. If they are pushing back, they want more than you gave; go one level deeper instead of repeating.
 
