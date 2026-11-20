@@ -17,5 +17,6 @@ const out = fitContext(huge);
 check('a context far over the limit still carries today\'s sets whole', out.length <= 30000 && JSON.parse(out).todayLogged.workouts[0].topSets[0].lift === 'Pull Ups');
 check('today goes first, before anything that could be cut', out.startsWith('{"todayLogged"'));
 check('the prompt tells the coach to judge today from todayLogged', /WHAT THEY LOGGED TODAY/.test(fn) && /Never say you can't see today's sets/.test(fn));
+check('a planned lift left out is not called a miss or nagged to log', /skipped on purpose/.test(fn) && /do not ask them to log it/.test(fn));
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
 console.log('\nall passed');
