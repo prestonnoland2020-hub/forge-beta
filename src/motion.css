@@ -1,30 +1,32 @@
-/* ONE QUIET MOTION PER SCREEN CHANGE — AND NOTHING ELSE MOVES.
-   Recorded at iPhone size, a tab switch was four motions on top of each other:
-   the page slid 8px, its cards slid in one after another, Today's card rose
-   from invisible, Goals' numbers counted up from 0 with a haptic click per
-   step, and the floor glow behind it all was scaling on an 8-second loop.
-   On the phone that read as glitchy.
+/* ONE CALM MOTION PER SCREEN CHANGE.
+   Recorded in WebKit at iPhone size: a tab switch snapped with no motion
+   (the view transition did not play in the WebView), then numbers counted up
+   from 0 and cards jumped in a third of a second later. Two visible changes
+   per tap read as a glitch.
 
-   Now: the new screen is drawn in place and fades from 92% to full in 160ms.
-   Opacity only — no transform — so it costs the phone nothing to draw, never
-   turns the page into a frame for fixed sheets, and nothing starts invisible
-   or lands late. Cards, numbers and the glow hold still. */
+   Now every screen change is the same short move: the new screen is already
+   almost fully there (opacity .85) and settles 8px into place in 240ms, with the
+   first few cards following 25ms apart. Nothing starts invisible, nothing
+   lands late. */
 @media (prefers-reduced-motion: no-preference) {
-  .app-frame main.page,
-  .app-frame main.page.screen-push,
-  .app-frame main.page.screen-pop { animation: page-in .16s ease-out backwards; }
+  .app-frame main.page { animation: page-in .24s cubic-bezier(.2, .8, .2, 1) backwards; }
+  .app-frame main.page.screen-push { animation-name: page-push; }
+  .app-frame main.page.screen-pop { animation-name: page-pop; }
+  .app-frame :is(.gx-group > *, .simple-preview-results > *, .td-stack > *,
+    .history-page > *, .simple-profile > *, .simple-settings-list > *, .gx-hero, .gx-card, .gx-empty-art span) {
+    animation: card-in .22s cubic-bezier(.2, .8, .2, 1) backwards !important;
+  }
+  .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(2) { animation-delay: 25ms !important; }
+  .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(3) { animation-delay: 50ms !important; }
+  .app-frame :is(.gx-group, .history-page, .simple-profile, .simple-settings-list, .td-stack, .gx-cards) > :nth-child(n + 4) { animation-delay: 75ms !important; }
 }
-@keyframes page-in { from { opacity: .92; } to { opacity: 1; } }
-
-/* Cards arrive with their screen, not after it. */
-.app-frame :is(.gx-group > *, .simple-preview-results > *, .td-stack > *,
-  .history-page > *, .simple-profile > *, .simple-settings-list > *, .gx-hero, .gx-card, .gx-empty-art span,
-  .today > .td-card, .today > .partners-card) { animation: none !important; }
-
-/* The floor glow is still lit by the week; it just doesn't breathe. A
-   full-screen layer scaling forever is work the phone does under every tap.
-   A new record still flares it once. */
-.app-frame:not(.record-flare)::before { animation: none !important; opacity: .9; }
-
+@keyframes page-in { from { opacity: .85; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes page-push { from { opacity: .85; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+@keyframes page-pop { from { opacity: .85; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
+@keyframes card-in { from { opacity: .7; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* "backwards", never "both": an animation that keeps filling after it ends
+   leaves the page counted as transformed, and a transformed page becomes the
+   frame for every fixed-position sheet inside it. The add-a-set sheet then
+   opened somewhere below the page and only its blurred backdrop showed. */
 /* The old per-screen classes defer to the rules above. */
 .screen-push, .screen-pop, .screen-fade { animation: none; }
