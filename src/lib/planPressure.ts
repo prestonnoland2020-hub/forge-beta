@@ -76,24 +76,24 @@ export function planPressure(input: PressureInput): PlanPressure | null {
   if (rough >= STRUGGLING_RUN) {
     return {
       verdict: 'too-much',
-      say: `You have had ${rough} rough mornings out of your last five check-ins. That is the block asking for more than you are absorbing, not a bad week.`,
-      offer: 'Reshape the block with less weekly load and an earlier easy week.',
+      say: `You have had ${rough} rough mornings out of your last five check-ins.`,
+      offer: 'If you are worn down, Forge can lighten the week and bring the easy week forward.',
       instruction: 'I am not recovering between sessions. Cut weekly running volume by about 15%, move the next easy week forward, and keep the hard run to one a week.',
     };
   }
   if (backedOffLifts.length) {
     return {
       verdict: 'too-much',
-      say: `${list(backedOffLifts)} ${backedOffLifts.length === 1 ? 'has' : 'have'} been backed off after repeated misses. The loads are ahead of where you are.`,
-      offer: 'Rebuild the strength side from what you are actually completing.',
+      say: `${list(backedOffLifts)} came up short of the reps asked a few sessions running.`,
+      offer: 'If you are worn down, Forge can ease those lifts back and build from what you are completing.',
       instruction: `Reset ${list(backedOffLifts)} to the loads I have actually been completing and build from there. Add a week before the next max attempt.`,
     };
   }
   if (missedSessions >= 3) {
     return {
       verdict: 'too-much',
-      say: `${missedSessions} prescribed sessions went unlogged in the last two weeks. A plan nobody can fit into their week is not a plan.`,
-      offer: 'Rebuild it around the days you actually train.',
+      say: `${missedSessions} planned sessions went unlogged in the last two weeks.`,
+      offer: 'If the week is too full, Forge can rebuild it around the days you actually train.',
       instruction: 'I am missing sessions because the week is too full. Rebuild the block around fewer training days without changing the goal date.',
     };
   }

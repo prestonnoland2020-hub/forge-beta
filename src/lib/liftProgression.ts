@@ -1,4 +1,4 @@
-import { WAVE_REPS, WAVE_LENGTH, ACCESSORY_REPS, ACCESSORY_LENGTH, FAILURES_BEFORE_BACKOFF, answeredThePlan } from '../features/training/aiPlanService';
+import { WAVE_REPS, WAVE_LENGTH, ACCESSORY_REPS, ACCESSORY_LENGTH, FAILURES_BEFORE_BACKOFF, answeredThePlan, strongerThanAsked } from '../features/training/aiPlanService';
 import { canonicalLiftKey } from './liftAliases';
 
 /* WHERE A LIFT IS, AND WHAT MOVES IT.
@@ -106,7 +106,7 @@ export function liftPosition(sets: ProgressionSet[], accessory: boolean): LiftPo
     if (answeredThePlan(asked, set.reps)) { exposures += 1; offScript = 0; misses = 0; return; }
     /* A double asked and a single taken is a miss. A double asked and eight
        taken is a different session. */
-    if (set.reps < asked) { misses += 1; return; }
+    if (set.reps < asked && !strongerThanAsked(Number(set.weight) || 0, set.reps, set.prescribedWeight, asked)) { misses += 1; return; }
     offScript += 1;
     if (offScript >= OFF_SCRIPT_BEFORE_RESEAT) {
       /* Re-seat to where the athlete has actually been working, and continue

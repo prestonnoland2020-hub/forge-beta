@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useCheckIns } from '../features/training/CheckInProvider';
 import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useGoals } from '../features/goals/GoalsProvider';
@@ -73,12 +73,24 @@ export function PlanPressureCard({ onReshape }: { onReshape: (instruction: strin
     return planPressure({ checkIns, backedOffLifts, missedSessions, goalsBehind, sessions });
   }, [checkIns, records, goals, setup]);
 
-  if (!pressure) return null;
+  /* ASK, DON'T DECLARE. The card used to tell an athlete the block was asking
+     too much and offer to reshape it — said to someone beating the plan, it
+     read as "you're doing badly, reset". Now it asks whether they are worn
+     down; "I'm good" puts it away for two weeks, and only "dial it back"
+     opens the rebuild. */
+  const dismissKey = pressure ? `forge-plan-pressure-ok:${pressure.verdict}:${pressure.say}` : '';
+  const [dismissed, setDismissed] = useState(() => { try { return Number(localStorage.getItem(dismissKey) || 0) > Date.now(); } catch { return false; } });
+  if (!pressure || dismissed) return null;
+  const keepGoing = () => { try { localStorage.setItem(dismissKey, String(Date.now() + 14 * 86400000)); } catch { /* storage off */ } setDismissed(true); };
+  const tooMuch = pressure.verdict === 'too-much';
 
   return <section className={`card plan-pressure ${pressure.verdict}`}>
-    <span className="eyebrow">{pressure.verdict === 'too-much' ? 'This block is asking too much' : 'There is room for more'}</span>
+    <span className="eyebrow">{tooMuch ? 'Feeling fatigued?' : 'There is room for more'}</span>
     <p className="plan-pressure-say">{pressure.say}</p>
     <p className="plan-pressure-offer">{pressure.offer}</p>
-    <button type="button" className="button" onClick={() => onReshape(pressure.instruction)}>Reshape the block</button>
+    <div className="plan-pressure-actions">
+      <button type="button" className="button" onClick={() => onReshape(pressure.instruction)}>{tooMuch ? 'Yes, dial it back' : 'Push me more'}</button>
+      <button type="button" className="button ghost" onClick={keepGoing}>{tooMuch ? 'I feel good' : 'Not now'}</button>
+    </div>
   </section>;
 }

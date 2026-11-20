@@ -153,3 +153,4 @@
   .goal-card-meta{grid-column:1/-1}
   .goal-card-verdict{grid-column:1/-1;grid-row:auto;justify-self:start}
 }
+.plan-pressure-actions{display:flex;gap:8px}.plan-pressure-actions .button{flex:1}
