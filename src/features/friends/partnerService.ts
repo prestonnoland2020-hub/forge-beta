@@ -257,9 +257,12 @@ export function lastTrainedLabel(iso: string | null): string {
 /* THE LAST FOUR WEEKS OF A PARTNER, BY DAY: every top set and run they
    logged, so tapping a partner shows what they actually did. */
 export type PartnerDay = { date: string; lifts: Array<{ name: string; weight: number; reps: number }>; cardio: Array<{ name: string; summary: string }> };
-export async function loadPartnerRecent(partnerId: string): Promise<PartnerDay[]> {
+export async function loadPartnerRecent(partnerId: string, span = 28): Promise<PartnerDay[]> {
   if (isDemoMode) return [];
-  const { data, error } = await supabase.rpc('forge_partner_recent', { partner_id: partnerId, p_today: localDayIso() });
+  /* 28 days is the feed's window; the growth charts ask for 12 weeks. */
+  const { data, error } = span > 28
+    ? await supabase.rpc('forge_partner_history', { partner_id: partnerId, p_today: localDayIso(), p_days: span })
+    : await supabase.rpc('forge_partner_recent', { partner_id: partnerId, p_today: localDayIso() });
   if (error) throw error;
   const days = new Map<string, PartnerDay>();
   for (const row of (data || []) as Array<{ performed_on: string; kind: string; name: string; weight: number | null; reps: number | null; summary: string | null }>) {
