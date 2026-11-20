@@ -22,6 +22,7 @@ import { calculateEstimatedOneRepMax } from '../../lib/strength';
 import { canonicalLiftKey,sameLift, splitDayKey } from '../../lib/liftAliases';
 import { repeatShape,findCompletedRepeats } from '../../lib/sessionAlreadyDone';
 import { useAthleteNotes } from './useAthleteNotes';
+import type { PlannedCardio } from '../../components/CardioPlanBuilder';
 import { bodyLogState,bodyLogReason,exerciseBlocked,easyRunWeeks } from '../../lib/bodyLog';
 import { useTodayOverride } from './coachOverrides';
 import { shortenRecommendation,easeRecommendation,moderateRecommendation,EASE_PERCENT } from '../../lib/coachActions';
@@ -49,7 +50,16 @@ const Context=createContext<Value|null>(null);
 const isoToday=()=>{const date=new Date();return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`};
 
 function localSplitDays():RecommendationSplitDay[]{
-  try{const saved=JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:Array<{name:string;dayType:string;muscles?:string[];exercises?:string[];cardio?:unknown[];cardioPolicy?:string}>}|null;return(saved?.days||[]).map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,type:['strength','cardio','mixed','rest','hyrox'].includes(day.dayType)?day.dayType as RecommendationSplitDay['type']:'rest',muscles:day.muscles||[],exercises:day.exercises||[],cardioTypes:day.dayType==='hyrox'?['HYROX']:day.dayType==='cardio'||day.dayType==='mixed'?['Forge']:[]}))}catch{return[]}
+  try{const saved=JSON.parse(localStorage.getItem('forge-training-plan-v1')||'null') as {days?:Array<{name:string;dayType:string;muscles?:string[];exercises?:string[];cardio?:unknown[];cardioPolicy?:string}>}|null;return(saved?.days||[]).map((day,index)=>({position:index+1,name:day.name||`Day ${index+1}`,type:['strength','cardio','mixed','rest','hyrox'].includes(day.dayType)?day.dayType as RecommendationSplitDay['type']:'rest',muscles:day.muscles||[],exercises:day.exercises||[],cardioTypes:day.dayType==='hyrox'?['HYROX']:day.dayType==='cardio'||day.dayType==='mixed'?['Forge']:[],...(day.dayType==='hyrox'&&day.cardioPolicy==='planned'&&day.cardio?.[0]?{plannedCardio:day.cardio[0] as PlannedCardio}:{})}))}catch{return[]}
+}
+
+/* A HYROX DAY THE ATHLETE WROTE lives in the local plan (the server's split
+   rows have no place for a circuit), so a split day from the server picks it up
+   here by name. */
+function withOwnHyrox(day:RecommendationSplitDay):RecommendationSplitDay{
+  if(day.type!=='hyrox'||day.plannedCardio)return day;
+  const own=localSplitDays().find(item=>item.type==='hyrox'&&item.name===day.name&&item.plannedCardio);
+  return own?{...day,plannedCardio:own.plannedCardio}:day;
 }
 
 export function DailyRecommendationProvider({children}:{children:ReactNode}){
@@ -188,7 +198,7 @@ export function DailyRecommendationProvider({children}:{children:ReactNode}){
      shortcut left out. So the whole thing is a function of the day now, the due
      day is simply the argument Today passes, and the logger passes whichever
      day the athlete picked. */
-  const buildBase=useCallback((day:RecommendationSplitDay)=>buildDailyRecommendation({date,splitDay:day,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,thresholdSecondsPerMile:day.type==='hyrox'?paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[]).threshold:undefined,metric:setup?.units==='Metric',bodyLog,inputFingerprint:recommendationFingerprint({date,splitDay:day,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp})}),[date,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,cycle.revision,aiPlanStamp,planInputsStamp]);
+  const buildBase=useCallback((rawDay:RecommendationSplitDay)=>{const day=withOwnHyrox(rawDay);return buildDailyRecommendation({date,splitDay:day,exercises,records,goals,recovery,profile,runningHistory:history,loadBiasPercent:strategy.loadBiasPercent,thresholdSecondsPerMile:day.type==='hyrox'?paceModel(records,enduranceTarget(goals),date,medianWeeklyMiles(records),setup?.excludedEfforts||[]).threshold:undefined,metric:setup?.units==='Metric',bodyLog,inputFingerprint:recommendationFingerprint({date,splitDay:day,exercises,records,goals,loadBiasPercent:strategy.loadBiasPercent,cycleRevision:cycle.revision,aiPlanStamp,planInputsStamp})});},[date,exercises,records,goals,recovery,profile,history,strategy.loadBiasPercent,cycle.revision,aiPlanStamp,planInputsStamp]);
   /* The stored AI program is authoritative for today's numbers: when its
      current week prescribes a top set for this split day, that exercise,
      weight, and reps replace the engine's guess — so Today, Plan, and the

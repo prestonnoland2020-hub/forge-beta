@@ -27,7 +27,7 @@ import { cardioPlanSummary, type CircuitStation, type PlannedCardio } from './Ca
 export type WrittenSession = { name: string; plan: PlannedCardio; summary: string; rationale: string };
 
 const unitFor = (exercise?: LibraryExercise) => exercise?.defaultUnit || (exercise?.kind === 'Cardio' ? 'meters' : 'reps');
-type Kind = 'hyrox' | 'circuit' | 'custom';
+type Kind = 'hyrox' | 'rounds' | 'circuit' | 'custom';
 
 export function ForgeWritesIt({ dateIso, session, onSession }: { dateIso: string; session: WrittenSession | null; onSession: (session: WrittenSession | null) => void }) {
   const { records } = useWorkoutHistory();
@@ -42,11 +42,11 @@ export function ForgeWritesIt({ dateIso, session, onSession }: { dateIso: string
   const metric = setup?.units === 'Metric';
   const library = useMemo(() => exercises.filter(exercise => exercise.enabled && /HYROX|CrossFit|Cardio|Bodyweight/i.test(`${exercise.detail} ${exercise.kind}`)), [exercises]);
 
-  const writeHyrox = () => {
+  const writeHyrox = (shape?: 'rounds') => {
     const runGoal = enduranceTarget(goals);
     const hyroxGoal = hyroxGoalOf(goals);
     const threshold = paceModel(records, runGoal, dateIso, medianWeeklyMiles(records), setup?.excludedEfforts || []).threshold;
-    const written = hyroxSession({ sessionIndex: hyroxSessionsDone(records, dateIso), thresholdSecondsPerMile: threshold || 0, division: hyroxGoal?.eventDivision, goalTarget: hyroxGoal?.target, weeksToRace: weeksUntil(hyroxGoal?.date, dateIso), readiness: recovery.confidence === 'Low' ? undefined : recovery.readiness, metric });
+    const written = hyroxSession({ sessionIndex: hyroxSessionsDone(records, dateIso), thresholdSecondsPerMile: threshold || 0, division: hyroxGoal?.eventDivision, goalTarget: hyroxGoal?.target, weeksToRace: weeksUntil(hyroxGoal?.date, dateIso), readiness: recovery.confidence === 'Low' ? undefined : recovery.readiness, metric, shape });
     onSession({ name: written.title, plan: written.plan, summary: written.summary, rationale: written.rationale });
   };
 
@@ -82,6 +82,7 @@ export function ForgeWritesIt({ dateIso, session, onSession }: { dateIso: string
   const pick = (next: Kind) => {
     setKind(next); setError('');
     if (next === 'hyrox') writeHyrox();
+    else if (next === 'rounds') writeHyrox('rounds');
     else if (next === 'circuit') void askForge('Write a CrossFit-style conditioning circuit for today from my library — balanced, about 25–35 minutes, no movement I have no equipment for.');
   };
 
@@ -98,6 +99,7 @@ export function ForgeWritesIt({ dateIso, session, onSession }: { dateIso: string
     <div className="forge-writes-chips">
       {/* HYROX work is for a HYROX goal; without one the chip is not offered. */}
       {hyroxGoalOf(goals) && <button type="button" className={kind === 'hyrox' ? 'active' : ''} onClick={() => pick('hyrox')} disabled={busy}>HYROX</button>}
+      {hyroxGoalOf(goals) && <button type="button" className={kind === 'rounds' ? 'active' : ''} onClick={() => pick('rounds')} disabled={busy}>HYROX rounds</button>}
       <button type="button" className={kind === 'circuit' ? 'active' : ''} onClick={() => pick('circuit')} disabled={busy}>{busy && kind === 'circuit' ? 'Writing…' : 'Circuit'}</button>
       <button type="button" className={kind === 'custom' ? 'active' : ''} onClick={() => { setKind('custom'); setError(''); }} disabled={busy}>Your words</button>
     </div>

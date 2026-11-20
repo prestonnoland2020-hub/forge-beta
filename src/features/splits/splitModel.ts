@@ -35,3 +35,11 @@ export type DayType='strength'|'cardio'|'mixed'|'rest'|'hyrox';
 export type TrainingDay={name:string;weekday:string;dayType:DayType;muscles:string[];exercises:string[];cardioPolicy:CardioPolicy;cardio:PlannedCardio[];recoveryStyle:'Full rest'|'Mobility'|'Active recovery';maxDuration:string;strengthDuration:string};
 export const plannedCardioMinutes=(plan:PlannedCardio)=>{if(plan.structure==='Steady'||plan.structure==='Custom')return Math.max(0,Number(plan.duration)||0);if(plan.structure==='Intervals'){const work=/seconds?/i.test(plan.workUnit||'')?Number(plan.workDistance||0)/60:/minutes?/i.test(plan.workUnit||'')?Number(plan.workDistance||0):0;return Math.ceil(Math.max(0,Number(plan.repeats)||0)*work+Math.max(0,(Number(plan.repeats)||0)-1)*(Number(plan.rest)||0)/60)}if(plan.structure==='Circuit'){if(plan.circuitFormat==='For time'&&Number(plan.duration)>0)return Number(plan.duration);if(plan.circuitFormat==='AMRAP'||plan.circuitFormat==='EMOM')return Math.max(0,Number(plan.rounds)||0);const rounds=Math.max(0,Number(plan.rounds)||0);return Math.ceil(rounds*8+Math.max(0,rounds-1)*(Number(plan.roundRest)||0)/60)}return 0};
 export const durationForDay=(day:TrainingDay,cardio=day.cardio)=>{const cardioMinutes=cardio.reduce((total,plan)=>total+plannedCardioMinutes(plan),0);if(day.dayType==='strength')return day.strengthDuration;if(day.dayType==='cardio')return cardioMinutes?String(cardioMinutes):'';if(day.dayType==='hyrox')return '';if(day.dayType==='mixed')return String((Number(day.strengthDuration)||0)+cardioMinutes);return ''};
+
+/* WHERE "WRITE YOUR OWN" STARTS ON A HYROX DAY: the shape athletes asked for —
+   three rounds of a row, wall balls and a run — to edit, not a blank page.
+   An existing session opens as it was saved. */
+export const hyroxStarter=(existing?:PlannedCardio):PlannedCardio=>existing?{...existing,activity:'Circuit'}:{id:Date.now(),activity:'Circuit',structure:'Circuit',targetSource:'Manual plan',circuitFormat:'Rounds',rounds:'3',roundRest:'0',stationEntries:[
+  {id:1,kind:'Cardio',name:'Rowing',target:'1000',unit:'meters',rest:'0'},
+  {id:2,kind:'Strength',name:'Wall Balls',target:'50',unit:'reps',load:'6 kg · 10 ft',rest:'0'},
+  {id:3,kind:'Cardio',name:'Run',target:'1000',unit:'meters',rest:'0'}]};

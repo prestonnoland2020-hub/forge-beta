@@ -1,4 +1,5 @@
 import type { CreatedGoal } from '../components/GoalBuilder';
+import type { PlannedCardio } from '../components/CardioPlanBuilder';
 import type { LibraryExercise } from '../features/training/TrainingLibraryProvider';
 import type { AdaptiveProfile, RunResult } from '../features/training/AdaptiveTrainingProvider';
 import type { WorkoutRecord } from '../features/training/WorkoutHistoryProvider';
@@ -9,7 +10,7 @@ import { normalizeMuscleGroups } from './muscleGroups';
 import { buildTrainingIntelligence } from './trainingIntelligence';
 import { canonicalLiftKey } from './liftAliases';
 import { liftPositions, rungFor } from './liftProgression';
-import { daysSinceHyrox,HYROX_STATIONS_EVERY_DAYS,hyroxGoalOf,hyroxSession,hyroxSessionsDone,weeksUntil } from './hyroxSession';
+import { daysSinceHyrox,HYROX_STATIONS_EVERY_DAYS,hyroxGoalOf,hyroxSession,ownHyroxSession,hyroxSessionsDone,weeksUntil } from './hyroxSession';
 import { exerciseBlocked,bodyLogReason,EMPTY_BODY_LOG,type BodyLogState } from './bodyLog';
 
 /* Bump this whenever the engine's OUTPUT changes shape or policy — the daily
@@ -44,6 +45,8 @@ export type RecommendationSplitDay={
   muscles:string[];
   exercises:string[];
   cardioTypes:string[];
+  /* A HYROX day the athlete wrote themselves (Plan, "Write your own"). */
+  plannedCardio?:PlannedCardio;
 };
 
 export type RecommendedTopSet={
@@ -236,6 +239,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   /* No HYROX goal, no HYROX session: the day stays open (see hyroxGoalOf). */
   const hyroxGoal=hyroxGoalOf(input.goals);
   const hyrox=(()=>{
+    if(input.splitDay.type==='hyrox'&&input.splitDay.plannedCardio?.stationEntries?.length)return ownHyroxSession(input.splitDay.plannedCardio);
     if(input.splitDay.type!=='hyrox'||!hyroxGoal)return undefined;
     return hyroxSession({sessionIndex:hyroxSessionsDone(input.records,input.date),thresholdSecondsPerMile:input.thresholdSecondsPerMile||0,division:hyroxGoal.eventDivision,goalTarget:hyroxGoal.target,weeksToRace:weeksUntil(hyroxGoal.date,input.date),readiness:input.recovery?.readiness,metric:input.metric});
   })();
