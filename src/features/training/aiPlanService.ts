@@ -277,6 +277,18 @@ export const FAILURES_BEFORE_BACKOFF = 3;
    asks here. */
 export const REP_TOLERANCE = 1;
 export const answeredThePlan = (asked: number, did: number) => did >= asked && did <= asked + REP_TOLERANCE;
+/* FEWER REPS, HEAVIER, IS NOT A MISS. 300 × 8 on a day that asked for 280 × 10
+   is a stronger set than the one asked for — the calculated max is higher. It
+   was being counted as "came up short", three of those backed the lift off,
+   and the coach told an athlete beating the plan that his loads were ahead of
+   him and the block needed resetting. A set short on reps only counts as short
+   when it is also weaker than the set that was asked for. */
+export const strongerThanAsked = (weight: number, reps: number, askedWeight: number | null | undefined, askedReps: number) => {
+  if (!askedWeight || askedWeight <= 0 || weight <= 0 || reps <= 0) return false;
+  const did = calculateEstimatedOneRepMax(weight, reps) || 0;
+  const asked = calculateEstimatedOneRepMax(askedWeight, askedReps) || 0;
+  return asked > 0 && did >= asked;
+};
 
 /* WHAT AN EMPTY CALENDAR CELL SAYS. Two screens draw the same week and each
    wrote its own version of this line, so a change to one silently disagreed
@@ -325,7 +337,7 @@ export const isRestDay = (day: { name?: string; type?: string; dayType?: string 
    same lift, the same week, forty-five pounds apart on two screens. Every
    surface builds it here now. */
 export function bestsFromHistory(
-  records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean; prescribedReps?: number }> }>,
+  records: Array<{ date?: string; topSets?: Array<{ lift?: string; weight?: number; reps?: number; calculatedMax?: number; completed?: boolean; prescribedReps?: number; prescribedWeight?: number | null }> }>,
   todayIso = localDayIso(),
 ): { latest: Map<string, LatestSet[]>; bests: Map<string, number>; singles: Map<string, number>; anchors: LiftAnchors; sessions: Map<string, number>; misses: Map<string, Map<number, number>>; lastAt: LiftAnchors; returning: Map<string, { factor: number; daysOff: number }> } {
   const bests = new Map<string, number>();
@@ -378,7 +390,7 @@ export function bestsFromHistory(
     const askedReps = set.prescribedReps || set.reps;
     const repSlot = Math.min(Math.max(Math.round(askedReps), 1), PRESCRIPTION_REP_CAP);
     const settledKey = `${key}|${repSlot}`;
-    const cameUpShort = Boolean(set.prescribedReps) && !answeredThePlan(set.prescribedReps!, set.reps) && set.reps < set.prescribedReps!;
+    const cameUpShort = Boolean(set.prescribedReps) && !answeredThePlan(set.prescribedReps!, set.reps) && set.reps < set.prescribedReps! && !strongerThanAsked(set.weight, set.reps, set.prescribedWeight, set.prescribedReps!);
     const ageDays = record.date ? (new Date(`${todayIso}T12:00:00`).getTime() - new Date(`${record.date}T12:00:00`).getTime()) / 86400000 : Infinity;
     if (set.completed === false || cameUpShort) {
       /* A miss is recent evidence too: it says the bar was too heavy. */
