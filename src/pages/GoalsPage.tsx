@@ -51,11 +51,29 @@ const reducedMotion = () => { try { return window.matchMedia('(prefers-reduced-m
    Goals was the second jump after each tab switch. */
 const counted = new Set<string>();
 let goalsFilledOnce = false;
-/* NUMBERS ARRIVE FINISHED. They used to count up from 0 for a second, with a
-   haptic click per step, after the screen had already moved in — a second
-   motion (and a buzz) on every visit, which read as a glitch. */
-function CountUp({ to, format = (value: number) => String(Math.round(value)) }: { to: number; delay?: number; duration?: number; format?: (value: number) => string }) {
-  return <>{format(to)}</>;
+function CountUp({ to, delay = 0, duration = 1100, format = (value: number) => String(Math.round(value)) }: { to: number; delay?: number; duration?: number; format?: (value: number) => string }) {
+  const seen = counted.has(String(to));
+  const [value, setValue] = useState(() => (reducedMotion() || seen ? to : 0));
+  useEffect(() => {
+    if (reducedMotion() || counted.has(String(to))) { setValue(to); return; }
+    counted.add(String(to));
+    let frame = 0;
+    let shown = format(0);
+    const start = performance.now() + delay;
+    const step = (now: number) => {
+      const t = Math.max(0, Math.min(1, (now - start) / duration));
+      const next = to * (1 - Math.pow(1 - t, 3));
+      setValue(next);
+      /* Felt as well as seen: a click each time the shown figure changes, and
+         a firmer tap when it lands. */
+      const text = format(next);
+      if (text !== shown) { shown = text; if (t < 1) rise(); }
+      if (t < 1) frame = requestAnimationFrame(step); else if (to > 0) land();
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [to, delay, duration]);
+  return <>{format(value)}</>;
 }
 
 const daysLeft = (iso: string) => Math.ceil((Date.parse(`${iso}T12:00:00`) - Date.now()) / 86400000);
@@ -141,7 +159,7 @@ export function GoalsPage({ embedded = false }: { embedded?: boolean } = {}) {
      width transition runs; each card is a beat behind the one above it. */
   /* Bars and the ring fill on the first visit of a session only; after that
      they are simply full, so returning to Goals has no late second motion. */
-  const [filled, setFilled] = useState(true);
+  const [filled, setFilled] = useState(() => goalsFilledOnce);
   /* Both frames are cancelled on cleanup and nothing guards a second run, so
      StrictMode's mount-unmount-mount still ends with the bars filled. */
   useEffect(() => { let inner = 0; const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => { goalsFilledOnce = true; setFilled(true); }); }); return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); }; }, []);

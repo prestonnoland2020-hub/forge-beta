@@ -56,11 +56,11 @@
 
 /* Arrivals come in on the mark's 45° line, one after another. */
 @media (prefers-reduced-motion: no-preference) {
-  .today > :is(.td-card, .partners-card) { animation: td-rise var(--dur-emphasis) var(--ease-strike) both; }
+  .today > :is(.td-card, .partners-card) { animation: td-rise var(--dur-emphasis) var(--ease-strike) backwards; }
   .today > .td-card { animation-delay: 60ms; }
   .today > .partners-card { animation-delay: 120ms; }
 }
-@keyframes td-rise { from { opacity: 0; transform: translate(-12px, 12px); } }
+@keyframes td-rise { from { opacity: .45; transform: translate(-8px, 8px); } }
 
 /* The first-week card: three steps that tick themselves off. Quieter than the
    workout card above it, so the workout stays the one thing to do. */
