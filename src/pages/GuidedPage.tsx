@@ -1,3 +1,4 @@
+import { FIRST_TIMER_HINT, FIRST_TIMER_KEY, wantsFirstTimerHint } from '../lib/guided/firstTimer';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { rememberGuidedFeel } from '../features/training/coachMemoryService';
 import { createPortal } from 'react-dom';
@@ -243,7 +244,8 @@ export function GuidedPage() {
     if (!cloudVoice()) return;
     void c.useCloud(blob => transcribe(blob, c.hints()));
   };
-  const say = (text: string, listen?: Command[]) => { lastLine.current = { text, listen }; coach.current?.say(text, listen); };
+  const hintSaid = useRef(false);
+  const say = (text: string, listen?: Command[]) => { if (text.includes(FIRST_TIMER_HINT)) { hintSaid.current = true; write(FIRST_TIMER_KEY, true); } lastLine.current = { text, listen }; coach.current?.say(text, listen); };
 
   const step: Step | undefined = workout?.steps[stepIndex];
   const weight = step ? (weights[stepIndex] !== undefined ? weights[stepIndex] : step.weight) : null;
@@ -274,7 +276,10 @@ export function GuidedPage() {
     const ask = s.move.timed ? (first ? " Say go when you're ready, and I'll time it." : " Say go when you're set.") : first ? " When you're finished, just say done." : '';
     if (s.part === 'warmup') return w !== null ? `Warm-up. ${s.move.name}, ${amount}${load}. ${s.move.cue}${ask}` : `Let's warm up first. ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
     if (s.part === 'cooldown') return `Last one. Let's cool down with ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
-    if (setNo === 0) return `Alright, ${s.move.name}. ${s.sets > 1 ? `${s.sets} sets, ` : ''}${amount}${load}. ${s.move.cue}${ask}`;
+    if (setNo === 0) {
+      const hint = wantsFirstTimerHint(s.part, w, setNo, hintSaid.current || read<boolean>(FIRST_TIMER_KEY, false)) ? ` ${FIRST_TIMER_HINT}` : '';
+      return `Alright, ${s.move.name}. ${s.sets > 1 ? `${s.sets} sets, ` : ''}${amount}${load}. ${s.move.cue}${ask}${hint}`;
+    }
     return `${setNo + 1 === s.sets ? 'Last set' : `Set ${setNo + 1}`} of ${s.move.name}. ${amount}${load}. ${setNo + 1 === s.sets ? 'Make it count.' : 'Same as before.'}${ask}`;
   };
   const CARD_CMDS: Command[] = ['ask', 'done', 'ready', 'start', 'how', 'easier', 'harder', 'heavier', 'lighter', 'repeat', 'skip', 'pause', 'resume', 'end'];

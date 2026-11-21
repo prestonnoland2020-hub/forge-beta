@@ -21,6 +21,7 @@ const PRE_ROLL = 0.35;        // seconds kept before speech starts
 const END_SILENCE = 650;      // ms of quiet that ends an utterance
 const MIN_SPEECH = 220;       // ms; shorter is a cough or a clank
 const MAX_SPEECH = 8000;      // ms; then it is sent anyway
+const CALIBRATE = 500;        // ms after the mic opens spent learning the room's noise floor
 const SESSION_CAP = 400;      // clips per workout, a guard on cost
 
 function encodeWav(samples: Float32Array, rate: number): Blob {
@@ -60,6 +61,9 @@ export class CloudEars {
   private speechStart = 0;
   private lastLoud = 0;
   private floor = 0.008;
+  private calStart: number | null = null;
+  private calSum = 0;
+  private calN = 0;
   private sent = 0;
   private busy = false;
   private voicedSq = 0;
@@ -73,7 +77,8 @@ export class CloudEars {
   /* A clip was held back for being far quieter than the athlete: the running count only. */
   onGated: (count: number) => void = () => {};
 
-  constructor(private transcribe: Transcribe) {}
+  private transcribe: Transcribe;
+  constructor(transcribe: Transcribe) { this.transcribe = transcribe; }
 
   /* Call from a tap: iOS only opens audio in answer to one. */
   async open() {
@@ -84,6 +89,7 @@ export class CloudEars {
        reached it, and Forge never heard a word (forge-voice had zero calls). */
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.ctx = new Ctx();
+    this.calStart = null; this.calSum = 0; this.calN = 0;
     const resuming = this.ctx.state === 'running' ? Promise.resolve() : this.ctx.resume().catch(() => {});
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     await resuming;
@@ -101,12 +107,23 @@ export class CloudEars {
   /* Call from a tap: brings a suspended or interrupted engine back. */
   wake() { if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume().catch(() => {}); }
 
-  private frame(input: Float32Array) {
+  frame(input: Float32Array, at?: number) {
     if (!this.ctx) return;
     const chunk = new Float32Array(input);
     let sum = 0; for (let i = 0; i < chunk.length; i += 1) sum += chunk[i] * chunk[i];
     const rms = Math.sqrt(sum / chunk.length);
-    const now = performance.now();
+    const now = at ?? performance.now();
+    /* THE FIRST HALF SECOND IS LISTENING ONLY. The floor starts low, so steady
+       gym noise (fans, a music hum) used to read as speech the moment the mic
+       opened and sent one clip every time. Now the floor is the room's average
+       over the first ~0.5 s and no clip can start until it is set. */
+    if (this.calStart === null) this.calStart = now;
+    if (now - this.calStart < CALIBRATE) {
+      this.calSum += rms; this.calN += 1;
+      this.floor = this.calSum / this.calN;
+      this.keepRing(chunk);
+      return;
+    }
     /* The noise floor follows the room: it falls quickly and rises slowly,
        so a gym's steady hum stops counting as speech after a few seconds. */
     this.floor = rms < this.floor ? this.floor * 0.9 + rms * 0.1 : this.floor * 0.995 + rms * 0.005;
@@ -174,6 +191,7 @@ export class CloudEars {
     if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => {});
     this.source = this.ctx.createMediaStreamSource(this.stream);
     this.source.connect(this.node);
+    this.calStart = null; this.calSum = 0; this.calN = 0;
   }
 
   close() {
