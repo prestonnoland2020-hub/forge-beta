@@ -8,7 +8,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
-import { amountText, buildWorkout, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
+import { amountText, buildWorkout, heavierNextTime, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
 import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
@@ -515,8 +515,7 @@ export function GuidedPage() {
     saved.current = true;
     const minutesTaken = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
     const main = logged.filter(item => item.feel !== null && !item.moveId.endsWith(':warmup'));
-    const best = new Map<string, LoggedSet>();
-    for (const item of main) if (!item.moveId.endsWith(':warmup') && item.weight !== null && (!best.has(item.moveId) || (item.weight ?? 0) > (best.get(item.moveId)!.weight ?? 0) || (item.weight === best.get(item.moveId)!.weight && item.reps > best.get(item.moveId)!.reps))) best.set(item.moveId, item);
+    const best = topSetPerMove(main);
     const muscles = [...new Set(logged.flatMap(item => item.muscles))];
     const notes = `${fromPlan ? 'Coached' : 'Forge Guided'} · ${fromPlan ? workout.title : workout.focus}. ` + [...new Set(main.map(item => item.name))].map(name => { const sets = main.filter(item => item.name === name); return `${name} ${sets.length}×${sets[0].timed ? `${sets[0].reps}s` : sets[0].reps}${sets[0].weight !== null ? ` @ ${sets[sets.length - 1].weight} ${unit}` : ''}`; }).join(' · ');
     if (logged.length) {
@@ -933,7 +932,7 @@ export function GuidedPage() {
 
   if (phase === 'done' && workout) {
     const main = logged.filter(item => item.feel !== null);
-    const notes = [...new Set(main.filter(item => item.feel === 'easy' && item.weight !== null).map(item => item.name))];
+    const notes = heavierNextTime(main);
     return frame(<div className="gd-screen">
       <span className="gd-check"><Svg d="M5 12.5 10 17l9-10" size={38} stroke={2.8} /></span>
       <h1>{main.length ? 'You did it.' : 'Workout ended.'}</h1>

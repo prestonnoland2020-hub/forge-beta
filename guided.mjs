@@ -1,6 +1,6 @@
 /* FORGE GUIDED: the builder makes safe, fitting workouts; the coach hears
    short commands; the weights follow how each set felt. */
-import { MUST_HIT, customWorkout, buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight } from './src/lib/guided/builder.ts';
+import { MUST_HIT, customWorkout, buildWorkout, nextWeight, owned, canDo, suggestFocus, estimateMinutes, startWeight, topSetPerMove, heavierNextTime } from './src/lib/guided/builder.ts';
 import { parseCommand, matchCommand, normalizePhrase, parseSetReport } from './src/lib/guided/voice.ts';
 import { MOVES } from './src/lib/guided/catalog.ts';
 import { planWorkout } from './src/lib/guided/fromPlan.ts';
@@ -145,5 +145,11 @@ check('every focus hits every muscle group it promises, and fits the time', !mis
   check('set report: "I hit 1,000 pounds for 2" reads the comma', parseSetReport('I hit 1,000 pounds for 2')?.weight === 1000);
   for (const t of ['Alright, Bench. 2 reps at 360 pounds.', 'should I do 400 for 6', "I didn't get 6 reps", 'coach I did 400 for 6?', 'Done', 'I did it', 'two three four five', 'play the next song'])
     check(`set report: "${t}" is not a set`, parseSetReport(t) === null, r(t)); }
+{ /* Nov 21: the done screen said "Incline Dumbbell Press felt easy. It starts heavier next time" when the 10 lb set was too hard and only the dropped 5 lb set felt easy. */
+  const set = (moveId, weight, feel, reps = 10) => ({ moveId, name: moveId, weight, feel, reps });
+  const run = [set('incline', 10, 'hard'), set('incline', 5, 'easy'), set('incline', 10, 'right'), set('row', 45, 'easy', 5), set('row:warmup', 45, 'easy', 5), set('lat', 45, 'right'), set('lat', 50, 'easy')];
+  check('top set per move: heaviest, first of equals, no warm-ups', topSetPerMove(run).get('incline').feel === 'hard' && topSetPerMove(run).get('lat').weight === 50 && !topSetPerMove(run).has('row:warmup'));
+  check('"starts heavier next time" only when the logged top set felt easy', JSON.stringify(heavierNextTime(run)) === JSON.stringify(['row', 'lat']), JSON.stringify(heavierNextTime(run)));
+  check('no weight, no heavier promise', heavierNextTime([set('plank', null, 'easy')]).length === 0); }
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);
