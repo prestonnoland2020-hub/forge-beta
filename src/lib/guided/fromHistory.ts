@@ -27,3 +27,14 @@ export function weightsFromTopSets(records: Array<{ date: string; topSets?: Arra
   }
   return out;
 }
+
+/* WHAT THE DONE SCREEN PROMISES. For each logged top set, the weight the next
+   guided workout will actually start that lift at: the same
+   weightsFromTopSets the builder reads, run over today's top sets. Only lifts
+   whose number differs from the top set just lifted are returned. */
+export type NextTime = { moveId: string; name: string; weight: number; was: number };
+export function nextTimeWeights(top: Array<{ moveId: string; name: string; weight: number | null; reps: number }>, date: string, metric: boolean): NextTime[] {
+  const sets = top.filter(item => item.weight !== null && item.weight > 0);
+  const next = weightsFromTopSets([{ date, topSets: sets.map(item => ({ lift: item.name, weight: item.weight as number, reps: item.reps, completed: true })) }], metric);
+  return sets.flatMap(item => next[item.moveId] !== undefined && next[item.moveId] !== item.weight ? [{ moveId: item.moveId, name: item.name, weight: next[item.moveId], was: item.weight as number }] : []);
+}

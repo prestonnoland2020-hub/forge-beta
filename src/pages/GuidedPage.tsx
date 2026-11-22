@@ -8,7 +8,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
-import { amountText, buildWorkout, heavierNextTime, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
+import { amountText, buildWorkout, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
 import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
@@ -16,7 +16,7 @@ import { guidedCoachContext, writeLive } from '../lib/guided/session';
 import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
 import { nativeVoice, type ScriptBeat } from '../lib/guided/nativeVoice';
 import { tickerEnd, tickerLive, tickerStart, tickerUpdate, type TickerState } from '../lib/liveActivity';
-import { weightsFromTopSets } from '../lib/guided/fromHistory';
+import { weightsFromTopSets, nextTimeWeights, type NextTime } from '../lib/guided/fromHistory';
 import { setEffort } from '../lib/setEffort';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
@@ -182,6 +182,7 @@ export function GuidedPage() {
   const [voiceState, setVoiceState] = useState({ speaking: false, listening: false });
   const [heard, setHeard] = useState('');
   const [savedNote, setSavedNote] = useState('');
+  const [nextTimes, setNextTimes] = useState<NextTime[]>([]);
   /* THE MICROPHONE IS ASKED FOR, NOT GRABBED. The first hands-free workout
      opens on a screen that says what the coach listens for and why, and only
      its button triggers the phone's own prompt. */
@@ -533,6 +534,8 @@ export function GuidedPage() {
          coach already lightened the next set for it. */
       for (const item of best.values()) if (item.feel === 'easy' || item.feel === 'right') setEffort(todayIso(), item.name, item.feel === 'right' ? 'good' : 'easy');
       setSavedNote(result.ok ? 'Saved to your log.' : 'Already in your log.');
+      /* Read after the effort is saved: the number the next workout will use. */
+      setNextTimes(nextTimeWeights([...best.values()], todayIso(), metric));
       /* The coach remembers how each lift's LAST set felt (row coach-memory-2026-11). */
       const lastFeel = new Map<string, LoggedSet>();
       for (const item of main) if (!item.timed) lastFeel.set(item.name, item);
@@ -932,7 +935,6 @@ export function GuidedPage() {
 
   if (phase === 'done' && workout) {
     const main = logged.filter(item => item.feel !== null);
-    const notes = heavierNextTime(main);
     return frame(<div className="gd-screen">
       <span className="gd-check"><Svg d="M5 12.5 10 17l9-10" size={38} stroke={2.8} /></span>
       <h1>{main.length ? 'You did it.' : 'Workout ended.'}</h1>
@@ -941,7 +943,7 @@ export function GuidedPage() {
         <div><strong>{new Set(logged.map(item => item.moveId.replace(/:warmup$/, ''))).size}</strong><span>moves</span></div>
         <div><strong>{main.length}</strong><span>sets</span></div>
       </div>
-      {notes.length > 0 && <div className="gd-card"><span className="gd-eyebrow">YOUR COACH NOTICED</span>{notes.map(name => <p key={name} className="gd-note"><Svg d="M12 19V5M5 12l7-7 7 7" size={16} />{name} felt easy. It starts heavier next time.</p>)}</div>}
+      {nextTimes.length > 0 && <div className="gd-card"><span className="gd-eyebrow">NEXT TIME</span>{nextTimes.map(item => <p key={item.moveId} className="gd-note"><Svg d={item.weight > item.was ? 'M12 19V5M5 12l7-7 7 7' : 'M12 5v14M5 12l7 7 7-7'} size={16} />{item.name}: {item.weight} {unit} next time</p>)}</div>}
       {savedNote && <p className="gd-saved"><Svg d="M5 12.5 10 17l9-10" size={18} />{savedNote}</p>}
       <button type="button" className="gd-cta" onClick={close}>Finish</button>
     </div>);
