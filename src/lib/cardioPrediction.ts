@@ -264,11 +264,13 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
      may sit more than 4% slower than a hard effort near the distance from the
      last six weeks: that effort is the athlete's real number. Near means half
      to double the goal distance, so the carry stays honest. */
+  /* A shorter effort still counts, with more room: a 5:36 mile says a lot
+     about a 5K, less than a 5K would. From 30% of the distance, 10% slack. */
   const shownRecently = qualifying
-    .filter(run => daysAgo(run.date) <= 42 && run.miles >= goalMiles * 0.5 && run.miles <= goalMiles * 2)
-    .map(run => equivalentSeconds(run.seconds, run.miles, goalMiles))
+    .filter(run => daysAgo(run.date) <= 42 && run.miles >= goalMiles * 0.3 && run.miles <= goalMiles * 2)
+    .map(run => equivalentSeconds(run.seconds, run.miles, goalMiles) * (run.miles >= goalMiles * 0.5 ? 1.04 : 1.10))
     .filter(value => value > 0);
-  const ceiling = shownRecently.length ? Math.round(Math.min(...shownRecently) * 1.04) : Infinity;
+  const ceiling = shownRecently.length ? Math.round(Math.min(...shownRecently)) : Infinity;
   const seconds = Math.min(blended, ceiling);
   const share = (weight: number) => Math.round((weight / total) * 100) / 100;
 

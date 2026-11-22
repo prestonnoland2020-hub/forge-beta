@@ -121,6 +121,21 @@ export function weeklyRunning(records: WorkoutRecord[], weeks = 8, todayIso = lo
   });
 }
 
+/* THE DIRECTION, SAID ONCE, IN WORDS. On Nov 18 the coach told Preston his
+   mileage "fell from 11 to 2" when it had gone 2, 4, 10 — it read the series
+   backwards, or never saw it (weeklyRunning is trimmed first when the context
+   runs long). This line is small, survives the trim, and leaves nothing to
+   read the wrong way round. */
+export function runningTrend(weeks: RunningWeek[]): string {
+  const done = weeks.filter(week => !week.partial).slice(-4);
+  if (!done.length) return 'No finished weeks of running yet.';
+  const list = done.map(week => `${week.miles} (week of ${week.weekOf})`).join(', ');
+  const last = done.at(-1)!.miles, prev = done.at(-2)?.miles;
+  const direction = prev === undefined ? '' : last > prev ? ` Going UP: last finished week ${last} mi vs ${prev} the week before.` : last < prev ? ` Going DOWN: last finished week ${last} mi vs ${prev} the week before.` : ` Flat at ${last} mi.`;
+  const current = weeks.find(week => week.partial);
+  return `Finished weeks, OLDEST FIRST: ${list}.${direction}${current ? ` This week so far (not finished): ${current.miles} mi.` : ''}`;
+}
+
 /* WHAT THE ATHLETE WEIGHS, WHICH FORGE HAS ALWAYS KNOWN AND NEVER SAID.
    Body weight is logged with the workout and stored on the record; it simply
    was not in anything the coach received. */
