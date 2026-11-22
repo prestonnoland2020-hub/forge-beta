@@ -18,5 +18,6 @@ check('a context far over the limit still carries today\'s sets whole', out.leng
 check('today goes first, before anything that could be cut', out.startsWith('{"todayLogged"'));
 check('the prompt tells the coach to judge today from todayLogged', /WHAT THEY LOGGED TODAY/.test(fn) && /Never say you can't see today's sets/.test(fn));
 check('a planned lift left out is not called a miss or nagged to log', /skipped on purpose/.test(fn) && /do not ask them to log it/.test(fn));
+check('common sense: close-enough distances count, corrections are accepted', /Close enough is the distance/.test(fn) && /take it as true/.test(fn));
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
 console.log('\nall passed');
