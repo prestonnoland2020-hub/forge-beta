@@ -257,7 +257,19 @@ export function predictRaceFromLegacyMethod(records: WorkoutRecord[], goalMiles:
   const curveWeight = prediction ? Math.max(CURVE_WEIGHT_FLOOR, 0.5 ** (Math.max(0, freshest - CURVE_FULL_DAYS) / CURVE_HALF_LIFE_DAYS)) : 0;
   if (prediction) parts.push({ seconds: prediction.seconds, weight: curveWeight });
   const total = parts.reduce((sum, part) => sum + part.weight, 0);
-  const seconds = Math.round(Math.exp(parts.reduce((sum, part) => sum + part.weight * Math.log(part.seconds), 0) / total));
+  const blended = Math.round(Math.exp(parts.reduce((sum, part) => sum + part.weight * Math.log(part.seconds), 0) / total));
+  /* WHAT YOU JUST RAN, YOU CAN RUN. The aerobic reads lead the blend, and on
+     Nov 21 a day of easy treadmill runs with their heart rates dragged
+     Preston's mile to 7:12 — the afternoon he ran a 5:36 mile. No estimate
+     may sit more than 2% slower than a hard effort near the distance from the
+     last six weeks: that effort is the athlete's real number. Near means half
+     to double the goal distance, so the carry stays honest. */
+  const shownRecently = qualifying
+    .filter(run => daysAgo(run.date) <= 42 && run.miles >= goalMiles * 0.5 && run.miles <= goalMiles * 2)
+    .map(run => equivalentSeconds(run.seconds, run.miles, goalMiles))
+    .filter(value => value > 0);
+  const ceiling = shownRecently.length ? Math.round(Math.min(...shownRecently) * 1.02) : Infinity;
+  const seconds = Math.min(blended, ceiling);
   const share = (weight: number) => Math.round((weight / total) * 100) / 100;
 
   /* THE RANGE takes in every source on its own, and never narrows below the
