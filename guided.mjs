@@ -4,6 +4,7 @@ import { MUST_HIT, customWorkout, buildWorkout, nextWeight, owned, canDo, sugges
 import { parseCommand, matchCommand, normalizePhrase, parseSetReport } from './src/lib/guided/voice.ts';
 import { MOVES } from './src/lib/guided/catalog.ts';
 import { planWorkout } from './src/lib/guided/fromPlan.ts';
+import { nextTimeWeights, weightsFromTopSets } from './src/lib/guided/fromHistory.ts';
 import { existsSync } from 'node:fs';
 
 let fails = 0;
@@ -151,5 +152,16 @@ check('every focus hits every muscle group it promises, and fits the time', !mis
   check('top set per move: heaviest, first of equals, no warm-ups', topSetPerMove(run).get('incline').feel === 'hard' && topSetPerMove(run).get('lat').weight === 50 && !topSetPerMove(run).has('row:warmup'));
   check('"starts heavier next time" only when the logged top set felt easy', JSON.stringify(heavierNextTime(run)) === JSON.stringify(['row', 'lat']), JSON.stringify(heavierNextTime(run)));
   check('no weight, no heavier promise', heavierNextTime([set('plank', null, 'easy')]).length === 0); }
+{ /* Done screen names the weight the next workout will actually prescribe (#35) */
+  const lifter = { styles: ['Strength'], vibe: [], place: 'Gym', gear: ['Dumbbells', 'Bench', 'Barbell', 'Machines'], level: 'Comfortable' };
+  const planned = buildWorkout(lifter, 45, 'Upper body', { seed: 3 });
+  const mains = planned.steps.filter(s => s.part === 'main' && s.move.load !== 'none');
+  const top = mains.map(s => ({ moveId: s.move.id, name: s.move.name, weight: 40, reps: 8 }));
+  const shown = nextTimeWeights(top, '2026-11-22', false);
+  const next = buildWorkout(lifter, 45, 'Upper body', { seed: 3, remembered: weightsFromTopSets([{ date: '2026-11-22', topSets: top.map(t => ({ lift: t.name, weight: t.weight, reps: t.reps, completed: true })) }], false) });
+  check('there is something to show', mains.length > 0);
+  check('done-screen number equals what the next session prescribes', shown.every(item => next.steps.filter(s => s.move.id === item.moveId && s.part === 'main').every(s => s.weight === item.weight)), JSON.stringify(shown));
+  check('only lifts whose weight changes are listed', shown.every(item => item.weight !== item.was));
+  check('no weight, no line', nextTimeWeights([{ moveId: 'plank', name: 'Plank', weight: null, reps: 30 }], '2026-11-22', false).length === 0); }
 console.log(fails ? `\n${fails} failing` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);
