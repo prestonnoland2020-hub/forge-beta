@@ -34,6 +34,9 @@ export function weightsFromTopSets(records: Array<{ date: string; topSets?: Arra
        estimate. */
     if (found.reps >= 8 && found.easy) weight = Math.max(weight, nextWeight(found.weight, 'easy', move.load, metric) ?? weight);
     else if (found.reps >= 8 && found.good) weight = Math.max(weight, found.weight);
+    /* A barbell is never lighter than the empty bar: 45 x 5 used to read
+       back as a 40 lb Barbell Row. */
+    if (move.load === 'barbell') weight = Math.max(weight, metric ? 20 : 45);
     out[move.id] = weight;
   }
   return out;
@@ -44,8 +47,12 @@ export function weightsFromTopSets(records: Array<{ date: string; topSets?: Arra
    weightsFromTopSets the builder reads, run over today's top sets. Only lifts
    whose number differs from the top set just lifted are returned. */
 export type NextTime = { moveId: string; name: string; weight: number; was: number };
-export function nextTimeWeights(top: Array<{ moveId: string; name: string; weight: number | null; reps: number }>, date: string, metric: boolean): NextTime[] {
+export function nextTimeWeights(top: Array<{ moveId: string; name: string; weight: number | null; reps: number; feel?: string | null }>, date: string, metric: boolean): NextTime[] {
+  /* Never a lighter number after a set she called easy or just right: a
+     five-rep set read back as a lighter set of ten is right for the builder,
+     but "Too easy" then "lighter next time" reads as the coach not listening. */
   const sets = top.filter(item => item.weight !== null && item.weight > 0);
+  const contradicts = (item: typeof sets[number], weight: number) => (item.feel === 'easy' || item.feel === 'right') && weight < (item.weight as number);
   const next = weightsFromTopSets([{ date, topSets: sets.map(item => ({ lift: item.name, weight: item.weight as number, reps: item.reps, completed: true })) }], metric);
-  return sets.flatMap(item => next[item.moveId] !== undefined && next[item.moveId] !== item.weight ? [{ moveId: item.moveId, name: item.name, weight: next[item.moveId], was: item.weight as number }] : []);
+  return sets.flatMap(item => next[item.moveId] !== undefined && next[item.moveId] !== item.weight && !contradicts(item, next[item.moveId]) ? [{ moveId: item.moveId, name: item.name, weight: next[item.moveId], was: item.weight as number }] : []);
 }

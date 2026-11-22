@@ -30,5 +30,14 @@ setEffort('2026-11-20', 'Goblet squat', 'easy');
 const heavy2 = weightsFromTopSets([{ date: '2026-11-20', topSets: [{ lift: 'Goblet squat', weight: 70, reps: 3, completed: true }] }], false);
 check('a heavy triple still goes through the estimate (no +step on top of it)', Object.values(heavy2).every(v => v < 70), JSON.stringify(heavy2));
 
+const { nextTimeWeights } = await import('./src/lib/guided/fromHistory.ts');
+setEffort('2026-11-22', 'Barbell Row', 'easy');
+const plan = nextTimeWeights([{ moveId: 'barbell-row', name: 'Barbell Row', weight: 45, reps: 5, feel: 'easy' }, { moveId: 'bench-press', name: 'Bench Press', weight: 45, reps: 5, feel: 'right' }], '2026-11-22', false);
+check('plan-day 45 lb bar sets never read back as a 40 lb barbell', plan.every(item => item.weight >= 45), JSON.stringify(plan));
+const after = nextTimeWeights([{ moveId: 'db-row', name: 'One-arm dumbbell row', weight: 30, reps: 5, feel: 'easy' }], '2026-11-22', false);
+check('no "lighter next time" line after a set called easy', after.length === 0, JSON.stringify(after));
+const easyLine = nextTimeWeights([{ moveId: 'db-row', name: 'One-arm dumbbell row', weight: 15, reps: 10, feel: 'easy' }], '2026-11-21', false);
+check('easy 15 x 10 shows "20 lb next time" on the done screen', easyLine.length === 1 && easyLine[0].weight === 20, JSON.stringify(easyLine));
+
 if (fails) { console.log(`\n${fails} failed`); process.exit(1); }
 console.log('\nall passed');
