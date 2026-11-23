@@ -127,6 +127,19 @@ export function recommendationFingerprint(input:Omit<EngineInput,'recovery'|'pro
   return stableHash(JSON.stringify([DAILY_RECOMMENDATION_VERSION,input.date,input.splitDay,input.cycleRevision||0,input.loadBiasPercent,input.aiPlanStamp||'',input.planInputsStamp||'',history,goals,library]));
 }
 
+/* THE ONE PLACE A PLAN LIFT'S NEXT LOAD IS WORKED OUT. The daily recommendation
+   and the Guided done screen both read it, so the "next time" number a coached
+   plan day promises is the number the next plan day prescribes. */
+export function strengthGoalMaxes(goals:CreatedGoal[],date:string){
+  const strengthGoals=goals.filter(goal=>goal.type==='Strength'&&goal.exercise).sort((a,b)=>{const ahead=(goal:typeof a)=>!goal.date||goal.date>=date?0:1;return ahead(b)-ahead(a)||String(b.date||'9999').localeCompare(String(a.date||'9999'))});
+  return strengthGoals.reduce<Record<string,number>>((map,goal)=>{const target=goalTarget(goal);if(goal.exercise&&target)map[canonicalLiftKey(goal.exercise)]=target;return map},{});
+}
+export function intelligenceFor({records,recovery,lifts,goalMaxByLift,date,loadBiasPercent=0}:{records:WorkoutRecord[];recovery:RecoveryState;lifts:string[];goalMaxByLift:Record<string,number>;date:string;loadBiasPercent?:number}){
+  const positions=liftPositions(records,lift=>!goalMaxByLift[canonicalLiftKey(lift)]);
+  const templates=lifts.map(exercise=>({exercise,calculatedMax:0,exposureIndex:rungFor(positions.get(canonicalLiftKey(exercise))||{exposures:0,offScript:0,misses:0,reseated:false})}));
+  return buildTrainingIntelligence({records,recovery,templates,goalMaxByLift,today:new Date(`${date}T12:00:00`),loadBiasPercent});
+}
+
 export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:string}):DailyRecommendation{
   const completed=strengthResults(input.records);
   const lastCompletedByLift=completed.reduce<Record<string,string>>((map,result)=>{const key=canonicalLiftKey(result.lift);if(!map[key]||result.date>map[key])map[key]=result.date;return map},{});
@@ -139,7 +152,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
   /* Keyed canonically: written raw, a "Squat" goal was invisible to a "Back
      Squat" template and the day fell back to "establish a baseline" on a lift
      with years of history behind it. */
-  const goalMaxByLift=strengthGoals.reduce<Record<string,number>>((map,goal)=>{const target=goalTarget(goal);if(goal.exercise&&target)map[canonicalLiftKey(goal.exercise)]=target;return map},{});
+  const goalMaxByLift=strengthGoalMaxes(input.goals,input.date);
   const dueMuscles=normalizeMuscleGroups(input.splitDay.muscles).filter(muscle=>muscle!=='Cardio');
   const explicitNames=new Set(input.splitDay.exercises.map(normalized));
   const compareExercise=(a:LibraryExercise,b:LibraryExercise)=>{
@@ -209,10 +222,7 @@ export function buildDailyRecommendation(input:EngineInput & {inputFingerprint:s
      good work that cost him his place. A prescription is answered when the
      athlete does what it asked; anything else is evidence, and evidence raises
      loads without moving the schedule. */
-  const positions=liftPositions(input.records,lift=>!goalMaxByLift[canonicalLiftKey(lift)]);
-  const positionOf=(name:string)=>positions.get(canonicalLiftKey(name));
-  const templates=selectedExercises.map(({exercise})=>({exercise:exercise.name,calculatedMax:0,exposureIndex:rungFor(positionOf(exercise.name)||{exposures:0,offScript:0,misses:0,reseated:false})}));
-  const intelligence=buildTrainingIntelligence({records:input.records,recovery:input.recovery,templates,goalMaxByLift,today:new Date(`${input.date}T12:00:00`),loadBiasPercent:input.loadBiasPercent});
+  const intelligence=intelligenceFor({records:input.records,recovery:input.recovery,lifts:selectedExercises.map(({exercise})=>exercise.name),goalMaxByLift,date:input.date,loadBiasPercent:input.loadBiasPercent});
   /* A cardio-only split day prescribes no strength: no top set appears on
      Today or in the workout log for that day. */
   const topSets=input.splitDay.type==='cardio'||input.splitDay.type==='hyrox'?[]:selectedExercises.map(selection=>{
