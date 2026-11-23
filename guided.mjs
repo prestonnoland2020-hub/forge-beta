@@ -149,9 +149,15 @@ check('every focus hits every muscle group it promises, and fits the time', !mis
 { /* Nov 21: the done screen said "Incline Dumbbell Press felt easy. It starts heavier next time" when the 10 lb set was too hard and only the dropped 5 lb set felt easy. */
   const set = (moveId, weight, feel, reps = 10) => ({ moveId, name: moveId, weight, feel, reps });
   const run = [set('incline', 10, 'hard'), set('incline', 5, 'easy'), set('incline', 10, 'right'), set('row', 45, 'easy', 5), set('row:warmup', 45, 'easy', 5), set('lat', 45, 'right'), set('lat', 50, 'easy')];
-  check('top set per move: heaviest, first of equals, no warm-ups', topSetPerMove(run).get('incline').feel === 'hard' && topSetPerMove(run).get('lat').weight === 50 && !topSetPerMove(run).has('row:warmup'));
+  check('top set per move: heaviest, latest of equals, no warm-ups', topSetPerMove(run).get('incline').feel === 'right' && topSetPerMove(run).get('lat').weight === 50 && !topSetPerMove(run).has('row:warmup'));
   check('"starts heavier next time" only when the logged top set felt easy', JSON.stringify(heavierNextTime(run)) === JSON.stringify(['row', 'lat']), JSON.stringify(heavierNextTime(run)));
   check('no weight, no heavier promise', heavierNextTime([set('plank', null, 'easy')]).length === 0); }
+{ /* Nov 23: Lat Pulldown 45 Too hard, 35 Too easy, 45 Just right — done screen said "40 lb next time". */
+  const set = (weight, feel) => ({ moveId: 'lat', name: 'Lat Pulldown', weight, feel, reps: 10 });
+  const run = [set(45, 'hard'), set(35, 'easy'), set(45, 'right')];
+  check('equal top sets: the later one is logged (45 Just right)', topSetPerMove(run).get('lat').feel === 'right');
+  const later = [set(45, 'right'), set(45, 'hard')];
+  check('equal top sets: a later Too hard is logged too', topSetPerMove(later).get('lat').feel === 'hard'); }
 { /* Done screen names the weight the next workout will actually prescribe (#35) */
   const lifter = { styles: ['Strength'], vibe: [], place: 'Gym', gear: ['Dumbbells', 'Bench', 'Barbell', 'Machines'], level: 'Comfortable' };
   const planned = buildWorkout(lifter, 45, 'Upper body', { seed: 3 });
