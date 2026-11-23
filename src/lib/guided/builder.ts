@@ -110,15 +110,18 @@ export function nextWeight(weight: number | null, feel: Feel, load: Move['load']
 }
 
 /* THE SET THAT GETS LOGGED for each move: the heaviest, and on a weight tie
-   the one with the most reps (the first of equals). Warm-ups and sets with no
-   feel or no weight never count. */
+   the one with the most reps. Between equal sets the LATEST wins: it is how
+   that weight feels now, and it is the feel the coach remembers. Nov 23: Lat
+   Pulldown 45 Too hard, 35 Too easy, 45 Just right logged the first, hard 45,
+   so the done screen said "40 lb next time" right after she called 45 just
+   right. Warm-ups and sets with no feel or no weight never count. */
 export type DoneSet = { moveId: string; name: string; reps: number; weight: number | null; feel: Feel | null };
 export function topSetPerMove<T extends DoneSet>(sets: T[]): Map<string, T> {
   const best = new Map<string, T>();
   for (const item of sets) {
     if (item.feel === null || item.weight === null || item.moveId.endsWith(':warmup')) continue;
     const seen = best.get(item.moveId);
-    if (!seen || item.weight > (seen.weight ?? 0) || (item.weight === seen.weight && item.reps > seen.reps)) best.set(item.moveId, item);
+    if (!seen || item.weight > (seen.weight ?? 0) || (item.weight === seen.weight && item.reps >= seen.reps)) best.set(item.moveId, item);
   }
   return best;
 }

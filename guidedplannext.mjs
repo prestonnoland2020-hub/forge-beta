@@ -37,4 +37,11 @@ for (const lift of ['Lat Pulldown', 'Bench Press']) {
 }
 const guidedOnly = nextTimeWeights(top, '2026-11-17', false);
 check('and it is not just Guided\'s ten-rep number', JSON.stringify(guidedOnly) !== JSON.stringify(shown) || shown.length === 0, JSON.stringify(shown));
+{ /* Nov 23: Barbell Row 45 x 5 Too easy on a coached plan day read "40 lb next time" (down arrow, under the bar). */
+  const row = [rec('r', '2026-11-23', [set('Barbell Row', 45, 5, 'Back')])];
+  for (const feel of ['easy', 'right']) {
+    const out = planNextTimes([{ moveId: 'plan-row', name: 'Barbell Row', weight: 45, reps: 5, feel }], row, [], '2026-11-23');
+    check(`Barbell Row 45 x 5 felt ${feel}: no lighter next-time line`, out.every(item => item.weight >= 45), JSON.stringify(out));
+  }
+}
 if (fails) process.exit(1);
