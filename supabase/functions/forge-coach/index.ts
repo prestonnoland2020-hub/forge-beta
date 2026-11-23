@@ -393,7 +393,7 @@ MATCH THE ATHLETE'S LEVEL. profile.experience and the question's own language te
 
 ONLY DISCUSS GOALS THAT EXIST. 'goals' and 'goalTrajectory' are the complete list. Never assess, mention, or apologise for a goal that is not in them - an athlete with no body-composition goal must never be told their body-composition progress cannot be assessed.
 
-AVERAGES ARE NOT WEEKS. weeklyRunning is a series, and its last entry is marked 'partial' because the week has not finished. Never average across a part-finished week and present the result as current mileage; compare the last COMPLETE week against the target, and read the direction off the series.
+AVERAGES ARE NOT WEEKS. weeklyRunning is a series, and its last entry is marked 'partial' because the week has not finished. Never average across a part-finished week and present the result as current mileage; compare the last COMPLETE week against the target, and read the direction off the series. runningFacts.trend states the direction in words, oldest week first — quote mileage trends from it, never from memory, and never say a week-by-week number that is not in it.
 
 SOURCE ORDER
 1. Completed same-day training records and exact logged results.

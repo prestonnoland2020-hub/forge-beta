@@ -17,7 +17,7 @@ import { hyroxGoalOf, hyroxSessionsDone, upcomingHyroxSessions, weeksUntil } fro
 import { localDayIso } from '../lib/time';
 import { readLocalAiPlan, currentWeekIndex, blockIsOver, blockEndIso, planBlockFor, resolvePlanWeek, goalLiftNames, weekCycleDays, bestsFromHistory} from '../features/training/aiPlanService';
 import { sameLift, canonicalLiftKey } from '../lib/liftAliases';
-import { goalTrajectories, weeklyRunning, bodyWeightSeries, medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
+import { goalTrajectories, weeklyRunning, runningTrend, bodyWeightSeries, medianWeeklyMiles, longestContinuousRun } from '../lib/goalTrajectory';
 import { goalFeasibility, competingRaces, openGoals } from '../lib/goalFeasibility';
 import { normalizeMuscleGroups } from '../lib/muscleGroups';
 import { useDailyRecommendation } from '../features/training/DailyRecommendationProvider';
@@ -215,7 +215,7 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
          lib/stats and handed over as facts. The model never adds up the log
          itself — that is how "your longest run" got said about a run that
          was not. */
-      runningFacts:{last7Days:{miles:last7DayMiles(records,todayIso),runs:last7DayRuns(records,todayIso).map(line=>receiptLine(line))},longestRun30d:(()=>{const line=longestRun(records,todayIso,30);return line?{miles:Math.round(line.miles*10)/10,date:line.date}:null})(),longestRunEver:(()=>{const line=longestRun(records);return line?{miles:Math.round(line.miles*10)/10,date:line.date}:null})()},
+      runningFacts:{trend:runningTrend(weeklyRunning(records)),last7Days:{miles:last7DayMiles(records,todayIso),runs:last7DayRuns(records,todayIso).map(line=>receiptLine(line))},longestRun30d:(()=>{const line=longestRun(records,todayIso,30);return line?{miles:Math.round(line.miles*10)/10,date:line.date}:null})(),longestRunEver:(()=>{const line=longestRun(records);return line?{miles:Math.round(line.miles*10)/10,date:line.date}:null})()},
       bodyWeight:bodyWeightSeries(records),availableLibrary:{exercises:exercises.filter(exercise=>exercise.enabled).map(exercise=>({name:exercise.name,kind:exercise.kind,muscles:exercise.muscles})),workouts:workouts.map(workout=>({name:workout.name,kind:workout.kind,summary:workout.summary}))},establishedSplit:setup?.splitDays.map(day=>({name:day.name,type:day.type,muscles:day.muscles}))||[],savedDailyRecommendation:recommendation,dueSplitDay:recommendation?.splitDay||{name:dueDay?.name||fallbackDay?.name,type:dueDay?.dayType||fallbackDay?.type,muscles:dueMuscles,mappedExercises:eligible.map(exercise=>exercise.name)},
     /* THE ATHLETE'S WHOLE TRAINING LIFE, at a resolution that fits. The coach
        used to receive the newest 180 days and nothing else, so it truthfully
