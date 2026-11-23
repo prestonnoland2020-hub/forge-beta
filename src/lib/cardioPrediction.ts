@@ -315,9 +315,22 @@ export const TESTED_WINDOW_DAYS = 182;
 export const TESTED_MAX_BEAT = 0.10;
 export function testedRaceSeconds(records: WorkoutRecord[], goalMiles: number, excluded: string[] = [], estimateSeconds: number | null = null, todayIso = today()): number | null {
   if (!goalMiles) return null;
-  const floor = estimateSeconds ? estimateSeconds * (1 - TESTED_MAX_BEAT) : 0;
+  const efforts = trustedEfforts(raceEvidenceEfforts(records), excluded);
+  /* A FRESH HARD EFFORT MOVES THE FLOOR, NOT THE OTHER WAY ROUND. The floor
+     came from the estimate alone, so when the estimate lagged (7:15 the day
+     after a 5:36 mile) it threw out the 5:36 and the Jul 5:19 as "too fast"
+     and the card fell back to a slow old run — a better mile made the card
+     worse. Anything run in the last six weeks at the distance (to a quarter over) is evidence
+     the estimate has to catch up to, so the floor is never set above it. */
+  let reference = estimateSeconds;
+  for (const run of efforts) {
+    if (run.miles < goalMiles * 0.98 || run.miles > goalMiles * 1.25 || (dateMs(todayIso) - dateMs(run.date)) / DAY > 42) continue;
+    const seconds = run.seconds * (goalMiles / run.miles);
+    if (reference === null || seconds < reference) reference = seconds;
+  }
+  const floor = reference ? reference * (1 - TESTED_MAX_BEAT) : 0;
   let best: number | null = null;
-  for (const run of trustedEfforts(raceEvidenceEfforts(records), excluded)) {
+  for (const run of efforts) {
     if (run.miles < goalMiles * 0.98) continue;
     if ((dateMs(todayIso) - dateMs(run.date)) / DAY > TESTED_WINDOW_DAYS) continue;
     const seconds = run.seconds * (goalMiles / run.miles);
