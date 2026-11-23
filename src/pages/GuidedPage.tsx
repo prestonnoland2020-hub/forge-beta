@@ -17,9 +17,11 @@ import { blobToBase64, cloudEarsSupported } from '../lib/guided/cloudEars';
 import { nativeVoice, type ScriptBeat } from '../lib/guided/nativeVoice';
 import { tickerEnd, tickerLive, tickerStart, tickerUpdate, type TickerState } from '../lib/liveActivity';
 import { weightsFromTopSets, nextTimeWeights, type NextTime } from '../lib/guided/fromHistory';
+import { planNextTimes } from '../lib/guided/planNext';
 import { setEffort } from '../lib/setEffort';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
 import { supabase } from '../lib/supabase';
+import { useGoals } from '../features/goals/GoalsProvider';
 import { isDemoMode } from '../lib/env';
 
 /* HOW THE COACH HEARS. Signed in, it hears the Wispr Flow way: short clips
@@ -140,6 +142,7 @@ export function GuidedPage() {
     try { const saved = JSON.parse(sessionStorage.getItem(FROM_PLAN_KEY) || 'null'); return saved && Array.isArray(saved.lifts) && saved.lifts.length ? saved : null; } catch { return null; }
   });
   const { addRecord, records } = useWorkoutHistory();
+  const { goals } = useGoals();
   const { setup } = useProfileSetup();
   const { isPro } = useBilling();
   const metric = setup?.units === 'Metric';
@@ -535,7 +538,9 @@ export function GuidedPage() {
       for (const item of best.values()) if (item.feel === 'easy' || item.feel === 'right') setEffort(todayIso(), item.name, item.feel === 'right' ? 'good' : 'easy');
       setSavedNote(result.ok ? 'Saved to your log.' : 'Already in your log.');
       /* Read after the effort is saved: the number the next workout will use. */
-      setNextTimes(nextTimeWeights([...best.values()], todayIso(), metric));
+      /* A plan day names the plan's own next weight (the top-set wave the next
+         plan day loads from); a free-form Coach me session keeps Guided's. */
+      setNextTimes(fromPlan ? planNextTimes([...best.values()], result.ok ? [...records, result.record] : records, goals, todayIso()) : nextTimeWeights([...best.values()], todayIso(), metric));
       /* The coach remembers how each lift's LAST set felt (row coach-memory-2026-11). */
       const lastFeel = new Map<string, LoggedSet>();
       for (const item of main) if (!item.timed) lastFeel.set(item.name, item);
