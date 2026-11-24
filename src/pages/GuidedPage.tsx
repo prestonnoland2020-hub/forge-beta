@@ -9,7 +9,7 @@ import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
 import { amountText, buildWorkout, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
-import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
+import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, talkingToCoach, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
@@ -222,10 +222,10 @@ export function GuidedPage() {
     c.onHeard = text => setHeard(text);
     c.onUnknown = text => {
       /* TALKING IS ASKING. "That one felt way too easy, what do I do" between
-         sets is a question for the coach, not a command to guess at. Anything
-         of four words or more that matched no command goes to the coach whole;
-         only short mishearings get the "Did you mean" buttons. */
-      if (text.trim().split(/\s+/).length >= 4) { setUnknown(null); misses.current = 0; void askRef.current(text); return; }
+         sets is a question for the coach, not a command to guess at. Four
+         words or more about the workout go to the coach whole; chatter, music
+         and mishearings never do (no AI call, no reply). */
+      if (talkingToCoach(text)) { setUnknown(null); misses.current = 0; void askRef.current(text); return; }
       setUnknown(text); misses.current += 1;
       if (misses.current === 2) { const hint = lastLine.current.listen?.includes('easy') ? 'Say too easy, just right, or too hard. Or tap one.' : lastLine.current.listen?.includes('more') ? 'Say ready when you want to go, or more rest.' : 'Say done when you finish the set. Or tap the button.'; c.say(hint, lastLine.current.listen); }
     };
@@ -479,7 +479,7 @@ export function GuidedPage() {
     if (lastSet && lastStep) { finish(); return; }
     const restFor = step.rest;
     const upNext = lastSet ? workout.steps[stepIndex + 1] : step;
-    const why = feel === 'easy' && nextW !== null && !lastSet ? ` That looked easy, so let's bump it to ${nextW} ${unitWord}.` : feel === 'hard' && nextW !== null && !lastSet ? ` Let's drop it to ${nextW} ${unitWord}. No shame in that.` : feel === 'hard' && swapped ? ` Next set, we'll switch to ${swapped.name}. It's a little easier.` : '';
+    const why = feel === 'easy' && nextW !== null && !lastSet ? ` That looked easy, so let's bump it to ${nextW} ${unitWord}.` : feel === 'hard' && nextW !== null && weight !== null && nextW < weight && !lastSet ? ` Let's drop it to ${nextW} ${unitWord}. No shame in that.` : feel === 'hard' && swapped ? ` Next set, we'll switch to ${swapped.name}. It's a little easier.` : '';
     setPhase('rest'); setTimer(restFor); setRunning(true); setPaused(false);
     /* What comes after the rest, fetched during it. */
     { const nextIndex = lastSet ? stepIndex + 1 : stepIndex; const nextSet = lastSet ? 0 : setIndex + 1; const s2 = workout.steps[nextIndex]; if (s2) coach.current?.prefetch(cardLine(s2, nextSet, nextIndex === stepIndex ? (nextW ?? weight) : s2.weight)); }
@@ -507,6 +507,20 @@ export function GuidedPage() {
     const w = nextWeight(weight, dir > 0 ? 'easy' : 'hard', step.move.load, metric);
     setWeights(map => ({ ...map, [stepIndex]: w }));
     say(`Okay, ${w} ${unitWord} it is.`, CARD_CMDS);
+  };
+  /* During rest "heavier" means the NEXT set: same move, or the next move
+     after its last set. The mic stays on the rest words (ready, more). */
+  const REST_CMDS: Command[] = ['ask', 'ready', 'more', 'heavier', 'lighter', 'skip', 'repeat', 'pause', 'resume', 'end'];
+  const bumpNext = (dir: 1 | -1) => {
+    if (!step || !workout) return;
+    const index = setIndex + 1 < step.sets ? stepIndex : stepIndex + 1;
+    const target = workout.steps[index]; if (!target) return;
+    const from = weights[index] !== undefined ? weights[index] : target.weight;
+    if (from === null || from === undefined || target.move.load === 'none') { say('The next one has no weight. Say easier or harder when it starts.', REST_CMDS); return; }
+    const w = nextWeight(from, dir > 0 ? 'easy' : 'hard', target.move.load, metric);
+    if (w === null) return;
+    setWeights(map => ({ ...map, [index]: w }));
+    say(`Okay, ${w} ${unitWord} for ${index === stepIndex ? 'the next set' : target.move.name}.`, REST_CMDS);
   };
   const explain = () => {
     if (!step) return;
@@ -609,9 +623,9 @@ export function GuidedPage() {
     if (phase === 'rest') {
       if (command === 'ready' || command === 'skip') { afterRest(); return; }
       /* "Too easy, go heavier" between sets changes the next set's weight. */
-      if (command === 'heavier') { bump(1); return; }
-      if (command === 'lighter') { bump(-1); return; }
-      if (command === 'more') { setTimer(t => t + 30); say('Sure, thirty more seconds.', ['ready', 'more', 'skip', 'repeat', 'end']); return; }
+      if (command === 'heavier') { bumpNext(1); return; }
+      if (command === 'lighter') { bumpNext(-1); return; }
+      if (command === 'more') { setTimer(t => t + 30); say('Sure, thirty more seconds.', REST_CMDS); return; }
     }
   };
   /* "I just did 400 pounds for six reps" on a card: that is the set. Logged
@@ -978,13 +992,14 @@ export function GuidedPage() {
   if (phase === 'rest') {
     const total = Math.max(1, step.rest);
     const upNext = setIndex + 1 < step.sets ? step : workout.steps[stepIndex + 1];
+    const upNextW = upNext === step ? weight : upNext ? (weights[stepIndex + 1] !== undefined ? weights[stepIndex + 1] : upNext.weight) : null;
     return frame(<div className="gd-screen gd-restscreen">
       {top(undefined, listenBadge)}
       <div className="gd-ring">
         <svg viewBox="0 0 260 260" aria-hidden="true"><circle cx="130" cy="130" r="110" className="track" /><circle cx="130" cy="130" r="110" className="fill" strokeDasharray="691" strokeDashoffset={691 * (1 - Math.max(0, timer) / total)} /></svg>
         <div><strong role="timer">{clock(Math.max(0, timer))}</strong><span>{paused ? 'Paused' : 'Rest. Breathe.'}</span></div>
       </div>
-      {upNext && <div className="gd-next"><span>UP NEXT</span><strong>{upNext.move.name}{upNext === step ? ` · set ${setIndex + 2} of ${step.sets}` : ''}</strong><small>{amountText(upNext)}{(upNext === step ? weight : upNext.weight) !== null ? ` · ${upNext === step ? weight : upNext.weight} ${unit}` : ''}</small></div>}
+      {upNext && <div className="gd-next"><span>UP NEXT</span><strong>{upNext.move.name}{upNext === step ? ` · set ${setIndex + 2} of ${step.sets}` : ''}</strong><small>{amountText(upNext)}{upNextW !== null && upNextW !== undefined ? ` · ${upNextW} ${unit}` : ''}</small></div>}
       {didYouMean || (heard && handsFree && <p className="gd-heard">Heard: “{heard}”</p>)}
       <button type="button" className="gd-ask-pill" onClick={() => setAskOpen(true)}><Svg d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" size={16} />Ask coach</button>
       {askSheet}{endSheet}

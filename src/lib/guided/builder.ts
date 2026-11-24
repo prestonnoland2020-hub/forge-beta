@@ -105,7 +105,8 @@ export function nextWeight(weight: number | null, feel: Feel, load: Move['load']
   if (weight === null) return null;
   const step = metric ? (load === 'barbell' || load === 'machine' ? 5 : 2) : (load === 'barbell' || load === 'machine' ? 10 : 5);
   if (feel === 'easy') return weight + step;
-  if (feel === 'hard') return Math.max(step, weight - step);
+  /* Never under the empty bar: Too hard at 45 lb used to say 35 lb. */
+  if (feel === 'hard') return Math.max(load === 'barbell' ? (metric ? 20 : 45) : step, weight - step);
   return weight;
 }
 
