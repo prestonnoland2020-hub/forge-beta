@@ -161,6 +161,16 @@ export function parseSetReport(transcript: string): SetReport | null {
   return weight === null && reps === null ? null : { weight, reps, unit };
 }
 
+/* TALKING TO THE COACH, OR JUST TALKING? A long phrase that matched no
+   command goes to the coach only when it is about the workout ("that felt way
+   too easy, what do I do"). Gym chatter, a friend, a song or a garbled
+   mishearing ("or pick the speed go") stays quiet: no AI call, no reply. */
+const WORKOUT_TALK = /\b(coach|sets?|reps?|weights?|pounds?|lbs?|kilos?|kg|felt|feel|feels|feeling|easy|easier|hard|harder|heavy|heavier|light|lighter|tired|sore|form|hurts?|pain|painful|injur\w*|breath\w*|rest|exercise|move|workout|squat|bench|deadlift|press|row|curl|plank)\b/i;
+export function talkingToCoach(heard: string): boolean {
+  const text = heard.trim();
+  return text.split(/\s+/).length >= 4 && WORKOUT_TALK.test(text);
+}
+
 export function matchCommand(transcript: string, allowed?: Command[], memory: Record<string, Command> = {}): Match | null {
   const ok = (command: Command) => !allowed || allowed.includes(command);
   const rule = parseCommand(transcript, allowed);
