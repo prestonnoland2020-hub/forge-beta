@@ -221,6 +221,11 @@ export function GuidedPage() {
     c.onState = setVoiceState;
     c.onHeard = text => setHeard(text);
     c.onUnknown = text => {
+      /* TALKING IS ASKING. "That one felt way too easy, what do I do" between
+         sets is a question for the coach, not a command to guess at. Anything
+         of four words or more that matched no command goes to the coach whole;
+         only short mishearings get the "Did you mean" buttons. */
+      if (text.trim().split(/\s+/).length >= 4) { setUnknown(null); misses.current = 0; void askRef.current(text); return; }
       setUnknown(text); misses.current += 1;
       if (misses.current === 2) { const hint = lastLine.current.listen?.includes('easy') ? 'Say too easy, just right, or too hard. Or tap one.' : lastLine.current.listen?.includes('more') ? 'Say ready when you want to go, or more rest.' : 'Say done when you finish the set. Or tap the button.'; c.say(hint, lastLine.current.listen); }
     };
@@ -313,23 +318,25 @@ export function GuidedPage() {
     if (step && /\bwhat(\'s| is) next\b|\bnext\b/.test(q)) { const next = workout?.steps[stepIndex + 1]; return next ? `After this, ${next.move.name}, ${amountText(next)}.` : 'This is the last move. You are almost done.'; }
     return "I can't reach the full coach right now, but you're doing great. Keep going, and ask me again after the workout.";
   };
+  const askRef = useRef<(question: string) => Promise<void>>(async () => {});
   const askCoach = async (question: string) => {
     const q = question.trim(); if (!q) return;
     setAskOpen(true); setAskBusy(true); setAskAnswer({ q, a: '' }); setAskText('');
     const safety = /\b(hurt|hurts|pain|painful|sharp|injur)/i.test(q);
     /* Listen straight away: the safe answer says "say skip", so skip must be heard. */
-    const resume: Command[] = phase === 'feel' ? ['ask', 'easy', 'right', 'hard', 'repeat', 'end'] : phase === 'rest' ? ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end'] : CARD_CMDS;
+    const resume: Command[] = phase === 'feel' ? ['ask', 'easy', 'right', 'hard', 'repeat', 'end'] : phase === 'rest' ? ['ask', 'ready', 'more', 'heavier', 'lighter', 'skip', 'repeat', 'pause', 'resume', 'end'] : CARD_CMDS;
     if (safety) say(localAnswer(q), resume);
     const recentGuided = records.filter(record => /^Guided/.test(record.title)).slice(0, 5).map(record => ({ date: record.date, title: record.title, notes: record.notes }));
     const response = await requestForgeCoach({ question: q, scope: 'today', context: {
       surface: 'forge-guided-voice',
-      replyStyle: 'The athlete is mid-workout with headphones in and will HEAR this. Answer in one or two short spoken sentences, plain words, no lists. Do not rebuild or change the workout; if they want a change, tell them to say easier, harder, heavier, lighter or skip.',
+      replyStyle: 'The athlete is mid-workout with headphones in and will HEAR this. Answer in one or two short spoken sentences, plain words, no lists. Do not rebuild or change the workout; if they want a change, tell them to say easier, harder, heavier, lighter or skip. If they are resting and say the last set felt too easy, tell them to say heavier for the next set.',
       guided: guidedCoachContext(), recentGuidedWorkouts: recentGuided,
     } }, localAnswer(q));
     const answer = response.source === 'ai' || response.source === 'limit' ? response.answer : localAnswer(q);
     setAskBusy(false); setAskAnswer({ q, a: answer });
     if (!safety) say(answer, resume); else lastLine.current = { text: answer, listen: resume };
   };
+  askRef.current = askCoach;
   const askSheet = askOpen ? <div className="gd-sheet-back" onClick={event => { if (event.target === event.currentTarget) setAskOpen(false); }}>
     <section className="gd-sheet" role="dialog" aria-modal="true" aria-labelledby="gd-ask-title">
       <h2 id="gd-ask-title">Ask your coach</h2>
@@ -476,7 +483,7 @@ export function GuidedPage() {
     setPhase('rest'); setTimer(restFor); setRunning(true); setPaused(false);
     /* What comes after the rest, fetched during it. */
     { const nextIndex = lastSet ? stepIndex + 1 : stepIndex; const nextSet = lastSet ? 0 : setIndex + 1; const s2 = workout.steps[nextIndex]; if (s2) coach.current?.prefetch(cardLine(s2, nextSet, nextIndex === stepIndex ? (nextW ?? weight) : s2.weight)); }
-    say(`${cheer(logged.length)}${why} Take ${restFor >= 60 ? `${Math.floor(restFor / 60)} minute${restFor >= 120 ? 's' : ''}${restFor % 60 ? ` ${restFor % 60} seconds` : ''}` : `${restFor} seconds`}${restFor >= 60 ? ' to recover' : ''}. ${lastSet ? `Next up is ${upNext.move.name}.` : 'Same move next.'} ${logged.length <= 1 ? "Just say ready when you want to go." : "Tell me when you're ready."}`, ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end']);
+    say(`${cheer(logged.length)}${why} Take ${restFor >= 60 ? `${Math.floor(restFor / 60)} minute${restFor >= 120 ? 's' : ''}${restFor % 60 ? ` ${restFor % 60} seconds` : ''}` : `${restFor} seconds`}${restFor >= 60 ? ' to recover' : ''}. ${lastSet ? `Next up is ${upNext.move.name}.` : 'Same move next.'} ${logged.length <= 1 ? "Just say ready when you want to go." : "Tell me when you're ready."}`, ['ask', 'ready', 'more', 'heavier', 'lighter', 'skip', 'repeat', 'pause', 'resume', 'end']);
   };
   const afterRest = () => {
     if (!step || !workout) return;
@@ -601,6 +608,9 @@ export function GuidedPage() {
     }
     if (phase === 'rest') {
       if (command === 'ready' || command === 'skip') { afterRest(); return; }
+      /* "Too easy, go heavier" between sets changes the next set's weight. */
+      if (command === 'heavier') { bump(1); return; }
+      if (command === 'lighter') { bump(-1); return; }
       if (command === 'more') { setTimer(t => t + 30); say('Sure, thirty more seconds.', ['ready', 'more', 'skip', 'repeat', 'end']); return; }
     }
   };
@@ -780,7 +790,7 @@ export function GuidedPage() {
         const timedLeft = result.timedEndsAt ? Math.max(1, Math.round((result.timedEndsAt - Date.now()) / 1000)) : 0;
         setPhase('card'); setTimer(timedLeft || item.reps); setRunning(Boolean(timedLeft));
       }
-      const listen: Command[] = beat.kind === 'feel' ? ['ask', 'easy', 'right', 'hard', 'repeat', 'end'] : beat.kind === 'rest' ? ['ask', 'ready', 'more', 'skip', 'repeat', 'pause', 'resume', 'end'] : CARD_CMDS;
+      const listen: Command[] = beat.kind === 'feel' ? ['ask', 'easy', 'right', 'hard', 'repeat', 'end'] : beat.kind === 'rest' ? ['ask', 'ready', 'more', 'heavier', 'lighter', 'skip', 'repeat', 'pause', 'resume', 'end'] : CARD_CMDS;
       lastLine.current = { text: beat.line, listen };
       coach.current?.nativeResumed(listen);
     };
