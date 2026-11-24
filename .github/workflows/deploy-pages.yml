@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: forge-pages
@@ -56,6 +57,29 @@ jobs:
         with:
           path: dist
 
+      # GitHub sometimes lists a just-uploaded artifact late, and deploy-pages
+      # then fails with "No artifacts named github-pages" (Nov 16, Nov 24).
+      # Wait until the run's artifact list shows it (up to ~2 minutes).
+      - name: Wait for the site artifact to be listed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 24); do
+            n=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?name=github-pages" --jq '.total_count' 2>/dev/null || echo 0)
+            if [ "${n:-0}" -ge 1 ]; then echo "artifact listed after $((i*5))s"; exit 0; fi
+            sleep 5
+          done
+          echo "artifact still not listed; trying the deploy anyway"
+
       - name: Deploy Forge beta
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Give GitHub a moment, then deploy again
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 45
+
+      - name: Deploy Forge beta (retry)
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
