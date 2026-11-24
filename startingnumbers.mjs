@@ -9,6 +9,8 @@ import { bestsFromHistory } from './src/features/training/aiPlanService.ts';
 import { goalProgress } from './src/lib/goalProgress.ts';
 import { calculateEstimatedOneRepMax } from './src/lib/strength.ts';
 import { canonicalLiftKey } from './src/lib/liftAliases.ts';
+/* Logged dates are relative to today: bestsFromHistory discounts old lifts, so a fixed date rots. */
+const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 const B = canonicalLiftKey('Bench Press'), Q = canonicalLiftKey('Back Squat'), D = canonicalLiftKey('Deadlift');
 
 let fails = 0;
@@ -26,10 +28,10 @@ check('and not a single for a Real 1RM goal', !empty.singles.get(B));
 check('a lift with no starting number stays empty', !empty.bests.has(D));
 
 console.log('\nThe first real set replaces it');
-const logged = bestsFromHistory([{ date: '2026-11-02', topSets: [{ lift: 'Bench Press', weight: 155, reps: 5 }] }]);
+const logged = bestsFromHistory([{ date: daysAgo(2), topSets: [{ lift: 'Bench Press', weight: 155, reps: 5 }] }]);
 check('the logged bench wins, even when lighter', logged.bests.get(B) === calculateEstimatedOneRepMax(155, 5), String(logged.bests.get(B)));
 check('the squat still uses its starting number', logged.bests.get(Q) === calculateEstimatedOneRepMax(225, 5), JSON.stringify([...logged.bests]));
-const missed = bestsFromHistory([{ date: '2026-11-02', topSets: [{ lift: 'Bench Press', weight: 205, reps: 5, completed: false }] }]);
+const missed = bestsFromHistory([{ date: daysAgo(2), topSets: [{ lift: 'Bench Press', weight: 205, reps: 5, completed: false }] }]);
 check('a missed set also means the number is not used', !missed.bests.has(B));
 
 console.log('\nA strength goal has a "now" on day one');
