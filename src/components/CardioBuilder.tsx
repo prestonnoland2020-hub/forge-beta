@@ -598,6 +598,8 @@ export function CardioBuilder({ onEntriesChange, initialOpen = false, initialEnt
           <span className="cardio-synced-state">✓ Saved to this day</span>
         </header>
         <div className="cardio-synced-title"><strong>{entry.activity}</strong>{watchName && <small>{watchName}</small>}</div>
+        {/* The heart rate the watch recorded, on the session it belongs to. */}
+        {entry.recorded?.averageHr ? <p className="cardio-synced-hr">♥ {entry.recorded.averageHr} bpm avg{entry.recorded.maxHr ? ` · ${entry.recorded.maxHr} max` : ''}</p> : null}
         {editor?.id !== entry.id && <EntryBreakdown entry={entry} />}
         {ownNote && editor?.id !== entry.id && <p className="cardio-entry-note">{ownNote}</p>}
         {editorFor(entry) || <footer>
