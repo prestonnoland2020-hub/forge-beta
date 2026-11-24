@@ -54,7 +54,7 @@ function todayLoggedFor(records: WorkoutRecord[], todayIso: string) {
     date: todayIso,
     workouts: today.map(record => ({ title: record.title || null, effort: record.effort ?? null, notes: record.notes || null,
       topSets: (record.topSets || []).filter(set => set.completed !== false && set.lift).map(set => ({ lift: set.lift, weight: set.weight, reps: set.reps, calculatedMax: set.calculatedMax ?? null })),
-      cardio: (record.cardioSessions || []).map(session => ({ activity: session.activity, summary: session.summary })) })),
+      cardio: (record.cardioSessions || []).map(session => ({ activity: session.activity, summary: session.summary, ...(session.recorded?.averageHr ? { averageHr: session.recorded.averageHr } : {}), ...(session.recorded?.maxHr ? { maxHr: session.recorded.maxHr } : {}) })) })),
     note: today.length ? 'These are the sets the athlete has logged today. Judge today from them.' : 'Nothing is logged today yet.',
   };
 }

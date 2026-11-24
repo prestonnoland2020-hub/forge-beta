@@ -81,6 +81,7 @@
 .cardio-synced-state.pending{color:var(--muted);font-weight:700}
 .cardio-synced-title{display:grid;gap:2px}
 .cardio-synced-title strong{font:800 20px var(--display);letter-spacing:.02em}
+.cardio-synced-hr{margin:4px 0 0;font:700 14px var(--body,inherit);color:#ff6b6b}
 .cardio-synced-title small{font-size:12px;color:var(--muted)}
 .cardio-synced .cardio-entry-facts>div{background:var(--surface-sunken)}
 .cardio-synced footer{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
