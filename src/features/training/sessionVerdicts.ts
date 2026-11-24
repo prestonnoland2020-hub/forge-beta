@@ -25,6 +25,8 @@ export const SHAPE_TOLERANCE = 0.45;
 /* A shade inside easy pace still counts as easy running, not as a hard session
    the athlete came up short on. */
 export const EASY_RUN_MARGIN = 0.98;
+/* Slower than the target by more than this is not an attempt at the session. */
+export const ATTEMPT_MARGIN = 1.15;
 
 const daysBetween = (from: string, to: string) =>
   Math.round((new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime()) / 86400000);
@@ -150,6 +152,13 @@ export function sessionVerdicts(
     const ranPace = (judged.reduce((total, effort) => total + effort.seconds, 0)
       / judged.reduce((total, effort) => total + effort.metres, 0)) * 1609.344;
     if (easyFloor && ranPace >= easyFloor * EASY_RUN_MARGIN) continue;
+    /* AND NOWHERE NEAR THE TARGET IS NOT AN ATTEMPT. Preston's easy two-mile
+       runs at 8:39-8:45 sat just inside his easy-pace floor, so three of them
+       were judged as 14-minute threshold runs asked at 6:23/mi — and Forge
+       kept telling him his last three hard sessions came in short. A real
+       attempt that goes badly lands within a few percent of the target; one
+       more than 15% off was a different run. */
+    if (ranPace > prescription.targetPace * ATTEMPT_MARGIN) continue;
 
     const verdict = sessionVerdict(prescription, judged);
     if (!verdict) continue;

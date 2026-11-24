@@ -64,7 +64,9 @@ export function ForgeNoticed() {
   const actions = useMemo(() => (note?.actions ? coach.parse(note.actions) : []), [note, coach]);
   if (!note) return null;
   const review = note.kind === 'week-review';
-  const close = () => setNote(null);
+  /* Closing is seeing it too. Only "Got it" used to count, so the X let the
+     same note come back every two days. */
+  const close = () => { acknowledge(note); setNote(null); };
   const done = () => { acknowledge(note); close(); };
   const applyAndClose = () => { coach.apply(actions, note.ask); done(); };
   return <Overlay><div className="coach-checkin-backdrop forge-noticed-backdrop" role="dialog" aria-modal="true" aria-label="Forge noticed" onClick={event => { if (event.target === event.currentTarget) close(); }}>
