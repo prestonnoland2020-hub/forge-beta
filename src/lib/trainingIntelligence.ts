@@ -37,6 +37,8 @@ const parseDay=(date:string)=>new Date(`${date}T12:00:00`).getTime();
 const uniqueDates=(records:WorkoutRecord[])=>[...new Set(records.map(record=>record.date))];
 const strengthResults=(records:WorkoutRecord[])=>records.flatMap(record=>record.topSets?.length?record.topSets.filter(set=>set.completed!==false).map(set=>({date:record.date,lift:set.lift,weight:set.weight,reps:set.reps,calculatedMax:set.calculatedMax})):(record.lift&&record.weight&&record.reps?[{date:record.date,lift:record.lift,weight:record.weight,reps:record.reps,calculatedMax:record.calculatedMax}]:[]));
 
+/* Barbell by name: the named barbell lifts and the big three plus press. Dumbbell, machine, cable and smith variants are excluded. */
+export function isBarbellLift(name:string){const n=name.toLowerCase();if(/dumbbell|\bdb\b|machine|cable|smith|goblet|kettlebell|landmine|hex|trap bar|romanian|\brdl\b|inverted|seated/.test(n))return false;return /barbell|pendlay|bent.?over row|bench press|back squat|front squat|^squat$|^deadlift$|overhead press|military press/.test(n)}
 export function buildTrainingIntelligence({records,recovery,templates,goalMaxByLift={},today=new Date(),loadBiasPercent=0,metric=false}:{records:WorkoutRecord[];recovery:RecoveryState;templates:LiftTemplate[];goalMaxByLift?:Record<string,number|undefined>;today?:Date;loadBiasPercent?:number;metric?:boolean}):TrainingIntelligence{
   const todayStart=new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime();
   const ages=uniqueDates(records).map(date=>Math.floor((todayStart-parseDay(date))/dayMs)).filter(age=>age>=0);
@@ -108,7 +110,13 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
     const liftKey=canonicalLiftKey(template.exercise);
     const accessory=!goalMax;
     const stage=prescribeTopSet({baselineMax,goalMax,weekIndex:completedProgrammedExposures,holding:!supportsProgress,readiness:recovery.confidence==='Low'?100:recovery.readiness,highFatigue:recovery.strengthFatigue==='High',anchors,allowTest:Boolean(goalMax),bestSingle:liftSingles.get(liftKey)||0,metric,accessory,sessions:liftSessions.get(liftKey)||0,misses:liftMisses.get(liftKey),lastAt:liftLastAt.get(liftKey),latest:liftLatest.get(liftKey)});
-    const safeBias=Math.max(-10,Math.min(10,loadBiasPercent));const adjustedWeight=Math.max(0,Math.round(stage.weight*(1+safeBias/100)/5)*5);const adjustedMax=epleyMax(adjustedWeight,stage.reps);
+    const safeBias=Math.max(-10,Math.min(10,loadBiasPercent));
+    /* A BARBELL LIFT IS NEVER LIGHTER THAN THE EMPTY BAR. Barbell Row 45 x 5,
+       Too easy, loaded 40 lb next plan day: the wave steps down on a wave day
+       and nothing knew a bar weighs 45 lb (20 kg). Floor applies to barbell
+       lifts by name; dumbbell and machine work is untouched. */
+    const barFloor=isBarbellLift(template.exercise)?(metric?20:45):0;
+    const adjustedWeight=stage.weight>0?Math.max(barFloor,Math.max(0,Math.round(stage.weight*(1+safeBias/100)/5)*5)):0;const adjustedMax=epleyMax(adjustedWeight,stage.reps);
     const source='history' as const;
     /* SAY WHAT ACTUALLY DECIDED THE LOAD. This named the athlete's highest
        estimate — "best recent comparable estimate came from 225 lb ×10" —
@@ -135,7 +143,7 @@ export function buildTrainingIntelligence({records,recovery,templates,goalMaxByL
         ?`Estimated from your ${nearest[1]} ${unit} ×${nearest[0]}${gap>=4?`, ${gap} reps away — you have no logged set at ${stage.reps}, so treat this as a starting point`:''}; latest was ${latest.weight} ${unit} ×${latest.reps} on ${latest.date}.`
         :`Estimated from ${strongestRecent.weight} ${unit} ×${strongestRecent.reps}, the only comparable set on file; latest was ${latest.weight} ${unit} ×${latest.reps} on ${latest.date}.`;
     const rationale=`${stage.rationale} ${evidence}${supportsProgress?' Recent performance supports one small progression step.':' Forge is holding the demonstrated level until another comparable result confirms progress.'}`;
-    const backoffSets=stage.isTest?2:3;const backoffReps=stage.reps<=2?Math.max(3,stage.reps+2):stage.reps;const backoffWeight=Math.max(5,Math.round(adjustedWeight*(stage.isTest?.85:.9)/5)*5);
+    const backoffSets=stage.isTest?2:3;const backoffReps=stage.reps<=2?Math.max(3,stage.reps+2):stage.reps;const backoffWeight=Math.max(barFloor||5,Math.round(adjustedWeight*(stage.isTest?.85:.9)/5)*5);
     return {...template,weight:adjustedWeight,reps:stage.reps,backoffSets,backoffReps,backoffWeight,calculatedMax:adjustedMax,stage:stage.label,rationale:`${rationale}${goalMaxByLift[canonicalLiftKey(template.exercise)]?` This load is progressing toward the ${goalMaxByLift[canonicalLiftKey(template.exercise)]} ${metric?'kg':'lb'} goal.`:' No movement-specific goal is set, so Forge targets a conservative improvement over demonstrated strength.'}${safeBias?` Coach load adjustment: ${safeBias>0?'+':''}${safeBias}%.`:''}`,source};
   });
   return{activeDays7,activeDaysPrior7,workloadTrend,daysSinceTraining,headline,reason,topSets};
