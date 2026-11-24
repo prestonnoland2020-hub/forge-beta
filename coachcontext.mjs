@@ -18,12 +18,16 @@ const check = (l, c, d = '') => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${d
 const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 
 /* His squat, bench and pull-up work as top_sets holds it. */
-const LIFTS = [
+/* Dates are shifted so the fixture keeps the same age relative to today (the 120-day window in goalTrajectory would otherwise age lifts out). */
+const SHIFT_DAYS = Math.max(0, Math.round((Date.now() - Date.parse('2026-11-17')) / 864e5));
+const shiftDate = iso => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + SHIFT_DAYS); return d.toISOString().slice(0, 10); };
+const LIFTS_RAW = [
   ['2026-09-04', 'Squat', 460, 4], ['2026-09-03', 'Bench', 320, 4], ['2026-08-26', 'Bench', 315, 6],
   ['2026-08-16', 'Squat', 408, 8], ['2026-08-11', 'Bench', 315, 6], ['2026-08-03', 'Bench', 300, 8],
   ['2026-07-31', 'Pull Ups', 105, 5], ['2026-07-26', 'Squat', 455, 3], ['2026-07-21', 'Bench', 315, 6],
   ['2026-07-07', 'Bench', 360, 1], ['2026-06-01', 'Squat', 475, 1], ['2026-06-01', 'Bench', 320, 5],
 ];
+const LIFTS = LIFTS_RAW.map(([date, ...rest]) => [shiftDate(date), ...rest]);
 /* His weigh-ins — the ones the coach said did not exist. Eight months of them,
    thinned to a couple a week, which is what the real table holds: 189.7 in
    March up to 192 now, a couple of pounds across the whole block. */
