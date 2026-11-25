@@ -100,14 +100,27 @@ export function startWeight(move: Move, level: Level, remembered: Record<string,
   return { weight: null, weightNote: 'Start light. Pick a weight you could do 15 times.' };
 }
 
-/* One tap after a set moves the next one. A step is one dumbbell jump. */
-export function nextWeight(weight: number | null, feel: Feel, load: Move['load'], metric: boolean): number | null {
+/* One tap after a set moves the next one. A step is one dumbbell jump.
+   "Way too easy" (or Too easy twice in a row on a move) jumps TWO steps, never
+   more. When the best weight she has lifted on that move is known, the second
+   step stays within about 10% above it: the first step is always allowed. */
+export function nextWeight(weight: number | null, feel: Feel, load: Move['load'], metric: boolean, jump: { steps?: 1 | 2; best?: number | null } = {}): number | null {
   if (weight === null) return null;
   const step = metric ? (load === 'barbell' || load === 'machine' ? 5 : 2) : (load === 'barbell' || load === 'machine' ? 10 : 5);
-  if (feel === 'easy') return weight + step;
+  if (feel === 'easy') {
+    if (jump.steps !== 2) return weight + step;
+    const ceiling = jump.best && jump.best > 0 ? Math.floor(jump.best * 1.1 / step) * step : Infinity;
+    return Math.max(weight + step, Math.min(weight + 2 * step, ceiling));
+  }
   /* Never under the empty bar: Too hard at 45 lb used to say 35 lb. */
   if (feel === 'hard') return Math.max(load === 'barbell' ? (metric ? 20 : 45) : step, weight - step);
   return weight;
+}
+
+/* Too easy a second time in a row on the same move. */
+export function easyStreak(previous: Array<{ moveId: string; feel: Feel | null }>, moveId: string): boolean {
+  const last = [...previous].reverse().find(item => item.moveId === moveId);
+  return last?.feel === 'easy';
 }
 
 /* THE SET THAT GETS LOGGED for each move: the heaviest, and on a weight tie

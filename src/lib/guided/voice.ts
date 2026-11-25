@@ -59,6 +59,8 @@ const LOOSE: Array<[Command, RegExp]> = [
 ];
 const SHORT = 3;
 
+/* "Way too easy" is Too easy, said harder: the next set jumps two steps. */
+export const saidWayEasy = (transcript: string) => /\b(way|much|far|so|super|really) too (easy|light)\b|\bwayyy? too (easy|light)\b|\b(way|much|far) (too )?(easy|light)\b/.test(transcript.toLowerCase().replace(/[.,!?]/g, ' '));
 export function parseCommand(transcript: string, allowed?: Command[]): Command | null {
   const text = ` ${transcript.toLowerCase().replace(/[.,!?]/g, ' ').replace(/\s+/g, ' ').trim()} `;
   const plain = unNegated(text);
