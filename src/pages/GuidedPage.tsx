@@ -21,6 +21,7 @@ import { weightsFromTopSets, nextTimeWeights, type NextTime } from '../lib/guide
 import { planNextTimes } from '../lib/guided/planNext';
 import { setEffort } from '../lib/setEffort';
 import { FROM_PLAN_KEY, planWorkout, type PlanLift } from '../lib/guided/fromPlan';
+import { moveNote } from '../lib/guided/notes';
 import { supabase } from '../lib/supabase';
 import { useGoals } from '../features/goals/GoalsProvider';
 import { isDemoMode } from '../lib/env';
@@ -553,7 +554,7 @@ export function GuidedPage() {
     const main = logged.filter(item => item.feel !== null && !item.moveId.endsWith(':warmup'));
     const best = topSetPerMove(main);
     const muscles = [...new Set(logged.flatMap(item => item.muscles))];
-    const notes = `${fromPlan ? 'Coached' : 'Forge Guided'} · ${fromPlan ? workout.title : workout.focus}. ` + [...new Set(main.map(item => item.name))].map(name => { const sets = main.filter(item => item.name === name); return `${name} ${sets.length}×${sets[0].timed ? `${sets[0].reps}s` : sets[0].reps}${sets[0].weight !== null ? ` @ ${sets[sets.length - 1].weight} ${unit}` : ''}`; }).join(' · ');
+    const notes = `${fromPlan ? 'Coached' : 'Forge Guided'} · ${fromPlan ? workout.title : workout.focus}. ` + [...new Set(main.map(item => item.name))].map(name => moveNote(name, main.filter(item => item.name === name), unit)).join(' · ');
     if (logged.length) {
       /* A coached run of today's plan is logged as today's plan: its day name,
          its recommendation and split position, and each top set tied to the
