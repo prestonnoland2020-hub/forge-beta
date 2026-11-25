@@ -1053,6 +1053,11 @@ export function resolveWeekRunning<T extends AiPlanWeek>(
       easyRuns[index % easyDays.length] = round1(easyRuns[index % easyDays.length] + 0.5);
       spare = round1(spare - 0.5);
     }
+    /* THE LAST BIT OF THE WEEK IS NOT DROPPED. Easy runs go up in half miles,
+       so up to 0.4 of the budget used to fall on the floor, and the week came
+       out a little under what the athlete runs (16.2 against 16.4, depending
+       on the weekday). The remainder goes on the first easy run. */
+    if (spare > 0.05) easyRuns[0] = round1(easyRuns[0] + spare);
   } else if (easyDays.length) {
     for (let index = 0; index < easyDays.length; index++) easyRuns.push(1);
   }
