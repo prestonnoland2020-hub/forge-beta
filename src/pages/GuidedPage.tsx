@@ -8,8 +8,9 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
-import { amountText, buildWorkout, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
-import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, talkingToCoach, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
+import { amountText, buildWorkout, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, easyStreak, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
+import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, saidWayEasy, talkingToCoach, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
+import { canonicalLiftKey } from '../lib/liftAliases';
 import { Icon } from '../components/Icon';
 import { requestForgeCoach } from '../features/training/coachService';
 import { guidedCoachContext, writeLive } from '../lib/guided/session';
@@ -465,10 +466,19 @@ export function GuidedPage() {
     const said = reported.current; reported.current = null;
     setLogged(list => [...list, { moveId: step.move.id, name: step.move.name, muscles: step.move.muscles, reps: said?.reps ?? step.reps, weight: said?.weight ?? weight, feel, timed: Boolean(step.move.timed) }]);
   };
-  const answer = (feel: Feel) => {
+  /* Heaviest weight ever lifted on this move (history plus today), so a two-step jump stays within ~10% of it. */
+  const bestLifted = (name: string, moveId: string) => {
+    const key = canonicalLiftKey(name);
+    let best = 0;
+    for (const rec of records) for (const set of rec.topSets || []) if (set.completed !== false && canonicalLiftKey(set.lift) === key) best = Math.max(best, Number(set.weight) || 0);
+    for (const item of logged) if (item.moveId === moveId && item.weight) best = Math.max(best, item.weight);
+    return best || null;
+  };
+  const answer = (feel: Feel, wayEasy = false) => {
     if (!step || !workout) return;
+    const jumpTwo = feel === 'easy' && (wayEasy || easyStreak(logged, step.move.id));
     record(feel);
-    const nextW = nextWeight(weight, feel, step.move.load, metric);
+    const nextW = nextWeight(weight, feel, step.move.load, metric, jumpTwo ? { steps: 2, best: bestLifted(step.move.name, step.move.id) } : {});
     let swapped: Move | undefined;
     if (feel === 'hard' && weight === null) swapped = swapFor(step, 'easier', have);
     if (feel === 'easy' && weight === null && setIndex + 1 >= step.sets) swapped = undefined;
@@ -479,7 +489,8 @@ export function GuidedPage() {
     if (lastSet && lastStep) { finish(); return; }
     const restFor = step.rest;
     const upNext = lastSet ? workout.steps[stepIndex + 1] : step;
-    const why = feel === 'easy' && nextW !== null && !lastSet ? ` That looked easy, so let's bump it to ${nextW} ${unitWord}.` : feel === 'hard' && nextW !== null && weight !== null && nextW < weight && !lastSet ? ` Let's drop it to ${nextW} ${unitWord}. No shame in that.` : feel === 'hard' && swapped ? ` Next set, we'll switch to ${swapped.name}. It's a little easier.` : '';
+    const jumped = jumpTwo && nextW !== null && weight !== null && nextW - weight > (metric ? (step.move.load === 'barbell' || step.move.load === 'machine' ? 5 : 2) : (step.move.load === 'barbell' || step.move.load === 'machine' ? 10 : 5));
+    const why = jumped && !lastSet ? ` That was easy. Going up ${nextW! - weight!} ${unitWord}, to ${nextW}.` : feel === 'easy' && nextW !== null && !lastSet ? ` That looked easy, so let's bump it to ${nextW} ${unitWord}.` : feel === 'hard' && nextW !== null && weight !== null && nextW < weight && !lastSet ? ` Let's drop it to ${nextW} ${unitWord}. No shame in that.` : feel === 'hard' && swapped ? ` Next set, we'll switch to ${swapped.name}. It's a little easier.` : '';
     setPhase('rest'); setTimer(restFor); setRunning(true); setPaused(false);
     /* What comes after the rest, fetched during it. */
     { const nextIndex = lastSet ? stepIndex + 1 : stepIndex; const nextSet = lastSet ? 0 : setIndex + 1; const s2 = workout.steps[nextIndex]; if (s2) coach.current?.prefetch(cardLine(s2, nextSet, nextIndex === stepIndex ? (nextW ?? weight) : s2.weight)); }
@@ -615,7 +626,7 @@ export function GuidedPage() {
       if (command === 'skip') { goTo(stepIndex + 1); return; }
     }
     if (phase === 'feel') {
-      if (command === 'easy') answer('easy');
+      if (command === 'easy') answer('easy', saidWayEasy(heardText));
       if (command === 'right') answer('right');
       if (command === 'hard') answer('hard');
       return;
