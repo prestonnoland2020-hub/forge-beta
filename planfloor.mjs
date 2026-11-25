@@ -7,9 +7,25 @@
 import { resolveWeekRunning, LONG_RUN_MAX_SHARE } from './src/features/training/aiPlanService.ts';
 import { medianWeeklyMiles, longestContinuousRun } from './src/lib/goalTrajectory.ts';
 
+/* EVERY WEEKDAY. The fixture is built back from today, so which runs land in
+   which calendar week changes with the day the suite runs: on a Tuesday the
+   plan came out 16.2 against 16.4 run (easy runs go up in half miles and the
+   odd tenths were dropped). Run the whole file once per start offset. */
+import { spawnSync } from 'node:child_process';
+if (process.env.SHIFT === undefined) {
+  let bad = 0;
+  for (let shift = 0; shift < 7; shift += 1) {
+    const out = spawnSync('npx', ['vite-node', 'planfloor.mjs'], { env: { ...process.env, SHIFT: String(shift) }, encoding: 'utf8' });
+    const failed = (out.stdout || '').split('\n').filter(line => line.includes('FAIL'));
+    console.log(`  weekday offset ${shift}: ${out.status === 0 ? 'ok' : 'FAILED'}`);
+    for (const line of failed) console.log(line);
+    if (out.status !== 0) bad += 1;
+  }
+  process.exit(bad ? 1 : 0);
+}
 let fails = 0;
 const check = (l, c, d = '') => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${l}${d ? ` — ${d}` : ''}`); if (!c) fails++; };
-const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const day = n => { const d = new Date(); d.setDate(d.getDate() - n - Number(process.env.SHIFT || 0)); return d.toISOString().slice(0, 10); };
 const run = (ago, miles, minutes, lines = 1) => ({ id: `r${ago}-${miles}`, date: day(ago), title: 'Run', muscles: ['Cardio'], hasCardio: true, topSets: [],
   cardioSessions: [{ id: `c${ago}-${miles}`, activity: 'Run', structure: 'steady', summary: `Run · ${miles} mi`,
     prescription: { legacyIntervals: Array.from({ length: lines }, () => ({ distance: miles / lines, unit: 'miles', time: minutes / lines, cardioType: 'Run' })) } }] });
@@ -32,7 +48,8 @@ for (let week = 0; week < 9; week += 1) {
 console.log('\n  what he is actually running is read from the log');
 const actualWeekly = medianWeeklyMiles(RUNNING);
 const actualLongest = longestContinuousRun(RUNNING);
-check('about 17-18 miles a week', actualWeekly >= 16 && actualWeekly <= 19, String(actualWeekly));
+/* Which runs fall in each calendar week moves with the weekday, so the median is 14.5-17.7. */
+check('about 15-18 miles a week', actualWeekly >= 14 && actualWeekly <= 19, String(actualWeekly));
 check('and a 6.5-mile longest run', actualLongest === 6.5, String(actualLongest));
 check('an interval session is not a long run', longestContinuousRun([run(1, 8, 60, 8)]) === 0);
 
