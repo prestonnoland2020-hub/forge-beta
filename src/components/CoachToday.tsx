@@ -99,8 +99,9 @@ export function CoachToday({ plan, run, context, coached = false }: { plan?: Coa
 
 /* The My plan | Coach me switch at the top of Today. Remembered per device. */
 export const TODAY_MODE_KEY = 'forge-today-mode';
-export function TodayModeSwitch({ mode, onChange }: { mode: 'plan' | 'coach'; onChange: (mode: 'plan' | 'coach') => void }) {
+export function TodayModeSwitch({ mode, onChange, coachFirst = false }: { mode: 'plan' | 'coach'; onChange: (mode: 'plan' | 'coach') => void; coachFirst?: boolean }) {
+  /* A coached athlete's own side comes first. */
   return <div className="ct-switch" role="tablist" aria-label="How to train today">
-    {(['plan', 'coach'] as const).map(item => <button type="button" role="tab" aria-selected={mode === item} key={item} className={mode === item ? 'on' : ''} onClick={() => onChange(item)}>{item === 'plan' ? 'My plan' : 'Coach me'}</button>)}
+    {((coachFirst ? ['coach', 'plan'] : ['plan', 'coach']) as Array<'plan' | 'coach'>).map(item => <button type="button" role="tab" aria-selected={mode === item} key={item} className={mode === item ? 'on' : ''} onClick={() => onChange(item)}>{item === 'plan' ? 'My plan' : 'Coach me'}</button>)}
   </div>;
 }

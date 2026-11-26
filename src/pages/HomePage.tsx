@@ -92,8 +92,14 @@ export function HomePage() {
   /* MY PLAN | COACH ME. Which Today she sees; remembered on the device. Someone
      who chose "Coach me" in setup starts on the coach side. */
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'plan' | 'coach'>(() => { try { const saved = localStorage.getItem(TODAY_MODE_KEY); if (saved === 'plan' || saved === 'coach') return saved; } catch { /* fine */ } return (setup as { trainingMode?: string } | null)?.trainingMode === 'coach' ? 'coach' : 'plan'; });
-  const chooseMode = (next: 'plan' | 'coach') => { setMode(next); try { localStorage.setItem(TODAY_MODE_KEY, next); } catch { /* fine */ } };
+  /* SOMEONE WHO SAID "BUILD IT FOR ME" OPENS ON THE GUIDED WORKOUT, EVERY
+     TIME. Today used to open on whichever side was tapped last on this
+     device, so one look at My plan (or a phone that had it saved from before)
+     left a coached athlete on the top-set card from then on. For her the
+     guided workout is Today; My plan is a look, not a setting. */
+  const coached = (setup as { trainingMode?: string } | null)?.trainingMode === 'coach';
+  const [mode, setMode] = useState<'plan' | 'coach'>(() => { if (coached) return 'coach'; try { const saved = localStorage.getItem(TODAY_MODE_KEY); if (saved === 'plan' || saved === 'coach') return saved; } catch { /* fine */ } return 'plan'; });
+  const chooseMode = (next: 'plan' | 'coach') => { setMode(next); if (coached) return; try { localStorage.setItem(TODAY_MODE_KEY, next); } catch { /* fine */ } };
   /* TOP SETS ONLY | BUILD MY WORKOUT. The plan side is either just the top
      sets that move the goals, or a whole session written around them. */
   const [build, setBuild] = useState<'top' | 'full'>(() => { try { return localStorage.getItem('forge-today-build') === 'full' ? 'full' : 'top'; } catch { return 'top'; } });
@@ -301,8 +307,8 @@ export function HomePage() {
     {/* TODAY IS TODAY'S WORKOUT AND NOTHING ELSE. Partners have their own tab;
         the nudges and the first-week checklist made this a feed to scroll
         past before the one thing it is for. */}
-    {!completedToday && <TodayModeSwitch mode={mode} onChange={chooseMode} />}
-    {!completedToday && mode === 'coach' && <CoachToday plan={coachPlanWithRun} run={coachRun} context={coachContext} coached={(setup as { trainingMode?: string } | null)?.trainingMode === 'coach'} />}
+    {!completedToday && <TodayModeSwitch mode={mode} onChange={chooseMode} coachFirst={coached} />}
+    {!completedToday && mode === 'coach' && <CoachToday plan={coachPlanWithRun} run={coachRun} context={coachContext} coached={coached} />}
 
     {/* IN PROGRESS UNTIL FINISHED. Sets save as they are logged, so a saved
         day is not a finished one: until Finish, the card says so and offers

@@ -49,6 +49,15 @@ console.log('\nSarah: stronger and a body weight, coach builds it, at the gym');
   await tap(p, 'Start with my coach'); await p.waitForTimeout(3200);
   t = await text(p); const s = await store(p);
   check('she lands on Today with her plan, guided', /TODAY, GUIDED/i.test(t) && !/Set up my coach/.test(t), flat(t).slice(0, 300));
+  check('Coach me is the first tab for her', await p.evaluate(() => document.querySelector('.ct-switch button')?.innerText.trim()) === 'Coach me');
+  /* A look at My plan does not move her there: next open is guided again. */
+  await tap(p, 'My plan'); let look = await text(p);
+  check('My plan is still one tap away', /What are you training today/i.test(look), flat(look).slice(0, 200));
+  await p.reload({ waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2300); look = await text(p);
+  check('and the next open is the guided workout again, not the top-set card', /TODAY, GUIDED/i.test(look) && !/What are you training today/i.test(look), flat(look).slice(0, 240));
+  /* Even on a phone that had My plan saved from before. */
+  await p.evaluate(() => localStorage.setItem('forge-today-mode', 'plan')); await p.reload({ waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2300); look = await text(p);
+  check('a saved My plan from before does not win either', /TODAY, GUIDED/i.test(look), flat(look).slice(0, 240));
   check('both goals were saved', s.goals.length === 2 && s.goals.some(g => g.type === 'Strength' && /Squat/.test(g.exercise)) && s.goals.some(g => g.type === 'Body Composition'), JSON.stringify(s.goals.map(g => g.title)));
   check('her wants, mode and style are on her profile', JSON.stringify(s.setup?.wants) === '["strength","weight"]' && s.setup?.trainingMode === 'coach' && s.setup?.guidedStyle === 'Gym');
   check('a 3-day lifting week with her goal lift in it, and no run', (s.plan?.days || []).filter(d => d.dayType === 'strength').length === 3 && !(s.plan?.days || []).some(d => d.dayType === 'cardio') && (s.plan?.days || []).some(d => (d.exercises || []).some(e => /Squat/.test(e))), (s.plan?.days || []).map(d => `${d.name}:${(d.exercises || []).join('/')}`).join(', '));
