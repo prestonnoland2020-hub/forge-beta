@@ -254,6 +254,11 @@ export function HomePage() {
       navigate('/guided?plan=1');
     },
   } : undefined;
+  /* The plan's run, for the coach's side of Today: on its own on a run day,
+     and as a line under the lifting when the day has both. */
+  const coachRunDetail = recommendation.cardio ? runDetail(recommendation.cardio.title, cardioPlanSummary(recommendation.cardio.session.plan)) : '';
+  const coachRun = !recommendedSets.length && recommendation.cardio ? { title: recommendation.cardio.title, detail: coachRunDetail || recommendation.cardio.summary, open: () => navigate(`${startUrl}${extraParam}`) } : undefined;
+  const coachPlanWithRun = coachPlan && recommendation.cardio ? { ...coachPlan, extra: `Then: ${recommendation.cardio.title}${coachRunDetail ? ` · ${coachRunDetail}` : ''}` } : coachPlan;
 
   const dayChips = <>
     <div className="tp-days" ref={daysRef} onScroll={onDaysScroll} role="radiogroup" aria-label="Training day">
@@ -297,7 +302,7 @@ export function HomePage() {
         the nudges and the first-week checklist made this a feed to scroll
         past before the one thing it is for. */}
     {!completedToday && <TodayModeSwitch mode={mode} onChange={chooseMode} />}
-    {!completedToday && mode === 'coach' && <CoachToday plan={coachPlan} context={coachContext} />}
+    {!completedToday && mode === 'coach' && <CoachToday plan={coachPlanWithRun} run={coachRun} context={coachContext} coached={(setup as { trainingMode?: string } | null)?.trainingMode === 'coach'} />}
 
     {/* IN PROGRESS UNTIL FINISHED. Sets save as they are logged, so a saved
         day is not a finished one: until Finish, the card says so and offers

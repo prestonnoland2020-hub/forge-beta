@@ -47,7 +47,7 @@ const go = async (p, hash) => { await p.evaluate(h => { location.hash = h; }, ha
   await p.goto(`${BASE}/#/`, { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2200);
   for (const box of await p.locator('input[type=checkbox]').all()) await box.check();
   await tap(p, 'Continue'); await p.fill('input[aria-label="Your name"]', 'Riley'); await tap(p, 'Continue');
-  await tap(p, 'I have goals'); await tap(p, 'Run faster'); await tap(p, '4'); await tap(p, '5K');
+  await tap(p, 'Run faster'); await tap(p, 'Continue'); await tap(p, 'I know what'); await tap(p, 'Continue'); await tap(p, '4'); await tap(p, '5K');
   const blocked = await p.evaluate(() => [...document.querySelectorAll('button')].find(x => x.innerText.trim() === 'Continue')?.disabled);
   check('Continue waits for a target', blocked === true);
   await (await p.$('input.ob-input')).fill('22');

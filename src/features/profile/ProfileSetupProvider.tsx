@@ -1,3 +1,4 @@
+import type { GuidedStyle, Want } from '../../lib/onboardingPlan';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { setStartingNumbers, type StartingNumber } from '../../lib/startingNumbers';
 import { normalizeMuscleGroups } from '../../lib/muscleGroups';
@@ -40,6 +41,9 @@ export type AthleteSetup = {
   /* Chosen on the first setup question. 'coach' = the coach builds and talks
      her through every workout (Forge Guided); no goal is required. */
   trainingMode?:'goals'|'coach';
+  /* What the athlete said they want, pick-any (lib/onboardingPlan.ts), and
+     for a coached athlete what kind of training the coach builds. */
+  wants?:Want[]; guidedStyle?:GuidedStyle;
 };
 
 const legacyStorageKey='forge-athlete-setup-v1';

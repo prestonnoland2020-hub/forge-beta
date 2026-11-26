@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthProvider';
 import { useAdaptiveTraining } from '../features/training/AdaptiveTrainingProvider';
@@ -19,6 +19,8 @@ import { ForgeLoader } from '../components/ForgeLoader';
 import { goalPath, OnboardingGoalPath } from '../components/OnboardingGoalPath';
 import { calculateEstimatedOneRepMax, weightForReps } from '../lib/strength';
 import { raceMiles } from '../lib/goalFeasibility';
+import { coachBuilds, coachSplit, focusOf, goalSlots, guidedPrefsFor, splitFocusFor, toggleWant, wantsFromFocus, withRestDays, type GoalSlot, type GuidedStyle, type Want } from '../lib/onboardingPlan';
+import { GUIDED_KEYS } from '../lib/guided/session';
 
 /* ONE QUESTION A SCREEN. Setup was three dense screens — a form of six
    controls, the full goal builder, and a lift picker per day — headed by
@@ -30,13 +32,21 @@ import { raceMiles } from '../lib/goalFeasibility';
    week, one goal, a split whose lifting days each name a movement, a runner's
    weekly miles, and the safety promise. So:
 
-     name → focus → days → goal → target → running → your week
+     name → what you want → who builds it → days → a goal each → your week
 
-   The goal pair is skipped when goals already exist (editing a profile), the
-   lift/race pick when the goal is a body weight, and running when the split
-   has no cardio. Everything the builder offers beyond the common case —
-   custom events, pace metrics, other lifts — is one tap away on Goals. */
-type StepId = 'agree' | 'name' | 'mode' | 'focus' | 'days' | 'goal' | 'target' | 'running' | 'numbers' | 'week';
+   WHAT YOU WANT IS PICK-ANY, AND IT COMES FIRST. "Coach me" used to end
+   setup on the spot, so a coached athlete had no goal for the coach to work
+   toward, and the goal path took exactly one focus. Now everyone says what
+   they want (stronger, a body weight, faster — any of them), then who builds
+   the workout, and each want gets its own short goal screen. A coached
+   athlete also says what kind of training (gym, home, Pilates, hybrid), and
+   the week is shaped for it (lib/onboardingPlan.ts).
+
+   The goal screens are skipped when goals already exist (editing a profile),
+   and running when the split has no cardio. Everything the builder offers
+   beyond the common case — custom events, pace metrics, other lifts — is one
+   tap away on Goals. */
+type StepId = 'agree' | 'name' | 'wants' | 'mode' | 'style' | 'gear' | 'days' | `goal-${GoalSlot}` | `target-${GoalSlot}` | 'running' | 'numbers' | 'week' | 'ready';
 
 const blank: AthleteSetup = {
   displayName: '', username: '', birthDate: '', units: 'Imperial', height: '', startingWeight: '', currentWeight: '',
@@ -56,12 +66,29 @@ const guessUnits = (): AthleteSetup['units'] => {
 /* Line icons drawn on a 24-unit grid in currentColor, so a selected card
    recolours its icon with the rest of it. */
 const icon = (path: string) => <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
-const focusCards: Array<{ id: AthleteSetup['primaryFocus']; label: string; copy: string; icon: ReactElement }> = [
-  { id: 'Strength', label: 'Get stronger', copy: 'Lift more on the big lifts', icon: icon('M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12') },
-  { id: 'Endurance', label: 'Run faster', copy: 'Train for a race or a time', icon: icon('M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M10 2h4') },
-  { id: 'Hybrid', label: 'Both', copy: 'Strength and running together', icon: icon('M13 2 4 14h7l-1 8 9-12h-7l1-8z') },
-  { id: 'Body composition', label: 'Change my weight', copy: 'Lose or gain, steadily', icon: icon('M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM8.5 11a3.5 3.5 0 0 1 7 0M12 11l1.6-2.2') },
+const wantCards: Array<{ id: Want; label: string; copy: string; icon: ReactElement }> = [
+  { id: 'strength', label: 'Get stronger', copy: 'Lift more, build muscle', icon: icon('M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12') },
+  { id: 'weight', label: 'Change my weight', copy: 'Lose or gain, steadily', icon: icon('M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM8.5 11a3.5 3.5 0 0 1 7 0M12 11l1.6-2.2') },
+  { id: 'run', label: 'Run faster', copy: 'Train for a race or a time', icon: icon('M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M10 2h4') },
+  { id: 'fit', label: 'Just get fit', copy: 'A steady routine, no target', icon: icon('M13 2 4 14h7l-1 8 9-12h-7l1-8z') },
 ];
+/* WHO BUILDS THE WORKOUT, and what each answer means in practice — said on
+   the screen the moment it is picked, not discovered a week later. */
+const modeCards: Array<{ id: 'coach' | 'goals'; label: string; copy: string; how: string[]; icon: ReactElement }> = [
+  { id: 'coach', label: 'Build it for me', copy: 'A coach builds every workout and talks you through it.',
+    how: ['Open Forge and press start.', 'Your coach shows each move and talks you through every set.', 'Say how each set felt. It sets your next weight and logs it for you.'],
+    icon: icon('M3 18v-6a9 9 0 0 1 18 0v6M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z') },
+  { id: 'goals', label: 'I know what I’m doing', copy: 'You run your own workout and log your top sets.',
+    how: ['Train the way you already do.', 'Log one top set per lift: your heaviest set. No warm-ups, no filler exercises.', 'Forge sets the weight for next time and builds each week toward your goals.'],
+    icon: icon('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z') },
+];
+const styleCards: Array<{ id: GuidedStyle; label: string; copy: string }> = [
+  { id: 'Gym', label: 'Gym', copy: 'Machines, barbells and dumbbells' },
+  { id: 'Home', label: 'Home', copy: 'With whatever you have' },
+  { id: 'Pilates', label: 'Pilates', copy: 'Mat work: core, control, low impact' },
+  { id: 'Hybrid', label: 'Hybrid', copy: 'Gym and running together' },
+];
+const homeGear = ['Dumbbells', 'Kettlebell', 'Mat', 'Bench'];
 const check = <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5 10 17l9-10" /></svg>;
 
 /* The races a first goal is almost always one of. The distance decides the
@@ -119,11 +146,7 @@ export function starterSplit(focus: AthleteSetup['primaryFocus'], count: number)
      days alone, and Plan draws a cycle onto consecutive dates — so an athlete
      who chose 4 days saw six lifting days and a run in their first week. The
      rest days are part of the cycle, spread between the training days. */
-  if (training.length >= 7) return training;
-  const slots = new Set(training.map((_, index) => Math.round(index * 7 / training.length)));
-  const rest = { name: 'Rest', type: 'Rest' as const, muscles: [] as string[] };
-  let next = 0;
-  return Array.from({ length: 7 }, (_, index) => slots.has(index) ? training[next++] : rest);
+  return withRestDays(training);
 }
 
 /* A REAL DAY, NOT ONE LIFT. A starter day used to get a single lift, so a
@@ -236,7 +259,9 @@ function OnboardingForm() {
     const splitDays = savedDays.length ? savedDays.map(day => ({
       name: String(day.name || ''), type: planDayType(day.dayType), muscles: day.muscles || [], exercises: day.exercises || [],
     })) : setup?.splitDays;
-    return { ...blank, units: guessUnits(), ...(setup || {}), ...(splitDays?.length ? { splitDays, trainingDays: splitDays.filter(day => day.type !== 'Rest').length || setup?.trainingDays || blank.trainingDays } : {}), ...(savedDays.length ? { splitSource: 'Custom' as const } : {}), displayName: setup?.displayName || suggestedName };
+    return { ...blank, units: guessUnits(), ...(setup || {}), ...(splitDays?.length ? { splitDays, trainingDays: splitDays.filter(day => day.type !== 'Rest').length || setup?.trainingDays || blank.trainingDays } : {}), ...(savedDays.length ? { splitSource: 'Custom' as const } : {}), displayName: setup?.displayName || suggestedName,
+      /* An account from before wants existed said one focus; a coached one never said any. */
+      wants: setup?.wants || (setup?.completedAt && setup.trainingMode !== 'coach' ? wantsFromFocus(setup.primaryFocus) : []) };
   });
   const set = <K extends keyof AthleteSetup>(key: K, value: AthleteSetup[K]) => { setError(''); setData(current => ({ ...current, [key]: value })); };
   const [error, setError] = useState('');
@@ -254,13 +279,11 @@ function OnboardingForm() {
   /* THE GOAL IS HELD, NOT SAVED, until Enter Forge. Saving it on its own
      screen meant Back-and-change wrote a second goal; held here, the last
      answer is the only one that lands. */
-  const [goalExercise, setGoalExercise] = useState('');
-  const [goalTarget, setGoalTarget] = useState('');
-  const [goalCurrent, setGoalCurrent] = useState('');
-  const [goalDate, setGoalDate] = useState(() => weeksFromNow(12));
-  const [pickDate, setPickDate] = useState(false);
-  const [pullUpReps, setPullUpReps] = useState(true);
-  const [division, setDivision] = useState('');
+  type GoalDraft = { exercise: string; target: string; current: string; date: string; pickDate: boolean; pullUpReps: boolean; division: string; goal: CreatedGoal | null };
+  const [drafts, setDrafts] = useState<Record<GoalSlot, GoalDraft>>(() => {
+    const blankDraft = (): GoalDraft => ({ exercise: '', target: '', current: '', date: weeksFromNow(12), pickDate: false, pullUpReps: true, division: '', goal: null });
+    return { strength: blankDraft(), run: blankDraft(), weight: blankDraft(), any: blankDraft() };
+  });
 
   const { exercises: libraryExercises } = useTrainingLibrary();
   const strengthLibrary = useMemo(() => libraryExercises.filter(exercise => exercise.enabled && isProgrammableStrength(exercise)), [libraryExercises]);
@@ -268,33 +291,80 @@ function OnboardingForm() {
     const names = coreOnly(strengthLibrary.map(exercise => exercise.name));
     return names.length ? names : [...CORE_LIFTS];
   }, [strengthLibrary]);
-  const plannedDays = useMemo(() => data.splitDays?.length ? data.splitDays : starterSplit(data.primaryFocus, data.trainingDays), [data.splitDays, data.primaryFocus, data.trainingDays]);
+  /* WHAT THEY WANT, WHO BUILDS IT, WHAT KIND. The three answers everything
+     below is shaped by. */
+  const wants: Want[] = data.wants || [];
+  const guided = data.trainingMode === 'coach';
+  const style = data.guidedStyle;
+  /* Home and Pilates: the coach builds each day, so no day carries lifts. */
+  const offPlan = coachBuilds(guided, style);
+  const [gear, setGear] = useState<string[]>([]);
+  const wantsKey = wants.join();
+  const plannedDays = useMemo(() => data.splitDays?.length ? data.splitDays
+    : offPlan ? coachSplit(style as 'Home' | 'Pilates', data.trainingDays, wants.includes('run'))
+    : starterSplit(splitFocusFor(wants, guided, style), data.trainingDays), [data.splitDays, wantsKey, guided, style, offPlan, data.trainingDays]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* One goal is asked per want (lib/onboardingPlan.ts). */
+  const slots = useMemo(() => askGoal ? goalSlots(wants, guided, style) : [], [askGoal, wantsKey, guided, style]); // eslint-disable-line react-hooks/exhaustive-deps
   const runningPlanned = plannedDays.some(day => /Cardio|Mixed/i.test(day.type));
   /* A runner with no lifting day is not asked what they can bench. */
   const liftingPlanned = plannedDays.some(day => /Strength|Mixed/i.test(day.type));
   const plannedCardioDays = plannedDays.filter(day => /Cardio|Mixed/i.test(day.type)).length;
 
-  const weightGoal = data.primaryFocus === 'Body composition';
-  const race = races.find(item => item.name === goalExercise);
-  const goalKind: 'lift' | 'race' | 'weight' = weightGoal ? 'weight' : race ? 'race' : 'lift';
   const massUnit = data.units === 'Metric' ? 'kg' : 'lb';
-  const goalUnit = goalKind === 'race' ? race!.unit : goalKind === 'lift' && isWeightedBodyweight(goalExercise) && pullUpReps ? 'reps' : massUnit;
-  const goalMetric = goalKind === 'race' ? 'Finish time' : goalKind === 'weight' ? 'Body weight' : 'Real 1RM';
-
+  const goalSteps = slots.flatMap(slot => slot === 'weight' ? ['target-weight'] : [`goal-${slot}`, `target-${slot}`]) as StepId[];
+  /* A new coached athlete has no week of lifts to check: the coach builds
+     it, so setup ends on a short "you're set" instead. */
   const steps = useMemo<StepId[]>(() => [
     ...(isEditing ? [] : ['agree'] as StepId[]),
-    'name', ...(isEditing ? [] : ['mode'] as StepId[]), 'focus', 'days',
-    ...(askGoal ? (weightGoal ? ['target'] : ['goal', 'target']) as StepId[] : []),
+    'name', 'wants',
+    ...(isEditing ? [] : ['mode'] as StepId[]),
+    ...(!isEditing && guided ? ['style', ...(style === 'Home' ? ['gear'] : [])] as StepId[] : []),
+    'days',
+    ...goalSteps,
     ...(runningPlanned ? ['running'] as StepId[] : []),
-    ...(isEditing ? [] : ['numbers'] as StepId[]),
-    'week',
-  ], [askGoal, weightGoal, runningPlanned, isEditing]);
-  const [stepId, setStepId] = useState<StepId>(needsExercises ? 'week' : needsGoal && askGoal ? (weightGoal ? 'target' : 'goal') : isEditing ? 'name' : 'agree');
+    ...(isEditing ? ['week'] : guided ? ['ready'] : ['numbers', 'week']) as StepId[],
+  ], [goalSteps.join(), runningPlanned, isEditing, guided, style]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [stepId, setStepId] = useState<StepId>(needsExercises ? 'week' : needsGoal && askGoal ? (goalSteps[0] || 'wants') : isEditing ? 'name' : 'agree');
   const stepIndex = Math.max(0, steps.indexOf(stepId));
+  /* THE STEPS AS THEY ARE NOW, not as they were when the tap landed. An
+     answer can change which screens follow (Build it for me adds "what
+     kind"), and the move happens a beat after the tap. */
+  const stepsRef = useRef(steps); stepsRef.current = steps;
+  const stepIdRef = useRef(stepId); stepIdRef.current = stepId;
   /* Forward slides in from the right, Back from the left — the direction a
      navigation stack moves, so the screen goes where the finger expects. */
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
-  const go = (offset: number) => { setError(''); setDirection(offset < 0 ? 'back' : 'forward'); setStepId(steps[Math.min(steps.length - 1, Math.max(0, stepIndex + offset))]); window.scrollTo(0, 0); };
+  const goTo = (id: StepId, way: 'forward' | 'back' = 'forward') => { setError(''); setDirection(way); setStepId(id); window.scrollTo(0, 0); };
+  const go = (offset: number) => { const list = stepsRef.current; const at = Math.max(0, list.indexOf(stepIdRef.current)); goTo(list[Math.min(list.length - 1, Math.max(0, at + offset))], offset < 0 ? 'back' : 'forward'); };
+
+  /* THE GOAL ON SCREEN. Each want has its own draft; a goal screen reads and
+     writes the one it is for. Off the goal screens (starting numbers, the
+     week) "the goal" is the lift goal, which is what those screens use. */
+  const stepSlot = (/^(?:goal|target)-(.+)$/.exec(stepId)?.[1] || null) as GoalSlot | null;
+  const slotInfo = (slot: GoalSlot) => {
+    const draft = drafts[slot];
+    const slotRace = races.find(item => item.name === draft.exercise);
+    const kind: 'lift' | 'race' | 'weight' = slot === 'weight' ? 'weight' : slotRace ? 'race' : 'lift';
+    const unit = kind === 'race' ? slotRace!.unit : kind === 'lift' && isWeightedBodyweight(draft.exercise) && draft.pullUpReps ? 'reps' : massUnit;
+    return { draft, race: slotRace, kind, unit };
+  };
+  const liftSlot = slots.find(slot => slotInfo(slot).kind === 'lift' && Boolean(drafts[slot].exercise)) || null;
+  const viewSlot: GoalSlot = stepSlot || liftSlot || slots[0] || 'any';
+  const { draft: viewDraft, race, kind: goalKind, unit: goalUnit } = slotInfo(viewSlot);
+  const patchGoal = (changes: Partial<GoalDraft>) => setDrafts(current => ({ ...current, [viewSlot]: { ...current[viewSlot], ...changes } }));
+  const { exercise: goalExercise, target: goalTarget, current: goalCurrent, date: goalDate, pickDate, pullUpReps, division, goal: pendingGoal } = viewDraft;
+  const setGoalExercise = (exercise: string) => patchGoal({ exercise });
+  const setGoalTarget = (target: string) => patchGoal({ target });
+  const setGoalCurrent = (current: string) => patchGoal({ current });
+  const setGoalDate = (date: string) => patchGoal({ date });
+  const setPickDate = (value: boolean) => patchGoal({ pickDate: value });
+  const setPullUpReps = (value: boolean) => patchGoal({ pullUpReps: value });
+  const setDivision = (value: string) => patchGoal({ division: value });
+  const setPendingGoal = (goal: CreatedGoal | null) => patchGoal({ goal });
+  /* Every goal set in setup, in the order it was asked. */
+  const pendingGoals = slots.map(slot => drafts[slot].goal).filter((goal): goal is CreatedGoal => Boolean(goal));
+  const racePicked = slots.some(slot => slotInfo(slot).kind === 'race');
+  const goalMetric = goalKind === 'race' ? 'Finish time' : goalKind === 'weight' ? 'Body weight' : 'Real 1RM';
   /* A tap answers and moves on — with a beat in between, so the athlete sees
      the check land on what they pressed before it slides away. */
   const [advancing, setAdvancing] = useState(false);
@@ -305,7 +375,7 @@ function OnboardingForm() {
   };
   const fail = (message: string) => { warning(); setError(message); };
 
-  const pendingGoalLift = goalKind === 'lift' && goalExercise ? [goalExercise] : [];
+  const pendingGoalLift = liftSlot ? [drafts[liftSlot].exercise] : [];
   const goalLiftKeys = new Set([...goals.map(goal => goal.exercise ? String(goal.exercise) : ''), ...pendingGoalLift].filter(Boolean).map(canonicalLiftKey));
 
   /* The mapping is filled the first time the week is shown — after the goal
@@ -316,7 +386,7 @@ function OnboardingForm() {
   const seedKey = `${plannedDays.map(day => `${day.name}:${day.type}`).join('|')}#${pendingGoalLift.join()}`;
   if (stepId === 'week' && seededFor !== seedKey) {
     setSeededFor(seedKey);
-    setDayExercises(defaultLifts(plannedDays, strengthLibrary, [...goals.filter(goal => goal.type === 'Strength' && goal.exercise).map(goal => String(goal.exercise)), ...pendingGoalLift]));
+    setDayExercises(offPlan ? {} : defaultLifts(plannedDays, strengthLibrary, [...goals.filter(goal => goal.type === 'Strength' && goal.exercise).map(goal => String(goal.exercise)), ...pendingGoalLift]));
   }
   const [openDay, setOpenDay] = useState(-1);
   const [allLiftsFor, setAllLiftsFor] = useState(-1);
@@ -333,7 +403,7 @@ function OnboardingForm() {
     const options = strengthLibrary.filter(exercise => chosen.includes(exercise.name) || goalLiftKeys.has(canonicalLiftKey(exercise.name)) || !muscles.length || exercise.muscles.some(muscle => muscles.includes(muscle)));
     return coreFirst(options.map(item => item.name)).map(name => options.find(item => item.name === name)!).filter(Boolean);
   };
-  const strengthDayIndexes = plannedDays.map((day, index) => ({ day, index })).filter(item => item.day.type === 'Strength' || item.day.type === 'Mixed');
+  const strengthDayIndexes = offPlan ? [] : plannedDays.map((day, index) => ({ day, index })).filter(item => item.day.type === 'Strength' || item.day.type === 'Mixed');
   const unmappedDays = strengthDayIndexes.filter(item => !(dayExercises[item.index] || []).length);
 
   /* The same goal the builder writes, field for field, so Goals, the plan and
@@ -345,7 +415,6 @@ function OnboardingForm() {
     if (goalKind === 'weight') return { ...common, type: 'Body Composition', title: `${target} ${goalUnit} body-weight goal`, connection: 'No fixed day', exercise: '' };
     return { ...common, type: 'Strength', title: `${target} ${goalUnit} ${label}`, connection: 'No fixed day', exercise: goalExercise };
   };
-  const [pendingGoal, setPendingGoal] = useState<CreatedGoal | null>(null);
 
   /* DAY ONE GETS NUMBERS. Without any, every load on Today read "Find your
      weight" and every goal "No data yet" until a week of logging. Most lifters
@@ -405,6 +474,25 @@ function OnboardingForm() {
      the connection lives in Profile, so the end of setup takes them straight to it. */
   const [importStrava, setImportStrava] = useState(false);
 
+  /* The split is reshaped when the answer changes what the week is — on
+     Continue, not on every tap, so trying a card and untapping it does not
+     throw away a split someone built. */
+  const submitWants = () => {
+    if (!wants.length) return fail('Pick at least one.');
+    const focus = focusOf(wants);
+    if (focus !== data.primaryFocus || !isEditing) { set('primaryFocus', focus); if (focus !== data.primaryFocus) set('splitDays', []); }
+    tap(); go(1);
+  };
+  /* A coached athlete can leave a goal for later: the coach needs none to
+     build a workout, and a beginner may not know a number yet. */
+  const skipGoal = () => {
+    if (!stepSlot) return;
+    tap(); patchGoal({ goal: null, target: '', current: '' });
+    const list = stepsRef.current;
+    goTo(list[Math.min(list.length - 1, list.indexOf(`target-${stepSlot}`) + 1)]);
+  };
+  const skipLink = guided ? <button type="button" className="text-button ob-skip" onClick={skipGoal}>Not sure yet? Skip, you can set one later</button> : null;
+
   const submitName = () => {
     if (!data.displayName.trim()) return fail('Enter your name.');
     go(1);
@@ -431,15 +519,18 @@ function OnboardingForm() {
     go(1);
   };
 
-  const finish = async (coachMode = false) => {
+  const finish = async () => {
+    const coachMode = guided;
     /* Agreements live on the first screen; anyone who reached the end
        without them (a deep link into the week) is sent back to tick them. */
     if (!isEditing && (!agreedTerms || !healthConsent || !data.acceptedSafety)) { setDirection('back'); setStepId('agree'); return fail('Tick the three boxes to start.'); }
     /* THE GATE. Nothing below this line runs without a goal — not the profile
        write that sets onboarding_completed, and not saveSetup. */
-    if (!coachMode && !goals.length && !pendingGoal) return fail('Set a goal first. Forge builds the plan around it.');
-    /* Coach me skips the week screen, so it takes Forge's picks as they are. */
-    const lifts = coachMode && !Object.keys(dayExercises).length ? defaultLifts(plannedDays, strengthLibrary, []) : dayExercises;
+    if (!coachMode && !goals.length && !pendingGoals.length) return fail('Set a goal first. Forge builds the plan around it.');
+    /* A new coached athlete never sees the week screen, so she takes Forge's
+       picks as they are, with her goal lift on its day. Home and Pilates days
+       carry no lifts: the coach builds those. */
+    const lifts = offPlan ? {} : coachMode && !Object.keys(dayExercises).length ? defaultLifts(plannedDays, strengthLibrary, pendingGoalLift) : dayExercises;
     if (!coachMode && unmappedDays.length) return fail(`Pick at least one lift for ${unmappedDays.map(item => item.day.name).join(', ')}.`);
     const weight = Number(data.currentWeight);
     const weightGiven = Boolean(String(data.currentWeight || '').trim()) && Number.isFinite(weight) && weight > 0;
@@ -476,18 +567,20 @@ function OnboardingForm() {
         displayName: data.displayName, birthDate: data.birthDate || null, heightCm: null,
         startingWeight: null, currentWeight: weightGiven ? weight : null,
         unitSystem: data.units === 'Metric' ? 'metric' : 'imperial', experienceLevel: 'intermediate',
-        primaryGoal: data.primaryFocus === 'Strength' ? 'strength' : data.primaryFocus === 'Endurance' ? 'endurance' : data.primaryFocus === 'Body composition' ? 'weight_change' : 'general_fitness',
+        primaryGoal: wants.includes('strength') && !wants.includes('run') ? 'strength' : wants.includes('run') && !wants.includes('strength') ? 'endurance' : wants.includes('weight') && wants.length === 1 ? 'weight_change' : data.primaryFocus === 'Strength' && !wants.length ? 'strength' : data.primaryFocus === 'Endurance' && !wants.length ? 'endurance' : data.primaryFocus === 'Body composition' && !wants.length ? 'weight_change' : 'general_fitness',
         equipment: [], preferredTrainingDays: Array.from({ length: data.trainingDays }, (_, index) => index),
       });
       /* A runner's days default to the cardio days in the split. Never more
          days than they train. */
       const runningDays = Math.min(data.trainingDays, data.runningDays || plannedCardioDays || 0);
-      const completed = { ...data, ...(isEditing ? {} : { trainingMode: coachMode ? 'coach' as const : 'goals' as const }), username, runningDays, splitDays, splitSource: data.splitSource || 'Recommended', acceptedSafety: true, completedAt: new Date().toISOString(),
+      const completed = { ...data, primaryFocus: focusOf(wants.length ? wants : wantsFromFocus(data.primaryFocus)), ...(isEditing ? {} : { trainingMode: coachMode ? 'coach' as const : 'goals' as const }), username, runningDays, splitDays, splitSource: data.splitSource || 'Recommended', acceptedSafety: true, completedAt: new Date().toISOString(),
         ...(startingList.length ? { startingNumbers: startingList } : {}),
         ...(isEditing ? {} : { acceptedTermsAt: new Date().toISOString(), healthConsentAt: new Date().toISOString(), consentVersion: LEGAL.version }) };
       /* The goal lands after every await, so a failed save above can be
          retried without writing it twice. */
-      if (pendingGoal && !goals.length) saveGoal(pendingGoal, null);
+      if (!goals.length) pendingGoals.forEach(goal => saveGoal(goal, null));
+      /* The coach's own setup, from the same answers, so Guided does not ask again. */
+      if (coachMode && !isEditing && style) { try { localStorage.setItem(GUIDED_KEYS.prefs, JSON.stringify(guidedPrefsFor(style, gear, wants))); } catch { /* per device */ } }
       saveSetup(completed);
       updateProfile({ runningDays, injuryConstraint: data.injuryConstraint });
       /* "WHAT SHOULD FORGE AVOID?" GOES INTO THE BODY LOG, where the daily
@@ -497,7 +590,8 @@ function OnboardingForm() {
       success();
       /* Setup is done: the 7-day Pro trial can start (BillingProvider asks the server). */
       if (!isEditing) window.dispatchEvent(new Event('forge:onboarded'));
-      if (coachMode) { try { localStorage.setItem('forge-today-mode', 'coach'); } catch { /* fine */ } navigate('/guided', { replace: true }); return; }
+      /* Today, with the coach in charge: her day from the plan, or the coach's pick. */
+      if (coachMode && !isEditing) { try { localStorage.setItem('forge-today-mode', 'coach'); } catch { /* fine */ } navigate('/', { replace: true }); return; }
       navigate(importStrava && !isEditing ? '/profile?view=connections' : from && from !== '/onboarding' ? from : isEditing ? '/profile' : '/', { replace: true });
     } catch (reason) {
       fail(reason instanceof Error ? reason.message : 'Your profile could not be saved. Please try again.'); setSaving(false);
@@ -537,8 +631,21 @@ function OnboardingForm() {
   /* Each screen is a body and, where something has to be confirmed rather
      than tapped, an action pinned to the bottom — where the thumb already is,
      and above the keyboard while one is open. */
+  const stepKind = stepId.split('-')[0] as 'agree' | 'name' | 'wants' | 'mode' | 'style' | 'gear' | 'days' | 'goal' | 'target' | 'running' | 'numbers' | 'week' | 'ready';
+  /* The injury note sits on the last screen, whichever one that is. */
+  const injuryNote = <>
+          {/* OPTIONAL, AND SAYS SO. Testers read "tick the boxes" and ticked this
+              one too -- it looked exactly like the three required agreements. */}
+          <p className="ob-check-group">Optional</p>
+          <label className="setup-check optional"><input type="checkbox" checked={data.injuryConstraint} onChange={event => { tap(); set('injuryConstraint', event.target.checked); }} /><span><strong>I have an injury or limitation</strong><small>Forge will train around it.</small></span></label>
+          {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
+  </>;
+  /* A goal the way a person would say it; the stored title is the builder's
+     ("5K Run · 24:30 mm:ss") so Goals reads it the same. */
+  const goalLine = (slot: GoalSlot) => { const info = slotInfo(slot); const goal = info.draft.goal; return !goal ? '' : info.kind === 'race' ? `${info.race!.label} in ${info.draft.target}` : info.kind === 'weight' ? `Reach ${info.draft.target} ${info.unit}` : goal.title; };
+  const goalDay = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const screen: { body: ReactElement; action?: ReactElement } = (() => {
-    switch (stepId) {
+    switch (stepKind) {
       /* THE AGREEMENTS COME FIRST, ON THEIR OWN SCREEN. They used to sit
          under the week on the last screen, below the fold, with Enter Forge
          greyed out above them — it looked broken. Here they are the whole
@@ -568,32 +675,62 @@ function OnboardingForm() {
         </>,
         action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!nameReady} onClick={() => nameReady && tap()}>Continue</button>,
       };
-      case 'mode': return { body: <>
-        <h1>How do you want to train?</h1>
-        <p className="ob-lead">You can switch any time from the Today screen.</p>
-        <div className="ob-cards" role="radiogroup" aria-label="How you want to train">
-          <button type="button" role="radio" aria-checked={false} className="ob-card" disabled={saving} onClick={() => { tap(); void finish(true); }}>
-            <span className="ob-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg></span>
-            <span className="ob-card-text"><strong>{saving ? 'Setting up your coach…' : 'Coach me'}</strong><small>Tell me what to do. A coach builds each workout and talks you through it.</small></span>
-          </button>
-          <button type="button" role="radio" aria-checked={false} className="ob-card" disabled={saving} onClick={() => tapThen(() => set('trainingMode', 'goals'))}>
-            <span className="ob-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span>
-            <span className="ob-card-text"><strong>I have goals</strong><small>Build a plan around a lift, a race or a body weight. Log your top sets.</small></span>
-          </button>
-        </div>
-      </> };
-      case 'focus': return { body: <>
-        <h1>What are you training for?</h1>
-        <div className="ob-cards" role="radiogroup" aria-label="Training focus">{focusCards.map(card => {
-          const active = data.primaryFocus === card.id;
-          return <button type="button" role="radio" aria-checked={active} key={card.id} className={active ? 'ob-card active' : 'ob-card'}
-            onClick={() => tapThen(() => { if (data.primaryFocus !== card.id) { set('primaryFocus', card.id); set('splitDays', []); setGoalExercise(''); setGoalTarget(''); setGoalCurrent(''); setPendingGoal(null); } })}>
-            <span className="ob-card-icon">{card.icon}</span>
+      case 'wants': return {
+        body: <>
+          <h1>What do you want?</h1>
+          <p className="ob-lead">Pick all that apply.</p>
+          <div className="ob-cards" role="group" aria-label="What you want">{wantCards.map(card => {
+            const active = wants.includes(card.id);
+            return <button type="button" role="checkbox" aria-checked={active} key={card.id} className={active ? 'ob-card active' : 'ob-card'}
+              onClick={toggle(() => set('wants', toggleWant(wants, card.id)))}>
+              <span className="ob-card-icon">{card.icon}</span>
+              <span className="ob-card-text"><strong>{card.label}</strong><small>{card.copy}</small></span>
+              <span className="ob-radio ob-tickbox">{active && check}</span>
+            </button>;
+          })}</div>
+        </>,
+        action: <button className="button ob-next" disabled={!wants.length} onClick={submitWants}>Continue</button>,
+      };
+      case 'mode': return {
+        body: <>
+          <h1>Who builds your workouts?</h1>
+          <p className="ob-lead">You can switch any time from the Today screen.</p>
+          <div className="ob-cards" role="radiogroup" aria-label="Who builds your workouts">{modeCards.map(card => {
+            const active = data.trainingMode === card.id;
+            return <div className="ob-mode" key={card.id}>
+              <button type="button" role="radio" aria-checked={active} className={active ? 'ob-card active' : 'ob-card'}
+                onClick={toggle(() => { if (data.trainingMode !== card.id) { set('trainingMode', card.id); set('splitDays', []); } })}>
+                <span className="ob-card-icon">{card.icon}</span>
+                <span className="ob-card-text"><strong>{card.label}</strong><small>{card.copy}</small></span>
+                <span className="ob-radio">{active && check}</span>
+              </button>
+              {/* What the answer means, the moment it is picked. */}
+              {active && <ol className="ob-how" aria-label={`How ${card.label} works`}>{card.how.map(line => <li key={line}>{line}</li>)}</ol>}
+            </div>;
+          })}</div>
+        </>,
+        action: <button className="button ob-next" disabled={!data.trainingMode} onClick={() => { tap(); go(1); }}>Continue</button>,
+      };
+      case 'style': return { body: <>
+        <h1>What kind of training?</h1>
+        <p className="ob-lead">Your coach builds every workout around this.</p>
+        <div className="ob-cards" role="radiogroup" aria-label="Kind of training">{styleCards.map(card => {
+          const active = style === card.id;
+          return <button type="button" role="radio" aria-checked={active} key={card.id} className={active ? 'ob-card compact active' : 'ob-card compact'}
+            onClick={() => tapThen(() => { if (style !== card.id) { set('guidedStyle', card.id); set('splitDays', []); } })}>
             <span className="ob-card-text"><strong>{card.label}</strong><small>{card.copy}</small></span>
             <span className="ob-radio">{active && check}</span>
           </button>;
         })}</div>
       </> };
+      case 'gear': return {
+        body: <>
+          <h1>What do you have at home?</h1>
+          <p className="ob-lead">Pick any. Nothing at all is fine too.</p>
+          <div className="ob-chips">{homeGear.map(item => chip(item, item, gear.includes(item), toggle(() => setGear(current => current.includes(item) ? current.filter(entry => entry !== item) : [...current, item]))))}</div>
+        </>,
+        action: <button className="button ob-next" onClick={() => { tap(); go(1); }}>{gear.length ? 'Continue' : 'No equipment'}</button>,
+      };
       case 'days': return { body: <>
         <h1>How many days a week can you train?</h1>
         <p className="ob-lead">Most people start with 3 or 4. You can change it any time.</p>
@@ -602,14 +739,15 @@ function OnboardingForm() {
             onClick={() => tapThen(() => { if (data.trainingDays !== count) { set('trainingDays', count); set('splitDays', []); } })}>{count}</button>)}</div>
       </> };
       case 'goal': {
-        const showLifts = data.primaryFocus !== 'Endurance';
-        const showRaces = data.primaryFocus !== 'Strength';
-        const pick = (name: string) => tapThen(() => { if (goalExercise !== name) { setGoalExercise(name); setGoalTarget(''); setGoalCurrent(''); setPendingGoal(null); setDivision(''); } });
+        const showLifts = stepSlot === 'strength' || stepSlot === 'any';
+        const showRaces = stepSlot === 'run' || stepSlot === 'any';
+        const pick = (name: string) => tapThen(() => { if (goalExercise !== name) patchGoal({ exercise: name, target: '', current: '', goal: null, division: '' }); });
         return { body: <>
-          <h1>{showLifts && showRaces ? 'Pick one goal to start with' : showLifts ? 'Which lift do you want to improve?' : 'What are you training for?'}</h1>
+          <h1>{showLifts && showRaces ? 'Pick one goal to start with' : showLifts ? 'Which lift do you want to improve?' : 'Which race are you training for?'}</h1>
           <p className="ob-lead">Forge builds every week around it. You can add more goals later.</p>
           {showLifts && <>{showRaces && <h2 className="ob-group">A lift</h2>}<div className="ob-chips">{liftChoices.map(name => chip(name, CORE_LIFT_LABELS[name] || name, goalExercise === name, () => pick(name)))}</div></>}
           {showRaces && <>{showLifts && <h2 className="ob-group">A race</h2>}<div className="ob-chips">{races.map(item => chip(item.name, item.label, goalExercise === item.name, () => pick(item.name)))}</div></>}
+          {skipLink}
         </> };
       }
       case 'target': {
@@ -647,6 +785,7 @@ function OnboardingForm() {
               ? <OnboardingGoalPath path={targetPath} date={goalDate} onUseWeeks={weeks => { tap(); setPickDate(!goalWeeks.includes(weeks)); setGoalDate(weeksFromNow(weeks)); }} />
               : goalTarget.trim() && !goalCurrent.trim() && <p className="ob-path-hint">Add {goalKind === 'weight' ? 'your weight today' : goalKind === 'race' ? 'your best time now' : 'your best right now'} and Forge shows what each week has to find.</p>}
             <p className="ob-why">Forge builds every week backwards from this goal — the weights, the runs and when to push.</p>
+            {skipLink}
           </>,
           action: <button className="button ob-next" type="submit" form={STEP_FORM} disabled={!targetReady} onClick={() => targetReady && tap()}>Continue</button>,
         };
@@ -688,7 +827,7 @@ function OnboardingForm() {
             </div>;
           })}</div>
           {liftingPlanned && removedLifts.length > 0 && <div className="ob-chips ob-number-restore">{removedLifts.map(lift => chip(lift, `+ ${CORE_LIFT_LABELS[lift] || lift}`, false, toggle(() => setRemovedLifts(current => current.filter(item => item !== lift)))))}</div>}
-          {(runningPlanned || goalKind === 'race') && <label className="setup-check"><input type="checkbox" checked={importStrava} onChange={event => { tap(); setImportStrava(event.target.checked); }} /><span><strong>I have a smartwatch I’ll connect</strong><small>After setup, Forge takes you straight to Connections so your runs come in and paces start from real training.</small></span></label>}
+          {(runningPlanned || racePicked) && <label className="setup-check"><input type="checkbox" checked={importStrava} onChange={event => { tap(); setImportStrava(event.target.checked); }} /><span><strong>I have a smartwatch I’ll connect</strong><small>After setup, Forge takes you straight to Connections so your runs come in and paces start from real training.</small></span></label>}
         </>,
         action: <button className="button ob-next" onClick={submitNumbers}>{!liftingPlanned || startingList.length || halfFilled.length ? 'Continue' : 'Skip for now'}</button>,
       };
@@ -698,19 +837,19 @@ function OnboardingForm() {
         return {
         body: <>
           <h1>{editingFreely ? 'Your week' : 'Your week is ready'}</h1>
-          <p className="ob-lead">Forge picked lifts for each day. You log one hard set of each, and Forge sets the weight next time. Tap a day to swap lifts, or just start.</p>
+          <p className="ob-lead">{offPlan ? 'Your coach builds each workout. Rest days are spread through the week.' : !liftingPlanned ? 'Forge planned a run for each training day. It sets the pace and distance, and builds up from what you run now.' : 'Forge picked lifts for each day. You log one hard set of each, and Forge sets the weight next time. Tap a day to swap lifts, or just start.'}</p>
           {/* The stored title is the builder's ("5K Run · 24:30 mm:ss") so Goals
               reads it the same; this card says it the way a person would. */}
-          {pendingGoal && <div className="ob-goal"><span>Your goal</span><strong>{goalKind === 'race' ? `${race!.label} in ${goalTarget}` : goalKind === 'weight' ? `Reach ${goalTarget} ${goalUnit}` : pendingGoal.title}</strong><small>by {new Date(`${pendingGoal.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small>
-            {weekPath && <OnboardingGoalPath path={weekPath} date={pendingGoal.date} compact />}</div>}
+          {slots.filter(slot => drafts[slot].goal).map((slot, index, shown) => <div className="ob-goal" key={slot}><span>{shown.length > 1 ? `Goal ${index + 1}` : 'Your goal'}</span><strong>{goalLine(slot)}</strong><small>by {goalDay(drafts[slot].goal!.date)}</small>
+            {slot === viewSlot && weekPath && <OnboardingGoalPath path={weekPath} date={drafts[slot].goal!.date} compact />}</div>)}
           <div className="ob-week">{plannedDays.map((day, index) => {
-            const lifting = day.type === 'Strength' || day.type === 'Mixed';
+            const lifting = !offPlan && (day.type === 'Strength' || day.type === 'Mixed');
             const chosen = dayExercises[index] || [];
             const open = openDay === index;
             return <section className={open ? 'setup-day open' : 'setup-day'} key={`${day.name}-${index}`}>
               <button type="button" className="setup-day-head" onClick={() => { if (!lifting) return; tap(); setOpenDay(open ? -1 : index); }} aria-expanded={lifting ? open : undefined} disabled={!lifting}>
                 <span className="ob-day-number">{index + 1}</span>
-                <span className="ob-day-text"><strong>{day.name}{chosen.some(name => goalLiftKeys.has(canonicalLiftKey(name))) && <em className="ob-day-goal">Goal lift</em>}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick lifts') : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
+                <span className="ob-day-text"><strong>{day.name}{chosen.some(name => goalLiftKeys.has(canonicalLiftKey(name))) && <em className="ob-day-goal">Goal lift</em>}</strong><small>{lifting ? (chosen.length ? chosen.join(' · ') : 'Pick lifts') : offPlan && day.type === 'Strength' ? 'Your coach builds it' : day.type === 'Rest' ? 'Rest day' : day.type === 'Hyrox' ? 'HYROX — Forge plans it' : 'Running — Forge plans it'}</small></span>
                 {lifting && <span className={chosen.length ? 'setup-day-count set' : 'setup-day-count'}>{open ? 'Done' : 'Edit'}</span>}
               </button>
               {/* IN THE DAY, THEN WHAT TO ADD. One grid of chips had no way to
@@ -735,15 +874,34 @@ function OnboardingForm() {
               })()}
             </section>;
           })}</div>
-          {/* OPTIONAL, AND SAYS SO. Testers read "tick the boxes" and ticked this
-              one too -- it looked exactly like the three required agreements. */}
-          <p className="ob-check-group">Optional</p>
-          <label className="setup-check optional"><input type="checkbox" checked={data.injuryConstraint} onChange={event => { tap(); set('injuryConstraint', event.target.checked); }} /><span><strong>I have an injury or limitation</strong><small>Forge will train around it.</small></span></label>
-          {data.injuryConstraint && <label className="ob-optional">What should Forge avoid?<textarea className="ob-input small" rows={3} value={data.limitationNotes} onChange={event => set('limitationNotes', event.target.value)} placeholder="e.g. no running on my left knee, no overhead pressing" /></label>}
+          {injuryNote}
         </>,
         action: <>
           <button className="button ob-next" disabled={saving} onClick={() => { void finish(); }}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : editingFreely ? 'Save' : 'Enter Forge'}</button>
         </>,
+        };
+      }
+      /* A COACHED ATHLETE'S LAST SCREEN: what she asked for, said back in a
+         few lines, and one button. There are no lifts to check — the coach
+         builds the workouts. */
+      case 'ready': {
+        const trainingDays = plannedDays.filter(day => day.type !== 'Rest').length;
+        const runDays = plannedDays.filter(day => day.type === 'Cardio').length;
+        const kind = style === 'Pilates' ? 'Pilates' : style === 'Home' ? 'home workouts' : runDays ? 'gym and running' : 'gym workouts';
+        const set = slots.filter(slot => drafts[slot].goal);
+        return {
+          body: <>
+            <h1>You’re set{data.displayName.trim() ? `, ${data.displayName.trim().split(' ')[0]}` : ''}</h1>
+            <p className="ob-lead">Your coach builds every workout around this.</p>
+            <ul className="ob-summary">
+              <li><span>Your week</span><strong>{trainingDays} {trainingDays === 1 ? 'day' : 'days'} · {kind}</strong></li>
+              {set.map(slot => <li key={slot}><span>Goal</span><strong>{goalLine(slot)}</strong><small>by {goalDay(drafts[slot].goal!.date)}</small></li>)}
+              {!set.length && <li><span>Goal</span><strong>{wants.includes('strength') ? 'Get stronger, set by set' : 'Get fit and stay consistent'}</strong><small>Add a target any time in Goals</small></li>}
+            </ul>
+            <p className="ob-why">Each day, open Forge and press start. Your coach shows every move, counts your sets and sets your next weights.</p>
+            {injuryNote}
+          </>,
+          action: <button className="button ob-next" disabled={saving} onClick={() => { void finish(); }}>{saving ? <><span className="ob-spinner" aria-hidden="true" />Building your plan…</> : 'Start with my coach'}</button>,
         };
       }
     }
