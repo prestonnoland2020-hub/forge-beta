@@ -1,4 +1,4 @@
-import { FIRST_TIMER_HINT, FIRST_TIMER_KEY, wantsFirstTimerHint } from '../lib/guided/firstTimer';
+import { FIRST_TIMER_HINT, wantsFirstTimerHint } from '../lib/guided/firstTimer';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { rememberGuidedFeel } from '../features/training/coachMemoryService';
 import { createPortal } from 'react-dom';
@@ -256,7 +256,7 @@ export function GuidedPage() {
     void c.useCloud(blob => transcribe(blob, c.hints()));
   };
   const hintSaid = useRef(false);
-  const say = (text: string, listen?: Command[]) => { if (text.includes(FIRST_TIMER_HINT)) { hintSaid.current = true; write(FIRST_TIMER_KEY, true); } lastLine.current = { text, listen }; coach.current?.say(text, listen); };
+  const say = (text: string, listen?: Command[]) => { if (text.includes(FIRST_TIMER_HINT)) hintSaid.current = true; lastLine.current = { text, listen }; coach.current?.say(text, listen); };
 
   const step: Step | undefined = workout?.steps[stepIndex];
   const weight = step ? (weights[stepIndex] !== undefined ? weights[stepIndex] : step.weight) : null;
@@ -288,7 +288,7 @@ export function GuidedPage() {
     if (s.part === 'warmup') return w !== null ? `Warm-up. ${s.move.name}, ${amount}${load}. ${s.move.cue}${ask}` : `Let's warm up first. ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
     if (s.part === 'cooldown') return `Last one. Let's cool down with ${s.move.name}, ${amount}. ${s.move.cue}${ask}`;
     if (setNo === 0) {
-      const hint = wantsFirstTimerHint(s.part, w, setNo, hintSaid.current || read<boolean>(FIRST_TIMER_KEY, false)) ? ` ${FIRST_TIMER_HINT}` : '';
+      const hint = wantsFirstTimerHint(w, setNo, hintSaid.current) ? ` ${FIRST_TIMER_HINT}` : '';
       return `Alright, ${s.move.name}. ${s.sets > 1 ? `${s.sets} sets, ` : ''}${amount}${load}. ${s.move.cue}${ask}${hint}`;
     }
     return `${setNo + 1 === s.sets ? 'Last set' : `Set ${setNo + 1}`} of ${s.move.name}. ${amount}${load}. ${setNo + 1 === s.sets ? 'Make it count.' : 'Same as before.'}${ask}`;
@@ -443,6 +443,7 @@ export function GuidedPage() {
     if (!workout) return;
     coach.current?.unlockAudio();
     openEars();
+    hintSaid.current = false;
     setStepIndex(0); setSetIndex(0); setWeights({}); setLogged([]); setStartedAt(Date.now()); setPhase('card'); setTimer(workout.steps[0].reps); setRunning(false);
     say(introLine(workout), CARD_CMDS);
   };
@@ -832,6 +833,7 @@ export function GuidedPage() {
     coach.current?.unlockAudio(); openEars();
     setWorkout(saved.workout); setCustom(saved.custom); setStepIndex(saved.stepIndex); setSetIndex(saved.setIndex); setWeights(saved.weights); setLogged(saved.logged); setStartedAt(saved.startedAt || Date.now());
     setTimer(s.reps); setRunning(false); setPhase('card');
+    hintSaid.current = true; /* already heard earlier in this workout */
     const w = saved.weights[saved.stepIndex] ?? s.weight;
     say(`Welcome back. ${cardLine(s, saved.setIndex, w)}`, CARD_CMDS);
   };
