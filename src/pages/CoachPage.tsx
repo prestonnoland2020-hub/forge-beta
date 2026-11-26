@@ -185,7 +185,7 @@ const strengthGoal=goals.find(goal=>goal.type==='Strength');const goalMax=Number
        claim that 'the goal lift is trained once this week, other strength days
        are accessory'. Both are false under the current design and the coach was
        being handed them alongside the real block. */
-    wearableRecovery,wearableRecoveryAvailable:Boolean(wearableRecovery),profile:{weeklyMileage:profile.weeklyMileage,runningDays:profile.runningDays,experience:profile.experience,strengthFatigue:profile.strengthFatigue},goals:goals.map(goal=>({title:goal.title,type:goal.type,target:goal.target,date:goal.date,exercise:goal.exercise,/* Past its date: done, not being trained for. */...(goal.date&&goal.date<todayIso?{deadlinePassed:true}:{})})),
+    wearableRecovery,wearableRecoveryAvailable:Boolean(wearableRecovery),profile:{weeklyMileage:profile.weeklyMileage,runningDays:profile.runningDays,experience:profile.experience,strengthFatigue:profile.strengthFatigue,...(setup?.wants?.length?{wants:setup.wants}:{}),...(setup?.trainingMode?{trainingMode:setup.trainingMode}:{}),...(setup?.guidedStyle?{guidedStyle:setup.guidedStyle}:{})},goals:goals.map(goal=>({title:goal.title,type:goal.type,target:goal.target,date:goal.date,exercise:goal.exercise,/* Past its date: done, not being trained for. */...(goal.date&&goal.date<todayIso?{deadlinePassed:true}:{})})),
       /* WHAT THE COACH WAS NEVER TOLD, AND SO REPORTED AS MISSING.
 
          "Am I on track?" used to return a list of gaps and two complaints —

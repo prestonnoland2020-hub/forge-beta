@@ -12,13 +12,15 @@ import { NUDGE_KEY, NUDGE_LINE, showNudge, dismissNudge, type NudgeState } from 
 
 const read = <T,>(key: string, fallback: T): T => { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; } };
 
-export type CoachPlan = { title: string; count: number; start: () => void };
+export type CoachPlan = { title: string; count: number; start: () => void; extra?: string };
+/* The plan's run for today, on a day with no lifting. */
+export type CoachRun = { title: string; detail: string; open: () => void };
 
 /* What Today knows that the pick needs: the logged workouts, what the body
    log keeps off-limits, what the goals train, and whether the plan rests. */
 export type CoachContext = Omit<PickInput, 'prefs' | 'lastFocus'> & { rest: boolean; easeLifting?: boolean };
 
-export function CoachToday({ plan, context }: { plan?: CoachPlan; context?: CoachContext } = {}) {
+export function CoachToday({ plan, run, context, coached = false }: { plan?: CoachPlan; run?: CoachRun; context?: CoachContext; coached?: boolean } = {}) {
   const navigate = useNavigate();
   /* TODAY'S PLAN, GUIDED, comes first: the day Forge wrote, top sets and
      accessories, walked through with photos and the coach's voice. The
@@ -31,7 +33,8 @@ export function CoachToday({ plan, context }: { plan?: CoachPlan; context?: Coac
   /* One coach line for someone who has never run a guided workout. */
   const todayIso = new Date().toISOString().slice(0, 10);
   const [nudgeState, setNudgeState] = useState(() => read<NudgeState | null>(NUDGE_KEY, null));
-  const nudge = showNudge(nudgeState, read<number>(GUIDED_KEYS.count, 0), todayIso);
+  /* Someone who chose the coach in setup does not need selling on it. */
+  const nudge = !coached && showNudge(nudgeState, read<number>(GUIDED_KEYS.count, 0), todayIso);
   const hideNudge = () => { const next = dismissNudge(nudgeState, todayIso); setNudgeState(next); try { localStorage.setItem(NUDGE_KEY, JSON.stringify(next)); } catch { /* per device */ } };
   const nudgeLine = nudge ? <p className="ct-nudge"><span>{NUDGE_LINE}</span><button type="button" aria-label="Dismiss" onClick={hideNudge}>×</button></p> : null;
   /* A Guided workout left part-way (GuidedPage keeps it for 24 hours). */
@@ -47,8 +50,19 @@ export function CoachToday({ plan, context }: { plan?: CoachPlan; context?: Coac
     <h3 className="td-title">{plan.title}</h3>
     {nudgeLine}
     <p className="ct-lead">Your full workout for today, {plan.count} {plan.count === 1 ? 'exercise' : 'exercises'}. Videos for every move, and your coach talks you through each set and logs it for you.</p>
+    {plan.extra && <p className="ct-why">{plan.extra}</p>}
     <button type="button" className="button wide" onClick={plan.start}>Start guided workout</button>
     <button type="button" className="ct-more" onClick={() => setOwnPick(true)}>Let the coach pick a different workout</button>
+  </section>;
+  /* A RUN DAY IS A RUN DAY. With the coach in charge, a day whose plan was a
+     run used to offer a lifting workout instead — the run was only on the My
+     plan side, so a coached runner never saw it. */
+  if (run && !ownPick) return <section className="td-card ct-card">
+    <span className="ct-eyebrow">TODAY’S RUN</span>
+    <h3 className="td-title">{run.title}</h3>
+    <p className="ct-lead">{run.detail}</p>
+    <button type="button" className="button wide" onClick={run.open}>Open today’s run</button>
+    <button type="button" className="ct-more" onClick={() => setOwnPick(true)}>Do a workout with my coach instead</button>
   </section>;
   if (!prefs) return <section className="td-card ct-card">
     <span className="ct-eyebrow">YOUR COACH</span>

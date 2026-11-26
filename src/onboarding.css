@@ -249,3 +249,18 @@ textarea.ob-input{min-height:96px;resize:vertical}
 .ob-day-add{display:flex;flex-wrap:wrap;gap:8px}
 .ob-day-add button{min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:700}
 .ob-day-more{justify-self:start;font-size:14px}
+
+/* WHAT YOU WANT IS PICK-ANY: a square tick says "more than one", where the
+   round one on the screens around it says "one of these". */
+.ob-tickbox{border-radius:8px}
+/* What the answer means, opened under the card that was picked. */
+.ob-mode{display:grid;gap:8px}
+.ob-how{display:grid;gap:8px;margin:0 0 4px;padding:14px 16px 14px 36px;border-radius:14px;background:var(--surface-sunken);color:var(--text);font-size:15px;line-height:1.45;font-weight:600;animation:ob-pop .24s cubic-bezier(.2,.8,.2,1)}
+.ob-how li::marker{color:var(--accent-text);font-weight:900}
+.ob-skip{justify-self:start;margin-top:4px;padding:10px 0;font-size:15px}
+/* A coached athlete's last screen: what she asked for, said back. */
+.ob-summary{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.ob-summary li{display:grid;gap:3px;padding:14px 16px;border-left:4px solid var(--accent);border-radius:14px;background:var(--surface-sunken)}
+.ob-summary span{font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-text)}
+.ob-summary strong{font-size:18px;font-weight:800;color:var(--text)}
+.ob-summary small{color:var(--muted);font-weight:600}
