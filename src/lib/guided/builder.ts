@@ -236,6 +236,22 @@ export const swapFor = (step: Step, way: 'easier' | 'harder', have: Set<Equip>):
   return move && canDo(move, have) ? move : undefined;
 };
 
+/* A BODYWEIGHT SET HAS NO WEIGHT TO MOVE, so Too easy / Too hard moves the
+   move or the reps instead. Too easy before the last set goes to the harder
+   version she can do, else two more reps (ten more seconds when timed); Too
+   hard goes to the easier version, else two fewer. Kept within 5–20 reps
+   (15–90 sec), so a run of answers cannot run away. Just right, the last set,
+   warm-ups and loaded moves: nothing but the old easier swap on Too hard
+   (loaded moves use nextWeight). Called only when the set has no weight. */
+export function bodyweightNext(step: Step, feel: Feel, lastSet: boolean, have: Set<Equip>): { move?: Move; reps?: number } | null {
+  if (feel === 'hard') { const move = swapFor(step, 'easier', have); if (move) return { move }; }
+  if (step.move.load !== 'none' || step.part !== 'main' || feel === 'right' || lastSet) return null;
+  if (feel === 'easy') { const move = swapFor(step, 'harder', have); if (move && move.load === 'none') return { move }; }
+  const [low, high, by] = step.move.timed ? [15, 90, 10] : [5, 20, 2];
+  const reps = Math.min(high, Math.max(low, step.reps + (feel === 'easy' ? by : -by)));
+  return reps !== step.reps ? { reps } : null;
+}
+
 /* BUILD MY OWN. She picks the moves from the Guided list, in her order; the
    coach still sets the sets, reps, rest and starting weight, and still talks
    her through it. Warm-up and stretch moves stay warm-up and cool-down. */
