@@ -68,11 +68,35 @@ export function parseCommand(transcript: string, allowed?: Command[]): Command |
   /* Loose words keep their old place in line: a short "okay ready" is still ready. */
   const order = (command: Command) => RULES.reduce((at, [name], i) => name === command ? i : at, -1);
   const ranked = rules.map((rule, i) => [rule, i < RULES.length ? i : order(rule[0]) + 0.5] as const).sort((a, b) => a[1] - b[1]).map(([rule]) => rule);
+  const longPhrase = text.trim().split(' ').length > LONG_AFTER;
+  /* The coach's own lines ("say done when you finish") are never commands. */
+  if (COACH_LINE.test(text)) return null;
   for (const [command, pattern] of ranked) {
     if (allowed && !allowed.includes(command)) continue;
-    if (pattern.test(NEGATABLE.includes(command) ? plain : text)) return command;
+    const target = NEGATABLE.includes(command) ? plain : text;
+    const hit = pattern.exec(target);
+    if (!hit) continue;
+    if (longPhrase && command !== 'ask' && !commandStandsOut(target, hit)) continue;
+    return command;
   }
   return null;
+}
+
+/* A LONG SENTENCE ONLY COUNTS WHEN THE COMMAND STANDS OUT. "He was done with
+   it" or a lyric with "too easy" in the middle must not end a set. In a phrase
+   longer than four words the command words must start it (first two words),
+   end it (last two words), or follow "I'm / that was / that one / it was /
+   felt / feels". Short phrases match anywhere, as before. */
+const LONG_AFTER = 4;
+const COACH_LINE = /\bsay\s+[a-z']+(\s+[a-z']+)?\s+when\b/;
+const LEAD_IN = /\b(i'?m|i am|that was|that one|it was|felt|feels)\s*$/;
+function commandStandsOut(target: string, hit: RegExpExecArray): boolean {
+  const words = (value: string) => value.trim().split(/\s+/).filter(Boolean);
+  const before = target.slice(0, hit.index);
+  const first = words(before).length;
+  const last = first + words(hit[0]).length - 1;
+  const total = words(target).length;
+  return first <= 1 || last >= total - 2 || LEAD_IN.test(before);
 }
 
 /* ---------- Learning how the phone hears HER ----------
