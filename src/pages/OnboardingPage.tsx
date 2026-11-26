@@ -249,6 +249,11 @@ function OnboardingForm() {
   /* Decided once: a goal saved on the last screen must not make the goal
      screens vanish from under the progress bar mid-save. */
   const [askGoal] = useState(() => !goals.length);
+  /* AND WHICH KINDS THEY ALREADY HAVE. Someone sent back through setup with
+     a lift goal who now also wants a body weight is asked for the weight,
+     not for nothing (one goal used to switch every goal screen off) and not
+     for the lift again. */
+  const [covered] = useState(() => ({ strength: goals.some(goal => goal.type === 'Strength'), run: goals.some(goal => goal.type === 'Endurance'), weight: goals.some(goal => goal.type === 'Body Composition'), any: goals.length > 0 }));
 
   /* THE SPLIT THEY SAVED IS THE ONE SHOWN. The Plan tab's copy holds each
      day's lifts; the profile's copy did not, so going through setup again
@@ -304,7 +309,8 @@ function OnboardingForm() {
     : offPlan ? coachSplit(style as 'Home' | 'Pilates', data.trainingDays, wants.includes('run'))
     : starterSplit(splitFocusFor(wants, guided, style), data.trainingDays), [data.splitDays, wantsKey, guided, style, offPlan, data.trainingDays]); // eslint-disable-line react-hooks/exhaustive-deps
   /* One goal is asked per want (lib/onboardingPlan.ts). */
-  const slots = useMemo(() => askGoal ? goalSlots(wants, guided, style) : [], [askGoal, wantsKey, guided, style]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* Editing a profile asks for no new goals unless there are none at all. */
+  const slots = useMemo(() => isEditing ? (askGoal ? goalSlots(wants, guided, style) : []) : goalSlots(wants, guided, style).filter(slot => !covered[slot]), [covered, askGoal, isEditing, wantsKey, guided, style]); // eslint-disable-line react-hooks/exhaustive-deps
   const runningPlanned = plannedDays.some(day => /Cardio|Mixed/i.test(day.type));
   /* A runner with no lifting day is not asked what they can bench. */
   const liftingPlanned = plannedDays.some(day => /Strength|Mixed/i.test(day.type));
@@ -578,7 +584,7 @@ function OnboardingForm() {
         ...(isEditing ? {} : { acceptedTermsAt: new Date().toISOString(), healthConsentAt: new Date().toISOString(), consentVersion: LEGAL.version }) };
       /* The goal lands after every await, so a failed save above can be
          retried without writing it twice. */
-      if (!goals.length) pendingGoals.forEach(goal => saveGoal(goal, null));
+      pendingGoals.forEach(goal => saveGoal(goal, null));
       /* The coach's own setup, from the same answers, so Guided does not ask again. */
       if (coachMode && !isEditing && style) { try { localStorage.setItem(GUIDED_KEYS.prefs, JSON.stringify(guidedPrefsFor(style, gear, wants))); } catch { /* per device */ } }
       saveSetup(completed);

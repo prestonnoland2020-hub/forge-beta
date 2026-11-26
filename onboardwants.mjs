@@ -153,5 +153,30 @@ console.log('\nHybrid with the coach, skipping the lift goal');
   check('no page errors', !errors.length, errors.join(' | ').slice(0, 300));
   await c.close();
 }
+
+console.log('\nSent back through setup with a lift goal, now wanting a body weight too');
+{
+  const { c, p, errors } = await fresh();
+  await onboard(p, { base: BASE, name: 'Sarah', focus: 'Get stronger', days: '3', lift: 'Squat', target: '135', current: '95' });
+  /* Her account is reset: setup is no longer complete, her goal is still there. */
+  await p.evaluate(() => { for (let i = 0; i < localStorage.length; i += 1) { const k = localStorage.key(i); if (k.startsWith('forge-athlete-setup-v1')) { const v = JSON.parse(localStorage.getItem(k)); v.completedAt = ''; localStorage.setItem(k, JSON.stringify(v)); } } });
+  await p.goto(`${BASE}/#/`); await p.reload({ waitUntil: 'domcontentloaded' }); await p.waitForTimeout(2300);
+  let t = await text(p);
+  check('she starts setup from the top', /Before we start/.test(t), flat(t).slice(0, 120));
+  for (const box of await p.locator('input[type=checkbox]').all()) if (await box.isVisible()) await box.check();
+  await tap(p, 'Continue'); await p.fill('input[aria-label="Your name"]', 'Sarah'); await tap(p, 'Continue');
+  await tap(p, 'Get stronger'); await tap(p, 'Change my weight'); await tap(p, 'Continue');
+  await tap(p, 'Build it for me'); await tap(p, 'Continue'); await tap(p, 'Gym'); await tap(p, '3');
+  t = await text(p);
+  check('the lift goal she has is not asked again; the weight goal is', /What weight are you aiming for\?/.test(t), flat(t).slice(0, 160));
+  const f = []; for (const i of await p.$$('input.ob-input:not([type=date])')) if (await i.isVisible()) f.push(i);
+  await f[0].fill('140'); await f[1].fill('152'); await tap(p, 'Continue');
+  await tap(p, 'Start with my coach'); await p.waitForTimeout(3200);
+  const s = await store(p); t = await text(p);
+  check('she ends with both goals, one of each', s.goals.length === 2 && s.goals.filter(g => g.type === 'Strength').length === 1 && s.goals.filter(g => g.type === 'Body Composition').length === 1, JSON.stringify(s.goals.map(g => g.title)));
+  check('and is coached, on Today', s.setup?.trainingMode === 'coach' && /TODAY, GUIDED/i.test(t), flat(t).slice(0, 200));
+  check('no page errors', !errors.length, errors.join(' | ').slice(0, 300));
+  await c.close();
+}
 await b.close();
 if (fails) process.exit(1);
