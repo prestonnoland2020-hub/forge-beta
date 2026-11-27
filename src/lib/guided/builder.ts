@@ -117,6 +117,16 @@ export function nextWeight(weight: number | null, feel: Feel, load: Move['load']
   return weight;
 }
 
+/* WHERE A SAVED WORKOUT PICKS UP. During a rest the set just finished is
+   already logged, so the resume point is the set after it (Nov 27: closing
+   the app on the rest after Incline DB set 2 resumed on set 2 again, and the
+   set was done and logged twice). On a card or the feel question the set is
+   not logged yet, so it stays where it is. */
+export function resumePoint(stepIndex: number, setIndex: number, sets: number, phase: string): { stepIndex: number; setIndex: number } {
+  if (phase !== 'rest') return { stepIndex, setIndex };
+  return setIndex + 1 < sets ? { stepIndex, setIndex: setIndex + 1 } : { stepIndex: stepIndex + 1, setIndex: 0 };
+}
+
 /* Too easy a second time in a row on the same move. */
 export function easyStreak(previous: Array<{ moveId: string; feel: Feel | null }>, moveId: string): boolean {
   const last = [...previous].reverse().find(item => item.moveId === moveId);

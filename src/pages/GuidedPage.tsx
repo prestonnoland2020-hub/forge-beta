@@ -8,7 +8,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
-import { amountText, BODY_KEY, bodyweightNext, buildWorkout, changeNote, laterSetTail, rememberBody, type BodyMemory, type SetFacts, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, easyStreak, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
+import { amountText, BODY_KEY, bodyweightNext, buildWorkout, changeNote, laterSetTail, rememberBody, type BodyMemory, type SetFacts, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, easyStreak, nextWeight, resumePoint, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
 import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, saidWayEasy, talkingToCoach, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { Icon } from '../components/Icon';
@@ -686,8 +686,10 @@ export function GuidedPage() {
   const close = () => { if (active) { setEndAsk(true); return; } leave(); };
   useEffect(() => {
     if (!active || !workout) return;
-    write(RESUME_KEY, { workout, stepIndex, setIndex, weights, logged, startedAt, custom, savedAt: Date.now() } satisfies SavedSession);
-  }, [active, workout, stepIndex, setIndex, weights, logged, startedAt, custom]);
+    const at = resumePoint(stepIndex, setIndex, workout.steps[stepIndex]?.sets ?? 1, phase);
+    if (!workout.steps[at.stepIndex]) { clearResume(); return; }
+    write(RESUME_KEY, { workout, stepIndex: at.stepIndex, setIndex: at.setIndex, weights, logged, startedAt, custom, savedAt: Date.now() } satisfies SavedSession);
+  }, [active, workout, stepIndex, setIndex, weights, logged, startedAt, custom, phase]);
   /* LIVE WORKOUT TICKER: the lock screen / Dynamic Island card on iPhone.
      Started when the workout starts, updated on every move, set and rest,
      ended when it is saved or put away. Rest counts down to a fixed end time
@@ -878,7 +880,7 @@ export function GuidedPage() {
       {top()}
       <span className="gd-badge">WORKOUT IN PROGRESS</span>
       <h1>Pick up where you left off?</h1>
-      <p className="gd-lead">{resume.workout.focus}{s ? ` · ${s.move.name}, set ${resume.setIndex + 1} of ${s.sets}` : ''}. {doneSets} set{doneSets === 1 ? '' : 's'} done so far.</p>
+      <p className="gd-lead">{resume.workout.title || resume.workout.focus}{s ? ` · ${s.move.name}, set ${resume.setIndex + 1} of ${s.sets}` : ''}. {doneSets} set{doneSets === 1 ? '' : 's'} done so far.</p>
       <button type="button" className="gd-cta" onClick={resumeNow}><Svg d="M7 4v16l13-8z" size={18} />Resume workout</button>
       <button type="button" className="gd-secondary" onClick={() => { clearResume(); setResume(null); }}>Start a new one</button>
     </div>);
