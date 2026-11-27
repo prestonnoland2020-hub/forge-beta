@@ -150,7 +150,7 @@ export function heavierNextTime(sets: DoneSet[]): string[] {
 /* A seeded shuffle, so tomorrow's glutes day is not today's. */
 function seeded(seed: number) { let s = seed || 1; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
 
-export function buildWorkout(prefs: GuidedPrefs, minutes: number, focus: Focus, options: { seed?: number; recent?: string[]; remembered?: Record<string, number>; metric?: boolean } = {}): Workout {
+export function buildWorkout(prefs: GuidedPrefs, minutes: number, focus: Focus, options: { seed?: number; recent?: string[]; remembered?: Record<string, number>; metric?: boolean; body?: BodyMemory } = {}): Workout {
   const have = owned(prefs);
   const style = focus === 'Stretch it out' ? 'Stretch & mobility' : leadStyle(prefs);
   const rand = seeded(options.seed ?? Date.now() % 100000);
@@ -174,7 +174,9 @@ export function buildWorkout(prefs: GuidedPrefs, minutes: number, focus: Focus, 
     used.add(move.id);
     const base = dose(move, style, prefs.level, part);
     const load = part === 'main' ? startWeight(move, prefs.level, options.remembered || {}, Boolean(options.metric)) : { weight: null };
-    steps.push({ move, part, ...base, ...load });
+    const step = applyBodyMemory({ move, part, ...base, ...load }, options.body || {}, have, used);
+    used.add(step.move.id);
+    steps.push(step);
   };
   if (focus !== 'Stretch it out') add(pick('warmup'), 'warmup');
   /* Never fewer moves than the focus promises; more when there is time. */
@@ -252,18 +254,58 @@ export function bodyweightNext(step: Step, feel: Feel, lastSet: boolean, have: S
   return reps !== step.reps ? { reps } : null;
 }
 
+/* REMEMBERED BODYWEIGHT REPS. Weights are remembered per move; a bodyweight
+   move has none, so where Too easy / Too hard left it (the reps, or the
+   harder / easier version) is saved under the move the workout started with,
+   and the next builder run starts there. Same 5-20 reps / 15-90 sec limits. */
+export const BODY_KEY = 'forge-guided-bodyweight-v1';
+export type BodyMemory = Record<string, { move?: string; reps: number }>;
+const clampReps = (reps: number, timed: boolean | undefined) => timed ? Math.min(90, Math.max(15, reps)) : Math.min(20, Math.max(5, reps));
+export function rememberBody(memory: BodyMemory, originId: string, step: Step, body: { move?: Move; reps?: number }): BodyMemory {
+  const move = body.move?.id ?? step.move.id;
+  const timed = (body.move ?? step.move).timed;
+  return { ...memory, [originId]: { ...(move !== originId ? { move } : {}), reps: clampReps(body.reps ?? step.reps, timed) } };
+}
+export function applyBodyMemory(step: Step, memory: BodyMemory, have: Set<Equip>, avoid: Set<string> = new Set()): Step {
+  if (step.part !== 'main' || step.move.load !== 'none' || step.weight !== null) return step;
+  const saved = memory[step.move.id]; if (!saved || !Number.isFinite(saved.reps)) return step;
+  let move = step.move;
+  if (saved.move) {
+    const other = MOVES.find(item => item.id === saved.move);
+    if (!other || other.load !== 'none' || !canDo(other, have) || avoid.has(other.id)) return step;
+    move = other;
+  }
+  return { ...step, move, reps: clampReps(saved.reps, move.timed) };
+}
+
+/* WHAT THE CARD SAYS FOR A LATER SET. "Same as before" only when nothing
+   changed; otherwise the change itself, so a Too easy answer is heard. */
+export type SetFacts = { name: string; reps: number; weight: number | null };
+export function changeNote(prev: SetFacts | null | undefined, cur: SetFacts, unitWord: string, timed = false): string {
+  if (!prev) return '';
+  const parts: string[] = [];
+  if (prev.name !== cur.name) parts.push(`Switched from ${prev.name}.`);
+  if (prev.reps !== cur.reps) parts.push(`Now ${cur.reps} ${timed ? 'seconds' : 'reps'}, ${cur.reps > prev.reps ? 'up' : 'down'} from ${prev.reps}.`);
+  if (prev.weight !== null && cur.weight !== null && prev.weight !== cur.weight) parts.push(`${cur.weight > prev.weight ? 'Up' : 'Down'} to ${cur.weight} ${unitWord}, from ${prev.weight}.`);
+  return parts.join(' ');
+}
+export function laterSetTail(lastSet: boolean, note: string): string {
+  return lastSet ? `${note ? `${note} ` : ''}Make it count.` : note || 'Same as before.';
+}
+
 /* BUILD MY OWN. She picks the moves from the Guided list, in her order; the
    coach still sets the sets, reps, rest and starting weight, and still talks
    her through it. Warm-up and stretch moves stay warm-up and cool-down. */
 export const CUSTOM_KEY = 'forge-guided-custom-v1';
-export function customWorkout(prefs: GuidedPrefs, ids: string[], style: Style, options: { remembered?: Record<string, number>; metric?: boolean } = {}): Workout {
+export function customWorkout(prefs: GuidedPrefs, ids: string[], style: Style, options: { remembered?: Record<string, number>; metric?: boolean; body?: BodyMemory } = {}): Workout {
   const steps: Step[] = [];
+  const have = owned(prefs); const taken = new Set(ids);
   for (const id of ids) {
     const move = MOVES.find(item => item.id === id);
     if (!move) continue;
     const part: Step['part'] = move.pattern === 'warmup' ? 'warmup' : move.pattern === 'stretch' ? 'cooldown' : 'main';
     const load = part === 'main' ? startWeight(move, prefs.level, options.remembered || {}, Boolean(options.metric)) : { weight: null };
-    steps.push({ move, part, ...dose(move, style, prefs.level, part), ...load });
+    steps.push(applyBodyMemory({ move, part, ...dose(move, style, prefs.level, part), ...load }, options.body || {}, have, taken));
   }
   const workout: Workout = { title: 'My workout', focus: 'Full body', minutes: 0, steps };
   workout.minutes = estimateMinutes(workout);
