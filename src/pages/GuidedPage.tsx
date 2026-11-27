@@ -8,7 +8,7 @@ import { useWorkoutHistory } from '../features/training/WorkoutHistoryProvider';
 import { useProfileSetup } from '../features/profile/ProfileSetupProvider';
 import { useBilling } from '../features/billing/BillingProvider';
 import { MOVES, photoUrl, type Move, type Pattern, type Style } from '../lib/guided/catalog';
-import { amountText, bodyweightNext, buildWorkout, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, easyStreak, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
+import { amountText, BODY_KEY, bodyweightNext, buildWorkout, changeNote, laterSetTail, rememberBody, type BodyMemory, type SetFacts, topSetPerMove, canDo, CUSTOM_KEY, customWorkout, estimateMinutes, FOCUSES, easyStreak, nextWeight, owned, suggestFocus, swapFor, type Feel, type Focus, type GuidedPrefs, type Level, type Place, type Step, type Workout } from '../lib/guided/builder';
 import { canListen, canSpeak, cheer, Coach, forgetVoice, loadVoiceMemory, matchCommand, parseSetReport, saidWayEasy, talkingToCoach, teachPhrase, VOICE_LABEL, type Command, type CoachVoice } from '../lib/guided/voice';
 import { canonicalLiftKey } from '../lib/liftAliases';
 import { Icon } from '../components/Icon';
@@ -280,7 +280,7 @@ export function GuidedPage() {
   /* Written to be heard, the way a trainer next to you talks: the full cue
      on the first set, short after that, and the voice commands explained
      only on the first card. */
-  const cardLine = (s: Step, setNo: number, w: number | null) => {
+  const cardLine = (s: Step, setNo: number, w: number | null, prev: SetFacts | null | undefined = prevSet.current[workout ? workout.steps.indexOf(s) : -1]) => {
     const first = workout ? workout.steps.indexOf(s) === 0 && setNo === 0 : setNo === 0;
     const amount = s.move.timed ? `${s.reps} seconds${s.move.perSide && s.part === 'main' ? ' on each side' : ''}` : `${s.reps} ${s.move.perSide ? 'on each side' : 'reps'}`;
     const load = w !== null ? ` at ${w} ${unitWord}` : s.weightNote && setNo === 0 ? `. ${s.weightNote}` : '';
@@ -291,7 +291,7 @@ export function GuidedPage() {
       const hint = wantsFirstTimerHint(w, setNo, hintSaid.current) ? ` ${FIRST_TIMER_HINT}` : '';
       return `Alright, ${s.move.name}. ${s.sets > 1 ? `${s.sets} sets, ` : ''}${amount}${load}. ${s.move.cue}${ask}${hint}`;
     }
-    return `${setNo + 1 === s.sets ? 'Last set' : `Set ${setNo + 1}`} of ${s.move.name}. ${amount}${load}. ${setNo + 1 === s.sets ? 'Make it count.' : 'Same as before.'}${ask}`;
+    return `${setNo + 1 === s.sets ? 'Last set' : `Set ${setNo + 1}`} of ${s.move.name}. ${amount}${load}. ${laterSetTail(setNo + 1 === s.sets, changeNote(prev, { name: s.move.name, reps: s.reps, weight: w }, unitWord, s.move.timed))}${ask}`;
   };
   const CARD_CMDS: Command[] = ['ask', 'done', 'ready', 'start', 'how', 'easier', 'harder', 'heavier', 'lighter', 'repeat', 'skip', 'pause', 'resume', 'end'];
   const speakCard = (index: number, setNo: number, w: number | null, plan = workout) => {
@@ -425,7 +425,7 @@ export function GuidedPage() {
     if (!prefs) return;
     if (!isPro && freeLeft <= 0) { setPhase('locked'); return; }
     const today = { ...prefs, styles: [todayStyle, ...prefs.styles.filter(item => item !== todayStyle)] };
-    const plan = buildWorkout(today, chosenMinutes, chosenFocus, { seed: Date.now() % 100000, recent: last.moves || [], remembered: { ...read<Record<string, number>>(WEIGHTS_KEY, {}), ...weightsFromTopSets(records, metric) }, metric });
+    const plan = buildWorkout(today, chosenMinutes, chosenFocus, { seed: Date.now() % 100000, recent: last.moves || [], remembered: { ...read<Record<string, number>>(WEIGHTS_KEY, {}), ...weightsFromTopSets(records, metric) }, metric, body: read<BodyMemory>(BODY_KEY, {}) });
     setWorkout(plan); setPhase('preview');
     /* The first thing the coach will say, fetched while she reads the list. */
     coach.current?.prefetch(introLine(plan));
@@ -434,7 +434,7 @@ export function GuidedPage() {
     if (!prefs || !picks.length) return;
     if (!isPro && freeLeft <= 0) { setPhase('locked'); return; }
     write(CUSTOM_KEY, picks);
-    const plan = customWorkout(prefs, picks, todayStyle as Style, { remembered: { ...read<Record<string, number>>(WEIGHTS_KEY, {}), ...weightsFromTopSets(records, metric) }, metric });
+    const plan = customWorkout(prefs, picks, todayStyle as Style, { remembered: { ...read<Record<string, number>>(WEIGHTS_KEY, {}), ...weightsFromTopSets(records, metric) }, metric, body: read<BodyMemory>(BODY_KEY, {}) });
     setCustom(true); setWorkout(plan); setPhase('preview');
     coach.current?.prefetch(introLine(plan));
   };
@@ -463,8 +463,12 @@ export function GuidedPage() {
   };
   /* A set the athlete said out loud ("I did 225 for 5") is logged as said. */
   const reported = useRef<{ reps?: number; weight?: number } | null>(null);
+  /* What the last set of each move was, so the next card can say what changed. */
+  const prevSet = useRef<Record<number, SetFacts>>({});
+  const originMove = useRef<Record<number, string>>({});
   const record = (feel: Feel | null) => {
     if (!step) return;
+    prevSet.current[stepIndex] = { name: step.move.name, reps: step.reps, weight };
     const said = reported.current; reported.current = null;
     setLogged(list => [...list, { moveId: step.move.id, name: step.move.name, muscles: step.move.muscles, reps: said?.reps ?? step.reps, weight: said?.weight ?? weight, feel, timed: Boolean(step.move.timed) }]);
   };
@@ -486,6 +490,7 @@ export function GuidedPage() {
     const body = weight === null ? bodyweightNext(step, feel, lastSet, have) : null;
     const swapped: Move | undefined = body?.move;
     if (nextW !== null) { setWeights(map => ({ ...map, [stepIndex]: nextW })); const remembered = read<Record<string, number>>(WEIGHTS_KEY, {}); remembered[step.move.id] = nextW; write(WEIGHTS_KEY, remembered); }
+    if (body) { const origin = originMove.current[stepIndex] || step.move.id; originMove.current[stepIndex] = origin; write(BODY_KEY, rememberBody(read<BodyMemory>(BODY_KEY, {}), origin, step, body)); }
     if (body) setWorkout(plan => plan ? { ...plan, steps: plan.steps.map((item, i) => i === stepIndex ? { ...item, ...(body.move ? { move: body.move } : {}), ...(body.reps ? { reps: body.reps } : {}) } : item) } : plan);
     const moreReps = body?.reps !== undefined ? `${body.reps}${step.move.timed ? ' seconds' : ' reps'}` : '';
     const lastStep = stepIndex + 1 >= workout.steps.length;
@@ -743,7 +748,7 @@ export function GuidedPage() {
         const here = s === stepIndex && n === setIndex;
         const amount = `${item.sets > 1 ? `Set ${n + 1} of ${item.sets} · ` : ''}${amountText(item)}${w !== null && w !== undefined ? ` · ${w} ${metric ? 'kg' : 'lb'}` : ''}`;
         const ticker = { title: item.move.name, detail: amount, done: s, total, short: item.part !== 'main' ? (item.part === 'warmup' ? 'Warm' : 'Cool') : item.sets > 1 ? `${n + 1}/${item.sets}` : 'Go' };
-        if (!(here && (phase === 'feel' || phase === 'rest'))) beats.push({ id: `card:${s}:${n}:${w ?? ''}`, kind: 'card', line: cardLine(item, n, w ?? null), seconds: item.move.timed ? item.reps : 0, timed: Boolean(item.move.timed), perSide: Boolean(item.move.perSide && item.part === 'main'), step: s, set: n, ticker });
+        if (!(here && (phase === 'feel' || phase === 'rest'))) beats.push({ id: `card:${s}:${n}:${w ?? ''}`, kind: 'card', line: cardLine(item, n, w ?? null, null), seconds: item.move.timed ? item.reps : 0, timed: Boolean(item.move.timed), perSide: Boolean(item.move.perSide && item.part === 'main'), step: s, set: n, ticker });
         if (item.part !== 'main') continue;
         if (!(here && phase === 'rest')) beats.push({ id: `feel:${s}:${n}`, kind: 'feel', line: FEEL_LINE, seconds: 0, timed: false, perSide: false, step: s, set: n, ticker: { ...ticker, detail: 'How did that feel?', short: 'Feel?' } });
         const lastSet = n + 1 >= item.sets;
