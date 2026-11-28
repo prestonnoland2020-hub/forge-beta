@@ -30,6 +30,7 @@ import { plateauLine, plateausFor } from '../lib/plateau';
 import { bodyLogState } from '../lib/bodyLog';
 import { primaryMusclesFor } from '../lib/liftAliases';
 import { canonicalLiftKey } from '../lib/liftAliases';
+import { bodyweightLines } from '../lib/guided/notes';
 import '../today-picks.css';
 
 const todayIso = () => {
@@ -88,6 +89,8 @@ export function HomePage() {
   const currentDate = todayIso();
   const completedToday = records.find(record => record.date === currentDate);
   const completedSets = (completedToday?.topSets || []).filter(set => set.completed !== false);
+  /* A guided bodyweight move has no top set; the notes still say what was done. */
+  const completedBodyweight = bodyweightLines(completedToday?.notes);
   const resumeUrl = completedToday ? openWorkout(currentDate) : null;
   /* MY PLAN | COACH ME. Which Today she sees; remembered on the device. Someone
      who chose "Coach me" in setup starts on the coach side. */
@@ -320,8 +323,9 @@ export function HomePage() {
         {!resumeUrl && <Link to={`/workout?edit=${completedToday.id}`}>Edit</Link>}</div>
       <h3 className="td-title">{completedToday.title}</h3>
       {completedToday.durationMinutes ? <p className="td-session-length"><Icon name="watch" size={13} />{completedSets.length ? 'Lifting' : 'Session'} · {sessionLength(completedToday.durationMinutes)}{/^(Forge Guided|Coached) · /.test(completedToday.notes || '') ? ' · with your coach' : ' · from your watch'}</p> : null}
-      {(completedSets.length > 0 || (completedToday.cardioSessions || []).length > 0) && <ul className="td-lines">
+      {(completedSets.length > 0 || completedBodyweight.length > 0 || (completedToday.cardioSessions || []).length > 0) && <ul className="td-lines">
         {completedSets.map((set, index) => <li key={set.id || `${set.lift}-${index}`}><span>{set.lift}</span><b>{set.weight} {weightUnit} × {set.reps}</b></li>)}
+        {completedBodyweight.map(line => <li key={`bw-${line.name}`}><span>{line.name}</span><b>{line.detail}</b></li>)}
         {(completedToday.cardioSessions || []).map(session => <li key={session.id}><span>{session.activity}</span><b>{formatCardioSummary(session)}</b></li>)}
       </ul>}
       {resumeUrl
