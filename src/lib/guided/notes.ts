@@ -14,3 +14,22 @@ export function moveNote(name: string, sets: NoteSet[], unit: string): string {
   if (sets.every(set => set.weight === null)) return `${name} ${sets.map(reps).join(', ')}`;
   return `${name} ${sets.map(set => set.weight !== null ? `${set.weight}×${reps(set)}` : reps(set)).join(', ')} ${unit}`;
 }
+
+/* THE BODYWEIGHT MOVES, READ BACK OUT OF THE NOTES. A set with no weight is
+   not a top set, so a Home or Pilates workout logged nothing the Today card
+   or the Logbook could show: Today read "Session · 1 min" over an empty card,
+   and the Logbook said "no historical top set recorded" for seven moves just
+   done (Nov 28). These are the notes' moves with no weight, as name and each
+   set ("Bodyweight squat", "12, 14, 14 reps"; "Plank", "30s, 40s"), for a
+   guided or coached day only. */
+export function bodyweightLines(notes: string | undefined): Array<{ name: string; detail: string }> {
+  const match = /^(?:Forge Guided|Coached) · [^.]*\.\s*(.*)$/s.exec(notes || '');
+  if (!match) return [];
+  return match[1].split(' · ').flatMap(part => {
+    const line = /^(.+?) (\d[\d×s, ]*)$/.exec(part.trim());
+    if (!line) return [];
+    const same = /^(\d+)×(\d+s?)$/.exec(line[2]);
+    const sets = same ? Array(Number(same[1])).fill(same[2]).join(', ') : line[2];
+    return [{ name: line[1], detail: /s$/.test(sets) ? sets : `${sets} reps` }];
+  });
+}
